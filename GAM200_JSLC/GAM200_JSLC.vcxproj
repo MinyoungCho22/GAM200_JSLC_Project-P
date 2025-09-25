@@ -124,14 +124,24 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Engine\Engine.cpp" />
+    <ClCompile Include="Engine\Matrix.cpp" />
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Game\Player.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="OpenGL\Shader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.h" />
+    <ClInclude Include="Engine\Matrix.h" />
     <ClInclude Include="Engine\Vec2.h" />
     <ClInclude Include="Game\Player.h" />
+    <ClInclude Include="OpenGL\Shader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="OpenGL\Shaders\simple.frag" />
+    <None Include="OpenGL\Shaders\simple.vert" />
+    <None Include="OpenGL\Shaders\solid_color.frag" />
+    <None Include="OpenGL\Shaders\solid_color.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

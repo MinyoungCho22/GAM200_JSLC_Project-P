@@ -13,6 +13,9 @@
     <Filter Include="CS200">
       <UniqueIdentifier>{0fade2a6-96fa-4ce3-b109-a227f332cf2c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="OpenGL\Shaders">
+      <UniqueIdentifier>{d9917324-0cb9-4836-a840-1efda0a77a6f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -25,6 +28,12 @@
     <ClCompile Include="Engine\Vec2.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\Matrix.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="OpenGL\Shader.cpp">
+      <Filter>OpenGL</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.h">
@@ -36,5 +45,25 @@
     <ClInclude Include="Engine\Vec2.h">
       <Filter>Engine</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\Matrix.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="OpenGL\Shader.h">
+      <Filter>OpenGL</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="OpenGL\Shaders\simple.vert">
+      <Filter>OpenGL\Shaders</Filter>
+    </None>
+    <None Include="OpenGL\Shaders\simple.frag">
+      <Filter>OpenGL\Shaders</Filter>
+    </None>
+    <None Include="OpenGL\Shaders\solid_color.vert">
+      <Filter>OpenGL\Shaders</Filter>
+    </None>
+    <None Include="OpenGL\Shaders\solid_color.frag">
+      <Filter>OpenGL\Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

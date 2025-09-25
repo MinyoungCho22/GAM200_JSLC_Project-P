@@ -1,7 +1,9 @@
 #pragma once
 #include <string>
+#include "../Game/Player.h"
 
 // 전방 선언
+class Shader;
 struct GLFWwindow;
 
 class Engine
@@ -17,9 +19,16 @@ private:
     void Update();
     void Draw() const;
 
+   
     GLFWwindow* p_window = nullptr;
+    Shader* p_shader = nullptr;
+    Shader* p_solid_color_shader = nullptr;
 
-    // 프레임 간 시간 간격 (델타 타임)
+    unsigned int groundVAO = 0;
+    unsigned int groundVBO = 0;
+
+    Player player; 
+
     static double deltaTime;
     double lastFrameTime = 0.0;
 };
