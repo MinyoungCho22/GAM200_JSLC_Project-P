@@ -25,7 +25,33 @@ bool Engine::Initialize(const std::string& windowTitle)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    m_window = glfwCreateWindow(m_width, m_height, windowTitle.c_str(), nullptr, nullptr);
+    // --- [수정] 전체 화면 모드 설정 ---
+    // 1. 주 모니터의 핸들을 가져옵니다.
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    if (!primaryMonitor)
+    {
+        Logger::Instance().Log(Logger::Severity::Error, "Failed to get primary monitor");
+        glfwTerminate();
+        return false;
+    }
+
+    // 2. 모니터의 현재 비디오 모드(해상도 등) 정보를 가져옵니다.
+    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+    if (!mode)
+    {
+        Logger::Instance().Log(Logger::Severity::Error, "Failed to get video mode for monitor");
+        glfwTerminate();
+        return false;
+    }
+
+    // 3. 엔진의 너비/높이 변수를 모니터 해상도로 업데이트합니다.
+    m_width = mode->width;
+    m_height = mode->height;
+
+    // 4. 모니터 핸들을 전달하여 전체 화면 창을 생성합니다.
+    m_window = glfwCreateWindow(m_width, m_height, windowTitle.c_str(), primaryMonitor, nullptr);
+    // --- [수정 완료] ---
+    
     if (!m_window)
     {
         Logger::Instance().Log(Logger::Severity::Error, "Failed to create GLFW window");
@@ -78,7 +104,6 @@ void Engine::Draw() const
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // [수정] 네임스페이스 추가
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(m_width), 0.0f, static_cast<float>(m_height), -1.0f, 1.0f);
 
     m_shader->use();
@@ -88,7 +113,6 @@ void Engine::Draw() const
     m_solid_color_shader->use();
     m_solid_color_shader->setMat4("projection", projection);
 
-    // [수정] 네임스페이스 추가
     Math::Vec2 groundPosition = { m_width / 2.0f, 100.0f };
     Math::Vec2 groundSize = { static_cast<float>(m_width), 2.0f };
     Math::Matrix groundModel = Math::Matrix::CreateTranslation(groundPosition) * Math::Matrix::CreateScale(groundSize);
