@@ -34,22 +34,43 @@
     <ClCompile Include="OpenGL\Shader.cpp">
       <Filter>OpenGL</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\Logger.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Window.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="CS200\RenderingAPI.cpp">
+      <Filter>CS200</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Engine\Engine.h">
+    <ClInclude Include="Engine\Engine.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Player.h">
+    <ClInclude Include="Game\Player.hpp">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Vec2.h">
+    <ClInclude Include="Engine\Vec2.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Matrix.h">
+    <ClInclude Include="Engine\Matrix.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="OpenGL\Shader.h">
+    <ClInclude Include="OpenGL\Shader.hpp">
       <Filter>OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Logger.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Window.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="CS200\RenderingAPI.hpp">
+      <Filter>CS200</Filter>
+    </ClInclude>
+    <ClInclude Include="CS200\RGBA.hpp">
+      <Filter>CS200</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

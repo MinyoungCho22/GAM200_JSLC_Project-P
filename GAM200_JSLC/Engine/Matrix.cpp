@@ -1,65 +1,56 @@
-#include "Matrix.h"
+#include "Matrix.hpp"
 #include <cstring>
 
-Matrix::Matrix()
+namespace Math
 {
-    memset(m, 0, sizeof(float) * 16);
-    m[0] = 1.0f;
-    m[5] = 1.0f;
-    m[10] = 1.0f;
-    m[15] = 1.0f;
-}
-
-Matrix Matrix::operator*(const Matrix& rhs) const
-{
-    Matrix result;
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            result.m[j * 4 + i] =
-                this->m[0 * 4 + i] * rhs.m[j * 4 + 0] +
-                this->m[1 * 4 + i] * rhs.m[j * 4 + 1] +
-                this->m[2 * 4 + i] * rhs.m[j * 4 + 2] +
-                this->m[3 * 4 + i] * rhs.m[j * 4 + 3];
+    Matrix Matrix::operator*(const Matrix& other) const
+    {
+        Matrix result{};
+        for (int i = 0; i < 4; ++i) { // 행
+            for (int j = 0; j < 4; ++j) { // 열
+                for (int k = 0; k < 4; ++k) {
+                    // 열 우선 곱셈 순서: result.m[j][i] = A[k][i] * B[j][k]
+                    result.m[j][i] += m[k][i] * other.m[j][k];
+                }
+            }
         }
+        return result;
     }
-    return result;
-}
 
-Matrix& Matrix::operator*=(const Matrix& rhs)
-{
-    *this = *this * rhs;
-    return *this;
-}
+    Matrix Matrix::CreateOrtho(float left, float right, float bottom, float top, float near, float far)
+    {
+        Matrix mat{};
+        mat.m[0][0] = 2.0f / (right - left);
+        mat.m[1][1] = 2.0f / (top - bottom);
+        mat.m[2][2] = -2.0f / (far - near);
+        // [수정] 열 우선 방식에 맞는 올바른 인덱스로 수정
+        mat.m[3][0] = -(right + left) / (right - left);
+        mat.m[3][1] = -(top + bottom) / (top - bottom);
+        mat.m[3][2] = -(far + near) / (far - near);
+        mat.m[3][3] = 1.0f;
+        return mat;
+    }
 
-Matrix Matrix::CreateTranslation(const Vec2& offset)
-{
-    Matrix mat;
-    mat.m[12] = offset.x;
-    mat.m[13] = offset.y;
-    return mat;
-}
+    Matrix Matrix::CreateTranslation(const Vec2& translate)
+    {
+        Matrix mat{};
+        mat.m[0][0] = 1.0f;
+        mat.m[1][1] = 1.0f;
+        mat.m[2][2] = 1.0f;
+        mat.m[3][3] = 1.0f;
+        // [수정] 열 우선 방식에 맞는 올바른 인덱스로 수정
+        mat.m[3][0] = translate.x;
+        mat.m[3][1] = translate.y;
+        return mat;
+    }
 
-Matrix Matrix::CreateScale(const Vec2& scale)
-{
-    Matrix mat;
-    mat.m[0] = scale.x;
-    mat.m[5] = scale.y;
-    return mat;
-}
-
-Matrix Matrix::CreateOrtho(float left, float right, float bottom, float top, float near, float far)
-{
-    Matrix mat;
-    mat.m[0] = 2.0f / (right - left);
-    mat.m[5] = 2.0f / (top - bottom);
-    mat.m[10] = -2.0f / (far - near);
-    mat.m[12] = -(right + left) / (right - left);
-    mat.m[13] = -(top + bottom) / (top - bottom);
-    mat.m[14] = -(far + near) / (far - near);
-    return mat;
-}
-
-const float* Matrix::GetAsFloatPtr() const
-{
-    return m;
+    Matrix Matrix::CreateScale(const Vec2& scale)
+    {
+        Matrix mat{};
+        mat.m[0][0] = scale.x;
+        mat.m[1][1] = scale.y;
+        mat.m[2][2] = 1.0f;
+        mat.m[3][3] = 1.0f;
+        return mat;
+    }
 }

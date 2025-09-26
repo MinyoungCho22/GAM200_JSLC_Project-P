@@ -1,28 +1,38 @@
 #pragma once
-#include "../Engine/Vec2.h"
+#include "../Engine/Vec2.hpp"
 
 class Shader;
-struct GLFWwindow;
 
 class Player
 {
 public:
-    void Init(Vec2 startPos, const char* texturePath);
-    void Update(double dt, GLFWwindow* p_window);
+    void Init(Math::Vec2 startPos, const char* texturePath);
+
+    // [수정] GLFWwindow* 인자 제거
+    void Update(double dt);
+
     void Draw(const Shader& shader) const;
     void Shutdown();
 
+    // [추가] 행동 기반 함수들
+    void MoveLeft();
+    void MoveRight();
+    void Jump();
+    void Crouch();
+    void StopCrouch();
+    void Dash();
+
 private:
     // 기본 상태
-    Vec2 position;
-    Vec2 velocity;
-    Vec2 size;
+    Math::Vec2 position;
+    Math::Vec2 velocity;
+    Math::Vec2 size;
     bool is_on_ground = false;
     int last_move_direction = 1; // 1: 오른쪽, -1: 왼쪽
 
     // 웅크리기 상태
     bool is_crouching = false;
-    Vec2 original_size; // 원래 크기를 저장하기 위한 변수
+    Math::Vec2 original_size;
 
     // 대시 상태
     bool is_dashing = false;
@@ -30,7 +40,7 @@ private:
 
     // 플레이어 능력치
     float move_speed = 300.0f;
-    float jump_velocity = 500.0f;
+    float jump_velocity = 600.0f; // 점프 속도 상향
     float dash_speed = 900.0f;
     float dash_duration = 0.15f;
 

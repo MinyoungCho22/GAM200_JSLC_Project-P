@@ -1,27 +1,36 @@
-#include "Player.h"
-#include "../Engine/Vec2.h"
-#include "../OpenGL/Shader.h"
-#include "../Engine/Matrix.h"
+#include "Player.hpp"
+#include "../OpenGL/Shader.hpp"
+#include "../Engine/Matrix.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <iostream>
+
+// stb_image.h 라이브러리의 실제 구현부를 생성하는 매크로입니다.
+// 이 매크로는 프로젝트 전체에서 단 하나의 .cpp 파일에만 존재해야 합니다.
+// 여러 파일에 포함되면 '중복 정의' 링크 오류가 발생합니다.
 #define STB_IMAGE_IMPLEMENTATION
 #pragma warning(push)
 #pragma warning(disable: 6262) // 과도한 스택 사용 경고 비활성화
 #include <stb_image.h>
 #pragma warning(pop)
-#include <iostream>
 
-const float GRAVITY = -980.0f;
 
-void Player::Init(Vec2 startPos, const char* texturePath)
+const float GRAVITY = -1500.0f; // 중력 강화
+
+void Player::Init(Math::Vec2 startPos, const char* texturePath)
 {
     position = startPos;
-    velocity = Vec2(0.0f, 0.0f);
+    velocity = Math::Vec2(0.0f, 0.0f);
 
     float vertices[] = {
-        0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-        0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-        1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f
+        // positions // texture Coords
+        0.0f, 1.0f,  0.0f, 1.0f,
+        1.0f, 0.0f,  1.0f, 0.0f,
+        0.0f, 0.0f,  0.0f, 0.0f,
+
+        0.0f, 1.0f,  0.0f, 1.0f,
+        1.0f, 1.0f,  1.0f, 1.0f,
+        1.0f, 0.0f,  1.0f, 0.0f
     };
 
     glGenVertexArrays(1, &VAO);
@@ -38,7 +47,7 @@ void Player::Init(Vec2 startPos, const char* texturePath)
     glBindTexture(GL_TEXTURE_2D, textureID);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     int width, height, nrChannels;
@@ -50,95 +59,56 @@ void Player::Init(Vec2 startPos, const char* texturePath)
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        // --- 수정: 이미지 비율 유지하며 크기 설정 ---
         float desiredWidth = 80.0f;
         float aspectRatio = static_cast<float>(height) / static_cast<float>(width);
-        size = Vec2(desiredWidth, desiredWidth * aspectRatio);
-        original_size = size; // 원래 크기 저장
+        size = Math::Vec2(desiredWidth, desiredWidth * aspectRatio);
+        original_size = size;
     }
     else { std::cout << "Failed to load texture: " << texturePath << std::endl; }
     stbi_image_free(data);
 }
 
-void Player::Update(double dt, GLFWwindow* p_window)
+void Player::Update(double dt)
 {
-    // --- 수정: 중력 계산을 항상 적용하도록 변경 ---
-    // 1. 점프, 웅크리기 등 대시가 아닐 때의 로직 처리
-    if (!is_dashing)
-    {
-        if (is_on_ground && glfwGetKey(p_window, GLFW_KEY_S) == GLFW_PRESS) {
-            is_crouching = true;
-            size.y = original_size.y * 0.6f;
-        }
-        else {
-            is_crouching = false;
-            size.y = original_size.y;
-        }
-
-        if (!is_crouching)
-        {
-            velocity.x = 0;
-            if (glfwGetKey(p_window, GLFW_KEY_A) == GLFW_PRESS) {
-                velocity.x -= move_speed;
-                last_move_direction = -1;
-            }
-            if (glfwGetKey(p_window, GLFW_KEY_D) == GLFW_PRESS) {
-                velocity.x += move_speed;
-                last_move_direction = 1;
-            }
-
-            if (is_on_ground && glfwGetKey(p_window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-                velocity.y = jump_velocity;
-                is_on_ground = false;
-            }
-        }
-        else {
-            velocity.x = 0;
-        }
-
-        if (glfwGetKey(p_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-            is_dashing = true;
-            dash_timer = dash_duration;
-        }
-    }
-
-    // 2. 대시 타이머 업데이트 및 상태 관리
     if (is_dashing)
     {
         dash_timer -= static_cast<float>(dt);
-        if (dash_timer <= 0.0f) {
+        if (dash_timer <= 0.0f)
+        {
             is_dashing = false;
-            // 대시가 끝나도 수직 속도는 유지되도록 velocity.y = 0; 줄 삭제
         }
     }
 
-    // 3. 물리 계산 (언제나 중력 적용)
-    velocity.y += GRAVITY * static_cast<float>(dt);
+    if (!is_on_ground)
+    {
+        velocity.y += GRAVITY * static_cast<float>(dt);
+    }
 
-    // 4. 최종 위치 업데이트
-    Vec2 final_velocity = velocity;
+    Math::Vec2 final_velocity = velocity;
     if (is_dashing) {
-        // 대시 중에는 수평 속도를 덮어씀
         final_velocity.x = last_move_direction * dash_speed;
     }
 
     position += final_velocity * static_cast<float>(dt);
 
-    // 5. 바닥 충돌 처리
     if (position.y < 100.0f)
     {
         position.y = 100.0f;
-        velocity.y = 0;
-        is_on_ground = true;
+        if (velocity.y < 0)
+        {
+            velocity.y = 0;
+            is_on_ground = true;
+        }
     }
+    velocity.x = 0;
 }
-
 
 void Player::Draw(const Shader& shader) const
 {
-    Matrix scaleMatrix = Matrix::CreateScale(size);
-    Matrix transMatrix = Matrix::CreateTranslation(position);
-    Matrix model = transMatrix * scaleMatrix;
+    // [수정] Matrix 타입 앞에 Math:: 네임스페이스 추가
+    Math::Matrix scaleMatrix = Math::Matrix::CreateScale(size);
+    Math::Matrix transMatrix = Math::Matrix::CreateTranslation({ position.x - size.x / 2.0f, position.y });
+    Math::Matrix model = transMatrix * scaleMatrix;
 
     shader.setMat4("model", model);
 
@@ -155,4 +125,51 @@ void Player::Shutdown()
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteTextures(1, &textureID);
+}
+
+void Player::MoveLeft()
+{
+    if (is_crouching || is_dashing) return;
+    velocity.x -= move_speed;
+    last_move_direction = -1;
+}
+
+void Player::MoveRight()
+{
+    if (is_crouching || is_dashing) return;
+    velocity.x += move_speed;
+    last_move_direction = 1;
+}
+
+void Player::Jump()
+{
+    if (is_on_ground && !is_crouching && !is_dashing)
+    {
+        velocity.y = jump_velocity;
+        is_on_ground = false;
+    }
+}
+
+void Player::Crouch()
+{
+    if (is_on_ground && !is_dashing)
+    {
+        is_crouching = true;
+        size.y = original_size.y * 0.6f;
+    }
+}
+
+void Player::StopCrouch()
+{
+    is_crouching = false;
+    size.y = original_size.y;
+}
+
+void Player::Dash()
+{
+    if (!is_dashing)
+    {
+        is_dashing = true;
+        dash_timer = dash_duration;
+    }
 }

@@ -1,15 +1,21 @@
-#include "Engine/Engine.h"
+#include "Engine/Engine.hpp"
+#include "Engine/Logger.hpp" // Logger 사용을 위해 포함
 
 int main(void)
 {
-    // 엔진 인스턴스 생성 및 초기화
+    // 로거를 가장 먼저 초기화합니다.
+    // Debug 레벨 이상의 로그를 콘솔에 출력하도록 설정합니다.
+    Logger::Instance().Initialize(Logger::Severity::Debug, true);
+
     Engine engine;
-    engine.Initialize("Project P");
+    if (!engine.Initialize("Project P"))
+    {
+        // 엔진 초기화 실패 시 에러 로그를 남기고 종료합니다.
+        Logger::Instance().Log(Logger::Severity::Error, "Engine initialization failed!");
+        return -1;
+    }
 
-    // 엔진의 메인 루프 실행
     engine.GameLoop();
-
-    // 엔진 종료 처리
     engine.Shutdown();
 
     return 0;

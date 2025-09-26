@@ -1,0 +1,8 @@
+[      0ms] [Info   ] Logger initialized.
+[      0ms] [Event  ] Engine Start
+[    188ms] [Event  ] Window created successfully
+[    190ms] [Debug  ] OpenGL Version: 3.3.0 NVIDIA 576.88
+[    191ms] [Info   ] Shaders loaded
+[    196ms] [Info   ] Player initialized with texture: Asset/player.png
+[    196ms] [Event  ] Engine initialization successful
+[  12135ms] [Event  ] Engine Stopped
