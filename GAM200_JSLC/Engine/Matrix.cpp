@@ -53,4 +53,14 @@ namespace Math
         mat.m[3][3] = 1.0f;
         return mat;
     }
+
+    Matrix Matrix::CreateIdentity()
+    {
+        Matrix mat{}; // 모든 요소를 0으로 초기화
+        mat.m[0][0] = 1.0f;
+        mat.m[1][1] = 1.0f;
+        mat.m[2][2] = 1.0f;
+        mat.m[3][3] = 1.0f;
+        return mat;
+    }
 }

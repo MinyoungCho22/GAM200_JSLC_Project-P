@@ -12,6 +12,7 @@ namespace Math
         static Matrix CreateOrtho(float left, float right, float bottom, float top, float near, float far);
         static Matrix CreateTranslation(const Vec2& translate);
         static Matrix CreateScale(const Vec2& scale);
+        static Matrix CreateIdentity(); // <-- 이 줄을 추가하세요.
 
         const float* const Ptr() const { return &m[0][0]; }
 
