@@ -1,10 +1,10 @@
 #include "Window.hpp"
-#include "../CS200/RenderingAPI.hpp" // RenderingAPI 사용을 위해
-#include "Logger.hpp" // 로거 사용을 위해
+#include "../CS200/RenderingAPI.hpp" 
+#include "Logger.hpp" 
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include "Vec2.hpp"
-#include <stdexcept> // std::runtime_error 사용을 위해
+#include <stdexcept> 
 
 // OpenGL 속성 설정을 위한 Helper 함수
 namespace
@@ -81,7 +81,7 @@ void Window::Clear(CS200::RGBA color)
 void Window::ForceResize(int desired_width, int desired_height)
 {
     SDL_SetWindowSize(sdlWindow, desired_width, desired_height);
-    // 실제 크기는 이벤트 루프에서 업데이트되므로 여기서는 로그만 남깁니다.
+    // 실제 크기는 이벤트 루프에서 업데이트되므로 여기서는 로그만 남기도록 하자
     Logger::Instance().Log(Logger::Severity::Event, "Window resize forced to: %dx%d", desired_width, desired_height);
 }
 

@@ -8,13 +8,13 @@ class Player
 public:
     void Init(Math::Vec2 startPos, const char* texturePath);
 
-    // [수정] GLFWwindow* 인자 제거
+    
     void Update(double dt);
 
     void Draw(const Shader& shader) const;
     void Shutdown();
 
-    // [추가] 행동 기반 함수들
+    // 행동 기반 함수들
     void MoveLeft();
     void MoveRight();
     void Jump();

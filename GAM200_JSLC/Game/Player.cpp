@@ -5,17 +5,18 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-// stb_image.h 라이브러리의 실제 구현부를 생성하는 매크로입니다.
-// 이 매크로는 프로젝트 전체에서 단 하나의 .cpp 파일에만 존재해야 합니다.
-// 여러 파일에 포함되면 '중복 정의' 링크 오류가 발생합니다.
+// stb_image.h 라이브러리의 실제 구현부를 생성하는 매크로
+// 이 매크로는 프로젝트 전체에서 단 하나의 .cpp 파일에만 존재해야 함
+// 여러 파일에 포함되면 '중복 정의' 링크 오류가 발생!
 #define STB_IMAGE_IMPLEMENTATION
 #pragma warning(push)
-#pragma warning(disable: 6262) // 과도한 스택 사용 경고 비활성화
+#pragma warning(disable: 6262) // 과도한 스택 사용 경고 비활성화(추후 수정 예정)
+
 #include <stb_image.h>
 #pragma warning(pop)
 
 
-const float GRAVITY = -1500.0f; // 중력 강화
+const float GRAVITY = -1500.0f; // 중력
 
 void Player::Init(Math::Vec2 startPos, const char* texturePath)
 {
@@ -105,7 +106,7 @@ void Player::Update(double dt)
 
 void Player::Draw(const Shader& shader) const
 {
-    // [수정] Matrix 타입 앞에 Math:: 네임스페이스 추가
+   
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(size);
     Math::Matrix transMatrix = Math::Matrix::CreateTranslation({ position.x - size.x / 2.0f, position.y });
     Math::Matrix model = transMatrix * scaleMatrix;
