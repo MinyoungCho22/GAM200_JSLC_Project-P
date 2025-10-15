@@ -2,40 +2,46 @@
 #include "Player.hpp"
 #include "PulseSource.hpp"
 #include "../Game/PurseCore.hpp"
+#include "../Engine/Logger.hpp" // Logger 사용을 위해 추가
 
 void PulseManager::Update(Player& player, std::vector<PulseSource>& sources, bool is_interact_key_pressed)
 {
     bool is_near_any_charger = false;
     PulseSource* nearby_source = nullptr;
 
-    // 1. 모든 펄스 공급원을 순회하며 플레이어와 충돌하는지 확인합니다.
     for (auto& source : sources)
     {
-        if (!source.HasPulse()) continue; // 펄스가 없는 소스는 건너뜁니다.
+        if (!source.HasPulse()) continue;
 
         Math::Vec2 playerPos = player.GetPosition();
         Math::Vec2 playerSize = player.GetSize();
+        float playerMinX = playerPos.x - playerSize.x / 2.0f;
+        float playerMaxX = playerPos.x + playerSize.x / 2.0f;
+        float playerMinY = playerPos.y;
+        float playerMaxY = playerPos.y + playerSize.y;
+
         Math::Vec2 sourcePos = source.GetPosition();
         Math::Vec2 sourceSize = source.GetSize();
+        float sourceMinX = sourcePos.x - sourceSize.x / 2.0f;
+        float sourceMaxX = sourcePos.x + sourceSize.x / 2.0f;
+        float sourceMinY = sourcePos.y - sourceSize.y / 2.0f;
+        float sourceMaxY = sourcePos.y + sourceSize.y / 2.0f;
 
-        // 간단한 AABB 충돌 검사
-        if (playerPos.x < sourcePos.x + sourceSize.x &&
-            playerPos.x + playerSize.x > sourcePos.x &&
-            playerPos.y < sourcePos.y + sourceSize.y &&
-            playerPos.y + playerSize.y > sourcePos.y)
+        if (playerMaxX > sourceMinX && playerMinX < sourceMaxX &&
+            playerMaxY > sourceMinY && playerMinY < sourceMaxY)
         {
             is_near_any_charger = true;
             nearby_source = &source;
-            break; // 하나만 찾아도 루프를 멈춥니다.
+            Logger::Instance().Log(Logger::Severity::Debug, "Collision Detected with a pulse source!"); // [디버그 로그]
+            break;
         }
     }
 
-    // 2. 플레이어의 PulseCore를 업데이트(tick)하고, 결과를 받습니다.
     PulseTickResult result = player.GetPulseCore().tick(is_interact_key_pressed, false, is_near_any_charger, false);
 
-    // 3. 만약 충전이 일어났다면, 펄스 공급원의 에너지를 실제로 감소시킵니다.
     if (result.charged && nearby_source != nullptr)
     {
+        Logger::Instance().Log(Logger::Severity::Debug, "Charging pulse! Delta: %f", result.delta); // [디버그 로그]
         nearby_source->Drain(result.delta);
     }
 }

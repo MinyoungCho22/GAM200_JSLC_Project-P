@@ -1,6 +1,6 @@
 #pragma once
 #include "../Engine/Vec2.hpp"
-#include "../Game/PurseCore.hpp"      // [추가] PulseCore 헤더를 포함합니다.
+#include "../Game/PurseCore.hpp"
 
 class Shader;
 
@@ -20,11 +20,8 @@ public:
     void StopCrouch();
     void Dash();
 
-    // [추가] Collision Check를 위한 Get 함수들
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
-
-    // [추가] Player의 PulseCore에 접근할 수 있는 함수
     PulseCore& GetPulseCore() { return m_pulseCore; }
 
 private:
@@ -33,10 +30,10 @@ private:
     Math::Vec2 velocity;
     Math::Vec2 size;
     bool is_on_ground = false;
-    int last_move_direction = 1; // 1: 오른쪽, -1: 왼쪽
+    int last_move_direction = 1;
 
-    // [추가] PulseCore 멤버 변수
-    PulseCore m_pulseCore;
+    // [수정] 최대 펄스 100, 시작 펄스 20으로 설정
+    PulseCore m_pulseCore{ 100.f, 20.f };
 
     // 웅크리기 상태
     bool is_crouching = false;

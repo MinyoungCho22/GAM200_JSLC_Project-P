@@ -8,7 +8,7 @@ class PulseSource
 public:
     void Initialize(Math::Vec2 position, Math::Vec2 size, float initial_pulse);
 
-    // 펄스를 소모시키고, 실제로 소모된 양을 반환합니다.
+    // 펄스를 소모시키고, 실제로 소모된 양을 반환
     float Drain(float amount);
 
     void Draw(Shader& shader) const;
