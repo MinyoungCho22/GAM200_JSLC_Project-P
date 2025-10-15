@@ -3,7 +3,7 @@
 #include "PulseSource.hpp"
 #include "../Game/PurseCore.hpp"
 #include "../Engine/Logger.hpp"
-#include "../Engine/Vec2.hpp" // Vec2의 거리 계산을 위해 추가
+#include "../Engine/Vec2.hpp"
 
 void PulseManager::Update(Player& player, std::vector<PulseSource>& sources, bool is_interact_key_pressed, double dt)
 {
