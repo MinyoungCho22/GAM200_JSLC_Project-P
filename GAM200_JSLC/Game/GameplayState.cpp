@@ -31,7 +31,7 @@ void GameplayState::Initialize()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    player.Init({ 200.0f, GROUND_LEVEL }, "Asset/player.png");
+    player.Init({ 200.0f, GROUND_LEVEL + 400.0f }, "Asset/player.png");
 
     pulseManager = std::make_unique<PulseManager>();
 
@@ -39,6 +39,12 @@ void GameplayState::Initialize()
     pulseSources.back().Initialize({ 600.f, GROUND_LEVEL + 50.f + VISUAL_Y_OFFSET }, { 50.f, 50.f }, 100.f);
     pulseSources.emplace_back();
     pulseSources.back().Initialize({ 800.f, GROUND_LEVEL + 150.f + VISUAL_Y_OFFSET }, { 30.f, 80.f }, 150.f);
+
+    // [추가] 새로운 펄스 공급원 2개
+    pulseSources.emplace_back();
+    pulseSources.back().Initialize({ 1200.f, GROUND_LEVEL + 80.f + VISUAL_Y_OFFSET }, { 60.f, 60.f }, 120.f);
+    pulseSources.emplace_back();
+    pulseSources.back().Initialize({ 1500.f, GROUND_LEVEL + 200.f + VISUAL_Y_OFFSET }, { 40.f, 100.f }, 200.f);
 }
 
 void GameplayState::Update(double dt)
@@ -48,7 +54,6 @@ void GameplayState::Update(double dt)
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) { glfwSetWindowShouldClose(window, true); }
 
-    // [추가] 현재 펄스 값을 확인하는 디버그 로그
     Logger::Instance().Log(Logger::Severity::Debug, "Player Pulse: %.1f / %.1f",
         player.GetPulseCore().getPulse().Value(),
         player.GetPulseCore().getPulse().Max());

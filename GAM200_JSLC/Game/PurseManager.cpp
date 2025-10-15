@@ -3,11 +3,14 @@
 #include "PulseSource.hpp"
 #include "../Game/PurseCore.hpp"
 #include "../Engine/Logger.hpp"
+#include "../Engine/Vec2.hpp" // Vec2의 거리 계산을 위해 추가
 
-// [수정] dt 인자를 받지만 tick 함수는 사용하지 않는 새로운 로직
 void PulseManager::Update(Player& player, std::vector<PulseSource>& sources, bool is_interact_key_pressed, double dt)
 {
-    // 1. 모든 펄스 공급원을 순회하며 플레이어와 충돌하는지 확인합니다.
+    PulseSource* closest_source = nullptr;
+    float closest_dist_sq = -1.0f; // 가장 가까운 거리를 추적하기 위한 변수 (제곱값으로 비교)
+
+    // 1. 플레이어와 충돌하는 모든 공급원을 확인합니다.
     for (auto& source : sources)
     {
         if (!source.HasPulse()) continue;
@@ -29,23 +32,27 @@ void PulseManager::Update(Player& player, std::vector<PulseSource>& sources, boo
         if (playerMaxX > sourceMinX && playerMinX < sourceMaxX &&
             playerMaxY > sourceMinY && playerMinY < sourceMaxY)
         {
-            Logger::Instance().Log(Logger::Severity::Debug, "Collision Detected with a pulse source!");
+            // 2. 충돌이 감지되면, 플레이어와의 거리를 계산합니다.
+            Math::Vec2 player_center = { playerPos.x, playerPos.y + playerSize.y / 2.0f };
+            float dist_sq = (player_center - source.GetPosition()).LengthSq();
 
-            // 2. 충돌 중이고 E키를 누르고 있다면
-            if (is_interact_key_pressed)
+            // 3. 이전에 찾은 공급원보다 더 가깝다면, '가장 가까운 공급원'으로 기록합니다.
+            if (closest_source == nullptr || dist_sq < closest_dist_sq)
             {
-                // 3. 공급원에서 뺄 양을 계산하고, 실제로 뺀 양을 받아옵니다.
-                float drain_amount_per_frame = player.GetPulseCore().getConfig().chargeRatePerSecond * static_cast<float>(dt);
-                float drained_amount = source.Drain(drain_amount_per_frame);
-
-                // 4. 실제로 뺀 양만큼 플레이어의 펄스를 채웁니다.
-                if (drained_amount > 0)
-                {
-                    player.GetPulseCore().getPulse().add(drained_amount);
-                    Logger::Instance().Log(Logger::Severity::Debug, "Charging pulse! Amount: %f", drained_amount);
-                }
+                closest_source = &source;
+                closest_dist_sq = dist_sq;
             }
-            break; // 한 번에 하나의 공급원과만 상호작용
         }
+    }
+
+    bool is_near_charger = (closest_source != nullptr);
+
+    // 4. 가장 가까운 공급원이 있을 때만 충전 로직이 동작하도록 합니다.
+    PulseTickResult result = player.GetPulseCore().tick(is_interact_key_pressed, is_near_charger, false, dt); // isDashing 대신 공격(false) 전달
+
+    if (result.charged && closest_source != nullptr)
+    {
+        closest_source->Drain(result.delta);
+        Logger::Instance().Log(Logger::Severity::Debug, "Charging pulse! Amount: %f", result.delta);
     }
 }
