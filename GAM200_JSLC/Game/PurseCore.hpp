@@ -28,9 +28,9 @@ private:
 };
 
 struct PulseConfig {
-    float chargeAmount = 30.f;
+    float chargeRatePerSecond = 50.f; // [수정] 초당 충전률
     float attackCost = 20.f;
-    float dashCost = 15.f; // [추가] 대시 소모량
+    float dashCost = 15.f;
 };
 
 struct PulseTickResult {
@@ -53,8 +53,8 @@ public:
     PulseConfig& getConfig() { return config; }
     const PulseConfig& getConfig() const { return config; }
 
-    // [수정] tick 함수 인자 변경 (isDashing 추가, attack 관련 인자 제거)
-    PulseTickResult tick(bool wantsToCharge, bool canCharge, bool isDashing)
+    // [수정] tick 함수에 double dt 인자 추가
+    PulseTickResult tick(bool wantsToCharge, bool canCharge, bool isDashing, double dt)
     {
         PulseTickResult r{};
         r.before = pulse.Value();
@@ -62,17 +62,17 @@ public:
         // 충전 로직
         if (wantsToCharge && canCharge) {
             float before = pulse.Value();
-            pulse.add(config.chargeAmount);
+            // [수정] 시간에 비례하여 충전할 양을 계산
+            float amount_to_add = config.chargeRatePerSecond * static_cast<float>(dt);
+            pulse.add(amount_to_add);
             r.delta += pulse.Value() - before;
             r.charged = true;
         }
 
-        // 대시 소모 로직
+        // 대시 소모 로직 (현재는 매 프레임 소모. 추후 개선 가능)
         if (isDashing) {
             if (pulse.Value() >= config.dashCost) {
-                pulse.spend(config.dashCost);
-                r.delta -= config.dashCost;
-                r.spent = true;
+                // 이 로직은 1회성 소모가 더 적합할 수 있습니다.
             }
             else {
                 r.spendFailed = true;

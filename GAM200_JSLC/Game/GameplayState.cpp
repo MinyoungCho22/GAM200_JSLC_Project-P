@@ -8,7 +8,6 @@
 #include <GLFW/glfw3.h>
 
 constexpr float GROUND_LEVEL = 350.0f;
-// 바닥 선과 오브젝트들을 시각적으로 올릴 높이 값
 constexpr float VISUAL_Y_OFFSET = 55.0f;
 
 GameplayState::GameplayState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
@@ -32,11 +31,10 @@ void GameplayState::Initialize()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    player.Init({ 200.0f, GROUND_LEVEL + 400}, "Asset/player.png");
+    player.Init({ 200.0f, GROUND_LEVEL }, "Asset/player.png");
 
     pulseManager = std::make_unique<PulseManager>();
 
-    // 
     pulseSources.emplace_back();
     pulseSources.back().Initialize({ 600.f, GROUND_LEVEL + 50.f + VISUAL_Y_OFFSET }, { 50.f, 50.f }, 100.f);
     pulseSources.emplace_back();
@@ -50,8 +48,13 @@ void GameplayState::Update(double dt)
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) { glfwSetWindowShouldClose(window, true); }
 
+    // [추가] 현재 펄스 값을 확인하는 디버그 로그
+    Logger::Instance().Log(Logger::Severity::Debug, "Player Pulse: %.1f / %.1f",
+        player.GetPulseCore().getPulse().Value(),
+        player.GetPulseCore().getPulse().Max());
+
     bool isPressingE = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS);
-    pulseManager->Update(player, pulseSources, isPressingE);
+    pulseManager->Update(player, pulseSources, isPressingE, dt);
 
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) player.MoveLeft();
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) player.MoveRight();
@@ -77,7 +80,6 @@ void GameplayState::Draw()
         source.Draw(*colorShader);
     }
 
-    //
     Math::Vec2 groundPosition = { engine.GetWidth() / 2.0f, GROUND_LEVEL + VISUAL_Y_OFFSET };
     Math::Vec2 groundSize = { static_cast<float>(engine.GetWidth()), 2.0f };
     Math::Matrix groundModel = Math::Matrix::CreateTranslation(groundPosition) * Math::Matrix::CreateScale(groundSize);

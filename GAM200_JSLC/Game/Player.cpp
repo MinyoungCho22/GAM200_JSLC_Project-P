@@ -12,7 +12,7 @@
 #pragma warning(pop)
 
 const float GRAVITY = -1500.0f;
-const float GROUND_LEVEL = 350.0f; // [수정] 지면 높이 상수 변경
+const float GROUND_LEVEL = 350.0f;
 
 void Player::Init(Math::Vec2 startPos, const char* texturePath)
 {
@@ -158,6 +158,9 @@ void Player::Dash()
 {
     if (!is_dashing && m_pulseCore.getPulse().Value() >= m_pulseCore.getConfig().dashCost)
     {
+        // [추가] 펄스를 실제로 소모하는 코드
+        m_pulseCore.getPulse().spend(m_pulseCore.getConfig().dashCost);
+
         is_dashing = true;
         dash_timer = dash_duration;
     }
