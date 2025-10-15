@@ -133,11 +133,16 @@
   <ItemGroup>
     <ClCompile Include="CS200\RenderingAPI.cpp" />
     <ClCompile Include="Engine\Engine.cpp" />
+    <ClCompile Include="Engine\GameStateManager.cpp" />
     <ClCompile Include="Engine\Logger.cpp" />
     <ClCompile Include="Engine\Matrix.cpp" />
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Engine\Window.cpp" />
+    <ClCompile Include="Game\GameplayState.cpp" />
     <ClCompile Include="Game\Player.cpp" />
+    <ClCompile Include="Game\PurseManager.cpp" />
+    <ClCompile Include="Game\PurseSource.cpp" />
+    <ClCompile Include="Game\SplashState.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="OpenGL\Shader.cpp" />
   </ItemGroup>
@@ -145,11 +150,18 @@
     <ClInclude Include="CS200\RenderingAPI.hpp" />
     <ClInclude Include="CS200\RGBA.hpp" />
     <ClInclude Include="Engine\Engine.hpp" />
+    <ClInclude Include="Engine\GameState.hpp" />
+    <ClInclude Include="Engine\GameStateManager.hpp" />
     <ClInclude Include="Engine\Logger.hpp" />
     <ClInclude Include="Engine\Matrix.hpp" />
     <ClInclude Include="Engine\Vec2.hpp" />
     <ClInclude Include="Engine\Window.hpp" />
+    <ClInclude Include="Game\GameplayState.hpp" />
     <ClInclude Include="Game\Player.hpp" />
+    <ClInclude Include="Game\PulseManager.hpp" />
+    <ClInclude Include="Game\PulseSource.hpp" />
+    <ClInclude Include="Game\PurseCore.hpp" />
+    <ClInclude Include="Game\SplashState.hpp" />
     <ClInclude Include="OpenGL\Shader.hpp" />
   </ItemGroup>
   <ItemGroup>

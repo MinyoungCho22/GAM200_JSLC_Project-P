@@ -1,0 +1,97 @@
+#include "GameplayState.hpp"
+#include "../Engine/GameStateManager.hpp"
+#include "../Engine/Engine.hpp"
+#include "../OpenGL/Shader.hpp"
+#include "../Engine/Logger.hpp"
+#include "../Engine/Matrix.hpp"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+GameplayState::GameplayState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
+
+void GameplayState::Initialize()
+{
+    Logger::Instance().Log(Logger::Severity::Info, "GameplayState Initialize");
+    textureShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
+    textureShader->use();
+    textureShader->setInt("imageTexture", 0);
+    colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
+
+    float line_vertices[] = { -0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, -0.5f };
+    glGenVertexArrays(1, &groundVAO);
+    glGenBuffers(1, &groundVBO);
+    glBindVertexArray(groundVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, groundVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(line_vertices), line_vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    player.Init({ 100.0f, 300.0f }, "Asset/player.png");
+
+    pulseManager = std::make_unique<PulseManager>();
+    pulseSources.emplace_back();
+    pulseSources.back().Initialize({ 600.f, 150.f }, { 50.f, 50.f }, 100.f);
+    pulseSources.emplace_back();
+    pulseSources.back().Initialize({ 800.f, 250.f }, { 30.f, 80.f }, 150.f);
+}
+
+void GameplayState::Update(double dt)
+{
+    Engine& engine = gsm.GetEngine();
+    GLFWwindow* window = engine.GetWindow();
+
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) { glfwSetWindowShouldClose(window, true); }
+
+    bool isPressingE = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS);
+    pulseManager->Update(player, pulseSources, isPressingE);
+
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) player.MoveLeft();
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) player.MoveRight();
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) player.Jump();
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) player.Crouch();
+    else player.StopCrouch();
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) player.Dash();
+
+    player.Update(dt);
+}
+
+void GameplayState::Draw()
+{
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // 배경색 설정
+
+    Engine& engine = gsm.GetEngine();
+    Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
+
+    textureShader->use();
+    textureShader->setMat4("projection", projection);
+    player.Draw(*textureShader);
+
+    colorShader->use();
+    colorShader->setMat4("projection", projection);
+
+    for (const auto& source : pulseSources) {
+        source.Draw(*colorShader);
+    }
+
+    Math::Vec2 groundPosition = { engine.GetWidth() / 2.0f, 100.0f };
+    Math::Vec2 groundSize = { static_cast<float>(engine.GetWidth()), 2.0f };
+    Math::Matrix groundModel = Math::Matrix::CreateTranslation(groundPosition) * Math::Matrix::CreateScale(groundSize);
+    colorShader->setMat4("model", groundModel);
+    colorShader->setVec3("objectColor", 0.8f, 0.8f, 0.8f);
+    glBindVertexArray(groundVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
+
+void GameplayState::Shutdown()
+{
+    player.Shutdown();
+    glDeleteVertexArrays(1, &groundVAO);
+    glDeleteBuffers(1, &groundVBO);
+    for (auto& source : pulseSources) {
+        source.Shutdown();
+    }
+    Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
+}

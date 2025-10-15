@@ -43,6 +43,21 @@
     <ClCompile Include="CS200\RenderingAPI.cpp">
       <Filter>CS200</Filter>
     </ClCompile>
+    <ClCompile Include="Game\PurseManager.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\PurseSource.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\GameStateManager.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\SplashState.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\GameplayState.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -71,6 +86,27 @@
     </ClInclude>
     <ClInclude Include="CS200\RGBA.hpp">
       <Filter>CS200</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\PurseCore.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\PulseManager.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\PulseSource.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\GameState.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\GameStateManager.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\SplashState.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\GameplayState.hpp">
+      <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
