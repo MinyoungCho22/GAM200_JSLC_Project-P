@@ -2,7 +2,7 @@
 #include "Player.hpp"
 #include "PulseSource.hpp"
 #include "../Game/PurseCore.hpp"
-#include "../Engine/Logger.hpp" // Logger 사용을 위해 추가
+#include "../Engine/Logger.hpp"
 
 void PulseManager::Update(Player& player, std::vector<PulseSource>& sources, bool is_interact_key_pressed)
 {
@@ -32,16 +32,17 @@ void PulseManager::Update(Player& player, std::vector<PulseSource>& sources, boo
         {
             is_near_any_charger = true;
             nearby_source = &source;
-            Logger::Instance().Log(Logger::Severity::Debug, "Collision Detected with a pulse source!"); // [디버그 로그]
+            Logger::Instance().Log(Logger::Severity::Debug, "Collision Detected with a pulse source!");
             break;
         }
     }
 
-    PulseTickResult result = player.GetPulseCore().tick(is_interact_key_pressed, false, is_near_any_charger, false);
+    // [수정] isDashing 인자를 tick 함수에 전달
+    PulseTickResult result = player.GetPulseCore().tick(is_interact_key_pressed, is_near_any_charger, player.IsDashing());
 
     if (result.charged && nearby_source != nullptr)
     {
-        Logger::Instance().Log(Logger::Severity::Debug, "Charging pulse! Delta: %f", result.delta); // [디버그 로그]
+        Logger::Instance().Log(Logger::Severity::Debug, "Charging pulse! Delta: %f", result.delta);
         nearby_source->Drain(result.delta);
     }
 }

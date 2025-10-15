@@ -5,18 +5,14 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-// stb_image.h 라이브러리의 실제 구현부를 생성하는 매크로
-// 이 매크로는 프로젝트 전체에서 단 하나의 .cpp 파일에만 존재해야 함
-// 여러 파일에 포함되면 '중복 정의' 링크 오류가 발생!
 #define STB_IMAGE_IMPLEMENTATION
 #pragma warning(push)
-#pragma warning(disable: 6262) // 과도한 스택 사용 경고 비활성화(추후 수정 예정)
-
+#pragma warning(disable: 6262)
 #include <stb_image.h>
 #pragma warning(pop)
 
-
-const float GRAVITY = -1500.0f; // 중력
+const float GRAVITY = -1500.0f;
+const float GROUND_LEVEL = 350.0f; // [수정] 지면 높이 상수 변경
 
 void Player::Init(Math::Vec2 startPos, const char* texturePath)
 {
@@ -24,14 +20,8 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
     velocity = Math::Vec2(0.0f, 0.0f);
 
     float vertices[] = {
-        // positions // texture Coords
-        0.0f, 1.0f,  0.0f, 1.0f,
-        1.0f, 0.0f,  1.0f, 0.0f,
-        0.0f, 0.0f,  0.0f, 0.0f,
-
-        0.0f, 1.0f,  0.0f, 1.0f,
-        1.0f, 1.0f,  1.0f, 1.0f,
-        1.0f, 0.0f,  1.0f, 0.0f
+        0.0f, 1.0f,  0.0f, 1.0f, 1.0f, 0.0f,  1.0f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f,
+        0.0f, 1.0f,  0.0f, 1.0f, 1.0f, 1.0f,  1.0f, 1.0f, 1.0f, 0.0f,  1.0f, 0.0f
     };
 
     glGenVertexArrays(1, &VAO);
@@ -60,7 +50,7 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        float desiredWidth = 80.0f;
+        float desiredWidth = 120.0f;
         float aspectRatio = static_cast<float>(height) / static_cast<float>(width);
         size = Math::Vec2(desiredWidth, desiredWidth * aspectRatio);
         original_size = size;
@@ -92,9 +82,9 @@ void Player::Update(double dt)
 
     position += final_velocity * static_cast<float>(dt);
 
-    if (position.y < 100.0f)
+    if (position.y < GROUND_LEVEL)
     {
-        position.y = 100.0f;
+        position.y = GROUND_LEVEL;
         if (velocity.y < 0)
         {
             velocity.y = 0;
@@ -106,16 +96,14 @@ void Player::Update(double dt)
 
 void Player::Draw(const Shader& shader) const
 {
-   
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(size);
-    Math::Matrix transMatrix = Math::Matrix::CreateTranslation({ position.x - size.x / 2.0f, position.y });
+    Math::Matrix transMatrix = Math::Matrix::CreateTranslation({ position.x, position.y + size.y / 2.0f });
     Math::Matrix model = transMatrix * scaleMatrix;
 
     shader.setMat4("model", model);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureID);
-
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
@@ -168,7 +156,7 @@ void Player::StopCrouch()
 
 void Player::Dash()
 {
-    if (!is_dashing)
+    if (!is_dashing && m_pulseCore.getPulse().Value() >= m_pulseCore.getConfig().dashCost)
     {
         is_dashing = true;
         dash_timer = dash_duration;

@@ -7,6 +7,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+constexpr float GROUND_LEVEL = 350.0f;
+// 바닥 선과 오브젝트들을 시각적으로 올릴 높이 값
+constexpr float VISUAL_Y_OFFSET = 55.0f;
+
 GameplayState::GameplayState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
 void GameplayState::Initialize()
@@ -28,13 +32,15 @@ void GameplayState::Initialize()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    player.Init({ 100.0f, 300.0f }, "Asset/player.png");
+    player.Init({ 200.0f, GROUND_LEVEL + 400}, "Asset/player.png");
 
     pulseManager = std::make_unique<PulseManager>();
+
+    // 
     pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 600.f, 150.f }, { 50.f, 50.f }, 100.f);
+    pulseSources.back().Initialize({ 600.f, GROUND_LEVEL + 50.f + VISUAL_Y_OFFSET }, { 50.f, 50.f }, 100.f);
     pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 800.f, 250.f }, { 30.f, 80.f }, 150.f);
+    pulseSources.back().Initialize({ 800.f, GROUND_LEVEL + 150.f + VISUAL_Y_OFFSET }, { 30.f, 80.f }, 150.f);
 }
 
 void GameplayState::Update(double dt)
@@ -59,14 +65,10 @@ void GameplayState::Update(double dt)
 
 void GameplayState::Draw()
 {
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // 배경색 설정
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     Engine& engine = gsm.GetEngine();
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
-
-    textureShader->use();
-    textureShader->setMat4("projection", projection);
-    player.Draw(*textureShader);
 
     colorShader->use();
     colorShader->setMat4("projection", projection);
@@ -75,7 +77,8 @@ void GameplayState::Draw()
         source.Draw(*colorShader);
     }
 
-    Math::Vec2 groundPosition = { engine.GetWidth() / 2.0f, 100.0f };
+    //
+    Math::Vec2 groundPosition = { engine.GetWidth() / 2.0f, GROUND_LEVEL + VISUAL_Y_OFFSET };
     Math::Vec2 groundSize = { static_cast<float>(engine.GetWidth()), 2.0f };
     Math::Matrix groundModel = Math::Matrix::CreateTranslation(groundPosition) * Math::Matrix::CreateScale(groundSize);
     colorShader->setMat4("model", groundModel);
@@ -83,6 +86,10 @@ void GameplayState::Draw()
     glBindVertexArray(groundVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+
+    textureShader->use();
+    textureShader->setMat4("projection", projection);
+    player.Draw(*textureShader);
 }
 
 void GameplayState::Shutdown()

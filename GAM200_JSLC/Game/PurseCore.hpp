@@ -2,31 +2,14 @@
 #include <algorithm>
 #include <functional>
 
-//  Pulse: 값만 관리 (최대/현재)
 class Pulse {
 public:
-    // [수정] 시작 값을 받을 수 있도록 생성자 변경
     explicit Pulse(float max = 100.0f, float start = 100.0f)
         : pulse_max(max), pulse_value(start) {
     }
 
     float Value() const { return pulse_value; }
     float Max()   const { return pulse_max; }
-
-    void setValue(float v) {
-        if (v < 0.f)
-            pulse_value = 0.f;
-        else if (v > pulse_max)
-            pulse_value = pulse_max;
-        else
-            pulse_value = v;
-    }
-
-    void setMax(float m) {
-        pulse_max = (m < 0.f ? 0.f : m);
-        if (pulse_value > pulse_max) pulse_value = pulse_max;
-        if (pulse_value < 0.f)       pulse_value = 0.f;
-    }
 
     void add(float amount) {
         if (amount <= 0.f) return;
@@ -47,6 +30,7 @@ private:
 struct PulseConfig {
     float chargeAmount = 30.f;
     float attackCost = 20.f;
+    float dashCost = 15.f; // [추가] 대시 소모량
 };
 
 struct PulseTickResult {
@@ -58,10 +42,8 @@ struct PulseTickResult {
     bool  spendFailed = false;
 };
 
-//기본적인 펄스 시스템 토대 
 class PulseCore {
 public:
-    // [수정] 시작 값을 받을 수 있도록 생성자 변경
     explicit PulseCore(float maxPulse = 100.f, float startPulse = 100.f, PulseConfig cfg = {})
         : pulse(maxPulse, startPulse), config(cfg) {
     }
@@ -71,26 +53,25 @@ public:
     PulseConfig& getConfig() { return config; }
     const PulseConfig& getConfig() const { return config; }
 
-    PulseTickResult tick(bool pressE, bool pressQ,
-        bool inCharger,
-        bool inAttack)
+    // [수정] tick 함수 인자 변경 (isDashing 추가, attack 관련 인자 제거)
+    PulseTickResult tick(bool wantsToCharge, bool canCharge, bool isDashing)
     {
         PulseTickResult r{};
         r.before = pulse.Value();
 
-        if (pressE && inCharger) {
+        // 충전 로직
+        if (wantsToCharge && canCharge) {
             float before = pulse.Value();
             pulse.add(config.chargeAmount);
             r.delta += pulse.Value() - before;
             r.charged = true;
         }
 
-        if (pressQ && inAttack) {
-            float before = pulse.Value();
-            float cost = config.attackCost;
-            if (pulse.Value() >= cost) {
-                pulse.spend(cost);
-                r.delta -= cost;
+        // 대시 소모 로직
+        if (isDashing) {
+            if (pulse.Value() >= config.dashCost) {
+                pulse.spend(config.dashCost);
+                r.delta -= config.dashCost;
                 r.spent = true;
             }
             else {
