@@ -4,7 +4,6 @@
 #include "Drone.hpp"
 #include "PulseSource.hpp"
 #include "PulseManager.hpp"
-#include "DroneManager.hpp"
 #include <memory>
 #include <vector>
 
@@ -21,12 +20,13 @@ public:
     void Shutdown() override;
 private:
     GameStateManager& gsm;
-    Player player;
+
     Drone drone;
+    Player player;
+    
     unsigned int groundVAO = 0, groundVBO = 0;
     std::unique_ptr<Shader> textureShader;
     std::unique_ptr<Shader> colorShader;
     std::vector<PulseSource> pulseSources;
     std::unique_ptr<PulseManager> pulseManager;
-    std::unique_ptr<DroneManager> droneManager;
 };

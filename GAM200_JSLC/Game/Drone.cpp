@@ -1,19 +1,13 @@
 #include "Drone.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
-<<<<<<< HEAD
 #include <glad/glad.h>
 #include <iostream>
 
-=======
-#include "../Engine/Logger.hpp"
-#include <glad/glad.h>
->>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
 #include <stb_image.h>
 
 void Drone::Init(Math::Vec2 startPos, const char* texturePath)
 {
-<<<<<<< HEAD
     drone_position = startPos;
     drone_velocity = { 0.0f, 0.0f };
     drone_direction = { 1.0f, 0.0f };
@@ -26,21 +20,6 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
         0.0f, 1.0f,  0.0f, 1.0f,
         1.0f, 0.0f,  1.0f, 0.0f,
         0.0f, 0.0f,  0.0f, 0.0f
-=======
-    m_position = startPos;
-    m_velocity = { 0.0f, 0.0f };
-    m_direction = { 1.0f, 0.0f }; // 오른쪽으로 시작
-
-    float vertices[] = {
-        // positions // texture Coords
-        0.0f, 1.0f,  0.0f, 1.0f,
-        1.0f, 0.0f,  1.0f, 0.0f,
-        0.0f, 0.0f,  0.0f, 0.0f,
-
-        0.0f, 1.0f,  0.0f, 1.0f,
-        1.0f, 1.0f,  1.0f, 1.0f,
-        1.0f, 0.0f,  1.0f, 0.0f
->>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
     };
 
     glGenVertexArrays(1, &VAO);
@@ -69,7 +48,6 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-<<<<<<< HEAD
         float desiredWidth = 100.0f;
         float aspectRatio = static_cast<float>(height) / static_cast<float>(width);
         drone_size = { desiredWidth, desiredWidth * aspectRatio };
@@ -77,23 +55,12 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
     else
     {
         std::cout << "Failed to load drone texture: " << texturePath << std::endl;
-=======
-        float desiredWidth = 60.0f;
-        float aspectRatio = static_cast<float>(height) / static_cast<float>(width);
-        m_size = { desiredWidth, desiredWidth * aspectRatio };
-        Logger::Instance().Log(Logger::Severity::Info, "Drone texture loaded: %s", texturePath);
-    }
-    else
-    {
-        Logger::Instance().Log(Logger::Severity::Error, "Failed to load drone texture: %s", texturePath);
->>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
     }
     stbi_image_free(data);
 }
 
 void Drone::Update(double dt)
 {
-<<<<<<< HEAD
     move_timer += static_cast<float>(dt);
 
     if (move_timer > 3.0f)
@@ -104,29 +71,12 @@ void Drone::Update(double dt)
 
     drone_velocity = drone_direction * drone_speed;
     drone_position += drone_velocity * static_cast<float>(dt);
-=======
-    m_moveTimer += static_cast<float>(dt);
-
-    if (m_moveTimer > 3.0f)
-    {
-        m_moveTimer = 0.0f;
-        m_direction.x = -m_direction.x;
-    }
-
-    m_velocity = m_direction * m_speed;
-    m_position += m_velocity * static_cast<float>(dt);
->>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
 }
 
 void Drone::Draw(const Shader& shader) const
 {
-<<<<<<< HEAD
-    Math::Matrix scaleMatrix = Math::Matrix::CreateScale(drone_velocity);
+    Math::Matrix scaleMatrix = Math::Matrix::CreateScale(drone_size);
     Math::Matrix transMatrix = Math::Matrix::CreateTranslation({ drone_position.x, drone_position.y + drone_velocity.y / 2.0f });
-=======
-    Math::Matrix scaleMatrix = Math::Matrix::CreateScale(m_size);
-    Math::Matrix transMatrix = Math::Matrix::CreateTranslation({ m_position.x, m_position.y + m_size.y / 2.0f });
->>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
     Math::Matrix model = transMatrix * scaleMatrix;
 
     shader.setMat4("model", model);
@@ -143,8 +93,4 @@ void Drone::Shutdown()
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteTextures(1, &textureID);
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
