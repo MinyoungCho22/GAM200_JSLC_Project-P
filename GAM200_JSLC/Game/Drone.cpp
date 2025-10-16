@@ -12,7 +12,18 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
     m_velocity = { 0.0f, 0.0f };
     m_direction = { 1.0f, 0.0f };
 
-    float vertices[] = { 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f };
+    // [수정] 정점을 (-0.5, -0.5) ~ (0.5, 0.5) 범위로 변경하여 회전축을 중앙으로 설정
+    float vertices[] = {
+        // positions    // texture Coords
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f,
+        -0.5f, -0.5f,   0.0f, 0.0f,
+
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f,  0.5f,   1.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f
+    };
+
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glBindVertexArray(VAO);
@@ -49,7 +60,6 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
 
 void Drone::Update(double dt)
 {
-    // [수정] 피격 상태일 때의 로직
     if (m_isHit)
     {
         m_hitTimer -= static_cast<float>(dt);
@@ -57,7 +67,7 @@ void Drone::Update(double dt)
         {
             m_isHit = false;
         }
-        return; // 피격 시에는 움직이지 않음
+        return;
     }
 
     m_moveTimer += static_cast<float>(dt);
@@ -73,16 +83,17 @@ void Drone::Update(double dt)
 void Drone::Draw(const Shader& shader) const
 {
     Math::Matrix rotationMatrix = Math::Matrix::CreateIdentity();
-    // [수정] 피격 상태일 때 흔들리는 효과 적용
     if (m_isHit)
     {
-        // sin 함수를 이용해 좌우로 부드럽게 흔들리게 함
         float angle = std::sin(m_hitTimer * 30.0f) * 45.0f;
         rotationMatrix = Math::Matrix::CreateRotation(angle);
     }
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(m_size);
-    Math::Matrix transMatrix = Math::Matrix::CreateTranslation({ m_position.x, m_position.y + m_size.y / 2.0f });
+    // [수정] 드론의 위치 기준점을 중앙으로 변경
+    Math::Matrix transMatrix = Math::Matrix::CreateTranslation(m_position);
+
+    // [수정] 모델 행렬 계산 순서 변경: 이동 -> 회전 -> 크기
     Math::Matrix model = transMatrix * rotationMatrix * scaleMatrix;
 
     shader.setMat4("model", model);
@@ -101,10 +112,9 @@ void Drone::Shutdown()
     glDeleteTextures(1, &textureID);
 }
 
-// [추가] TakeHit 함수 구현
 void Drone::TakeHit()
 {
-    if (m_isHit) return; // 이미 피격 상태면 무시
+    if (m_isHit) return;
     m_isHit = true;
     m_hitTimer = m_hitDuration;
 }

@@ -1,10 +1,11 @@
 #pragma once
 #include "../Engine/GameState.hpp"
+#include "../Engine/DebugRenderer.hpp" // [추가]
 #include "Player.hpp"
 #include "PulseSource.hpp"
 #include "PulseManager.hpp"
 #include "DroneManager.hpp"
-#include "PulseGauge.hpp" // [추가]
+#include "PulseGauge.hpp"
 #include <memory>
 #include <vector>
 
@@ -29,4 +30,6 @@ private:
     std::unique_ptr<PulseManager> pulseManager;
     std::unique_ptr<DroneManager> droneManager;
     PulseGauge m_pulseGauge;
+    std::unique_ptr<DebugRenderer> m_debugRenderer; // [추가]
+    bool m_isDebugDraw = false; // [추가]
 };

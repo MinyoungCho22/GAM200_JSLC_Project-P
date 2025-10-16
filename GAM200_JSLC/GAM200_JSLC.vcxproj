@@ -132,6 +132,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CS200\RenderingAPI.cpp" />
+    <ClCompile Include="Engine\DebugRenderer.cpp" />
     <ClCompile Include="Engine\Engine.cpp" />
     <ClCompile Include="Engine\GameStateManager.cpp" />
     <ClCompile Include="Engine\Logger.cpp" />
@@ -152,6 +153,7 @@
   <ItemGroup>
     <ClInclude Include="CS200\RenderingAPI.hpp" />
     <ClInclude Include="CS200\RGBA.hpp" />
+    <ClInclude Include="Engine\DebugRenderer.hpp" />
     <ClInclude Include="Engine\Engine.hpp" />
     <ClInclude Include="Engine\GameState.hpp" />
     <ClInclude Include="Engine\GameStateManager.hpp" />

@@ -4,7 +4,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include <cmath> // fmod를 사용하기 위해
+#include <cmath>
 
 #define STB_IMAGE_IMPLEMENTATION
 #pragma warning(push)

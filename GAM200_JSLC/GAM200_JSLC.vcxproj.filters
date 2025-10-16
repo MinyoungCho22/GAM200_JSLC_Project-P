@@ -67,6 +67,9 @@
     <ClCompile Include="Game\PulseGauge.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\DebugRenderer.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -125,6 +128,9 @@
     </ClInclude>
     <ClInclude Include="Game\PulseGauge.hpp">
       <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\DebugRenderer.hpp">
+      <Filter>Engine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
