@@ -5,7 +5,6 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-#define STB_IMAGE_IMPLEMENTATION
 #pragma warning(push)
 #pragma warning(disable: 6262)
 #include <stb_image.h>

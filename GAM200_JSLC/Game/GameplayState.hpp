@@ -1,6 +1,7 @@
 #pragma once
 #include "../Engine/GameState.hpp"
 #include "Player.hpp"
+#include "Drone.hpp"
 #include "PulseSource.hpp"
 #include "PulseManager.hpp"
 #include <memory>
@@ -20,6 +21,7 @@ public:
 private:
     GameStateManager& gsm;
     Player player;
+    Drone drone;
     unsigned int groundVAO = 0, groundVBO = 0;
     std::unique_ptr<Shader> textureShader;
     std::unique_ptr<Shader> colorShader;

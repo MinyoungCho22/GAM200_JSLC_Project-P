@@ -76,12 +76,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\study\GAM200\vcpkg_win\installed\x64-windows\include;$(SolutionDir)Engine;$(SolutionDir)Game;$(SolutionDir)OpenGL;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\study\GAM200\vcpkg_win\installed\x64-windows\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glad.lib; glew32.lib; SDL2.lib; opengl32.lib; %(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -92,12 +94,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\study\GAM200\vcpkg_win\installed\x64-windows\include;$(SolutionDir)Engine;$(SolutionDir)Game;$(SolutionDir)OpenGL;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\study\GAM200\vcpkg_win\installed\x64-windows\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glad.lib; glew32.lib; SDL2.lib; opengl32.lib; %(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -106,12 +110,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\study\GAM200\vcpkg_win\installed\x64-windows\include;$(SolutionDir)Engine;$(SolutionDir)Game;$(SolutionDir)OpenGL;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\study\GAM200\vcpkg_win\installed\x64-windows\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glad.lib; glew32.lib; SDL2.lib; opengl32.lib; %(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -122,12 +128,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\study\GAM200\vcpkg_win\installed\x64-windows\include;$(SolutionDir)Engine;$(SolutionDir)Game;$(SolutionDir)OpenGL;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\study\GAM200\vcpkg_win\installed\x64-windows\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glad.lib; glew32.lib; SDL2.lib; opengl32.lib; %(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -136,8 +144,10 @@
     <ClCompile Include="Engine\GameStateManager.cpp" />
     <ClCompile Include="Engine\Logger.cpp" />
     <ClCompile Include="Engine\Matrix.cpp" />
+    <ClCompile Include="Engine\stb_image.cpp" />
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Engine\Window.cpp" />
+    <ClCompile Include="Game\Drone.cpp" />
     <ClCompile Include="Game\GameplayState.cpp" />
     <ClCompile Include="Game\Player.cpp" />
     <ClCompile Include="Game\PurseManager.cpp" />
@@ -156,6 +166,8 @@
     <ClInclude Include="Engine\Matrix.hpp" />
     <ClInclude Include="Engine\Vec2.hpp" />
     <ClInclude Include="Engine\Window.hpp" />
+    <ClInclude Include="GameObjectTypes.hpp" />
+    <ClInclude Include="Game\Drone.hpp" />
     <ClInclude Include="Game\GameplayState.hpp" />
     <ClInclude Include="Game\Player.hpp" />
     <ClInclude Include="Game\PulseManager.hpp" />
