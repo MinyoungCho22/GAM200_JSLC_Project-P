@@ -3,6 +3,7 @@
 #include "Player.hpp"
 #include "PulseSource.hpp"
 #include "PulseManager.hpp"
+#include "DroneManager.hpp"
 #include <memory>
 #include <vector>
 
@@ -25,4 +26,5 @@ private:
     std::unique_ptr<Shader> colorShader;
     std::vector<PulseSource> pulseSources;
     std::unique_ptr<PulseManager> pulseManager;
+    std::unique_ptr<DroneManager> droneManager;
 };

@@ -58,6 +58,12 @@
     <ClCompile Include="Game\GameplayState.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Drone.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\DroneManager.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -106,6 +112,12 @@
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\GameplayState.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Drone.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\DroneManager.hpp">
       <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>
