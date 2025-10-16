@@ -80,7 +80,7 @@ void GameplayState::Draw()
     Engine& engine = gsm.GetEngine();
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
 
-    // 1. 단색 오브젝트들 먼저 그리기
+    
     colorShader->use();
     colorShader->setMat4("projection", projection);
     for (const auto& source : pulseSources) {
@@ -95,7 +95,7 @@ void GameplayState::Draw()
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 
-    // 2. 텍스처를 사용하는 오브젝트들 그리기
+    
     textureShader->use();
     textureShader->setMat4("projection", projection);
 
