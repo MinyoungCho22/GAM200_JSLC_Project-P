@@ -72,7 +72,7 @@ public:
         // 대시 소모 로직 (현재는 매 프레임 소모. 추후 개선 가능)
         if (isDashing) {
             if (pulse.Value() >= config.dashCost) {
-                // 이 로직은 1회성 소모가 더 적합할 수 있습니다.
+                 // 이 로직은 1회성 소모가 더 적합할 수 있습니다.
             }
             else {
                 r.spendFailed = true;

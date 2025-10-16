@@ -148,6 +148,10 @@
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Engine\Window.cpp" />
     <ClCompile Include="Game\Drone.cpp" />
+<<<<<<< HEAD
+=======
+    <ClCompile Include="Game\DroneManager.cpp" />
+>>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
     <ClCompile Include="Game\GameplayState.cpp" />
     <ClCompile Include="Game\Player.cpp" />
     <ClCompile Include="Game\PurseManager.cpp" />
@@ -166,8 +170,13 @@
     <ClInclude Include="Engine\Matrix.hpp" />
     <ClInclude Include="Engine\Vec2.hpp" />
     <ClInclude Include="Engine\Window.hpp" />
+<<<<<<< HEAD
     <ClInclude Include="GameObjectTypes.hpp" />
     <ClInclude Include="Game\Drone.hpp" />
+=======
+    <ClInclude Include="Game\Drone.hpp" />
+    <ClInclude Include="Game\DroneManager.hpp" />
+>>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
     <ClInclude Include="Game\GameplayState.hpp" />
     <ClInclude Include="Game\Player.hpp" />
     <ClInclude Include="Game\PulseManager.hpp" />

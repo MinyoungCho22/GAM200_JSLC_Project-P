@@ -61,8 +61,13 @@
     <ClCompile Include="Game\Drone.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+<<<<<<< HEAD
     <ClCompile Include="Engine\stb_image.cpp">
       <Filter>Engine</Filter>
+=======
+    <ClCompile Include="Game\DroneManager.cpp">
+      <Filter>Game</Filter>
+>>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -114,12 +119,21 @@
     <ClInclude Include="Game\GameplayState.hpp">
       <Filter>Game</Filter>
     </ClInclude>
+<<<<<<< HEAD
     <ClInclude Include="GameObjectTypes.hpp">
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\Drone.hpp">
       <Filter>Game</Filter>
     </ClInclude>
+=======
+    <ClInclude Include="Game\Drone.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\DroneManager.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+>>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
   </ItemGroup>
   <ItemGroup>
     <None Include="OpenGL\Shaders\simple.vert">

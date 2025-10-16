@@ -31,8 +31,12 @@ void GameplayState::Initialize()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
+<<<<<<< HEAD
     player.Init({ 200.0f, GROUND_LEVEL }, "Asset/player.png");
     drone.Init({ 200.0f, GROUND_LEVEL + 150.0f }, "Asset/drone.png");
+=======
+    player.Init({ 200.0f, GROUND_LEVEL + 400.0f}, "Asset/player.png");
+>>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
 
     pulseManager = std::make_unique<PulseManager>();
 
@@ -40,6 +44,16 @@ void GameplayState::Initialize()
     pulseSources.back().Initialize({ 600.f, GROUND_LEVEL + 50.f + VISUAL_Y_OFFSET }, { 50.f, 50.f }, 100.f);
     pulseSources.emplace_back();
     pulseSources.back().Initialize({ 800.f, GROUND_LEVEL + 150.f + VISUAL_Y_OFFSET }, { 30.f, 80.f }, 150.f);
+<<<<<<< HEAD
+=======
+    pulseSources.emplace_back();
+    pulseSources.back().Initialize({ 1200.f, GROUND_LEVEL + 80.f + VISUAL_Y_OFFSET }, { 60.f, 60.f }, 120.f);
+    pulseSources.emplace_back();
+    pulseSources.back().Initialize({ 1500.f, GROUND_LEVEL + 200.f + VISUAL_Y_OFFSET }, { 40.f, 100.f }, 200.f);
+
+    droneManager = std::make_unique<DroneManager>();
+    droneManager->SpawnDrone({ 800.0f, GROUND_LEVEL + 200.0f }, "Asset/Drone.png");
+>>>>>>> 96909bfd1549a09b7e09b0ce175d60a91d54ec7f
 }
 
 void GameplayState::Update(double dt)
@@ -64,6 +78,7 @@ void GameplayState::Update(double dt)
     else player.StopCrouch();
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) player.Dash();
 
+    droneManager->Update(dt);
     player.Update(dt);
 }
 
@@ -74,13 +89,12 @@ void GameplayState::Draw()
     Engine& engine = gsm.GetEngine();
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
 
+    
     colorShader->use();
     colorShader->setMat4("projection", projection);
-
     for (const auto& source : pulseSources) {
         source.Draw(*colorShader);
     }
-
     Math::Vec2 groundPosition = { engine.GetWidth() / 2.0f, GROUND_LEVEL + VISUAL_Y_OFFSET };
     Math::Vec2 groundSize = { static_cast<float>(engine.GetWidth()), 2.0f };
     Math::Matrix groundModel = Math::Matrix::CreateTranslation(groundPosition) * Math::Matrix::CreateScale(groundSize);
@@ -90,8 +104,13 @@ void GameplayState::Draw()
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 
+    
     textureShader->use();
     textureShader->setMat4("projection", projection);
+
+    // 드론을 먼저 그리고
+    droneManager->Draw(*textureShader);
+    // 플레이어를 마지막에 그린다
     player.Draw(*textureShader);
 }
 
@@ -103,5 +122,6 @@ void GameplayState::Shutdown()
     for (auto& source : pulseSources) {
         source.Shutdown();
     }
+    droneManager->Shutdown();
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
 }
