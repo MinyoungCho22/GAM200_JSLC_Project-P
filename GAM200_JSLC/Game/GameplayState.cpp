@@ -9,6 +9,7 @@
 
 constexpr float GROUND_LEVEL = 350.0f;
 constexpr float VISUAL_Y_OFFSET = 55.0f;
+constexpr float ATTACK_RANGE_SQ = 250.0f * 250.0f;
 
 GameplayState::GameplayState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
@@ -31,7 +32,7 @@ void GameplayState::Initialize()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    player.Init({ 200.0f, GROUND_LEVEL + 400.0f }, "Asset/player.png");
+    player.Init({ 200.0f, GROUND_LEVEL + 400.0f}, "Asset/player.png");
 
     pulseManager = std::make_unique<PulseManager>();
 
@@ -45,9 +46,8 @@ void GameplayState::Initialize()
     pulseSources.back().Initialize({ 1500.f, GROUND_LEVEL + 200.f + VISUAL_Y_OFFSET }, { 40.f, 100.f }, 200.f);
 
     droneManager = std::make_unique<DroneManager>();
-    droneManager->SpawnDrone({ 800.0f, GROUND_LEVEL + 80.0f }, "Asset/Drone.png");
+    droneManager->SpawnDrone({ 800.0f, GROUND_LEVEL + 70.0f }, "Asset/Drone.png");
 
-    // [추가] 펄스 게이지 초기화
     Engine& engine = gsm.GetEngine();
     m_pulseGauge.Initialize({ 80.f, engine.GetHeight() * 0.75f }, { 40.f, 300.f });
 }
@@ -73,10 +73,31 @@ void GameplayState::Update(double dt)
     else player.StopCrouch();
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) player.Dash();
 
+    static bool f_key_was_pressed = false;
+    bool f_key_is_pressed = (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS);
+    if (f_key_is_pressed && !f_key_was_pressed)
+    {
+        if (player.GetPulseCore().getPulse().Value() >= 20.0f)
+        {
+            auto& drones = droneManager->GetDrones();
+            for (auto& drone : drones)
+            {
+                float distSq = (player.GetPosition() - drone.GetPosition()).LengthSq();
+                if (distSq < ATTACK_RANGE_SQ)
+                {
+                    player.GetPulseCore().getPulse().spend(20.0f);
+                    drone.TakeHit();
+                    Logger::Instance().Log(Logger::Severity::Event, "Drone has been hit!");
+                    break;
+                }
+            }
+        }
+    }
+    f_key_was_pressed = f_key_is_pressed;
+
     droneManager->Update(dt);
     player.Update(dt);
 
-    // 플레이어와 드론의 충돌 감지
     const auto& drones = droneManager->GetDrones();
     for (const auto& drone : drones)
     {
@@ -102,7 +123,6 @@ void GameplayState::Update(double dt)
         }
     }
 
-    // [추가] 펄스 게이지 업데이트
     const auto& pulse = player.GetPulseCore().getPulse();
     m_pulseGauge.Update(pulse.Value(), pulse.Max());
 }
@@ -116,11 +136,9 @@ void GameplayState::Draw()
 
     colorShader->use();
     colorShader->setMat4("projection", projection);
-
     for (const auto& source : pulseSources) {
         source.Draw(*colorShader);
     }
-
     Math::Vec2 groundPosition = { engine.GetWidth() / 2.0f, GROUND_LEVEL + VISUAL_Y_OFFSET };
     Math::Vec2 groundSize = { static_cast<float>(engine.GetWidth()), 2.0f };
     Math::Matrix groundModel = Math::Matrix::CreateTranslation(groundPosition) * Math::Matrix::CreateScale(groundSize);
@@ -135,7 +153,6 @@ void GameplayState::Draw()
     droneManager->Draw(*textureShader);
     player.Draw(*textureShader);
 
-    // [추가] 펄스 게이지 그리기
     colorShader->use();
     m_pulseGauge.Draw(*colorShader);
 }
@@ -149,6 +166,6 @@ void GameplayState::Shutdown()
         source.Shutdown();
     }
     droneManager->Shutdown();
-    m_pulseGauge.Shutdown(); // [추가]
+    m_pulseGauge.Shutdown();
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
 }

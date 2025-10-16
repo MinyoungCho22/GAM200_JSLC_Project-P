@@ -31,8 +31,12 @@ void DroneManager::Shutdown()
     }
 }
 
-// [추가] GetDrones 함수 구현
 const std::vector<Drone>& DroneManager::GetDrones() const
+{
+    return drones;
+}
+
+std::vector<Drone>& DroneManager::GetDrones()
 {
     return drones;
 }

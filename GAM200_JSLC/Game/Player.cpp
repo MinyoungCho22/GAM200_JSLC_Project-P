@@ -85,7 +85,7 @@ void Player::Update(double dt)
     {
         velocity.y += GRAVITY * static_cast<float>(dt);
     }
-
+    
     Math::Vec2 final_velocity = velocity;
     if (is_dashing) {
         final_velocity.x = last_move_direction * dash_speed;
