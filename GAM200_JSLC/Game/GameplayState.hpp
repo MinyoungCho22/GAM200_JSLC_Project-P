@@ -4,6 +4,7 @@
 #include "PulseSource.hpp"
 #include "PulseManager.hpp"
 #include "DroneManager.hpp"
+#include "PulseGauge.hpp" // [Ãß°¡]
 #include <memory>
 #include <vector>
 
@@ -27,4 +28,5 @@ private:
     std::vector<PulseSource> pulseSources;
     std::unique_ptr<PulseManager> pulseManager;
     std::unique_ptr<DroneManager> droneManager;
+    PulseGauge m_pulseGauge;
 };

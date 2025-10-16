@@ -19,11 +19,12 @@ public:
     void StopCrouch();
     void Dash();
 
+    // [추가] 피해를 입는 함수
+    void TakeDamage(float amount);
+
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
     PulseCore& GetPulseCore() { return m_pulseCore; }
-
-    // [추가] 현재 대시 중인지 여부를 반환하는 함수
     bool IsDashing() const { return is_dashing; }
 
 private:
@@ -40,6 +41,11 @@ private:
 
     bool is_dashing = false;
     float dash_timer = 0.0f;
+
+    // [추가] 무적 상태 관리 변수
+    bool  m_isInvincible = false;
+    float m_invincibilityTimer = 0.0f;
+    const float m_invincibilityDuration = 3.0f; // 3초 무적
 
     float move_speed = 300.0f;
     float jump_velocity = 600.0f;

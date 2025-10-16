@@ -11,6 +11,7 @@ public:
     void Draw(const Shader& shader) const;
     void Shutdown();
     Math::Vec2 GetPosition() const { return m_position; }
+    Math::Vec2 GetSize() const { return m_size; } // [Ãß°¡]
 
 private:
     Math::Vec2 m_position;

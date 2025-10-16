@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <cmath> // fmod를 사용하기 위해
 
 #define STB_IMAGE_IMPLEMENTATION
 #pragma warning(push)
@@ -61,6 +62,16 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
 
 void Player::Update(double dt)
 {
+    // [추가] 무적 타이머 업데이트
+    if (m_isInvincible)
+    {
+        m_invincibilityTimer -= static_cast<float>(dt);
+        if (m_invincibilityTimer <= 0.0f)
+        {
+            m_isInvincible = false;
+        }
+    }
+
     if (is_dashing)
     {
         dash_timer -= static_cast<float>(dt);
@@ -96,6 +107,16 @@ void Player::Update(double dt)
 
 void Player::Draw(const Shader& shader) const
 {
+    // [추가] 무적 상태일 때 깜빡이는 로직
+    if (m_isInvincible)
+    {
+        // 0.2초마다 0.1초씩 보였다 안 보였다 반복
+        if (fmod(m_invincibilityTimer, 0.2f) < 0.1f)
+        {
+            return; // 그리지 않고 함수 종료
+        }
+    }
+
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(size);
     Math::Matrix transMatrix = Math::Matrix::CreateTranslation({ position.x, position.y + size.y / 2.0f });
     Math::Matrix model = transMatrix * scaleMatrix;
@@ -114,6 +135,16 @@ void Player::Shutdown()
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteTextures(1, &textureID);
+}
+
+// [추가] 피해를 입었을 때 호출되는 함수
+void Player::TakeDamage(float amount)
+{
+    if (m_isInvincible) return; // 무적 상태면 아무것도 하지 않음
+
+    m_pulseCore.getPulse().spend(amount);
+    m_isInvincible = true;
+    m_invincibilityTimer = m_invincibilityDuration;
 }
 
 void Player::MoveLeft()
@@ -158,9 +189,7 @@ void Player::Dash()
 {
     if (!is_dashing && m_pulseCore.getPulse().Value() >= m_pulseCore.getConfig().dashCost)
     {
-        // [추가] 펄스를 실제로 소모하는 코드
         m_pulseCore.getPulse().spend(m_pulseCore.getConfig().dashCost);
-
         is_dashing = true;
         dash_timer = dash_duration;
     }

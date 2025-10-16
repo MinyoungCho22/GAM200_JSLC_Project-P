@@ -64,6 +64,9 @@
     <ClCompile Include="Game\DroneManager.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="Game\PulseGauge.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -118,6 +121,9 @@
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\DroneManager.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\PulseGauge.hpp">
       <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>

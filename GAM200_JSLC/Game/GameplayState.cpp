@@ -31,7 +31,7 @@ void GameplayState::Initialize()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    player.Init({ 200.0f, GROUND_LEVEL + 400.0f}, "Asset/player.png");
+    player.Init({ 200.0f, GROUND_LEVEL + 400.0f }, "Asset/player.png");
 
     pulseManager = std::make_unique<PulseManager>();
 
@@ -45,7 +45,11 @@ void GameplayState::Initialize()
     pulseSources.back().Initialize({ 1500.f, GROUND_LEVEL + 200.f + VISUAL_Y_OFFSET }, { 40.f, 100.f }, 200.f);
 
     droneManager = std::make_unique<DroneManager>();
-    droneManager->SpawnDrone({ 800.0f, GROUND_LEVEL + 200.0f }, "Asset/Drone.png");
+    droneManager->SpawnDrone({ 800.0f, GROUND_LEVEL + 80.0f }, "Asset/Drone.png");
+
+    // [추가] 펄스 게이지 초기화
+    Engine& engine = gsm.GetEngine();
+    m_pulseGauge.Initialize({ 80.f, engine.GetHeight() * 0.75f }, { 40.f, 300.f });
 }
 
 void GameplayState::Update(double dt)
@@ -71,6 +75,36 @@ void GameplayState::Update(double dt)
 
     droneManager->Update(dt);
     player.Update(dt);
+
+    // 플레이어와 드론의 충돌 감지
+    const auto& drones = droneManager->GetDrones();
+    for (const auto& drone : drones)
+    {
+        Math::Vec2 playerPos = player.GetPosition();
+        Math::Vec2 playerSize = player.GetSize();
+        float playerMinX = playerPos.x - playerSize.x / 2.0f;
+        float playerMaxX = playerPos.x + playerSize.x / 2.0f;
+        float playerMinY = playerPos.y;
+        float playerMaxY = playerPos.y + playerSize.y;
+
+        Math::Vec2 dronePos = drone.GetPosition();
+        Math::Vec2 droneSize = drone.GetSize();
+        float droneMinX = dronePos.x - droneSize.x / 2.0f;
+        float droneMaxX = dronePos.x + droneSize.x / 2.0f;
+        float droneMinY = dronePos.y;
+        float droneMaxY = dronePos.y + droneSize.y;
+
+        if (playerMaxX > droneMinX && playerMinX < droneMaxX &&
+            playerMaxY > droneMinY && playerMinY < droneMaxY)
+        {
+            player.TakeDamage(20.0f);
+            break;
+        }
+    }
+
+    // [추가] 펄스 게이지 업데이트
+    const auto& pulse = player.GetPulseCore().getPulse();
+    m_pulseGauge.Update(pulse.Value(), pulse.Max());
 }
 
 void GameplayState::Draw()
@@ -80,12 +114,13 @@ void GameplayState::Draw()
     Engine& engine = gsm.GetEngine();
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
 
-    
     colorShader->use();
     colorShader->setMat4("projection", projection);
+
     for (const auto& source : pulseSources) {
         source.Draw(*colorShader);
     }
+
     Math::Vec2 groundPosition = { engine.GetWidth() / 2.0f, GROUND_LEVEL + VISUAL_Y_OFFSET };
     Math::Vec2 groundSize = { static_cast<float>(engine.GetWidth()), 2.0f };
     Math::Matrix groundModel = Math::Matrix::CreateTranslation(groundPosition) * Math::Matrix::CreateScale(groundSize);
@@ -95,14 +130,14 @@ void GameplayState::Draw()
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 
-    
     textureShader->use();
     textureShader->setMat4("projection", projection);
-
-    // 드론을 먼저 그리고
     droneManager->Draw(*textureShader);
-    // 플레이어를 마지막에 그린다
     player.Draw(*textureShader);
+
+    // [추가] 펄스 게이지 그리기
+    colorShader->use();
+    m_pulseGauge.Draw(*colorShader);
 }
 
 void GameplayState::Shutdown()
@@ -114,5 +149,6 @@ void GameplayState::Shutdown()
         source.Shutdown();
     }
     droneManager->Shutdown();
+    m_pulseGauge.Shutdown(); // [추가]
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
 }
