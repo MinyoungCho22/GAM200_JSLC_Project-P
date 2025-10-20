@@ -1,6 +1,6 @@
 #pragma once
 #include "../Engine/GameState.hpp"
-#include "../Engine/DebugRenderer.hpp" // [Ãß°¡]
+#include "../Engine/DebugRenderer.hpp"
 #include "Player.hpp"
 #include "PulseSource.hpp"
 #include "PulseManager.hpp"

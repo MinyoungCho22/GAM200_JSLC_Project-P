@@ -1,16 +1,14 @@
-#include "Player.hpp"
+ï»¿#include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <vector>
 #include <cmath>
 
 #define STB_IMAGE_IMPLEMENTATION
-#pragma warning(push)
-#pragma warning(disable: 6262)
 #include <stb_image.h>
-#pragma warning(pop)
 
 const float GRAVITY = -1500.0f;
 const float GROUND_LEVEL = 350.0f;
@@ -20,16 +18,22 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
     position = startPos;
     velocity = Math::Vec2(0.0f, 0.0f);
 
-    float vertices[] = {
-        0.0f, 1.0f,  0.0f, 1.0f, 1.0f, 0.0f,  1.0f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f,
-        0.0f, 1.0f,  0.0f, 1.0f, 1.0f, 1.0f,  1.0f, 1.0f, 1.0f, 0.0f,  1.0f, 0.0f
+    
+    std::vector<float> vertices = {
+        0.0f, 1.0f,  0.0f, 1.0f,
+        1.0f, 0.0f,  1.0f, 0.0f,
+        0.0f, 0.0f,  0.0f, 0.0f,
+
+        0.0f, 1.0f,  0.0f, 1.0f,
+        1.0f, 1.0f,  1.0f, 1.0f,
+        1.0f, 0.0f,  1.0f, 0.0f
     };
 
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
@@ -56,13 +60,16 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
         size = Math::Vec2(desiredWidth, desiredWidth * aspectRatio);
         original_size = size;
     }
-    else { std::cout << "Failed to load texture: " << texturePath << std::endl; }
+    else {
+        std::cout << "Failed to load texture: " << texturePath << std::endl;
+    }
     stbi_image_free(data);
 }
 
+
 void Player::Update(double dt)
 {
-    // [Ãß°¡] ¹«Àû Å¸ÀÌ¸Ó ¾÷µ¥ÀÌÆ®
+    // [ì¶”ê°€] ë¬´ì  íƒ€ì´ë¨¸ ì—…ë°ì´íŠ¸
     if (m_isInvincible)
     {
         m_invincibilityTimer -= static_cast<float>(dt);
@@ -107,13 +114,13 @@ void Player::Update(double dt)
 
 void Player::Draw(const Shader& shader) const
 {
-    // [Ãß°¡] ¹«Àû »óÅÂÀÏ ¶§ ±ôºıÀÌ´Â ·ÎÁ÷
+    // [ì¶”ê°€] ë¬´ì  ìƒíƒœì¼ ë•Œ ê¹œë¹¡ì´ëŠ” ë¡œì§
     if (m_isInvincible)
     {
-        // 0.2ÃÊ¸¶´Ù 0.1ÃÊ¾¿ º¸¿´´Ù ¾È º¸¿´´Ù ¹İº¹
+        // 0.2ì´ˆë§ˆë‹¤ 0.1ì´ˆì”© ë³´ì˜€ë‹¤ ì•ˆ ë³´ì˜€ë‹¤ ë°˜ë³µ
         if (fmod(m_invincibilityTimer, 0.2f) < 0.1f)
         {
-            return; // ±×¸®Áö ¾Ê°í ÇÔ¼ö Á¾·á
+            return; // ê·¸ë¦¬ì§€ ì•Šê³  í•¨ìˆ˜ ì¢…ë£Œ
         }
     }
 
@@ -137,10 +144,10 @@ void Player::Shutdown()
     glDeleteTextures(1, &textureID);
 }
 
-// [Ãß°¡] ÇÇÇØ¸¦ ÀÔ¾úÀ» ¶§ È£ÃâµÇ´Â ÇÔ¼ö
+// [ì¶”ê°€] í”¼í•´ë¥¼ ì…ì—ˆì„ ë•Œ í˜¸ì¶œë˜ëŠ” í•¨ìˆ˜
 void Player::TakeDamage(float amount)
 {
-    if (m_isInvincible) return; // ¹«Àû »óÅÂ¸é ¾Æ¹«°Íµµ ÇÏÁö ¾ÊÀ½
+    if (m_isInvincible) return; // ë¬´ì  ìƒíƒœë©´ ì•„ë¬´ê²ƒë„ í•˜ì§€ ì•ŠìŒ
 
     m_pulseCore.getPulse().spend(amount);
     m_isInvincible = true;
