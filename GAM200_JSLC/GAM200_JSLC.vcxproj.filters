@@ -132,6 +132,9 @@
     <ClInclude Include="Engine\DebugRenderer.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
+    <ClInclude Include="OpenGL\GLWrapper.hpp">
+      <Filter>OpenGL</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="OpenGL\Shaders\simple.vert">

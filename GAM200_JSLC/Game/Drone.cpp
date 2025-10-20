@@ -2,7 +2,7 @@
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
-#include <glad/glad.h>
+#include "../OpenGL/GLWrapper.hpp"
 #include <stb_image.h>
 #include <cmath>
 
@@ -12,34 +12,33 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
     m_velocity = { 0.0f, 0.0f };
     m_direction = { 1.0f, 0.0f };
 
-    // [수정] 정점을 (-0.5, -0.5) ~ (0.5, 0.5) 범위로 변경하여 회전축을 중앙으로 설정
     float vertices[] = {
-        // positions    // texture Coords
-        -0.5f,  0.5f,   0.0f, 1.0f,
-         0.5f, -0.5f,   1.0f, 0.0f,
-        -0.5f, -0.5f,   0.0f, 0.0f,
+        // positions      // texture Coords
+        -0.5f,  0.5f,     0.0f, 1.0f,
+         0.5f, -0.5f,     1.0f, 0.0f,
+        -0.5f, -0.5f,     0.0f, 0.0f,
 
-        -0.5f,  0.5f,   0.0f, 1.0f,
-         0.5f,  0.5f,   1.0f, 1.0f,
-         0.5f, -0.5f,   1.0f, 0.0f
+        -0.5f,  0.5f,     0.0f, 1.0f,
+         0.5f,  0.5f,     1.0f, 1.0f,
+         0.5f, -0.5f,     1.0f, 0.0f
     };
 
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    GL::GenVertexArrays(1, &VAO);
+    GL::GenBuffers(1, &VBO);
+    GL::BindVertexArray(VAO);
+    GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
+    GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    GL::EnableVertexAttribArray(0);
+    GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    GL::EnableVertexAttribArray(1);
 
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    GL::GenTextures(1, &textureID);
+    GL::BindTexture(GL_TEXTURE_2D, textureID);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
@@ -47,8 +46,8 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
     if (data)
     {
         GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
+        GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        GL::GenerateMipmap(GL_TEXTURE_2D);
         float desiredWidth = 60.0f;
         float aspectRatio = static_cast<float>(height) / static_cast<float>(width);
         m_size = { desiredWidth, desiredWidth * aspectRatio };
@@ -90,26 +89,23 @@ void Drone::Draw(const Shader& shader) const
     }
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(m_size);
-    // [수정] 드론의 위치 기준점을 중앙으로 변경
     Math::Matrix transMatrix = Math::Matrix::CreateTranslation(m_position);
-
-    // [수정] 모델 행렬 계산 순서 변경: 이동 -> 회전 -> 크기
     Math::Matrix model = transMatrix * rotationMatrix * scaleMatrix;
 
     shader.setMat4("model", model);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+    GL::ActiveTexture(GL_TEXTURE0);
+    GL::BindTexture(GL_TEXTURE_2D, textureID);
+    GL::BindVertexArray(VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
 }
 
 void Drone::Shutdown()
 {
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteTextures(1, &textureID);
+    GL::DeleteVertexArrays(1, &VAO);
+    GL::DeleteBuffers(1, &VBO);
+    GL::DeleteTextures(1, &textureID);
 }
 
 void Drone::TakeHit()

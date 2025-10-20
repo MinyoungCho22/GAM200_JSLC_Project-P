@@ -1,7 +1,7 @@
 ﻿#include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
-#include <glad/glad.h>
+#include "../OpenGL/GLWrapper.hpp"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <vector>
@@ -18,7 +18,6 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
     position = startPos;
     velocity = Math::Vec2(0.0f, 0.0f);
 
-    
     std::vector<float> vertices = {
         0.0f, 1.0f,  0.0f, 1.0f,
         1.0f, 0.0f,  1.0f, 0.0f,
@@ -29,22 +28,22 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
         1.0f, 0.0f,  1.0f, 0.0f
     };
 
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    GL::GenVertexArrays(1, &VAO);
+    GL::GenBuffers(1, &VBO);
+    GL::BindVertexArray(VAO);
+    GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
+    GL::BufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    GL::EnableVertexAttribArray(0);
+    GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    GL::EnableVertexAttribArray(1);
 
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    GL::GenTextures(1, &textureID);
+    GL::BindTexture(GL_TEXTURE_2D, textureID);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
@@ -52,8 +51,8 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
     if (data)
     {
         GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
+        GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        GL::GenerateMipmap(GL_TEXTURE_2D);
 
         float desiredWidth = 120.0f;
         float aspectRatio = static_cast<float>(height) / static_cast<float>(width);
@@ -69,7 +68,6 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
 
 void Player::Update(double dt)
 {
-    // [추가] 무적 타이머 업데이트
     if (m_isInvincible)
     {
         m_invincibilityTimer -= static_cast<float>(dt);
@@ -92,7 +90,7 @@ void Player::Update(double dt)
     {
         velocity.y += GRAVITY * static_cast<float>(dt);
     }
-    
+
     Math::Vec2 final_velocity = velocity;
     if (is_dashing) {
         final_velocity.x = last_move_direction * dash_speed;
@@ -114,13 +112,11 @@ void Player::Update(double dt)
 
 void Player::Draw(const Shader& shader) const
 {
-    // [추가] 무적 상태일 때 깜빡이는 로직
     if (m_isInvincible)
     {
-        // 0.2초마다 0.1초씩 보였다 안 보였다 반복
         if (fmod(m_invincibilityTimer, 0.2f) < 0.1f)
         {
-            return; // 그리지 않고 함수 종료
+            return;
         }
     }
 
@@ -130,24 +126,23 @@ void Player::Draw(const Shader& shader) const
 
     shader.setMat4("model", model);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+    GL::ActiveTexture(GL_TEXTURE0);
+    GL::BindTexture(GL_TEXTURE_2D, textureID);
+    GL::BindVertexArray(VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
 }
 
 void Player::Shutdown()
 {
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteTextures(1, &textureID);
+    GL::DeleteVertexArrays(1, &VAO);
+    GL::DeleteBuffers(1, &VBO);
+    GL::DeleteTextures(1, &textureID);
 }
 
-// [추가] 피해를 입었을 때 호출되는 함수
 void Player::TakeDamage(float amount)
 {
-    if (m_isInvincible) return; // 무적 상태면 아무것도 하지 않음
+    if (m_isInvincible) return;
 
     m_pulseCore.getPulse().spend(amount);
     m_isInvincible = true;

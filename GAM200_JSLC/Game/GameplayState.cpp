@@ -4,7 +4,7 @@
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Logger.hpp"
 #include "../Engine/Matrix.hpp"
-#include <glad/glad.h>
+#include "../OpenGL/GLWrapper.hpp"
 #include <GLFW/glfw3.h>
 
 constexpr float GROUND_LEVEL = 350.0f;
@@ -23,15 +23,15 @@ void GameplayState::Initialize()
     colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
 
     float line_vertices[] = { -0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, -0.5f };
-    glGenVertexArrays(1, &groundVAO);
-    glGenBuffers(1, &groundVBO);
-    glBindVertexArray(groundVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, groundVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(line_vertices), line_vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    GL::GenVertexArrays(1, &groundVAO);
+    GL::GenBuffers(1, &groundVBO);
+    GL::BindVertexArray(groundVAO);
+    GL::BindBuffer(GL_ARRAY_BUFFER, groundVBO);
+    GL::BufferData(GL_ARRAY_BUFFER, sizeof(line_vertices), line_vertices, GL_STATIC_DRAW);
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    GL::EnableVertexAttribArray(0);
+    GL::BindBuffer(GL_ARRAY_BUFFER, 0);
+    GL::BindVertexArray(0);
 
     player.Init({ 200.0f, GROUND_LEVEL + 400.0f }, "Asset/player.png");
 
@@ -65,16 +65,22 @@ void GameplayState::Update(double dt)
 
     m_isDebugDraw = (glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS);
 
-   
     Math::Vec2 playerPos = player.GetPosition();
     Math::Vec2 playerSize = player.GetSize();
     Math::Vec2 playerCenter = { playerPos.x + 60.0f, playerPos.y + playerSize.y / 1.1f };
 
     if (true)
     {
-        Logger::Instance().Log(Logger::Severity::Debug, "Player Pulse: %.1f / %.1f",
-            player.GetPulseCore().getPulse().Value(),
-            player.GetPulseCore().getPulse().Max());
+        // Update the log timer every frame
+        m_logTimer += dt;
+        // Check if 0.5 seconds have passed
+        if (m_logTimer >= 0.5)
+        {
+            Logger::Instance().Log(Logger::Severity::Debug, "Player Pulse: %.1f / %.1f",
+                player.GetPulseCore().getPulse().Value(),
+                player.GetPulseCore().getPulse().Max());
+            m_logTimer -= 0.5; // Reset the timer
+        }
 
         bool isPressingE = (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS);
         pulseManager->Update(player, pulseSources, isPressingE, dt);
@@ -95,7 +101,6 @@ void GameplayState::Update(double dt)
                 auto& drones = droneManager->GetDrones();
                 for (auto& drone : drones)
                 {
-                    // 위에서 계산한 playerCenter를 사용하여 공격 사거리를 판정합니다.
                     float distSq = (playerCenter - drone.GetPosition()).LengthSq();
                     if (distSq < ATTACK_RANGE_SQ)
                     {
@@ -119,7 +124,6 @@ void GameplayState::Update(double dt)
         Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
         Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
 
-        // [수정] playerCenter를 기준으로 플레이어의 히트박스(AABB)를 계산합니다.
         float playerMinX = playerCenter.x - playerHitboxSize.x / 2.0f;
         float playerMaxX = playerCenter.x + playerHitboxSize.x / 2.0f;
         float playerMinY = playerCenter.y - playerHitboxSize.y / 2.0f;
@@ -145,7 +149,7 @@ void GameplayState::Update(double dt)
 
 void GameplayState::Draw()
 {
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     Engine& engine = gsm.GetEngine();
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
@@ -160,9 +164,9 @@ void GameplayState::Draw()
     Math::Matrix groundModel = Math::Matrix::CreateTranslation(groundPosition) * Math::Matrix::CreateScale(groundSize);
     colorShader->setMat4("model", groundModel);
     colorShader->setVec3("objectColor", 0.8f, 0.8f, 0.8f);
-    glBindVertexArray(groundVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+    GL::BindVertexArray(groundVAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
 
     textureShader->use();
     textureShader->setMat4("projection", projection);
@@ -176,22 +180,16 @@ void GameplayState::Draw()
     {
         colorShader->use();
 
-        // 플레이어의 중심을 기준으로 사거리와 히트박스를 그리자
         Math::Vec2 playerPos = player.GetPosition();
         Math::Vec2 playerSize = player.GetSize();
         Math::Vec2 playerCenter = { playerPos.x + 60.0f, playerPos.y + playerSize.y / 1.1f };
 
-        // 플레이어 공격 사거리 그리기
         m_debugRenderer->DrawCircle(*colorShader, playerCenter, ATTACK_RANGE * 0.7f, { 0.2f, 0.8f });
-
-        // 플레이어 히트박스 그리기
         m_debugRenderer->DrawBox(*colorShader, playerCenter, { playerSize.x * 0.4f, playerSize.y * 0.8f }, { 0.2f, 0.2f });
 
-        // 드론 히트박스 그리기
         const auto& drones = droneManager->GetDrones();
         for (const auto& drone : drones)
         {
-            // 드론의 위치 기준점은 이미 중앙이므로 그대로 사용
             m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 0.8f, 0.2f });
         }
     }
@@ -200,8 +198,8 @@ void GameplayState::Draw()
 void GameplayState::Shutdown()
 {
     player.Shutdown();
-    glDeleteVertexArrays(1, &groundVAO);
-    glDeleteBuffers(1, &groundVBO);
+    GL::DeleteVertexArrays(1, &groundVAO);
+    GL::DeleteBuffers(1, &groundVBO);
     for (auto& source : pulseSources) {
         source.Shutdown();
     }

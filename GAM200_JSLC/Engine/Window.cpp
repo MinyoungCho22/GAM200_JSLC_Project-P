@@ -1,12 +1,11 @@
 #include "Window.hpp"
-#include "../CS200/RenderingAPI.hpp" 
-#include "Logger.hpp" 
-#include <GL/glew.h>
+#include "../CS200/RenderingAPI.hpp"
+#include "Logger.hpp"
+#include "../OpenGL/GLWrapper.hpp"
 #include <SDL2/SDL.h>
 #include "Vec2.hpp"
-#include <stdexcept> 
+#include <stdexcept>
 
-// OpenGL 속성 설정을 위한 Helper 함수
 namespace
 {
     void hint_gl(SDL_GLattr attr, int value)
@@ -45,7 +44,7 @@ void Window::Initialize(std::string_view title)
     catch (const std::runtime_error& e)
     {
         Logger::Instance().Log(Logger::Severity::Error, "Window initialization failed: %s", e.what());
-        is_closed = true; // 초기화 실패 시 창을 닫힌 상태로 설정
+        is_closed = true;
         return;
     }
 
@@ -81,7 +80,6 @@ void Window::Clear(CS200::RGBA color)
 void Window::ForceResize(int desired_width, int desired_height)
 {
     SDL_SetWindowSize(sdlWindow, desired_width, desired_height);
-    // 실제 크기는 이벤트 루프에서 업데이트되므로 여기서는 로그만 남기도록 하자
     Logger::Instance().Log(Logger::Severity::Event, "Window resize forced to: %dx%d", desired_width, desired_height);
 }
 
@@ -143,14 +141,13 @@ void Window::setupOpenGL()
         throw std::runtime_error("Unable to initialize GLEW");
     }
 
-    // VSync 설정 (Adaptive VSync 시도 후 실패 시 일반 VSync로 전환)
     if (SDL_GL_SetSwapInterval(-1) < 0)
     {
         SDL_GL_SetSwapInterval(1);
     }
 
     CS200::RenderingAPI::Init();
-    Logger::Instance().Log(Logger::Severity::Debug, "OpenGL Version: %s", reinterpret_cast<const char*>(glGetString(GL_VERSION)));
+    Logger::Instance().Log(Logger::Severity::Debug, "OpenGL Version: %s", reinterpret_cast<const char*>(GL::GetString(GL_VERSION)));
 }
 
 void Window::processEvents()
@@ -176,7 +173,7 @@ void Window::processEvents()
             else if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
             {
                 SDL_GL_GetDrawableSize(sdlWindow, &size.x, &size.y);
-                glViewport(0, 0, size.x, size.y);
+                GL::Viewport(0, 0, size.x, size.y);
                 Logger::Instance().Log(Logger::Severity::Debug, "Window resized to %dx%d", size.x, size.y);
             }
             break;

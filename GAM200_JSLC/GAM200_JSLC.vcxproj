@@ -170,6 +170,7 @@
     <ClInclude Include="Game\PulseSource.hpp" />
     <ClInclude Include="Game\PulseCore.hpp" />
     <ClInclude Include="Game\SplashState.hpp" />
+    <ClInclude Include="OpenGL\GLWrapper.hpp" />
     <ClInclude Include="OpenGL\Shader.hpp" />
   </ItemGroup>
   <ItemGroup>
