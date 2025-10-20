@@ -144,8 +144,8 @@
     <ClCompile Include="Game\GameplayState.cpp" />
     <ClCompile Include="Game\Player.cpp" />
     <ClCompile Include="Game\PulseGauge.cpp" />
-    <ClCompile Include="Game\PurseManager.cpp" />
-    <ClCompile Include="Game\PurseSource.cpp" />
+    <ClCompile Include="Game\PulseManager.cpp" />
+    <ClCompile Include="Game\PulseSource.cpp" />
     <ClCompile Include="Game\SplashState.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="OpenGL\Shader.cpp" />
@@ -168,7 +168,7 @@
     <ClInclude Include="Game\PulseGauge.hpp" />
     <ClInclude Include="Game\PulseManager.hpp" />
     <ClInclude Include="Game\PulseSource.hpp" />
-    <ClInclude Include="Game\PurseCore.hpp" />
+    <ClInclude Include="Game\PulseCore.hpp" />
     <ClInclude Include="Game\SplashState.hpp" />
     <ClInclude Include="OpenGL\Shader.hpp" />
   </ItemGroup>

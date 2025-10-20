@@ -43,10 +43,10 @@
     <ClCompile Include="CS200\RenderingAPI.cpp">
       <Filter>CS200</Filter>
     </ClCompile>
-    <ClCompile Include="Game\PurseManager.cpp">
+    <ClCompile Include="Game\PulseManager.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="Game\PurseSource.cpp">
+    <ClCompile Include="Game\PulseSource.cpp">
       <Filter>Game</Filter>
     </ClCompile>
     <ClCompile Include="Engine\GameStateManager.cpp">
@@ -99,7 +99,7 @@
     <ClInclude Include="CS200\RGBA.hpp">
       <Filter>CS200</Filter>
     </ClInclude>
-    <ClInclude Include="Game\PurseCore.hpp">
+    <ClInclude Include="Game\PulseCore.hpp">
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\PulseManager.hpp">

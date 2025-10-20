@@ -1,6 +1,6 @@
 #pragma once
 #include "../Engine/Vec2.hpp"
-#include "../Game/PurseCore.hpp"
+#include "../Game/PulseCore.hpp"
 
 class Shader;
 
