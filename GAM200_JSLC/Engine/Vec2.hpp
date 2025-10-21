@@ -50,4 +50,9 @@ namespace Math
     Vec2 operator*(float scalar, const Vec2& rhs);
     Vec2 operator/(const Vec2& lhs, float scalar);
 
+    // [추가] Lerp 함수 선언
+    // a와 b 벡터 사이를 t(0.0 ~ 1.0) 비율로 선형 보간
+    Vec2 Lerp(Vec2 a, Vec2 b, float t);
+
+
 } // namespace Math

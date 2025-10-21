@@ -41,7 +41,7 @@ void DebugRenderer::Initialize()
     GL::BindVertexArray(0);
 }
 
-void DebugRenderer::Shutdown()
+void DebugRenderer::Shutdown() const
 {
     GL::DeleteVertexArrays(1, &circleVAO);
     GL::DeleteVertexArrays(1, &boxVAO);
@@ -49,7 +49,7 @@ void DebugRenderer::Shutdown()
     GL::DeleteBuffers(1, &EBO);
 }
 
-void DebugRenderer::DrawCircle(Shader& shader, Math::Vec2 center, float radius, Math::Vec2 color)
+void DebugRenderer::DrawCircle(Shader& shader, Math::Vec2 center, float radius, Math::Vec2 color) const
 {
     Math::Matrix model = Math::Matrix::CreateTranslation(center) * Math::Matrix::CreateScale({ radius, radius });
     shader.setMat4("model", model);
@@ -60,7 +60,7 @@ void DebugRenderer::DrawCircle(Shader& shader, Math::Vec2 center, float radius, 
     GL::BindVertexArray(0);
 }
 
-void DebugRenderer::DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, Math::Vec2 color)
+void DebugRenderer::DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, Math::Vec2 color) const
 {
     Math::Matrix model = Math::Matrix::CreateTranslation(pos) * Math::Matrix::CreateScale(size);
     shader.setMat4("model", model);

@@ -55,6 +55,11 @@ namespace Math
         return Vec2();
     }
 
+    Vec2 Lerp(Vec2 a, Vec2 b, float t)
+    {
+        return a + (b - a) * t;
+    }
+
     // Vec2 멤버 연산자 구현
     Vec2& Vec2::operator+=(const Vec2& rhs) { x += rhs.x; y += rhs.y; return *this; }
     Vec2& Vec2::operator-=(const Vec2& rhs) { x -= rhs.x; y -= rhs.y; return *this; }

@@ -196,3 +196,8 @@ void Player::Dash()
         dash_timer = dash_duration;
     }
 }
+
+void Player::SetPosition(Math::Vec2 new_pos)
+{
+    position = new_pos;
+}

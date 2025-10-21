@@ -21,7 +21,7 @@ public:
 
     // [추가] 피해를 입는 함수
     void TakeDamage(float amount);
-
+    void SetPosition(Math::Vec2 new_pos);
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
     PulseCore& GetPulseCore() { return m_pulseCore; }

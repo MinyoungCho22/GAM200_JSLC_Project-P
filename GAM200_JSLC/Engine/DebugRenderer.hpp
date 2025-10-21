@@ -7,13 +7,13 @@ class DebugRenderer
 {
 public:
     void Initialize();
-    void Shutdown();
+    void Shutdown() const;
 
   
-    void DrawCircle(Shader& shader, Math::Vec2 center, float radius, Math::Vec2 color);
+    void DrawCircle(Shader& shader, Math::Vec2 center, float radius, Math::Vec2 color) const;
 
     
-    void DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, Math::Vec2 color);
+    void DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, Math::Vec2 color) const;
 
 private:
     unsigned int circleVAO = 0;
