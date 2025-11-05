@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include <string>
 #include <memory>
-#include "Input.hpp" // Input 헤더 포함
+#include "Input.hpp"
 
 struct GLFWwindow;
 class GameStateManager;

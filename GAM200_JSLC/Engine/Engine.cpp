@@ -35,7 +35,7 @@ bool Engine::Initialize(const std::string& windowTitle)
     glfwSetWindowUserPointer(m_window, this);
     glfwSetKeyCallback(m_window, KeyCallback);
 
-    // ✅ Input::Input 타입으로 Input 매니저 초기화
+    // Input::Input 타입으로 Input 매니저 초기화
     m_input = std::make_unique<Input::Input>();
     m_input->Initialize(m_window);
 
