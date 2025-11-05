@@ -1,4 +1,4 @@
-#include "Engine.hpp"
+ï»¿#include "Engine.hpp"
 #include "Logger.hpp"
 #include "GameStateManager.hpp"
 #include "../Game/SplashState.hpp"
@@ -17,13 +17,11 @@ bool Engine::Initialize(const std::string& windowTitle)
         return false;
     }
 
-    // Ã¢ ¸ðµå·Î ½ÇÇàÇÏ±â À§ÇØ ¿øÇÏ´Â ³Êºñ¿Í ³ôÀÌ¸¦ Á÷Á¢ ¼³Á¤ÇÕ´Ï´Ù.
     m_width = 1980;
     m_height = 1080;
     m_windowedWidth = m_width;
     m_windowedHeight = m_height;
 
-    // ³× ¹øÂ° ÀÎÀÚ(monitor)¸¦ nullptr·Î ¹Ù²ã¼­ Ã¢ ¸ðµå·Î ¶ç¿ó´Ï´Ù.
     m_window = glfwCreateWindow(m_width, m_height, windowTitle.c_str(), nullptr, nullptr);
 
     if (!m_window) {
@@ -32,16 +30,14 @@ bool Engine::Initialize(const std::string& windowTitle)
         return false;
     }
 
-    // ÀüÃ¼È­¸é¿¡¼­ µ¹¾Æ¿Ã ¶§ »ç¿ëÇÒ ÃÊ±â Ã¢ À§Ä¡¸¦ ÀúÀåÇÕ´Ï´Ù.
     glfwGetWindowPos(m_window, &m_windowedX, &m_windowedY);
-
     glfwMakeContextCurrent(m_window);
-
-    // ÄÝ¹é ÇÔ¼ö°¡ EngineÀÇ ¸â¹ö ÇÔ¼ö¿¡ Á¢±ÙÇÒ ¼ö ÀÖµµ·Ï this Æ÷ÀÎÅÍ¸¦ µî·ÏÇÕ´Ï´Ù.
     glfwSetWindowUserPointer(m_window, this);
-
-    // KeyCallback ÇÔ¼ö¸¦ GLFW¿¡ Å°º¸µå ÄÝ¹éÀ¸·Î µî·ÏÇÕ´Ï´Ù.
     glfwSetKeyCallback(m_window, KeyCallback);
+
+    // âœ… Input::Input íƒ€ìž…ìœ¼ë¡œ Input ë§¤ë‹ˆì € ì´ˆê¸°í™”
+    m_input = std::make_unique<Input::Input>();
+    m_input->Initialize(m_window);
 
     glewExperimental = GL_TRUE;
     if (glewInit() != GLEW_OK) {
@@ -70,12 +66,11 @@ void Engine::GameLoop()
         m_lastFrameTime = currentFrameTime;
 
         glfwPollEvents();
+        m_input->Update();
         Update();
 
         GL::Clear(GL_COLOR_BUFFER_BIT);
-
         m_gameStateManager->Draw();
-
         glfwSwapBuffers(m_window);
     }
 }
@@ -85,14 +80,11 @@ void Engine::Update()
     m_gameStateManager->Update(m_deltaTime);
 }
 
-// Å°º¸µå ÀÔ·ÂÀÌ ¹ß»ýÇÒ ¶§¸¶´Ù È£ÃâµÉ ÄÝ¹é ÇÔ¼ö
 void Engine::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    // Ã¢¿¡ µî·ÏÇØ µÐ Engine °´Ã¼¸¦ ´Ù½Ã °¡Á®¿È
     Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
     if (engine)
     {
-        // Alt + Enter Å°°¡ '´­·ÈÀ» ¶§'¸¸ ½ÇÇà
         if (key == GLFW_KEY_ENTER && action == GLFW_PRESS && mods == GLFW_MOD_ALT)
         {
             engine->ToggleFullscreen();
@@ -100,32 +92,31 @@ void Engine::KeyCallback(GLFWwindow* window, int key, int scancode, int action, 
     }
 }
 
-// ½ÇÁ¦ ÀüÃ¼È­¸é/Ã¢¸ðµå ÀüÈ¯ ·ÎÁ÷
 void Engine::ToggleFullscreen()
 {
     m_isFullscreen = !m_isFullscreen;
 
     if (m_isFullscreen)
     {
-        // --- ÀüÃ¼È­¸éÀ¸·Î ÀüÈ¯ ---
-        // 1. ÇöÀç Ã¢ÀÇ À§Ä¡¿Í Å©±â¸¦ ÀúÀåÇÕ´Ï´Ù.
         glfwGetWindowPos(m_window, &m_windowedX, &m_windowedY);
         glfwGetWindowSize(m_window, &m_windowedWidth, &m_windowedHeight);
-
-        // 2. ÁÖ ¸ð´ÏÅÍÀÇ ÇØ»óµµ¸¦ °¡Á®¿É´Ï´Ù.
         GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
-
-        // 3. ÀüÃ¼È­¸éÀ¸·Î ÀüÈ¯ÇÕ´Ï´Ù.
         glfwSetWindowMonitor(m_window, primaryMonitor, 0, 0, mode->width, mode->height, mode->refreshRate);
         Logger::Instance().Log(Logger::Severity::Event, "Switched to Fullscreen mode");
     }
     else
     {
-        // --- Ã¢ ¸ðµå·Î ÀüÈ¯ ---
-        // ÀúÀåÇØ µÐ À§Ä¡¿Í Å©±â¸¦ »ç¿ëÇØ Ã¢ ¸ðµå·Î µÇµ¹¸³´Ï´Ù.
         glfwSetWindowMonitor(m_window, nullptr, m_windowedX, m_windowedY, m_windowedWidth, m_windowedHeight, 0);
         Logger::Instance().Log(Logger::Severity::Event, "Switched to Windowed mode");
+    }
+}
+
+void Engine::RequestShutdown()
+{
+    if (m_window)
+    {
+        glfwSetWindowShouldClose(m_window, true);
     }
 }
 

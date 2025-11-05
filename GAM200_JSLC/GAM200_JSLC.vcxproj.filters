@@ -76,6 +76,15 @@
     <ClCompile Include="Game\Background.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Room.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Collision.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Input.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -149,6 +158,15 @@
     </ClInclude>
     <ClInclude Include="Game\Background.hpp">
       <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Room.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Collision.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Input.hpp">
+      <Filter>Engine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

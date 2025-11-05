@@ -1,6 +1,7 @@
-#pragma once
+ï»¿#pragma once
 #include <string>
 #include <memory>
+#include "Input.hpp" // Input í—¤ë” í¬í•¨
 
 struct GLFWwindow;
 class GameStateManager;
@@ -13,17 +14,19 @@ public:
     bool Initialize(const std::string& windowTitle);
     void GameLoop();
     void Shutdown();
+    void RequestShutdown();
     double GetDeltaTime() const { return m_deltaTime; }
     GLFWwindow* GetWindow() const { return m_window; }
     int GetWidth() const { return m_width; }
     int GetHeight() const { return m_height; }
+
+    Input::Input& GetInput() const { return *m_input; }
 
     void ToggleFullscreen();
 
 private:
     void Update();
 
-    // Å°º¸µå ÀÔ·ÂÀ» Ã³¸®ÇÒ Äİ¹é ÇÔ¼ö (staticÀ¸·Î ¼±¾ğÇØ¾ß ÇÔ)
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
     GLFWwindow* m_window = nullptr;
@@ -33,9 +36,9 @@ private:
     double m_deltaTime = 0.0;
     double m_lastFrameTime = 0.0;
 
-    // --- ÀüÃ¼È­¸é »óÅÂ ÀúÀåÀ» À§ÇÑ º¯¼öµé ---
+    std::unique_ptr<Input::Input> m_input; // âœ… Input::Input íƒ€ì…ìœ¼ë¡œ ìˆ˜ì •
+
     bool m_isFullscreen = false;
-    // Ã¢ ¸ğµåÀÏ ¶§ÀÇ À§Ä¡¿Í Å©±â¸¦ ÀúÀåÇØ µÑ º¯¼ö
     int m_windowedX = 100;
     int m_windowedY = 100;
     int m_windowedWidth = 1980;
