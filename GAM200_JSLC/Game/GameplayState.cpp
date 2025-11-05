@@ -7,7 +7,6 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Collision.hpp"
 
-// ✅ [수정] 바닥 높이를 230.0f로 변경
 constexpr float GROUND_LEVEL = 230.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
 constexpr float ATTACK_RANGE = 200.0f;
@@ -60,7 +59,7 @@ void GameplayState::Initialize()
     /*
     const float roomWidth = 1620.0f;
     const float minX = (engine.GetWidth() - roomWidth) / 2.0f;
-    // ✅ [수정] 드론 Y좌표를 새 GROUND_LEVEL 기준으로 변경
+    // 드론 Y좌표를 새 GROUND_LEVEL 기준으로 변경
     droneManager->SpawnDrone({ minX + 620.0f, GROUND_LEVEL + 300.0f }, "Asset/Drone.png"); // 230 + 300 = 530
     droneManager->SpawnDrone({ minX + 1020.0f, GROUND_LEVEL + 100.0f }, "Asset/Drone.png"); // 230 + 100 = 330
     droneManager->SpawnDrone({ minX + 1520.0f, GROUND_LEVEL + 20.0f }, "Asset/Drone.png"); // 230 + 20 = 250
