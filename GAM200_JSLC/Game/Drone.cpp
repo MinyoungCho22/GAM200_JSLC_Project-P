@@ -3,8 +3,12 @@
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include <stb_image.h>
 #include <cmath>
+
+#pragma warning(push, 0)
+// ✅ [수정] #define STB_IMAGE_IMPLEMENTATION 라인을 삭제
+#include <stb_image.h>
+#pragma warning(pop)
 
 void Drone::Init(Math::Vec2 startPos, const char* texturePath)
 {
@@ -13,7 +17,6 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
     m_direction = { 1.0f, 0.0f };
 
     float vertices[] = {
-        // positions      // texture Coords
         -0.5f,  0.5f,     0.0f, 1.0f,
          0.5f, -0.5f,     1.0f, 0.0f,
         -0.5f, -0.5f,     0.0f, 0.0f,
@@ -92,7 +95,11 @@ void Drone::Draw(const Shader& shader) const
     Math::Matrix transMatrix = Math::Matrix::CreateTranslation(m_position);
     Math::Matrix model = transMatrix * rotationMatrix * scaleMatrix;
 
+    shader.use();
     shader.setMat4("model", model);
+
+    shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    shader.setBool("flipX", m_direction.x < 0.0f);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureID);

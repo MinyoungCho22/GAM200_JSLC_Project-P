@@ -1,12 +1,15 @@
-#include "Background.hpp"
+Ôªø#include "Background.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp"
-#include <stb_image.h>
 #include <iostream>
+
+#pragma warning(push, 0)
+// ‚úÖ [ÏàòÏ†ï] #define STB_IMAGE_IMPLEMENTATION ÎùºÏù∏ÏùÑ ÏÇ≠Ï†ú
+#include <stb_image.h>
+#pragma warning(pop)
 
 void Background::Initialize(const char* texturePath)
 {
-    // 1. ≈ÿΩ∫√≥ ∑ŒµÂ (stb_image ªÁøÎ)
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
     unsigned char* data = stbi_load(texturePath, &width, &height, &nrChannels, 0);
@@ -17,7 +20,6 @@ void Background::Initialize(const char* texturePath)
         return;
     }
 
-    // 2. OpenGL ≈ÿΩ∫√≥ ª˝º∫
     GL::GenTextures(1, &m_textureID);
     GL::BindTexture(GL_TEXTURE_2D, m_textureID);
 
@@ -25,7 +27,6 @@ void Background::Initialize(const char* texturePath)
     GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
     GL::GenerateMipmap(GL_TEXTURE_2D);
 
-    // πË∞Ê ¿ÃπÃ¡ˆ¥¬ π›∫πµ«¡ˆ æ ∞Ì ∞°¿Â¿⁄∏Æø° ∏¬√Á¡ˆµµ∑œ º≥¡§
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -33,17 +34,14 @@ void Background::Initialize(const char* texturePath)
 
     stbi_image_free(data);
 
-    // 3. VAO/VBO ª˝º∫ (¡ﬂæ” ±‚¡ÿ ªÁ∞¢«¸)
-    // ∑ª¥ı∏µø° ªÁøÎ«“ ªÁ∞¢«¸ ¡§¡° (¿ßƒ° 2f, ≈ÿΩ∫√≥ ¡¬«• 2f)
     float vertices[] = {
-        // positions    // texture Coords
-        -0.5f,  0.5f,   0.0f, 1.0f, // Top-left
-         0.5f, -0.5f,   1.0f, 0.0f, // Bottom-right
-        -0.5f, -0.5f,   0.0f, 0.0f, // Bottom-left
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f,
+        -0.5f, -0.5f,   0.0f, 0.0f,
 
-        -0.5f,  0.5f,   0.0f, 1.0f, // Top-left
-         0.5f,  0.5f,   1.0f, 1.0f, // Top-right
-         0.5f, -0.5f,   1.0f, 0.0f  // Bottom-right
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f,  0.5f,   1.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f
     };
 
     GL::GenVertexArrays(1, &VAO);
@@ -53,10 +51,8 @@ void Background::Initialize(const char* texturePath)
     GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
     GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Position attribute
     GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     GL::EnableVertexAttribArray(0);
-    // Texture coord attribute
     GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     GL::EnableVertexAttribArray(1);
 
@@ -72,17 +68,16 @@ void Background::Shutdown()
 
 void Background::Draw(Shader& shader, const Math::Matrix& model)
 {
-    // ∏µ® «‡∑ƒ¿ª ºŒ¿Ã¥ıø° ¿¸¥ﬁ
     shader.setMat4("model", model);
 
-    // ≈ÿΩ∫√≥∏¶ »∞º∫»≠«œ∞Ì πŸ¿Œµ˘
+    shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    shader.setBool("flipX", false);
+
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, m_textureID);
 
-    // VAO∏¶ πŸ¿Œµ˘«œ∞Ì ªÁ∞¢«¸ ±◊∏Æ±‚
     GL::BindVertexArray(VAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
 
-    // πŸ¿Œµ˘ «ÿ¡¶
     GL::BindVertexArray(0);
 }

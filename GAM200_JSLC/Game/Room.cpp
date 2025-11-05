@@ -2,10 +2,10 @@
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 
-// --- [수정] 방의 크기와 바닥 위치를 여기서 정의합니다 ---
+// 방의 크기와 바닥 위치를 여기서 정의
 constexpr float ROOM_WIDTH = 1620.0f;
 constexpr float ROOM_HEIGHT = 660.0f;
-// ✅ [수정] top-left (180, 870)에 맞게 GROUND_LEVEL(minY)을 210.0f로 변경
+// 방의 '시각적' 바닥(빨간 박스)을 210.0f로 설정 (870 - 660 = 210)
 constexpr float GROUND_LEVEL = 210.0f;
 
 void Room::Initialize(Engine& engine, const char* texturePath)
@@ -13,16 +13,15 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_background = std::make_unique<Background>();
     m_background->Initialize(texturePath);
 
-    float screenWidth = static_cast<float>(engine.GetWidth());
+    float screenWidth = static_cast<float>(engine.GetWidth()); // 1980
 
     // 방의 절대 좌표 경계를 계산하고 저장합니다.
-    // ✅ [수정] minX가 (1980 - 1620) / 2 = 180.0f로, 요청과 일치합니다.
-    float minX = (screenWidth - ROOM_WIDTH) / 2.0f;
-    float maxX = minX + ROOM_WIDTH;
-    float minY = GROUND_LEVEL;
-    // ✅ [수정] maxY가 210.0f + 660.0f = 870.0f로, 요청과 일치합니다.
-    float maxY = minY + ROOM_HEIGHT;
+    float minX = (screenWidth - ROOM_WIDTH) / 2.0f; // 180
+    float maxX = minX + ROOM_WIDTH; // 1800
+    float minY = GROUND_LEVEL; // 210
+    float maxY = minY + ROOM_HEIGHT; // 210 + 660 = 870
 
+    // 경계: X는 180~1800, Y는 210~870. 요청하신 값과 일치합니다.
     m_boundaries = { {minX, minY}, {maxX, maxY} };
 
     m_roomSize = { ROOM_WIDTH, ROOM_HEIGHT };
@@ -39,24 +38,27 @@ void Room::Shutdown()
 
 void Room::Update(Player& player)
 {
-    Math::Vec2 currentPlayerPos = player.GetPosition();
-    Math::Vec2 playerSize = player.GetSize();
+    Math::Vec2 centerPos = player.GetPosition();
+    Math::Vec2 halfSize = player.GetSize() * 0.5f;
 
     // X축 경계 체크
-    if (currentPlayerPos.x < m_boundaries.bottom_left.x)
+    if (centerPos.x - halfSize.x < m_boundaries.bottom_left.x)
     {
-        player.SetPosition({ m_boundaries.bottom_left.x, currentPlayerPos.y });
+        player.SetPosition({ m_boundaries.bottom_left.x + halfSize.x, centerPos.y });
     }
-    else if (currentPlayerPos.x + playerSize.x > m_boundaries.top_right.x)
+    else if (centerPos.x + halfSize.x > m_boundaries.top_right.x)
     {
-        player.SetPosition({ m_boundaries.top_right.x - playerSize.x, currentPlayerPos.y });
+        player.SetPosition({ m_boundaries.top_right.x - halfSize.x, centerPos.y });
     }
 
     // Y축 경계 체크 (천장)
-    if (currentPlayerPos.y + playerSize.y > m_boundaries.top_right.y)
+    if (centerPos.y + halfSize.y > m_boundaries.top_right.y)
     {
-        player.SetPosition({ currentPlayerPos.x, m_boundaries.top_right.y - playerSize.y });
+        player.SetPosition({ centerPos.x, m_boundaries.top_right.y - halfSize.y });
     }
+
+    // 플레이어의 Y축 바닥 경계는 Player.cpp (230)에서 처리하므로
+    // Room.cpp (210)에서는 Y축 바닥 경계를 체크할 필요가 없음. (Player가 230 위에서 멈추기 때문)
 }
 
 void Room::Draw(Engine& engine, Shader& textureShader, const Math::Matrix& projection)
@@ -76,5 +78,7 @@ void Room::DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::M
     colorShader.use();
     colorShader.setMat4("projection", projection);
 
+    // 이 함수는 Room의 'GROUND_LEVEL = 210.0f' 기준으로 계산된 m_roomCenter를 사용하므로
+    // 항상 고정된 (180, 870) 위치에 빨간 박스를 그리게 됨.
     renderer.DrawBox(colorShader, m_roomCenter, m_roomSize, { 1.0f, 0.0f });
 }

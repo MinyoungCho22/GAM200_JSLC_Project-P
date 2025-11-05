@@ -1,12 +1,16 @@
-#include "SplashState.hpp"
+﻿#include "SplashState.hpp"
 #include "GameplayState.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
-#include "../OpenGL/GLWrapper.hpp"
+#include "../OpenGL/GLWrapper.hpp" 
+
+
+#pragma warning(push, 0)
 #include <stb_image.h>
+#pragma warning(pop)
 
 SplashState::SplashState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
@@ -15,9 +19,22 @@ void SplashState::Initialize()
     Logger::Instance().Log(Logger::Severity::Info, "SplashState Initialize");
     shader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
     shader->use();
-    shader->setInt("imageTexture", 0);
 
-    float vertices[] = { -0.5f, 0.5f, 0.0f, 1.0f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f, -0.5f, 1.0f, 0.0f, -0.5f, 0.5f, 0.0f, 1.0f, 0.5f, -0.5f, 1.0f, 0.0f, 0.5f, 0.5f, 1.0f, 1.0f };
+
+    shader->setInt("ourTexture", 0);
+
+    // 정점 좌표를 (-0.5, -0.5) ~ (0.5, 0.5)로 설정 (중심점 기준)
+    float vertices[] = {
+        // positions      // texture Coords
+        -0.5f,  0.5f,   0.0f, 1.0f, // Top-left
+         0.5f, -0.5f,   1.0f, 0.0f, // Bottom-right
+        -0.5f, -0.5f,   0.0f, 0.0f, // Bottom-left
+
+        -0.5f,  0.5f,   0.0f, 1.0f, // Top-left
+         0.5f,  0.5f,   1.0f, 1.0f, // Top-right
+         0.5f, -0.5f,   1.0f, 0.0f  // Bottom-right
+    };
+
     GL::GenVertexArrays(1, &VAO);
     GL::GenBuffers(1, &VBO);
     GL::BindVertexArray(VAO);
@@ -61,7 +78,9 @@ void SplashState::Update(double dt)
 
 void SplashState::Draw()
 {
+    // 흰색 배경으로 지웁니다.
     GL::ClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    GL::Clear(GL_COLOR_BUFFER_BIT);
 
     shader->use();
 
@@ -73,6 +92,10 @@ void SplashState::Draw()
 
     shader->setMat4("model", model);
     shader->setMat4("projection", projection);
+
+    // 플레이어 애니메이션으로 변경된 셰이더 상태를 리셋
+    shader->setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f); // 전체 텍스처 사용
+    shader->setBool("flipX", false); // 뒤집지 않음
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
