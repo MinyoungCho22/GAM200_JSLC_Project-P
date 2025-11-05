@@ -1,4 +1,4 @@
-#include "Shader.hpp"
+﻿#include "Shader.hpp"
 #include "../Engine/Logger.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
@@ -96,4 +96,16 @@ void Shader::setVec3(const std::string& name, float v1, float v2, float v3) cons
 void Shader::setMat4(const std::string& name, const Math::Matrix& mat) const
 {
     GL::UniformMatrix4fv(GL::GetUniformLocation(ID, name.c_str()), 1, GL_FALSE, mat.Ptr());
+}
+
+
+void Shader::setVec4(const std::string& name, float v1, float v2, float v3, float v4) const
+{
+    GL::Uniform4f(GL::GetUniformLocation(ID, name.c_str()), v1, v2, v3, v4);
+}
+
+
+void Shader::setBool(const std::string& name, bool value) const
+{
+    GL::Uniform1i(GL::GetUniformLocation(ID, name.c_str()), static_cast<int>(value));
 }

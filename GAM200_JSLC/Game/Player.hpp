@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
 
@@ -19,7 +19,6 @@ public:
     void StopCrouch();
     void Dash();
 
-    // [Ãß°¡] ÇÇÇØ¸¦ ÀÔ´Â ÇÔ¼ö
     void TakeDamage(float amount);
     void SetPosition(Math::Vec2 new_pos);
     Math::Vec2 GetPosition() const { return position; }
@@ -28,24 +27,23 @@ public:
     bool IsDashing() const { return is_dashing; }
 
 private:
-    Math::Vec2 position;
-    Math::Vec2 velocity;
-    Math::Vec2 size;
+    Math::Vec2 position{};
+    Math::Vec2 velocity{};
+    Math::Vec2 size{};
     bool is_on_ground = false;
     int last_move_direction = 1;
 
     PulseCore m_pulseCore{ 100.f, 20.f };
 
     bool is_crouching = false;
-    Math::Vec2 original_size;
+    Math::Vec2 original_size{};
 
     bool is_dashing = false;
     float dash_timer = 0.0f;
 
-    // [Ãß°¡] ¹«Àû »óÅÂ °ü¸® º¯¼ö
     bool  m_isInvincible = false;
     float m_invincibilityTimer = 0.0f;
-    const float m_invincibilityDuration = 3.0f; // 3ÃÊ ¹«Àû
+    const float m_invincibilityDuration = 3.0f;
 
     float move_speed = 300.0f;
     float jump_velocity = 600.0f;
@@ -55,4 +53,16 @@ private:
     unsigned int VAO = 0;
     unsigned int VBO = 0;
     unsigned int textureID = 0;
+
+    
+    int m_tex_width = 0;         // ì „ì²´ í…ìŠ¤ì²˜ ì‹œíŠ¸ì˜ ë„ˆë¹„
+    int m_tex_height = 0;        // ì „ì²´ í…ìŠ¤ì²˜ ì‹œíŠ¸ì˜ ë†’ì´
+    int m_frame_width = 0;       // í”„ë ˆì„ í•˜ë‚˜ì˜ ë„ˆë¹„
+
+    bool m_is_flipped = false;   // ì¢Œìš° ë°˜ì „ ì—¬ë¶€
+
+    int m_anim_total_frames = 7; // ì• ë‹ˆë©”ì´ì…˜ ì´ í”„ë ˆì„ ìˆ˜
+    int m_anim_current_frame = 0; // í˜„ì¬ í”„ë ˆì„ ì¸ë±ìŠ¤
+    float m_anim_timer = 0.0f;
+    float m_anim_frame_duration = 0.1f; // 1í”„ë ˆì„ë‹¹ 0.1ì´ˆ (10 FPS)
 };
