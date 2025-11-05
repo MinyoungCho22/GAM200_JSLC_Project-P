@@ -15,19 +15,19 @@ class Room
 public:
     Room() = default;
 
-    // 엔진을 참조하여 방의 크기와 경계를 설정하고, 배경 이미지를 로드합니다.
+    // 엔진을 참조하여 방의 크기와 경계를 설정하고, 배경 이미지를 로드
     void Initialize(Engine& engine, const char* texturePath);
 
-    // 배경 리소스를 해제합니다.
+    // 배경 리소스를 해제
     void Shutdown();
 
-    // 플레이어의 위치를 받아 방의 경계 밖으로 나가지 못하게 제한합니다.
+    // 플레이어의 위치를 받아 방의 경계 밖으로 나가지 못하게 제한
     void Update(Player& player);
 
-    // 배경 이미지를 그립니다.
+    // 배경 이미지를 그림
     void Draw(Engine& engine, Shader& textureShader, const Math::Matrix& projection);
 
-    // 디버그 모드일 때 방의 경계를 그립니다.
+    // 디버그 모드일 때 방의 경계를 그림
     void DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::Matrix& projection);
 
 private:

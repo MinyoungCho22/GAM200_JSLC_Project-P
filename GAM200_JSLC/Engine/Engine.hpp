@@ -36,7 +36,7 @@ private:
     double m_deltaTime = 0.0;
     double m_lastFrameTime = 0.0;
 
-    std::unique_ptr<Input::Input> m_input; // ✅ Input::Input 타입으로 수정
+    std::unique_ptr<Input::Input> m_input;
 
     bool m_isFullscreen = false;
     int m_windowedX = 100;

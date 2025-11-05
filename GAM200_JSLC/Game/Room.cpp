@@ -2,10 +2,10 @@
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 
-// --- 방의 크기와 바닥 위치를 여기서 정의합니다 ---
+// --- 방의 크기와 바닥 위치를 여기서 정의 ---
 constexpr float ROOM_WIDTH = 1620.0f;
 constexpr float ROOM_HEIGHT = 660.0f;
-constexpr float GROUND_LEVEL = 170.0f; // Player.cpp와 반드시 일치해야 함
+constexpr float GROUND_LEVEL = 170.0f; // Player.cpp와 반드시 일치해야 함(팀원 모두 주의 할 것)
 
 void Room::Initialize(Engine& engine, const char* texturePath)
 {
@@ -14,7 +14,7 @@ void Room::Initialize(Engine& engine, const char* texturePath)
 
     float screenWidth = static_cast<float>(engine.GetWidth());
 
-    // 방의 절대 좌표 경계를 계산하고 저장합니다.
+    // 방의 절대 좌표 경계를 계산하고 저장
     float minX = (screenWidth - ROOM_WIDTH) / 2.0f;
     float maxX = minX + ROOM_WIDTH;
     float minY = GROUND_LEVEL;
@@ -22,7 +22,7 @@ void Room::Initialize(Engine& engine, const char* texturePath)
 
     m_boundaries = { {minX, minY}, {maxX, maxY} };
 
-    // 디버그 드로잉을 위해 크기와 중심점도 저장합니다.
+    // 디버그 드로잉을 위해 크기와 중심점도 저장
     m_roomSize = { ROOM_WIDTH, ROOM_HEIGHT };
     m_roomCenter = { minX + ROOM_WIDTH / 2.0f, minY + ROOM_HEIGHT / 2.0f };
 }

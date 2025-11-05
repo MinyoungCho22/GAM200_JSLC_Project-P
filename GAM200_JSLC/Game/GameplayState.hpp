@@ -6,7 +6,7 @@
 #include "PulseManager.hpp"
 #include "DroneManager.hpp"
 #include "PulseGauge.hpp"
-#include "Room.hpp" // ✅ Background와 Camera 대신 Room을 포함
+#include "Room.hpp"
 #include <memory>
 #include <vector>
 
@@ -25,7 +25,6 @@ public:
 private:
     GameStateManager& gsm;
     Player player;
-    // unsigned int groundVAO = 0, groundVBO = 0; // ◁ Room으로 이동 (제거)
     std::unique_ptr<Shader> textureShader;
     std::unique_ptr<Shader> colorShader;
     std::vector<PulseSource> pulseSources;
@@ -34,7 +33,6 @@ private:
     PulseGauge m_pulseGauge;
     std::unique_ptr<DebugRenderer> m_debugRenderer;
     bool m_isDebugDraw = false;
-    // std::unique_ptr<Background> m_background; // ◁ Room으로 이동 (제거)
-    std::unique_ptr<Room> m_room; // ✅ Room 객체 추가
+    std::unique_ptr<Room> m_room;
     double m_logTimer = 0.0;
 };
