@@ -7,6 +7,7 @@
 #include "DroneManager.hpp"
 #include "PulseGauge.hpp"
 #include "../Engine/Camera.hpp"
+#include "Background.hpp"
 #include <memory>
 #include <vector>
 
@@ -33,6 +34,6 @@ private:
     PulseGauge m_pulseGauge;
     std::unique_ptr<DebugRenderer> m_debugRenderer;
     bool m_isDebugDraw = false;
-    std::unique_ptr<Camera> m_camera;
+    std::unique_ptr<Background> m_background;
     double m_logTimer = 0.0;
 };

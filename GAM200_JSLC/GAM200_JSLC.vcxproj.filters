@@ -73,6 +73,9 @@
     <ClCompile Include="Engine\Camera.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Background.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -143,6 +146,9 @@
     </ClInclude>
     <ClInclude Include="Engine\Rect.hpp">
       <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Background.hpp">
+      <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

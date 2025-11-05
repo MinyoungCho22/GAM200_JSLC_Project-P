@@ -11,7 +11,7 @@
 #include <stb_image.h>
 
 const float GRAVITY = -1500.0f;
-const float GROUND_LEVEL = 350.0f;
+const float GROUND_LEVEL = 170.0f;
 
 void Player::Init(Math::Vec2 startPos, const char* texturePath)
 {

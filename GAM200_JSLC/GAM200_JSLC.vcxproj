@@ -148,6 +148,7 @@
     <ClCompile Include="Engine\Matrix.cpp" />
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Engine\Window.cpp" />
+    <ClCompile Include="Game\Background.cpp" />
     <ClCompile Include="Game\Drone.cpp" />
     <ClCompile Include="Game\DroneManager.cpp" />
     <ClCompile Include="Game\GameplayState.cpp" />
@@ -172,6 +173,7 @@
     <ClInclude Include="Engine\Rect.hpp" />
     <ClInclude Include="Engine\Vec2.hpp" />
     <ClInclude Include="Engine\Window.hpp" />
+    <ClInclude Include="Game\Background.hpp" />
     <ClInclude Include="Game\Drone.hpp" />
     <ClInclude Include="Game\DroneManager.hpp" />
     <ClInclude Include="Game\GameplayState.hpp" />

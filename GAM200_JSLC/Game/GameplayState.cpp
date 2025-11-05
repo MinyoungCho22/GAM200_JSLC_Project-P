@@ -7,8 +7,9 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include <GLFW/glfw3.h>
 
-constexpr float GROUND_LEVEL = 350.0f;
-constexpr float VISUAL_Y_OFFSET = 55.0f;
+// [수정] 바닥 높이를 170.0f로 변경
+constexpr float GROUND_LEVEL = 170.0f;
+constexpr float VISUAL_Y_OFFSET = 0.0f; // Room.png에 바닥이 있으므로 0으로 설정
 constexpr float ATTACK_RANGE = 200.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
 
@@ -22,6 +23,8 @@ void GameplayState::Initialize()
     textureShader->setInt("imageTexture", 0);
     colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
 
+    // Room.png에 바닥이 있으므로, 하얀색 바닥선 VAO는 생성/사용하지 않음 (주석 처리)
+    /*
     float line_vertices[] = { -0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, -0.5f };
     GL::GenVertexArrays(1, &groundVAO);
     GL::GenBuffers(1, &groundVBO);
@@ -32,30 +35,22 @@ void GameplayState::Initialize()
     GL::EnableVertexAttribArray(0);
     GL::BindBuffer(GL_ARRAY_BUFFER, 0);
     GL::BindVertexArray(0);
+    */
 
-    player.Init({ 200.0f, GROUND_LEVEL + 400.0f }, "Asset/player.png");
+    // [수정] 플레이어 시작 위치를 새 GROUND_LEVEL 기준으로 변경
+    player.Init({ 300.0f, GROUND_LEVEL + 100.0f }, "Asset/player.png");
 
     pulseManager = std::make_unique<PulseManager>();
 
+    // [수정] 펄스 공급원을 요청하신 위치에 하나만 생성합니다.
     pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 600.f, GROUND_LEVEL + 50.f + VISUAL_Y_OFFSET }, { 50.f, 50.f }, 100.f);
-    pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 800.f, GROUND_LEVEL + 150.f + VISUAL_Y_OFFSET }, { 30.f, 80.f }, 150.f);
-    pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 1200.f, GROUND_LEVEL + 80.f + VISUAL_Y_OFFSET }, { 60.f, 60.f }, 120.f);
-    pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 1500.f, GROUND_LEVEL + 200.f + VISUAL_Y_OFFSET }, { 40.f, 100.f }, 200.f);
-    pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 2000.f, GROUND_LEVEL + 120.f + VISUAL_Y_OFFSET }, { 50.f, 70.f }, 130.f);
-    pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 2800.f, GROUND_LEVEL + 180.f + VISUAL_Y_OFFSET }, { 30.f, 120.f }, 180.f);
-    pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 3500.f, GROUND_LEVEL + 100.f + VISUAL_Y_OFFSET }, { 80.f, 80.f }, 160.f);
+    pulseSources.back().Initialize({ 420.f, 390.f }, { 50.f, 50.f }, 100.f);
 
     droneManager = std::make_unique<DroneManager>();
-    droneManager->SpawnDrone({ 800.0f, GROUND_LEVEL + 130.0f }, "Asset/Drone.png");
-    droneManager->SpawnDrone({ 1800.0f, GROUND_LEVEL + 230.0f }, "Asset/Drone.png");
-    droneManager->SpawnDrone({ 2500.0f, GROUND_LEVEL + 150.0f }, "Asset/Drone.png");
+    // [수정] 드론들을 1620px 방(X: 180 ~ 1800) 안으로 재배치
+    droneManager->SpawnDrone({ 800.0f, GROUND_LEVEL + 330.0f }, "Asset/Drone.png");
+    droneManager->SpawnDrone({ 1200.0f, GROUND_LEVEL + 430.0f }, "Asset/Drone.png");
+    droneManager->SpawnDrone({ 1600.0f, GROUND_LEVEL + 350.0f }, "Asset/Drone.png");
 
     Engine& engine = gsm.GetEngine();
     m_pulseGauge.Initialize({ 80.f, engine.GetHeight() * 0.75f }, { 40.f, 300.f });
@@ -63,17 +58,9 @@ void GameplayState::Initialize()
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
 
-    // [카메라] 카메라를 생성하고 초기화
-    float screenWidth = static_cast<float>(engine.GetWidth());
-    float screenHeight = static_cast<float>(engine.GetHeight());
-
-    // 화면의 세로 기준 49.9% ~ 50.1% 영역을 플레이어 존으로 설정
-    Math::Rect player_zone{
-        { screenWidth * 0.25f, screenHeight * 0.499f }, // bottom_left (좌측 하단)
-        { screenWidth * 0.5f,  screenHeight * 0.501f }  // top_right (우측 상단)
-    };
-    m_camera = std::make_unique<Camera>(player_zone);
-    m_camera->SetLimit({ {0.0f, 0.0f}, {5000.0f, static_cast<float>(engine.GetHeight())} });
+    // Background 초기화
+    m_background = std::make_unique<Background>();
+    m_background->Initialize("Asset/Room.png");
 }
 
 void GameplayState::Update(double dt)
@@ -141,12 +128,10 @@ void GameplayState::Update(double dt)
     {
         Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
         Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
-
         float playerMinX = playerCenter.x - playerHitboxSize.x / 2.0f;
         float playerMaxX = playerCenter.x + playerHitboxSize.x / 2.0f;
         float playerMinY = playerCenter.y - playerHitboxSize.y / 2.0f;
         float playerMaxY = playerCenter.y + playerHitboxSize.y / 2.0f;
-
         Math::Vec2 dronePos = drone.GetPosition();
         float droneMinX = dronePos.x - droneHitboxSize.x / 2.0f;
         float droneMaxX = dronePos.x + droneHitboxSize.x / 2.0f;
@@ -164,42 +149,62 @@ void GameplayState::Update(double dt)
     const auto& pulse = player.GetPulseCore().getPulse();
     m_pulseGauge.Update(pulse.Value(), pulse.Max());
 
-    // [카메라] 매 프레임 플레이어 위치를 따라 카메라를 업데이트
-    m_camera->Update(player.GetPosition(), dt);
+    // [수정] 카메라 업데이트 호출 삭제
+    // m_camera->Update(player.GetPosition(), dt);
 
-    // [카메라] 플레이어가 화면 밖으로 나가지 않도록 위치를 보정
-    Math::Vec2 cameraPos = m_camera->GetPosition();
+    // [수정] 'Room.png'의 내부 경계(1620x660)로 플레이어 위치를 제한
     Math::Vec2 currentPlayerPos = player.GetPosition();
-    float screenWidth = static_cast<float>(engine.GetWidth());
+    float screenWidth = static_cast<float>(engine.GetWidth()); // 1980
 
-    if (currentPlayerPos.x < cameraPos.x)
+    const float roomWidth = 1620.0f;
+    const float roomHeight = 660.0f;
+    const float minX = (screenWidth - roomWidth) / 2.0f; // (1980 - 1620) / 2 = 180.0f
+    const float maxX = minX + roomWidth;                  // 180.0f + 1620.0f = 1800.0f
+    const float minY = GROUND_LEVEL;                      // 170.0f
+    const float maxY = minY + roomHeight;                 // 170.0f + 660.0f = 830.0f
+
+    // X축 경계 체크
+    if (currentPlayerPos.x < minX)
     {
-        player.SetPosition({ cameraPos.x, currentPlayerPos.y });
+        player.SetPosition({ minX, currentPlayerPos.y });
     }
-    if (currentPlayerPos.x + player.GetSize().x > cameraPos.x + screenWidth)
+    else if (currentPlayerPos.x + player.GetSize().x > maxX)
     {
-        player.SetPosition({ cameraPos.x + screenWidth - player.GetSize().x, currentPlayerPos.y });
+        player.SetPosition({ maxX - player.GetSize().x, currentPlayerPos.y });
+    }
+
+    // Y축 경계 체크 (천장)
+    if (currentPlayerPos.y + player.GetSize().y > maxY)
+    {
+        player.SetPosition({ currentPlayerPos.x, maxY - player.GetSize().y });
     }
 }
 
 void GameplayState::Draw()
 {
     GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
     Engine& engine = gsm.GetEngine();
 
-    // [카메라] '뷰(view)'와 '프로젝션(projection)' 행렬을 준비
+    // [수정] 카메라 View 행렬 제거. 'projection'만 사용합니다.
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
-    Math::Matrix view = m_camera->GetViewMatrix();
-    Math::Matrix view_projection = projection * view;
 
-    // [카메라] 월드에 있는 모든 객체를 그릴 때는 view_projection을 사용
+    // --- 1. 배경 그리기 (projection 사용) ---
+    textureShader->use();
+    textureShader->setMat4("projection", projection);
+    Math::Vec2 screenSize = { (float)engine.GetWidth(), (float)engine.GetHeight() };
+    Math::Vec2 screenCenter = screenSize * 0.5f;
+    Math::Matrix bg_model = Math::Matrix::CreateTranslation(screenCenter) * Math::Matrix::CreateScale(screenSize);
+    m_background->Draw(*textureShader, bg_model);
+
+    // --- 2. 월드 객체 그리기 (projection 사용) ---
     colorShader->use();
-    colorShader->setMat4("projection", view_projection);
+    colorShader->setMat4("projection", projection);
     for (const auto& source : pulseSources) {
         source.Draw(*colorShader);
     }
 
+    // [수정] 하얀색 바닥선 그리기 주석 처리
+    /*
     Math::Vec2 groundPosition = { 2500.0f, GROUND_LEVEL + VISUAL_Y_OFFSET };
     Math::Vec2 groundSize = { 5000.0f, 2.0f };
     Math::Matrix groundModel = Math::Matrix::CreateTranslation(groundPosition) * Math::Matrix::CreateScale(groundSize);
@@ -208,35 +213,37 @@ void GameplayState::Draw()
     GL::BindVertexArray(groundVAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
     GL::BindVertexArray(0);
+    */
 
     textureShader->use();
-    textureShader->setMat4("projection", view_projection);
+    textureShader->setMat4("projection", projection);
     droneManager->Draw(*textureShader);
     player.Draw(*textureShader);
 
-    // [카메라] UI(펄스 게이지)는 카메라를 따라가면 안 되므로, view가 빠진 원래 projection 행렬을 사용하도록 하자
+    // --- 3. UI 그리기 (projection 사용) ---
     colorShader->use();
     colorShader->setMat4("projection", projection);
     m_pulseGauge.Draw(*colorShader);
 
-    // 디버그 드로잉도 월드 좌표 기준이므로 view_projection을 사용
-    // Tab 키를 눌렀을 때 디버그 정보 그리기
+    // --- 4. 디버그 그리기 (projection 사용) ---
     if (m_isDebugDraw)
     {
         colorShader->use();
-        colorShader->setMat4("projection", view_projection);
+        colorShader->setMat4("projection", projection);
 
+        // [수정] 방 경계를 그리는 디버그 박스 추가
+        const float roomWidth = 1620.0f;
+        const float roomHeight = 660.0f;
+        const float minX = (engine.GetWidth() - roomWidth) / 2.0f;
+        Math::Vec2 roomCenter = { minX + roomWidth / 2.0f, GROUND_LEVEL + roomHeight / 2.0f };
+        m_debugRenderer->DrawBox(*colorShader, roomCenter, { roomWidth, roomHeight }, { 1.0f, 0.0f });
+
+        // (플레이어, 드론 히트박스 그리는 코드는 동일)
         Math::Vec2 playerPos = player.GetPosition();
         Math::Vec2 playerSize = player.GetSize();
         Math::Vec2 playerCenter = { playerPos.x + 60.0f, playerPos.y + playerSize.y / 1.1f };
-
-        // 플레이어 공격 사거리 그리기 
         m_debugRenderer->DrawCircle(*colorShader, playerCenter, ATTACK_RANGE, { 1.0f, 0.0f });
-
-        // 플레이어 히트박스 그리기 
         m_debugRenderer->DrawBox(*colorShader, playerCenter, { playerSize.x * 0.4f, playerSize.y * 0.8f }, { 0.0f, 1.0f });
-
-        // 드론 히트박스 그리기 
         const auto& drones = droneManager->GetDrones();
         for (const auto& drone : drones)
         {
@@ -247,9 +254,10 @@ void GameplayState::Draw()
 
 void GameplayState::Shutdown()
 {
+    m_background->Shutdown();
     player.Shutdown();
-    GL::DeleteVertexArrays(1, &groundVAO);
-    GL::DeleteBuffers(1, &groundVBO);
+    // GL::DeleteVertexArrays(1, &groundVAO); // 주석 처리
+    // GL::DeleteBuffers(1, &groundVBO); // 주석 처리
     for (auto& source : pulseSources) {
         source.Shutdown();
     }
@@ -257,4 +265,4 @@ void GameplayState::Shutdown()
     m_pulseGauge.Shutdown();
     m_debugRenderer->Shutdown();
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
-}
+}   
