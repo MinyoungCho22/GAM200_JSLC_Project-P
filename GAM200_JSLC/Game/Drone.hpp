@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include "../Engine/Vec2.hpp"
 
 class Shader;
@@ -10,7 +10,7 @@ public:
     void Update(double dt);
     void Draw(const Shader& shader) const;
     void Shutdown();
-    void TakeHit(); // [Ãß°¡]
+    void TakeHit(); // [ì¶”ê°€]
 
     Math::Vec2 GetPosition() const { return m_position; }
     Math::Vec2 GetSize() const { return m_size; }
@@ -21,10 +21,10 @@ private:
     Math::Vec2 m_direction;
     Math::Vec2 m_size;
 
-    // [Ãß°¡] ÇÇ°İ »óÅÂ °ü¸® º¯¼ö
+    // [ì¶”ê°€] í”¼ê²© ìƒíƒœ ê´€ë¦¬ ë³€ìˆ˜
     bool m_isHit = false;
     float m_hitTimer = 0.0f;
-    const float m_hitDuration = 0.5f; // 0.5ÃÊ°£ Èçµé¸²
+    const float m_hitDuration = 0.5f; // 0.5ì´ˆê°„ í”ë“¤ë¦¼
 
     float m_speed = 200.0f;
     float m_moveTimer = 0.0f;

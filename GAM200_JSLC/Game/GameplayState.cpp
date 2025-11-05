@@ -7,7 +7,8 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Collision.hpp"
 
-constexpr float GROUND_LEVEL = 170.0f;
+// ✅ [수정] 바닥 높이를 210.0f로 변경
+constexpr float GROUND_LEVEL = 60.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
 constexpr float ATTACK_RANGE = 200.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
@@ -22,20 +23,52 @@ void GameplayState::Initialize()
     textureShader->setInt("imageTexture", 0);
     colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
 
+    // ✅ [수정] 플레이어 시작 위치를 새 GROUND_LEVEL 기준으로 변경
     player.Init({ 300.0f, GROUND_LEVEL + 100.0f }, "Asset/player.png");
     pulseManager = std::make_unique<PulseManager>();
 
     Engine& engine = gsm.GetEngine();
 
+    // --- 펄스 공급원 생성 ---
+
+    // 1. 첫 번째 펄스 공급원 (Top-left: 423, 390 / Size: 51, 63)
+    float width1 = 51.f;
+    float height1 = 63.f;
+    float topLeftX1 = 423.f;
+    float topLeftY1 = 390.f;
+    Math::Vec2 center1 = { topLeftX1 + (width1 / 2.0f), topLeftY1 - (height1 / 2.0f) };
     pulseSources.emplace_back();
-    pulseSources.back().Initialize({ 420.f, 390.f }, { 50.f, 50.f }, 100.f);
+    pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
+
+    // 2. 두 번째 펄스 공급원 (Top-left: 693, 525 / Size: 213, 141)
+    float width2 = 213.f;
+    float height2 = 141.f;
+    float topLeftX2 = 693.f;
+    float topLeftY2 = 525.f;
+    Math::Vec2 center2 = { topLeftX2 + (width2 / 2.0f), topLeftY2 - (height2 / 2.0f) };
+    pulseSources.emplace_back();
+    pulseSources.back().Initialize(center2, { width2, height2 }, 100.f);
+
+    // 3. 세 번째 펄스 공급원 (Top-left: 1413, 270 / Size: 75, 33)
+    float width3 = 75.f;
+    float height3 = 33.f;
+    float topLeftX3 = 1413.f;
+    float topLeftY3 = 270.f;
+    Math::Vec2 center3 = { topLeftX3 + (width3 / 2.0f), topLeftY3 - (height3 / 2.0f) };
+    pulseSources.emplace_back();
+    pulseSources.back().Initialize(center3, { width3, height3 }, 100.f);
+
+    // --- 펄스 공급원 설정 끝 ---
 
     droneManager = std::make_unique<DroneManager>();
+    // [수정] 드론 생성 로직 주석 처리
+    /*
     const float roomWidth = 1620.0f;
     const float minX = (engine.GetWidth() - roomWidth) / 2.0f;
-    droneManager->SpawnDrone({ minX + 620.0f, GROUND_LEVEL + 230.0f }, "Asset/Drone.png");
+    droneManager->SpawnDrone({ minX + 620.0f, GROUND_LEVEL + 530.0f }, "Asset/Drone.png");
     droneManager->SpawnDrone({ minX + 1020.0f, GROUND_LEVEL + 330.0f }, "Asset/Drone.png");
     droneManager->SpawnDrone({ minX + 1520.0f, GROUND_LEVEL + 250.0f }, "Asset/Drone.png");
+    */
 
     m_pulseGauge.Initialize({ 80.f, engine.GetHeight() * 0.75f }, { 40.f, 300.f });
     m_debugRenderer = std::make_unique<DebugRenderer>();
@@ -62,7 +95,9 @@ void GameplayState::Update(double dt)
 
     Math::Vec2 playerPos = player.GetPosition();
     Math::Vec2 playerSize = player.GetSize();
-    Math::Vec2 playerCenter = { playerPos.x + 60.0f, playerPos.y + playerSize.y / 1.1f };
+    Math::Vec2 playerCenter = { playerPos.x + playerSize.x / 2.0f, playerPos.y + playerSize.y / 1.1f };
+    Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
+
 
     if (true)
     {
@@ -76,7 +111,7 @@ void GameplayState::Update(double dt)
         }
 
         bool isPressingE = input.IsKeyPressed(Input::Key::E);
-        pulseManager->Update(player, pulseSources, isPressingE, dt);
+        pulseManager->Update(playerCenter, playerHitboxSize, player, pulseSources, isPressingE, dt);
 
         if (input.IsKeyPressed(Input::Key::A)) player.MoveLeft();
         if (input.IsKeyPressed(Input::Key::D)) player.MoveRight();
@@ -111,7 +146,6 @@ void GameplayState::Update(double dt)
     const auto& drones = droneManager->GetDrones();
     for (const auto& drone : drones)
     {
-        Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
         Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
 
         if (Collision::CheckAABB(playerCenter, playerHitboxSize, drone.GetPosition(), droneHitboxSize))
@@ -136,11 +170,14 @@ void GameplayState::Draw()
 
     m_room->Draw(engine, *textureShader, projection);
 
+    // 펄스 공급원 그리기 (주석 처리됨)
+    /*
     colorShader->use();
     colorShader->setMat4("projection", projection);
     for (const auto& source : pulseSources) {
         source.Draw(*colorShader);
     }
+    */
 
     textureShader->use();
     textureShader->setMat4("projection", projection);
@@ -160,14 +197,21 @@ void GameplayState::Draw()
 
         Math::Vec2 playerPos = player.GetPosition();
         Math::Vec2 playerSize = player.GetSize();
-        Math::Vec2 playerCenter = { playerPos.x + 60.0f, playerPos.y + playerSize.y / 1.1f };
+        Math::Vec2 playerCenter = { playerPos.x + playerSize.x / 2.0f, playerPos.y + playerSize.y / 1.1f };
         m_debugRenderer->DrawCircle(*colorShader, playerCenter, ATTACK_RANGE, { 1.0f, 0.0f });
-        m_debugRenderer->DrawBox(*colorShader, playerCenter, { playerSize.x * 0.4f, playerSize.y * 0.8f }, { 0.0f, 1.0f });
+
+        Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
+        m_debugRenderer->DrawBox(*colorShader, playerCenter, playerHitboxSize, { 0.0f, 1.0f });
 
         const auto& drones = droneManager->GetDrones();
         for (const auto& drone : drones)
         {
             m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+        }
+
+        for (const auto& source : pulseSources)
+        {
+            m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
         }
     }
 }

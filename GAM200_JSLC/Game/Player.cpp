@@ -7,11 +7,14 @@
 #include <vector>
 #include <cmath>
 
+#pragma warning(push, 0)
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#pragma warning(pop)
 
 const float GRAVITY = -1500.0f;
-const float GROUND_LEVEL = 170.0f;
+// ✅ [수정] 바닥 높이를 210.0f로 변경
+const float GROUND_LEVEL = 60.0f;
 
 void Player::Init(Math::Vec2 startPos, const char* texturePath)
 {
@@ -54,7 +57,7 @@ void Player::Init(Math::Vec2 startPos, const char* texturePath)
         GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         GL::GenerateMipmap(GL_TEXTURE_2D);
 
-        float desiredWidth = 120.0f;
+        float desiredWidth = 360.0f;
         float aspectRatio = static_cast<float>(height) / static_cast<float>(width);
         size = Math::Vec2(desiredWidth, desiredWidth * aspectRatio);
         original_size = size;

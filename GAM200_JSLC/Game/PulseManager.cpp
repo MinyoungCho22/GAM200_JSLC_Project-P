@@ -1,49 +1,35 @@
-#include "PulseManager.hpp"
-#include "Player.hpp"
+ï»¿#include "PulseManager.hpp"
+#include "Player.hpp"          // Player::GetPulseCore()ë¥¼ ìœ„í•´ í•„ìš”
 #include "PulseSource.hpp"
-#include "../Game/PulseCore.hpp"
+#include "../Game/PulseCore.hpp"   // PulseTickResultë¥¼ ìœ„í•´ í•„ìš”
 #include "../Engine/Logger.hpp"
 #include "../Engine/Vec2.hpp"
+#include "../Engine/Collision.hpp" // Collision::CheckAABBë¥¼ ìœ„í•´ í•„ìš”
 
-void PulseManager::Update(Player& player, std::vector<PulseSource>& sources, bool is_interact_key_pressed, double dt)
+// âœ… [ìˆ˜ì •] í•¨ìˆ˜ ì‹œê·¸ë‹ˆì²˜ë¥¼ .hpp íŒŒì¼ê³¼ ì¼ì¹˜ì‹œí‚µë‹ˆë‹¤.
+void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitboxSize,
+    Player& player, std::vector<PulseSource>& sources,
+    bool is_interact_key_pressed, double dt)
 {
     PulseSource* closest_source = nullptr;
     float closest_dist_sq = -1.0f;
 
-    // GameplayState¿Í µ¿ÀÏÇÑ ¹æ½ÄÀ¸·Î ÇÃ·¹ÀÌ¾îÀÇ Áß½É°ú È÷Æ®¹Ú½º Å©±â¸¦ ¸ÕÀú °è»ê
-    Math::Vec2 playerPos = player.GetPosition();
-    Math::Vec2 playerSize = player.GetSize();
-    Math::Vec2 playerCenter = { playerPos.x + 60.0f, playerPos.y + playerSize.y / 1.1f };
-    Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
+    // âœ… [ì œê±°] GameplayStateì—ì„œ ì´ë¯¸ ê³„ì‚°í–ˆìœ¼ë¯€ë¡œ, 
+    // PulseManager ë‚´ë¶€ì—ì„œ playerCenterì™€ playerHitboxSizeë¥¼ ì¤‘ë³µ ê³„ì‚°í•˜ëŠ” ë¡œì§ì„ ì‚­ì œí•©ë‹ˆë‹¤.
 
-    // °è»êµÈ Áß½É°ú Å©±â¸¦ ¹ÙÅÁÀ¸·Î ÇÃ·¹ÀÌ¾îÀÇ È÷Æ®¹Ú½º(AABB)¸¦ ±¸ÇÕ´Ï´Ù.
-    float playerMinX = playerCenter.x - playerHitboxSize.x / 2.0f;
-    float playerMaxX = playerCenter.x + playerHitboxSize.x / 2.0f;
-    float playerMinY = playerCenter.y - playerHitboxSize.y / 2.0f;
-    float playerMaxY = playerCenter.y + playerHitboxSize.y / 2.0f;
-
-    // 1. ÇÃ·¹ÀÌ¾î¿Í Ãæµ¹ÇÏ´Â ¸ğµç °ø±Ş¿øÀ» È®ÀÎÇÕ´Ï´Ù.
+    // 1. í”Œë ˆì´ì–´ì™€ ì¶©ëŒí•˜ëŠ” ëª¨ë“  ê³µê¸‰ì›ì„ í™•ì¸í•©ë‹ˆë‹¤.
     for (auto& source : sources)
     {
         if (!source.HasPulse()) continue;
 
-        // PulseSourceÀÇ È÷Æ®¹Ú½º °è»ê
-        Math::Vec2 sourcePos = source.GetPosition();
-        Math::Vec2 sourceSize = source.GetSize();
-        float sourceMinX = sourcePos.x - sourceSize.x / 2.0f;
-        float sourceMaxX = sourcePos.x + sourceSize.x / 2.0f;
-        float sourceMinY = sourcePos.y - sourceSize.y / 2.0f;
-        float sourceMaxY = sourcePos.y + sourceSize.y / 2.0f;
-
-        // ¼öÁ¤µÈ ÇÃ·¹ÀÌ¾î È÷Æ®¹Ú½º¿Í PulseSourceÀÇ Ãæµ¹À» °Ë»ç
-        if (playerMaxX > sourceMinX && playerMinX < sourceMaxX &&
-            playerMaxY > sourceMinY && playerMinY < sourceMaxY)
+        // âœ… [ìˆ˜ì •] GameplayStateì—ì„œ ì „ë‹¬ë°›ì€ playerHitboxCenterì™€ playerHitboxSizeë¥¼ ì‚¬ìš©í•©ë‹ˆë‹¤.
+        if (Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, source.GetPosition(), source.GetSize()))
         {
-            // 2. Ãæµ¹ÀÌ °¨ÁöµÇ¸é, ÇÃ·¹ÀÌ¾î¿ÍÀÇ °Å¸®¸¦ °è»êÇÕ´Ï´Ù.
-            // [¼öÁ¤] °Å¸® °è»ê ½Ã¿¡µµ ÀÏ°üµÇ°Ô »õ·Î Á¤ÀÇÇÑ playerCenter¸¦ »ç¿ë
-            float dist_sq = (playerCenter - source.GetPosition()).LengthSq();
+            // 2. ì¶©ëŒì´ ê°ì§€ë˜ë©´, í”Œë ˆì´ì–´ì™€ì˜ ê±°ë¦¬ë¥¼ ê³„ì‚°í•©ë‹ˆë‹¤.
+            // âœ… [ìˆ˜ì •] ì¤‘ì‹¬ì ë„ ì „ë‹¬ë°›ì€ playerHitboxCenterë¥¼ ì‚¬ìš©í•©ë‹ˆë‹¤.
+            float dist_sq = (playerHitboxCenter - source.GetPosition()).LengthSq();
 
-            // 3. ÀÌÀü¿¡ Ã£Àº °ø±Ş¿øº¸´Ù ´õ °¡±õ´Ù¸é, '°¡Àå °¡±î¿î °ø±Ş¿ø'À¸·Î ±â·Ï
+            // 3. ì´ì „ì— ì°¾ì€ ê³µê¸‰ì›ë³´ë‹¤ ë” ê°€ê¹ë‹¤ë©´, 'ê°€ì¥ ê°€ê¹Œìš´ ê³µê¸‰ì›'ìœ¼ë¡œ ê¸°ë¡
             if (closest_source == nullptr || dist_sq < closest_dist_sq)
             {
                 closest_source = &source;
@@ -54,7 +40,7 @@ void PulseManager::Update(Player& player, std::vector<PulseSource>& sources, boo
 
     bool is_near_charger = (closest_source != nullptr);
 
-    // 4. °¡Àå °¡±î¿î °ø±Ş¿øÀÌ ÀÖÀ» ¶§¸¸ ÃæÀü ·ÎÁ÷ÀÌ µ¿ÀÛ
+    // 4. ê°€ì¥ ê°€ê¹Œìš´ ê³µê¸‰ì›ì´ ìˆì„ ë•Œë§Œ ì¶©ì „ ë¡œì§ì´ ë™ì‘
     PulseTickResult result = player.GetPulseCore().tick(is_interact_key_pressed, is_near_charger, false, dt);
 
     if (result.charged && closest_source != nullptr)

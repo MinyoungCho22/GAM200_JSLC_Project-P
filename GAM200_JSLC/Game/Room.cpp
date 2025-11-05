@@ -1,11 +1,12 @@
-#include "Room.hpp"
+ï»¿#include "Room.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 
-// --- ¹æÀÇ Å©±â¿Í ¹Ù´Ú À§Ä¡¸¦ ¿©±â¼­ Á¤ÀÇ ---
+// --- [ìˆ˜ì •] ë°©ì˜ í¬ê¸°ì™€ ë°”ë‹¥ ìœ„ì¹˜ë¥¼ ì—¬ê¸°ì„œ ì •ì˜í•©ë‹ˆë‹¤ ---
 constexpr float ROOM_WIDTH = 1620.0f;
 constexpr float ROOM_HEIGHT = 660.0f;
-constexpr float GROUND_LEVEL = 170.0f; // Player.cpp¿Í ¹İµå½Ã ÀÏÄ¡ÇØ¾ß ÇÔ(ÆÀ¿ø ¸ğµÎ ÁÖÀÇ ÇÒ °Í)
+// âœ… [ìˆ˜ì •] top-left (180, 870)ì— ë§ê²Œ GROUND_LEVEL(minY)ì„ 210.0fë¡œ ë³€ê²½
+constexpr float GROUND_LEVEL = 210.0f;
 
 void Room::Initialize(Engine& engine, const char* texturePath)
 {
@@ -14,15 +15,16 @@ void Room::Initialize(Engine& engine, const char* texturePath)
 
     float screenWidth = static_cast<float>(engine.GetWidth());
 
-    // ¹æÀÇ Àı´ë ÁÂÇ¥ °æ°è¸¦ °è»êÇÏ°í ÀúÀå
+    // ë°©ì˜ ì ˆëŒ€ ì¢Œí‘œ ê²½ê³„ë¥¼ ê³„ì‚°í•˜ê³  ì €ì¥í•©ë‹ˆë‹¤.
+    // âœ… [ìˆ˜ì •] minXê°€ (1980 - 1620) / 2 = 180.0fë¡œ, ìš”ì²­ê³¼ ì¼ì¹˜í•©ë‹ˆë‹¤.
     float minX = (screenWidth - ROOM_WIDTH) / 2.0f;
     float maxX = minX + ROOM_WIDTH;
     float minY = GROUND_LEVEL;
+    // âœ… [ìˆ˜ì •] maxYê°€ 210.0f + 660.0f = 870.0fë¡œ, ìš”ì²­ê³¼ ì¼ì¹˜í•©ë‹ˆë‹¤.
     float maxY = minY + ROOM_HEIGHT;
 
     m_boundaries = { {minX, minY}, {maxX, maxY} };
 
-    // µğ¹ö±× µå·ÎÀ×À» À§ÇØ Å©±â¿Í Áß½ÉÁ¡µµ ÀúÀå
     m_roomSize = { ROOM_WIDTH, ROOM_HEIGHT };
     m_roomCenter = { minX + ROOM_WIDTH / 2.0f, minY + ROOM_HEIGHT / 2.0f };
 }
@@ -37,11 +39,10 @@ void Room::Shutdown()
 
 void Room::Update(Player& player)
 {
-    // GameplayState¿¡ ÀÖ´ø ÇÃ·¹ÀÌ¾î °æ°è Á¦ÇÑ ·ÎÁ÷
     Math::Vec2 currentPlayerPos = player.GetPosition();
     Math::Vec2 playerSize = player.GetSize();
 
-    // XÃà °æ°è Ã¼Å©
+    // Xì¶• ê²½ê³„ ì²´í¬
     if (currentPlayerPos.x < m_boundaries.bottom_left.x)
     {
         player.SetPosition({ m_boundaries.bottom_left.x, currentPlayerPos.y });
@@ -51,7 +52,7 @@ void Room::Update(Player& player)
         player.SetPosition({ m_boundaries.top_right.x - playerSize.x, currentPlayerPos.y });
     }
 
-    // YÃà °æ°è Ã¼Å© (ÃµÀå)
+    // Yì¶• ê²½ê³„ ì²´í¬ (ì²œì¥)
     if (currentPlayerPos.y + playerSize.y > m_boundaries.top_right.y)
     {
         player.SetPosition({ currentPlayerPos.x, m_boundaries.top_right.y - playerSize.y });
@@ -60,7 +61,6 @@ void Room::Update(Player& player)
 
 void Room::Draw(Engine& engine, Shader& textureShader, const Math::Matrix& projection)
 {
-    // GameplayState¿¡ ÀÖ´ø ¹è°æ ±×¸®±â ·ÎÁ÷
     textureShader.use();
     textureShader.setMat4("projection", projection);
 
@@ -73,7 +73,6 @@ void Room::Draw(Engine& engine, Shader& textureShader, const Math::Matrix& proje
 
 void Room::DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::Matrix& projection)
 {
-    // GameplayState¿¡ ÀÖ´ø ¹æ °æ°è µğ¹ö±× ±×¸®±â ·ÎÁ÷
     colorShader.use();
     colorShader.setMat4("projection", projection);
 

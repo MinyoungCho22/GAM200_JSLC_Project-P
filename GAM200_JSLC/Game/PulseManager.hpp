@@ -1,12 +1,14 @@
-#pragma once
+ï»¿#pragma once
+#include "../Engine/Vec2.hpp"
+#include "Player.hpp"
+#include "PulseSource.hpp"
 #include <vector>
-
-class Player;
-class PulseSource;
 
 class PulseManager
 {
 public:
-    // [¼öÁ¤] double dt ÀÎÀÚ Ãß°¡
-    void Update(Player& player, std::vector<PulseSource>& sources, bool is_interact_key_pressed, double dt);
+    // âœ… Update í•¨ìˆ˜ì˜ ì¸ìë¥¼ player ëŒ€ì‹  playerHitbox...ë¡œ ë³€ê²½
+    void Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitboxSize,
+        Player& player, std::vector<PulseSource>& pulseSources,
+        bool isPressingE, double dt);
 };
