@@ -1,124 +1,315 @@
-#include "Font.hpp"
-#include "../OpenGL/GLWrapper.hpp"
+ï»¿#include "Font.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
-#include <iostream>
 #include <vector>
+#include <iostream>
 
 #pragma warning(push, 0)
-
+// stb_image.hê°€ ë‹¤ë¥¸ .cpp íŒŒì¼ (ì˜ˆ: Texture.cpp ë“±)ì—
+// ì´ë¯¸ #define STB_IMAGE_IMPLEMENTATION ë˜ì–´ìˆë‹¤ë©´
+// ì—¬ê¸°ì„œëŠ” ì´ #defineì„ ì œê±°í•´ì•¼ ì¤‘ë³µ ì •ì˜ ì˜¤ë¥˜ê°€ ë‚˜ì§€ ì•ŠìŠµë‹ˆë‹¤.
+// #define STB_IMAGE_IMPLEMENTATION 
 #include <stb_image.h>
 #pragma warning(pop)
 
-void Font::Initialize(const char* texturePath, int columns, int rows)
+// GetPixel í—¬í¼ êµ¬í˜„ (RGBA 4ì±„ë„ ê°€ì •)
+unsigned int Font::GetPixel(const unsigned char* data, int x, int y, int width, int channels) const
 {
-    m_numCols = columns;
-    m_numRows = rows;
+    // stbi_load(false) ê¸°ì¤€. (0,0)ì€ Top-Left ì…ë‹ˆë‹¤.
+    const unsigned char* p = data + (y * width + x) * channels;
+    unsigned int r = p[0];
+    unsigned int g = p[1];
+    unsigned int b = p[2];
+    unsigned int a = (channels == 4) ? p[3] : 255;
+    return (a << 24) | (b << 16) | (g << 8) | r;
+}
 
-    // 1. ÅØ½ºÃ³ ·Îµå
-    GL::GenTextures(1, &m_textureID);
-    GL::BindTexture(GL_TEXTURE_2D, m_textureID);
+void Font::Initialize(const char* fontAtlasPath)
+{
+    // stbi_load(false)ë¡œ ë‘¡ë‹ˆë‹¤. (ì—”ì§„ì˜ ë‹¤ë¥¸ í…ìŠ¤ì²˜ ë¡œë”©ê³¼ ì¼ê´€ì„± ìœ ì§€)
+    stbi_set_flip_vertically_on_load(false);
 
-    // ÇÈ¼¿ ¾ÆÆ® ÆùÆ®ÀÌ¹Ç·Î GL_NEAREST¸¦ »ç¿ëÇÕ´Ï´Ù.
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load(fontAtlasPath, &width, &height, &nrChannels, 0);
+    if (!data)
+    {
+        std::cerr << "Failed to load font texture: " << fontAtlasPath << std::endl;
+        return;
+    }
+
+    m_atlasWidth = width;
+    m_atlasHeight = height;
+
+    if (GetPixel(data, 0, 0, width, nrChannels) != 0xFFFFFFFF)
+    {
+        std::cerr << "Font Error: Font image has invalid format. First pixel must be white." << std::endl;
+        stbi_image_free(data);
+        return;
+    }
+
+    m_fontHeight = height - 1; // y=0ì€ íŒŒì‹±ìš©, y=1 ~ (height)ê°€ í°íŠ¸ ë†’ì´
+    size_t current_char_index = 0;
+    int last_boundary_x = 0;
+    unsigned int last_color = GetPixel(data, 0, 0, width, nrChannels); // y=0 ë¼ì¸ ìŠ¤ìº”
+
+    for (int x = 1; x < width; ++x)
+    {
+        unsigned int current_color = GetPixel(data, x, 0, width, nrChannels); // y=0 ë¼ì¸
+        if (current_color != last_color)
+        {
+            if (current_char_index >= m_charSequence.length())
+            {
+                std::cerr << "Font Error: Font image has more characters than expected." << std::endl;
+                break;
+            }
+
+            char c = m_charSequence[current_char_index];
+            Math::IRect rect;
+            // í”½ì…€ ì¢Œí‘œ (y=0 Top, y=height Bottom) ê¸°ì¤€
+            rect.bottom_left = { last_boundary_x, 1 };                 // (min_x, min_y) (min_y = 1)
+            rect.top_right = { x, 1 + m_fontHeight };                // (max_x, max_y) (max_y = height)
+            m_charToRectMap[c] = rect;
+
+            current_char_index++;
+            last_boundary_x = x;
+            last_color = current_color;
+        }
+    }
+
+    // --- OpenGL í…ìŠ¤ì²˜/VAO/FBO ìƒì„± ---
+
+    GL::GenTextures(1, &m_atlasTextureID);
+    GL::BindTexture(GL_TEXTURE_2D, m_atlasTextureID);
+
+    GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
+    GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+
+    // GL_NEARESTëŠ” ì´ë¯¸ ì—¬ê¸°ì„œ ì‚¬ìš© ì¤‘ì…ë‹ˆë‹¤. (ì˜¬ë°”ë¥¸ ì„¤ì •)
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    int width, height, nrChannels;
-    stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load(texturePath, &width, &height, &nrChannels, 0);
-
-    if (data)
-    {
-        m_texWidth = width;
-        m_texHeight = height;
-        m_charWidth = 1.0f / m_numCols;   // UV ³Êºñ
-        m_charHeight = 1.0f / m_numRows;  // UV ³ôÀÌ
-
-        GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-        GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        GL::GenerateMipmap(GL_TEXTURE_2D);
-    }
-    else
-    {
-        std::cout << "Failed to load font texture: " << texturePath << std::endl;
-    }
     stbi_image_free(data);
 
-    // 2. VAO/VBO »ı¼º (¸ğµç ¹®ÀÚ°¡ (-0.5, 0.5) Áß½ÉÀÇ Äõµå ÇÏ³ª¸¦ °øÀ¯)
     std::vector<float> vertices = {
-        // positions      // texture Coords
-        -0.5f,  0.5f,   0.0f, 1.0f,
-         0.5f, -0.5f,   1.0f, 0.0f,
-        -0.5f, -0.5f,   0.0f, 0.0f,
+        // positions   // texture Coords
+        -0.5f,  0.5f,  0.0f, 1.0f, // Top-left
+         0.5f, -0.5f,  1.0f, 0.0f, // Bottom-right
+        -0.5f, -0.5f,  0.0f, 0.0f, // Bottom-left
 
-        -0.5f,  0.5f,   0.0f, 1.0f,
-         0.5f,  0.5f,   1.0f, 1.0f,
-         0.5f, -0.5f,   1.0f, 0.0f
+        -0.5f,  0.5f,  0.0f, 1.0f, // Top-left
+         0.5f,  0.5f,  1.0f, 1.0f, // Top-right
+         0.5f, -0.5f,  1.0f, 0.0f  // Bottom-right
     };
 
-    GL::GenVertexArrays(1, &VAO);
-    GL::GenBuffers(1, &VBO);
-    GL::BindVertexArray(VAO);
-    GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
+    GL::GenVertexArrays(1, &m_quadVAO);
+    GL::GenBuffers(1, &m_quadVBO);
+    GL::BindVertexArray(m_quadVAO);
+    GL::BindBuffer(GL_ARRAY_BUFFER, m_quadVBO);
     GL::BufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
     GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     GL::EnableVertexAttribArray(0);
     GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     GL::EnableVertexAttribArray(1);
     GL::BindVertexArray(0);
+
+    GL::GenFramebuffers(1, &m_fboID);
 }
 
 void Font::Shutdown()
 {
-    GL::DeleteVertexArrays(1, &VAO);
-    GL::DeleteBuffers(1, &VBO);
-    GL::DeleteTextures(1, &m_textureID);
+    // ìºì‹œëœ ëª¨ë“  í…ìŠ¤ì²˜ ì‚­ì œ
+    for (auto const& [key, val] : m_textCache)
+    {
+        GL::DeleteTextures(1, &val.textureID);
+    }
+    m_textCache.clear();
+
+    // FBO ì‚­ì œ
+    if (m_fboID != 0) GL::DeleteFramebuffers(1, &m_fboID);
+
+    // ì¿¼ë“œ VAO/VBO ì‚­ì œ
+    if (m_quadVAO != 0) GL::DeleteVertexArrays(1, &m_quadVAO);
+    if (m_quadVBO != 0) GL::DeleteBuffers(1, &m_quadVBO);
+
+    // ì›ë³¸ ì•„í‹€ë¼ìŠ¤ í…ìŠ¤ì²˜ ì‚­ì œ
+    if (m_atlasTextureID != 0) GL::DeleteTextures(1, &m_atlasTextureID);
 }
 
-void Font::DrawText(Shader& shader, const std::string& text, Math::Vec2 position, float size)
+CachedTextureInfo Font::PrintToTexture(Shader& atlasShader, const std::string& text)
 {
-    shader.use();
-    shader.setBool("flipX", false); // ÅØ½ºÆ®´Â µÚÁıÁö ¾ÊÀ½
+    if (text.empty())
+    {
+        return { 0, 0, 0 };
+    }
+
+    // ìºì‹œ í™•ì¸
+    auto it = m_textCache.find(text);
+    if (it != m_textCache.end())
+    {
+        return it->second; // ìºì‹œ íˆíŠ¸
+    }
+
+    // ìºì‹œ ë¯¸ìŠ¤: ìƒˆ í…ìŠ¤ì²˜ ë² ì´í‚¹
+    CachedTextureInfo newTextureInfo = BakeTextToTexture(atlasShader, text);
+    newTextureInfo.text = text; // ìºì‹œ ì •ë³´ì— ì›ë³¸ í…ìŠ¤íŠ¸ ì €ì¥
+
+    // ìºì‹œì— ì €ì¥
+    m_textCache[text] = newTextureInfo;
+    return newTextureInfo;
+}
+
+CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string& text)
+{
+    Math::ivec2 textSize = measureText(text);
+    if (textSize.x == 0)
+    {
+        return { 0, 0, 0 };
+    }
+
+    // ìƒˆ íƒ€ê²Ÿ í…ìŠ¤ì²˜ ìƒì„± (ë¹„ì–´ ìˆìŒ)
+    unsigned int newTexID = 0;
+    GL::GenTextures(1, &newTexID);
+    GL::BindTexture(GL_TEXTURE_2D, newTexID);
+    GL::TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textSize.x, textSize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    // FBO í…ìŠ¤ì²˜ì—ë„ GL_NEAREST ì ìš©
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // FBO ì„¤ì •: ë Œë”ë§ ëŒ€ìƒì„ ì´ í…ìŠ¤ì²˜ë¡œ ë³€ê²½
+    GL::BindFramebuffer(GL_FRAMEBUFFER, m_fboID);
+    GL::FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, newTexID, 0);
+
+    if (GL::CheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
+        std::cerr << "Framebuffer is not complete!" << std::endl;
+        GL::BindFramebuffer(GL_FRAMEBUFFER, 0);
+        return { 0, 0, 0 };
+    }
+
+    // FBOì— ê·¸ë¦¬ê¸°
+    GL::Viewport(0, 0, textSize.x, textSize.y);
+    GL::ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    GL::Clear(GL_COLOR_BUFFER_BIT);
+
+    atlasShader.use();
+    Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(textSize.x), 0.0f, static_cast<float>(textSize.y), -1.0f, 1.0f);
+    atlasShader.setMat4("projection", projection);
+    atlasShader.setBool("flipX", false);
 
     GL::ActiveTexture(GL_TEXTURE0);
-    GL::BindTexture(GL_TEXTURE_2D, m_textureID);
-    GL::BindVertexArray(VAO);
+    GL::BindTexture(GL_TEXTURE_2D, m_atlasTextureID);
+    GL::BindVertexArray(m_quadVAO);
 
-    Math::Vec2 currentPos = position;
-    float charRenderWidth = size;
-    float charRenderHeight = size; // (ºñÀ²À» 1:1·Î °¡Á¤, ÇÊ¿ä½Ã ¼öÁ¤)
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    int current_x = 0;
     for (const char c : text)
     {
-        int charIndex = static_cast<int>(c);
-        if (charIndex < 0 || charIndex > 127) continue; // ASCII ¹üÀ§ ¹ÛÀÌ¸é ¹«½Ã
+        auto it = m_charToRectMap.find(c);
+        if (it == m_charToRectMap.end()) continue;
 
-        // ÆùÆ® ½ÃÆ®¿¡¼­ ¹®ÀÚÀÇ UV ÁÂÇ¥ °è»ê
-        int row = charIndex / m_numCols;
-        int col = charIndex % m_numCols;
+        const auto& char_rect = it->second; // íƒ€ì…: Math::IRect
 
-        // YÁÂÇ¥´Â ÅØ½ºÃ³°¡ À§¿¡¼­ ¾Æ·¡·Î(top-down) µÇ¾îÀÖ´Ù°í °¡Á¤
-        float uv_x = static_cast<float>(col) / m_numCols;
-        float uv_y = static_cast<float>(row) / m_numRows;
+        const Math::ivec2 char_size = {
+            char_rect.top_right.x - char_rect.bottom_left.x,
+            char_rect.top_right.y - char_rect.bottom_left.y
+        };
 
-        // stbi_load°¡ ÀÌ¹ÌÁö¸¦ µÚÁı¾úÀ¸¹Ç·Î(true), UVÀÇ YÁÂÇ¥¸¦ ´Ù½Ã µÚÁı¾îÁİ´Ï´Ù.
-        uv_y = (1.0f - m_charHeight) - uv_y;
+        Math::Vec2 charCenter = {
+            static_cast<float>(current_x + char_size.x / 2.0f),
+            static_cast<float>(char_size.y / 2.0f)
+        };
+        Math::Matrix model = Math::Matrix::CreateTranslation(charCenter) * Math::Matrix::CreateScale({ static_cast<float>(char_size.x), static_cast<float>(char_size.y) });
+        atlasShader.setMat4("model", model);
 
-        shader.setVec4("spriteRect", uv_x, uv_y, m_charWidth, m_charHeight);
+        // UV Yì¢Œí‘œ ê³„ì‚° (stbi_load(false) ê¸°ì¤€)
 
-        // ¹®ÀÚÀÇ ±×¸®±â À§Ä¡ °è»ê (Áß½ÉÁ¡ ±âÁØ)
-        Math::Vec2 charCenter = { currentPos.x + charRenderWidth / 2.0f, currentPos.y + charRenderHeight / 2.0f };
-        Math::Matrix model = Math::Matrix::CreateTranslation(charCenter) * Math::Matrix::CreateScale({ charRenderWidth, charRenderHeight });
-        shader.setMat4("model", model);
+        float uv_x = static_cast<float>(char_rect.bottom_left.x) / m_atlasWidth;
+        float uv_w = static_cast<float>(char_size.x) / m_atlasWidth;
+        float uv_h = static_cast<float>(char_size.y) / m_atlasHeight;
+        float uv_y = 1.0f - (static_cast<float>(char_rect.top_right.y) / m_atlasHeight);
+
+        // âœ… [ìˆ˜ì •] 1í”½ì…€ ë³´ì •ìœ¼ë¡œ ë³€ê²½
+
+        // 1. ì¢Œìš° ê²½ê³„ ë³´ì • (Xì¶•) - ë°˜ í”½ì…€
+        const float pixel_epsilon_x = 0.5f / m_atlasWidth;
+        uv_x += pixel_epsilon_x;
+        uv_w -= 2.0f * pixel_epsilon_x;
+
+        // 2. ìƒí•˜ ê²½ê³„ ë³´ì • (Yì¶•) - 1 í”½ì…€
+        // í°íŠ¸ ì•„í‹€ë¼ìŠ¤ì˜ y=0 (í°ìƒ‰)ê³¼ y=1 (ê¸€ì ì‹œì‘) ì‚¬ì´ë¥¼ í”¼í•˜ê¸° ìœ„í•´
+        // UVì˜ 'ìœ„ìª½'(top)ì„ 1í”½ì…€ ë‚´ë¦¬ê³ ,
+        // UVì˜ 'ì•„ë˜ìª½'(bottom)ì„ 1í”½ì…€ ì˜¬ë¦½ë‹ˆë‹¤.
+        const float one_pixel_y = 1.0f / m_atlasHeight;
+
+        uv_y += one_pixel_y; // UVì˜ bottomì„ 1í”½ì…€ ì˜¬ë¦¼
+        uv_h -= 2.0f * one_pixel_y; // UVì˜ heightë¥¼ 2í”½ì…€ ì¤„ì„ (ìœ„ 1, ì•„ë˜ 1)
+
+        atlasShader.setVec4("spriteRect", uv_x, uv_y, uv_w, uv_h);
 
         GL::DrawArrays(GL_TRIANGLES, 0, 6);
 
-        // ´ÙÀ½ ¹®ÀÚ À§Ä¡·Î ÀÌµ¿
-        currentPos.x += charRenderWidth;
+        current_x += char_size.x;
     }
 
+    // ì›ë˜ í”„ë ˆì„ë²„í¼(í™”ë©´)ë¡œ ë³µê·€
+    GL::BindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return { newTexID, textSize.x, textSize.y };
+}
+
+void Font::DrawBakedText(Shader& textureShader, const CachedTextureInfo& textureInfo, Math::Vec2 position, float newHeight)
+{
+    if (textureInfo.textureID == 0 || textureInfo.height == 0)
+    {
+        return;
+    }
+
+    textureShader.use();
+
+    float scale = newHeight / m_fontHeight;
+    float renderWidth = textureInfo.width * scale;
+    float renderHeight = textureInfo.height * scale;
+
+    Math::Vec2 center = {
+        position.x + renderWidth / 2.0f,
+        position.y + renderHeight / 2.0f
+    };
+
+    // Yì¶• ë’¤ì§‘ê¸° (ì´ì „ ì½”ë“œì™€ ë™ì¼)
+    Math::Matrix model = Math::Matrix::CreateTranslation(center) *
+        Math::Matrix::CreateScale({ renderWidth, -renderHeight });
+    textureShader.setMat4("model", model);
+
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+
+    GL::ActiveTexture(GL_TEXTURE0);
+    GL::BindTexture(GL_TEXTURE_2D, textureInfo.textureID);
+    GL::BindVertexArray(m_quadVAO);
+
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+
     GL::BindVertexArray(0);
-    GL::BindTexture(GL_TEXTURE_2D, 0);
+}
+
+Math::ivec2 Font::measureText(const std::string& text) const
+{
+    if (text.empty()) return { 0, m_fontHeight };
+
+    int total_width = 0;
+    for (const char c : text)
+    {
+        auto it = m_charToRectMap.find(c);
+        if (it != m_charToRectMap.end())
+        {
+            total_width += (it->second.top_right.x - it->second.bottom_left.x);
+        }
+    }
+    return { total_width, m_fontHeight };
 }

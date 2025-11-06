@@ -1,32 +1,55 @@
-#pragma once
-#include "../Engine/Vec2.hpp"
+Ôªø#pragma once
+
+#include "../Engine/Vec2.hpp" // Math::Vec2, Math::ivec2
+#include "../Engine/Rect.hpp" // ‚úÖ [ÏàòÏ†ï] Math::IRectÎ•º Ìè¨Ìï®
 #include <string>
 #include <map>
+#include <unordered_map>
+#include <memory> 
+
+#include "../OpenGL/GLWrapper.hpp" 
 
 class Shader;
-class Matrix;
+
+struct CachedTextureInfo
+{
+    unsigned int textureID = 0;
+    int width = 0;
+    int height = 0;
+    std::string text;
+};
 
 class Font
 {
 public:
     Font() = default;
+    ~Font() { Shutdown(); }
 
-    // ∆˘∆Æ ≈ÿΩ∫√≥∏¶ ∑ŒµÂ«œ∞Ì, ≈ÿΩ∫√≥∞° ∞°∑Œ/ºº∑Œ ∏Ó ∞≥¿« πÆ¿⁄∑Œ ¿Ã∑ÁæÓ¡Æ ¿÷¥¬¡ˆ º≥¡§«’¥œ¥Ÿ.
-    void Initialize(const char* texturePath, int columns, int rows);
+    void Initialize(const char* fontAtlasPath);
     void Shutdown();
 
-    // ¡ˆ¡§µ» ºŒ¿Ã¥ı∏¶ ªÁøÎ«ÿ ≈ÿΩ∫∆Æ∏¶ ±◊∏≥¥œ¥Ÿ.
-    void DrawText(Shader& shader, const std::string& text, Math::Vec2 position, float size);
+    CachedTextureInfo PrintToTexture(Shader& atlasShader, const std::string& text);
+    void DrawBakedText(Shader& textureShader, const CachedTextureInfo& textureInfo, Math::Vec2 position, float newHeight);
 
 private:
-    unsigned int m_textureID = 0;
-    unsigned int VAO = 0;
-    unsigned int VBO = 0;
+    unsigned int GetPixel(const unsigned char* data, int x, int y, int width, int channels) const;
+    CachedTextureInfo BakeTextToTexture(Shader& atlasShader, const std::string& text);
+    Math::ivec2 measureText(const std::string& text) const;
 
-    int m_texWidth = 0;
-    int m_texHeight = 0;
-    int m_numCols = 1;
-    int m_numRows = 1;
-    float m_charWidth = 1.0f;  // 0.0 ~ 1.0 UV Rati
-    float m_charHeight = 1.0f; // 0.0 ~ 1.0 UV Ratio
+private:
+    unsigned int m_atlasTextureID = 0;
+    int m_atlasWidth = 0;
+    int m_atlasHeight = 0;
+    int m_fontHeight = 0;
+
+    const std::string m_charSequence = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+    // ‚úÖ [ÏàòÏ†ï] 'irect'Î•º 'IRect'Î°ú Î≥ÄÍ≤Ω
+    std::map<char, Math::IRect> m_charToRectMap;
+
+    unsigned int m_quadVAO = 0;
+    unsigned int m_quadVBO = 0;
+    unsigned int m_fboID = 0;
+
+    std::unordered_map<std::string, CachedTextureInfo> m_textCache;
 };

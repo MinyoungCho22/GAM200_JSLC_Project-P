@@ -1,11 +1,11 @@
-#include "Setting.hpp"
+ï»¿#include "Setting.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include "Font.hpp"
+// #include "Font.hpp" // <--- .hpp íŒŒì¼ì— ì´ë¯¸ í¬í•¨ë¨
 
 SettingState::SettingState(GameStateManager& gsm_ref)
     : gsm(gsm_ref), m_currentSelection(MenuOption::Setting), m_overlayVAO(0), m_overlayVBO(0) {
@@ -15,14 +15,29 @@ void SettingState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "SettingState Initialize");
 
-    // ÆùÆ®¿Í ÄÃ·¯ ¼ÎÀÌ´õ ·Îµå
+    // í°íŠ¸ì™€ ì»¬ëŸ¬ ì…°ì´ë” ë¡œë“œ
     m_font = std::make_unique<Font>();
-    m_font->Initialize("Asset/fonts/Font_Outlined.png", 16, 8);
+
+    // âœ… [ìˆ˜ì •] Font::Initialize í˜¸ì¶œ ë°©ì‹ ë³€ê²½
+    m_font->Initialize("Asset/fonts/Font_Outlined.png");
+
     m_colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
 
-    // È­¸éÀ» µ¤À» ¹İÅõ¸í »ç°¢ÇüÀ» À§ÇÑ VAO/VBO »ı¼º
+    // âœ… [ì¶”ê°€] í°íŠ¸ ì…°ì´ë” ë¡œë“œ (simple.vert/frag ì‚¬ìš©)
+    m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
+    m_fontShader->use();
+    m_fontShader->setInt("ourTexture", 0);
+
+    // âœ… [ì¶”ê°€] ë©”ë‰´ í…ìŠ¤íŠ¸ë¥¼ ë¯¸ë¦¬ FBO í…ìŠ¤ì²˜ë¡œ ë² ì´í‚¹
+    m_settingText = m_font->PrintToTexture(*m_fontShader, "Setting");
+    m_settingSelectedText = m_font->PrintToTexture(*m_fontShader, "> Setting <");
+    m_exitText = m_font->PrintToTexture(*m_fontShader, "Exit");
+    m_exitSelectedText = m_font->PrintToTexture(*m_fontShader, "> Exit <");
+
+
+    // í™”ë©´ì„ ë®ì„ ë°˜íˆ¬ëª… ì‚¬ê°í˜•ì„ ìœ„í•œ VAO/VBO ìƒì„±
     float vertices[] = {
-        // positions (0.0 ~ 1.0 ¹üÀ§)
+        // positions (0.0 ~ 1.0 ë²”ìœ„)
         0.0f, 1.0f,
         1.0f, 0.0f,
         0.0f, 0.0f,
@@ -46,14 +61,14 @@ void SettingState::Update(double dt)
     Engine& engine = gsm.GetEngine();
     auto& input = engine.GetInput();
 
-    // ESC Å°¸¦ ´©¸£¸é »óÅÂ¸¦ Pop (GameplayState·Î µ¹¾Æ°¨)
+    // ESC í‚¤ë¥¼ ëˆ„ë¥´ë©´ ìƒíƒœë¥¼ Pop (GameplayStateë¡œ ëŒì•„ê°)
     if (input.IsKeyTriggered(Input::Key::Escape))
     {
         gsm.PopState();
         return;
     }
 
-    // W (À§) / S (¾Æ·¡) Å°·Î ¸Ş´º ¼±ÅÃ
+    // W (ìœ„) / S (ì•„ë˜) í‚¤ë¡œ ë©”ë‰´ ì„ íƒ
     if (input.IsKeyTriggered(Input::Key::W))
     {
         m_currentSelection = MenuOption::Setting;
@@ -63,14 +78,14 @@ void SettingState::Update(double dt)
         m_currentSelection = MenuOption::Exit;
     }
 
-    // Enter Å°·Î ¼±ÅÃ ½ÇÇà
+    // Enter í‚¤ë¡œ ì„ íƒ ì‹¤í–‰
     if (input.IsKeyTriggered(Input::Key::Enter) || input.IsKeyTriggered(Input::Key::Space))
     {
         if (m_currentSelection == MenuOption::Setting)
         {
-            // TODO: ÀÌ°÷¿¡ ½ÇÁ¦ ¼³Á¤ È­¸éÀ¸·Î ³Ñ¾î°¡´Â ·ÎÁ÷ ±¸Çö
+            // TODO: ì´ê³³ì— ì‹¤ì œ ì„¤ì • í™”ë©´ìœ¼ë¡œ ë„˜ì–´ê°€ëŠ” ë¡œì§ êµ¬í˜„
             Logger::Instance().Log(Logger::Severity::Event, "Setting option selected (not implemented)");
-            gsm.PopState(); // Áö±İÀº ±×³É ´İ±â
+            gsm.PopState(); // ì§€ê¸ˆì€ ê·¸ëƒ¥ ë‹«ê¸°
         }
         else if (m_currentSelection == MenuOption::Exit)
         {
@@ -81,56 +96,67 @@ void SettingState::Update(double dt)
 
 void SettingState::Draw()
 {
-    // GameplayState°¡ ÀÌ¹Ì È­¸éÀ» ±×·ÈÀ¸¹Ç·Î, Clear()¸¦ È£ÃâÇÏÁö ¾Ê½À´Ï´Ù.
+    // GameplayStateê°€ ì´ë¯¸ í™”ë©´ì„ ê·¸ë ¸ìœ¼ë¯€ë¡œ, Clear()ë¥¼ í˜¸ì¶œí•˜ì§€ ì•ŠìŠµë‹ˆë‹¤.
 
     Engine& engine = gsm.GetEngine();
     float screenWidth = static_cast<float>(engine.GetWidth());
     float screenHeight = static_cast<float>(engine.GetHeight());
 
+    // âœ… [ì¶”ê°€] Viewport ë¦¬ì…‹ (FBO ë Œë”ë§ìœ¼ë¡œ ì¸í•´ ë³€ê²½ë˜ì—ˆì„ ìˆ˜ ìˆìŒ)
+    GL::Viewport(0, 0, engine.GetWidth(), engine.GetHeight());
+
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, screenWidth, 0.0f, screenHeight, -1.0f, 1.0f);
 
-    // 1. ¹İÅõ¸í °ËÀº»ö ¿À¹ö·¹ÀÌ ±×¸®±â
+    // 1. ë°˜íˆ¬ëª… ê²€ì€ìƒ‰ ì˜¤ë²„ë ˆì´ ê·¸ë¦¬ê¸°
     m_colorShader->use();
     m_colorShader->setMat4("projection", projection);
 
     Math::Matrix overlayModel = Math::Matrix::CreateTranslation({ screenWidth / 2.0f, screenHeight / 2.0f }) * Math::Matrix::CreateScale({ screenWidth, screenHeight });
     m_colorShader->setMat4("model", overlayModel);
-    m_colorShader->setVec4("objectColor", 0.0f, 0.0f, 0.0f, 0.7f); // 70% Åõ¸íµµÀÇ °ËÀº»ö
+    m_colorShader->setVec4("objectColor", 0.0f, 0.0f, 0.0f, 0.7f); // 70% íˆ¬ëª…ë„ì˜ ê²€ì€ìƒ‰
 
-    // ÅØ½ºÃ³ ¼ÎÀÌ´õ¸¦ »ç¿ëÇÏÁö ¾ÊÀ¸¹Ç·Î, ÅØ½ºÃ³ ¹ÙÀÎµù ÇØÁ¦ (Áß¿ä)
+    // âœ… [ì¶”ê°€] ì˜¤ë²„ë ˆì´ëŠ” ë¸”ë Œë”© í™œì„±í™”
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     GL::BindTexture(GL_TEXTURE_2D, 0);
     GL::BindVertexArray(m_overlayVAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
 
-    // 2. ÅØ½ºÆ® ±×¸®±â (ÅØ½ºÃ³ ¼ÎÀÌ´õ »ç¿ë)
-    gsm.GetEngine().GetTextureShader().use(); // GameplayStateÀÇ ÅØ½ºÃ³ ¼ÎÀÌ´õ Àç»ç¿ë
-    gsm.GetEngine().GetTextureShader().setMat4("projection", projection);
+    // 2. í…ìŠ¤íŠ¸ ê·¸ë¦¬ê¸° (âœ… [ìˆ˜ì •] í°íŠ¸ ì…°ì´ë” ì‚¬ìš©)
+    m_fontShader->use();
+    m_fontShader->setMat4("projection", projection);
+
+    // (ë¸”ë Œë”©ì€ ì˜¤ë²„ë ˆì´ì—ì„œ ì´ë¯¸ ì¼°ìœ¼ë¯€ë¡œ ê³„ì† ì‚¬ìš©)
 
     Math::Vec2 settingPos = { screenWidth / 2.0f - 150.f, screenHeight / 2.0f + 50.f };
     Math::Vec2 exitPos = { screenWidth / 2.0f - 150.f, screenHeight / 2.0f - 50.f };
     float size = 64.0f;
 
- 
-
-    std::string settingText = "Setting";
-    std::string exitText = "Exit";
-
+    // âœ… [ìˆ˜ì •] m_font->DrawText(...)ë¥¼ DrawBakedText(...)ë¡œ ë³€ê²½
     if (m_currentSelection == MenuOption::Setting)
     {
-        settingText = "> Setting <";
+        // "Setting"ì´ ì„ íƒë¨
+        m_font->DrawBakedText(*m_fontShader, m_settingSelectedText, settingPos, size);
+        m_font->DrawBakedText(*m_fontShader, m_exitText, exitPos, size);
     }
-    else
+    else // m_currentSelection == MenuOption::Exit
     {
-        exitText = "> Exit <";
+        // "Exit"ê°€ ì„ íƒë¨
+        m_font->DrawBakedText(*m_fontShader, m_settingText, settingPos, size);
+        m_font->DrawBakedText(*m_fontShader, m_exitSelectedText, exitPos, size);
     }
 
-    m_font->DrawText(gsm.GetEngine().GetTextureShader(), settingText, settingPos, size);
-    m_font->DrawText(gsm.GetEngine().GetTextureShader(), exitText, exitPos, size);
+    // (ì„ íƒ ì‚¬í•­) í…ìŠ¤íŠ¸ ê·¸ë¦¬ê¸° í›„ VAO ë°”ì¸ë”© í•´ì œ
+    GL::BindVertexArray(0);
 }
 
 void SettingState::Shutdown()
 {
-    m_font->Shutdown();
+    // âœ… [ìˆ˜ì •] m_font->Shutdown() í˜¸ì¶œ ì œê±°
+    // (unique_ptrì´ ì†Œë©¸ìì—ì„œ ìë™ìœ¼ë¡œ Font::Shutdown() í˜¸ì¶œ)
+    // m_font->Shutdown(); 
+
     GL::DeleteVertexArrays(1, &m_overlayVAO);
     GL::DeleteBuffers(1, &m_overlayVBO);
     Logger::Instance().Log(Logger::Severity::Info, "SettingState Shutdown");

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <GL/glew.h>
 
@@ -35,6 +35,13 @@ namespace GL
     static inline void GenerateMipmap(GLenum target) { glGenerateMipmap(target); }
     static inline void ActiveTexture(GLenum texture) { glActiveTexture(texture); }
     static inline void DeleteTextures(GLsizei n, const GLuint* textures) { glDeleteTextures(n, textures); }
+
+    // ✅ [추가] Framebuffers (FBO)
+    static inline void GenFramebuffers(GLsizei n, GLuint* framebuffers) { glGenFramebuffers(n, framebuffers); }
+    static inline void BindFramebuffer(GLenum target, GLuint framebuffer) { glBindFramebuffer(target, framebuffer); }
+    static inline void FramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level) { glFramebufferTexture2D(target, attachment, textarget, texture, level); }
+    static inline GLenum CheckFramebufferStatus(GLenum target) { return glCheckFramebufferStatus(target); }
+    static inline void DeleteFramebuffers(GLsizei n, const GLuint* framebuffers) { glDeleteFramebuffers(n, framebuffers); }
 
     // Shaders & Programs
     static inline GLuint CreateShader(GLenum type) { return glCreateShader(type); }

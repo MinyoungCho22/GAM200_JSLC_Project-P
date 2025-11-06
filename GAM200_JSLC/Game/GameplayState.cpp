@@ -9,6 +9,11 @@
 #include "Setting.hpp" 
 #include <GLFW/glfw3.h>
 
+// 텍스트 포맷팅을 위한 헤더
+#include <string>
+#include <sstream>
+#include <iomanip>
+
 // 플레이어의 물리적 바닥 높이
 constexpr float GROUND_LEVEL = 230.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
@@ -21,10 +26,12 @@ void GameplayState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Initialize");
 
- 
     colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
 
-   
+    m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
+    m_fontShader->use();
+    m_fontShader->setInt("ourTexture", 0);
+
     gsm.GetEngine().GetTextureShader().use();
     gsm.GetEngine().GetTextureShader().setInt("ourTexture", 0);
 
@@ -33,8 +40,7 @@ void GameplayState::Initialize()
 
     Engine& engine = gsm.GetEngine();
 
-    // --- 펄스 공급원 생성 (top-left 기준 좌표) ---
-    // 1. (Top-left: 423, 390 / Size: 51, 63) -> Center(448.5, 358.5)
+    // --- 펄스 공급원 생성 (기존 로직과 동일) ---
     float width1 = 51.f;
     float height1 = 63.f;
     float topLeftX1 = 410.f;
@@ -43,7 +49,6 @@ void GameplayState::Initialize()
     pulseSources.emplace_back();
     pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
 
-    // 2. (Top-left: 693, 525 / Size: 213, 141) -> Center(799.5, 454.5)
     float width2 = 208.f;
     float height2 = 141.f;
     float topLeftX2 = 673.f;
@@ -52,7 +57,6 @@ void GameplayState::Initialize()
     pulseSources.emplace_back();
     pulseSources.back().Initialize(center2, { width2, height2 }, 100.f);
 
-    // 3. (Top-left: 1413, 270 / Size: 75, 33) -> Center(1450.5, 253.5)
     float width3 = 75.f;
     float height3 = 33.f;
     float topLeftX3 = 1369.f;
@@ -63,24 +67,24 @@ void GameplayState::Initialize()
     // --- 펄스 공급원 설정 끝 ---
 
     droneManager = std::make_unique<DroneManager>();
-    // 드론 생성 주석 처리
-    /*
-    const float roomWidth = 1620.0f;
-    const float minX = 180.0f;
-    droneManager->SpawnDrone({ minX + 620.0f, GROUND_LEVEL + 300.0f }, "Asset/Drone.png");
-    droneManager->SpawnDrone({ minX + 1020.0f, GROUND_LEVEL + 100.0f }, "Asset/Drone.png");
-    droneManager->SpawnDrone({ minX + 1520.0f, GROUND_LEVEL + 20.0f }, "Asset/Drone.png");
-    */
 
     m_pulseGauge.Initialize({ 80.f, engine.GetHeight() * 0.75f }, { 40.f, 300.f });
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
 
     m_room = std::make_unique<Room>();
-    m_room->Initialize(engine,"Asset/Room.png");
+    m_room->Initialize(engine, "Asset/Room.png");
 
     m_font = std::make_unique<Font>();
-    m_font->Initialize("Asset/fonts/Font_Outlined.png", 16, 8);
+    m_font->Initialize("Asset/fonts/Font_Outlined.png");
+
+    // ✅ [수정] 정적 텍스트 및 FPS 초기 텍스트 베이킹
+    m_debugToggleText = m_font->PrintToTexture(*m_fontShader, "Debug (TAB)");
+    m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ..."); // 초기값
+
+    // FPS 타이머 초기화 (hpp에서 이미 0.0으로 초기화됨)
+    m_fpsTimer = 0.0;
+    m_frameCount = 0;
 }
 
 void GameplayState::Update(double dt)
@@ -88,11 +92,11 @@ void GameplayState::Update(double dt)
     Engine& engine = gsm.GetEngine();
     auto& input = engine.GetInput();
 
-    // ESC 키를 누르면 SettingState(일시정지 메뉴)를 Push합니다.
+    // ESC 키 (기존 로직)
     if (input.IsKeyTriggered(Input::Key::Escape))
     {
         gsm.PushState(std::make_unique<SettingState>(gsm));
-        return; // 일시정지 상태이므로 아래 게임 로직을 실행하지 않고 즉시 반환
+        return;
     }
 
     if (input.IsKeyTriggered(Input::Key::Tab))
@@ -100,10 +104,10 @@ void GameplayState::Update(double dt)
         m_isDebugDraw = !m_isDebugDraw;
     }
 
+    // --- (기존 플레이어/게임 로직 ... ) ---
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerSize = player.GetSize();
     Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
-
 
     if (true)
     {
@@ -153,7 +157,6 @@ void GameplayState::Update(double dt)
     for (const auto& drone : drones)
     {
         Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
-
         if (Collision::CheckAABB(playerCenter, playerHitboxSize, drone.GetPosition(), droneHitboxSize))
         {
             player.TakeDamage(20.0f);
@@ -163,31 +166,53 @@ void GameplayState::Update(double dt)
 
     const auto& pulse = player.GetPulseCore().getPulse();
     m_pulseGauge.Update(pulse.Value(), pulse.Max());
-
-    //  m_room->Update에 engine 객체를 전달하지 않습니다.
     m_room->Update(player);
+    // --- (기존 플레이어/게임 로직 끝) ---
+
+
+    // --- ✅ [수정] 동적 텍스트 베이킹 ---
+
+    // 1. FPS 텍스트 (1초마다 갱신)
+    m_fpsTimer += dt;
+    m_frameCount++;
+
+    if (m_fpsTimer >= 1.0) // 1초가 지났다면
+    {
+        // FPS 텍스처를 새로 굽습니다.
+        int average_fps = static_cast<int>(m_frameCount / m_fpsTimer);
+        std::stringstream ss_fps;
+        ss_fps << "FPS: " << average_fps;
+        m_fpsText = m_font->PrintToTexture(*m_fontShader, ss_fps.str());
+
+        // 타이머와 카운터 리셋
+        m_fpsTimer -= 1.0; // 0.0으로 리셋하는 것보다 1.0을 빼는 것이 더 정확합니다.
+        m_frameCount = 0;
+    }
+    // (1초가 지나지 않았으면 m_fpsText는 이전 텍스처를 그대로 사용합니다)
+
+    // 2. 펄스 텍스트 (매 프레임 굽기)
+    // (값이 동일하면 Font 캐시가 알아서 처리하므로 효율에 문제없음)
+    std::stringstream ss_pulse;
+    ss_pulse.precision(1); // 소수점 1자리
+    ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
+    m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
 }
 
 void GameplayState::Draw()
 {
-    GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     Engine& engine = gsm.GetEngine();
 
-    // Engine에서 공용 텍스처 셰이더를 가져옵니다.
+    GL::Viewport(0, 0, engine.GetWidth(), engine.GetHeight());
+    GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    GL::Clear(GL_COLOR_BUFFER_BIT);
+
     Shader& textureShader = engine.GetTextureShader();
 
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
 
     m_room->Draw(engine, textureShader, projection);
 
-    // 펄스 공급원 그리기 (주석 처리됨)
-    /*
-    colorShader->use();
-    colorShader->setMat4("projection", projection);
-    for (const auto& source : pulseSources) {
-        source.Draw(*colorShader);
-    }
-    */
+    // ... (펄스 공급원 그리기 주석) ...
 
     textureShader.use();
     textureShader.setMat4("projection", projection);
@@ -198,9 +223,19 @@ void GameplayState::Draw()
     colorShader->setMat4("projection", projection);
     m_pulseGauge.Draw(*colorShader);
 
-    // "HELLO WORLD" 텍스트 (SettingState로 이동됨)
-    // m_font->DrawText(textureShader, "HELLO WORLD", { 800.f, 800.f }, 64.0f);
+    // --- 텍스트 그리기 ---
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    m_fontShader->use();
+    m_fontShader->setMat4("projection", projection);
+
+    // Y 좌표는 Bottom-Left (0, 0) 기준입니다.
+    m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, engine.GetHeight() - 40.f }, 32.0f);
+    m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, engine.GetHeight() - 80.f }, 32.0f);
+    m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, engine.GetHeight() - 120.f }, 32.0f);
+
+    // ... (Debug Draw 로직) ...
     if (m_isDebugDraw)
     {
         m_room->DrawDebug(*m_debugRenderer, *colorShader, projection);
@@ -238,6 +273,8 @@ void GameplayState::Shutdown()
     droneManager->Shutdown();
     m_pulseGauge.Shutdown();
     m_debugRenderer->Shutdown();
-    m_font->Shutdown(); 
+
+    // m_font->Shutdown() 호출은 unique_ptr이 자동으로 처리
+
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
 }
