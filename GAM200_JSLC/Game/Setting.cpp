@@ -1,11 +1,12 @@
-﻿#include "Setting.hpp"
+﻿//Setting.cpp
+
+#include "Setting.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-// #include "Font.hpp" // <--- .hpp 파일에 이미 포함됨
 
 SettingState::SettingState(GameStateManager& gsm_ref)
     : gsm(gsm_ref), m_currentSelection(MenuOption::Setting), m_overlayVAO(0), m_overlayVBO(0) {
@@ -18,17 +19,17 @@ void SettingState::Initialize()
     // 폰트와 컬러 셰이더 로드
     m_font = std::make_unique<Font>();
 
-    // ✅ [수정] Font::Initialize 호출 방식 변경
+    // Font::Initialize 호출 방식 변경
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
     m_colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
 
-    // ✅ [추가] 폰트 셰이더 로드 (simple.vert/frag 사용)
+    // 폰트 셰이더 로드 (simple.vert/frag 사용)
     m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
     m_fontShader->use();
     m_fontShader->setInt("ourTexture", 0);
 
-    // ✅ [추가] 메뉴 텍스트를 미리 FBO 텍스처로 베이킹
+    // 메뉴 텍스트를 미리 FBO 텍스처로 베이킹
     m_settingText = m_font->PrintToTexture(*m_fontShader, "Setting");
     m_settingSelectedText = m_font->PrintToTexture(*m_fontShader, "> Setting <");
     m_exitText = m_font->PrintToTexture(*m_fontShader, "Exit");
@@ -96,13 +97,12 @@ void SettingState::Update(double dt)
 
 void SettingState::Draw()
 {
-    // GameplayState가 이미 화면을 그렸으므로, Clear()를 호출하지 않습니다.
 
     Engine& engine = gsm.GetEngine();
     float screenWidth = static_cast<float>(engine.GetWidth());
     float screenHeight = static_cast<float>(engine.GetHeight());
 
-    // ✅ [추가] Viewport 리셋 (FBO 렌더링으로 인해 변경되었을 수 있음)
+    // Viewport 리셋 (FBO 렌더링으로 인해 변경되었을 수 있음)
     GL::Viewport(0, 0, engine.GetWidth(), engine.GetHeight());
 
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, screenWidth, 0.0f, screenHeight, -1.0f, 1.0f);
@@ -115,7 +115,7 @@ void SettingState::Draw()
     m_colorShader->setMat4("model", overlayModel);
     m_colorShader->setVec4("objectColor", 0.0f, 0.0f, 0.0f, 0.7f); // 70% 투명도의 검은색
 
-    // ✅ [추가] 오버레이는 블렌딩 활성화
+    // 오버레이는 블렌딩 활성화
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -123,7 +123,7 @@ void SettingState::Draw()
     GL::BindVertexArray(m_overlayVAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
 
-    // 2. 텍스트 그리기 (✅ [수정] 폰트 셰이더 사용)
+    // 2. 텍스트 그리기
     m_fontShader->use();
     m_fontShader->setMat4("projection", projection);
 
@@ -133,7 +133,7 @@ void SettingState::Draw()
     Math::Vec2 exitPos = { screenWidth / 2.0f - 150.f, screenHeight / 2.0f - 50.f };
     float size = 64.0f;
 
-    // ✅ [수정] m_font->DrawText(...)를 DrawBakedText(...)로 변경
+
     if (m_currentSelection == MenuOption::Setting)
     {
         // "Setting"이 선택됨
@@ -147,16 +147,12 @@ void SettingState::Draw()
         m_font->DrawBakedText(*m_fontShader, m_exitSelectedText, exitPos, size);
     }
 
-    // (선택 사항) 텍스트 그리기 후 VAO 바인딩 해제
+    // 텍스트 그리기 후 VAO 바인딩 해제
     GL::BindVertexArray(0);
 }
 
 void SettingState::Shutdown()
 {
-    // ✅ [수정] m_font->Shutdown() 호출 제거
-    // (unique_ptr이 소멸자에서 자동으로 Font::Shutdown() 호출)
-    // m_font->Shutdown(); 
-
     GL::DeleteVertexArrays(1, &m_overlayVAO);
     GL::DeleteBuffers(1, &m_overlayVBO);
     Logger::Instance().Log(Logger::Severity::Info, "SettingState Shutdown");

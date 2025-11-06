@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "../Engine/Vec2.hpp" // Math::Vec2, Math::ivec2
-#include "../Engine/Rect.hpp" // ✅ [수정] Math::IRect를 포함
+#include "../Engine/Vec2.hpp"
+#include "../Engine/Rect.hpp"
 #include <string>
 #include <map>
 #include <unordered_map>
@@ -44,7 +44,7 @@ private:
 
     const std::string m_charSequence = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 
-    // ✅ [수정] 'irect'를 'IRect'로 변경
+    
     std::map<char, Math::IRect> m_charToRectMap;
 
     unsigned int m_quadVAO = 0;

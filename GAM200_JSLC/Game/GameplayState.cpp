@@ -8,8 +8,6 @@
 #include "../Engine/Collision.hpp"
 #include "Setting.hpp" 
 #include <GLFW/glfw3.h>
-
-// 텍스트 포맷팅을 위한 헤더
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -40,7 +38,7 @@ void GameplayState::Initialize()
 
     Engine& engine = gsm.GetEngine();
 
-    // --- 펄스 공급원 생성 (기존 로직과 동일) ---
+    // --- 펄스 공급원 생성 ---
     float width1 = 51.f;
     float height1 = 63.f;
     float topLeftX1 = 410.f;
@@ -78,7 +76,7 @@ void GameplayState::Initialize()
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
-    // ✅ [수정] 정적 텍스트 및 FPS 초기 텍스트 베이킹
+    // 정적 텍스트 및 FPS 초기 텍스트 베이킹
     m_debugToggleText = m_font->PrintToTexture(*m_fontShader, "Debug (TAB)");
     m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ..."); // 초기값
 
@@ -170,7 +168,7 @@ void GameplayState::Update(double dt)
     // --- (기존 플레이어/게임 로직 끝) ---
 
 
-    // --- ✅ [수정] 동적 텍스트 베이킹 ---
+    // --- 동적 텍스트 베이킹 ---
 
     // 1. FPS 텍스트 (1초마다 갱신)
     m_fpsTimer += dt;
@@ -178,17 +176,17 @@ void GameplayState::Update(double dt)
 
     if (m_fpsTimer >= 1.0) // 1초가 지났다면
     {
-        // FPS 텍스처를 새로 굽습니다.
+        // FPS 텍스처를 새로 굽기
         int average_fps = static_cast<int>(m_frameCount / m_fpsTimer);
         std::stringstream ss_fps;
         ss_fps << "FPS: " << average_fps;
         m_fpsText = m_font->PrintToTexture(*m_fontShader, ss_fps.str());
 
         // 타이머와 카운터 리셋
-        m_fpsTimer -= 1.0; // 0.0으로 리셋하는 것보다 1.0을 빼는 것이 더 정확합니다.
+        m_fpsTimer -= 1.0; // 0.0으로 리셋하는 것보다 1.0을 빼는 것이 더 정확
         m_frameCount = 0;
     }
-    // (1초가 지나지 않았으면 m_fpsText는 이전 텍스처를 그대로 사용합니다)
+    // (1초가 지나지 않았으면 m_fpsText는 이전 텍스처를 그대로 사용)
 
     // 2. 펄스 텍스트 (매 프레임 굽기)
     // (값이 동일하면 Font 캐시가 알아서 처리하므로 효율에 문제없음)
@@ -230,12 +228,12 @@ void GameplayState::Draw()
     m_fontShader->use();
     m_fontShader->setMat4("projection", projection);
 
-    // Y 좌표는 Bottom-Left (0, 0) 기준입니다.
+    // Y 좌표는 Bottom-Left (0, 0) 기준
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, engine.GetHeight() - 40.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, engine.GetHeight() - 80.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, engine.GetHeight() - 120.f }, 32.0f);
 
-    // ... (Debug Draw 로직) ...
+    // Debug Draw 로직
     if (m_isDebugDraw)
     {
         m_room->DrawDebug(*m_debugRenderer, *colorShader, projection);
@@ -273,8 +271,6 @@ void GameplayState::Shutdown()
     droneManager->Shutdown();
     m_pulseGauge.Shutdown();
     m_debugRenderer->Shutdown();
-
-    // m_font->Shutdown() 호출은 unique_ptr이 자동으로 처리
 
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
 }

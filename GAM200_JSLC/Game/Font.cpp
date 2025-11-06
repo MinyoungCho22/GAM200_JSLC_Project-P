@@ -5,17 +5,13 @@
 #include <iostream>
 
 #pragma warning(push, 0)
-// stb_image.h가 다른 .cpp 파일 (예: Texture.cpp 등)에
-// 이미 #define STB_IMAGE_IMPLEMENTATION 되어있다면
-// 여기서는 이 #define을 제거해야 중복 정의 오류가 나지 않습니다.
-// #define STB_IMAGE_IMPLEMENTATION 
 #include <stb_image.h>
 #pragma warning(pop)
 
-// GetPixel 헬퍼 구현 (RGBA 4채널 가정)
+// GetPixel 헬퍼 구현 (RGBA 4채널)
 unsigned int Font::GetPixel(const unsigned char* data, int x, int y, int width, int channels) const
 {
-    // stbi_load(false) 기준. (0,0)은 Top-Left 입니다.
+    // stbi_load(false) 기준. (0,0)은 Top-Left
     const unsigned char* p = data + (y * width + x) * channels;
     unsigned int r = p[0];
     unsigned int g = p[1];
@@ -26,7 +22,7 @@ unsigned int Font::GetPixel(const unsigned char* data, int x, int y, int width, 
 
 void Font::Initialize(const char* fontAtlasPath)
 {
-    // stbi_load(false)로 둡니다. (엔진의 다른 텍스처 로딩과 일관성 유지)
+    // stbi_load(false) (엔진의 다른 텍스처 로딩과 일관성 유지)
     stbi_set_flip_vertically_on_load(false);
 
     int width, height, nrChannels;
@@ -84,7 +80,7 @@ void Font::Initialize(const char* fontAtlasPath)
     GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
     GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 
-    // GL_NEAREST는 이미 여기서 사용 중입니다. (올바른 설정)
+    // GL_NEAREST는 여기서 사용
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -234,7 +230,7 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
         float uv_h = static_cast<float>(char_size.y) / m_atlasHeight;
         float uv_y = 1.0f - (static_cast<float>(char_rect.top_right.y) / m_atlasHeight);
 
-        // ✅ [수정] 1픽셀 보정으로 변경
+        // 1픽셀 보정으로 변경
 
         // 1. 좌우 경계 보정 (X축) - 반 픽셀
         const float pixel_epsilon_x = 0.5f / m_atlasWidth;
@@ -244,7 +240,7 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
         // 2. 상하 경계 보정 (Y축) - 1 픽셀
         // 폰트 아틀라스의 y=0 (흰색)과 y=1 (글자 시작) 사이를 피하기 위해
         // UV의 '위쪽'(top)을 1픽셀 내리고,
-        // UV의 '아래쪽'(bottom)을 1픽셀 올립니다.
+        // UV의 '아래쪽'(bottom)을 1픽셀 올림
         const float one_pixel_y = 1.0f / m_atlasHeight;
 
         uv_y += one_pixel_y; // UV의 bottom을 1픽셀 올림
@@ -281,7 +277,7 @@ void Font::DrawBakedText(Shader& textureShader, const CachedTextureInfo& texture
         position.y + renderHeight / 2.0f
     };
 
-    // Y축 뒤집기 (이전 코드와 동일)
+   
     Math::Matrix model = Math::Matrix::CreateTranslation(center) *
         Math::Matrix::CreateScale({ renderWidth, -renderHeight });
     textureShader.setMat4("model", model);

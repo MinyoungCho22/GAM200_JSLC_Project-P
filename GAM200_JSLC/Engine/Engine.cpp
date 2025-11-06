@@ -1,4 +1,6 @@
-﻿#include "Engine.hpp"
+﻿//Engine.cpp
+
+#include "Engine.hpp"
 #include "Logger.hpp"
 #include "GameStateManager.hpp"
 #include "../Game/SplashState.hpp"
@@ -96,7 +98,7 @@ void Engine::KeyCallback(GLFWwindow* window, int key, int scancode, int action, 
 
 void Engine::FramebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
-    // ✅ [수정] static_static_cast -> static_cast 오타 수정
+    
     Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
     if (engine)
     {
