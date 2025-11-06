@@ -30,7 +30,7 @@ public:
 
     CachedTextureInfo PrintToTexture(Shader& atlasShader, const std::string& text);
     void DrawBakedText(Shader& textureShader, const CachedTextureInfo& textureInfo, Math::Vec2 position, float newHeight);
-
+    int m_fontHeight = 0;
 private:
     unsigned int GetPixel(const unsigned char* data, int x, int y, int width, int channels) const;
     CachedTextureInfo BakeTextToTexture(Shader& atlasShader, const std::string& text);
@@ -40,7 +40,6 @@ private:
     unsigned int m_atlasTextureID = 0;
     int m_atlasWidth = 0;
     int m_atlasHeight = 0;
-    int m_fontHeight = 0;
 
     const std::string m_charSequence = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 

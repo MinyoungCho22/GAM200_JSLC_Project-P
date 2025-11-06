@@ -1,6 +1,4 @@
-﻿//Engine.cpp
-
-#include "Engine.hpp"
+﻿#include "Engine.hpp"
 #include "Logger.hpp"
 #include "GameStateManager.hpp"
 #include "../Game/SplashState.hpp"
@@ -32,9 +30,9 @@ bool Engine::Initialize(const std::string& windowTitle)
     glfwGetWindowPos(m_window, &m_windowedX, &m_windowedY);
     glfwMakeContextCurrent(m_window);
     glfwSetWindowUserPointer(m_window, this);
-    glfwSetKeyCallback(m_window, KeyCallback);
 
-    glfwSetFramebufferSizeCallback(m_window, FramebufferSizeCallback);
+    glfwSetKeyCallback(m_window, Engine::KeyCallback);
+    glfwSetFramebufferSizeCallback(m_window, Engine::FramebufferSizeCallback);
 
     m_input = std::make_unique<Input::Input>();
     m_input->Initialize(m_window);
@@ -84,6 +82,53 @@ void Engine::Update()
     m_gameStateManager->Update(m_deltaTime);
 }
 
+Math::ivec2 Engine::GetRecommendedResolution()
+{
+    if (!m_window)
+    {
+        return { 1920, 1080 };
+    }
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    if (primaryMonitor == NULL)
+    {
+        return { 1920, 1080 };
+    }
+    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+    return { mode->width, mode->height };
+}
+
+
+void Engine::SetResolution(int width, int height)
+{
+    // 새 해상도를 창 모드일 때의 기본값으로 저장
+    m_windowedWidth = width;
+    m_windowedHeight = height;
+
+    if (m_isFullscreen)
+    {
+        // 이미 전체화면이면, 해상도 변경을 위해 모니터를 다시 설정
+        GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+        glfwSetWindowMonitor(m_window, primaryMonitor, 0, 0, width, height, mode->refreshRate);
+    }
+    else
+    {
+        // 창 모드이면, 윈도우 크기 변경
+        glfwSetWindowSize(m_window, width, height);
+
+ 
+        GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+        int xpos = (mode->width - width) / 2;
+        int ypos = (mode->height - height) / 2;
+        glfwSetWindowPos(m_window, xpos, ypos);
+    }
+
+
+    Logger::Instance().Log(Logger::Severity::Event, "Resolution set to %d x %d", width, height);
+}
+
+
 void Engine::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
@@ -98,7 +143,7 @@ void Engine::KeyCallback(GLFWwindow* window, int key, int scancode, int action, 
 
 void Engine::FramebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
-    
+
     Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
     if (engine)
     {
@@ -143,11 +188,13 @@ void Engine::ToggleFullscreen()
         GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
 
+        // 전체 화면으로 전환 (현재 모니터의 최대 해상도 사용)
         glfwSetWindowMonitor(m_window, primaryMonitor, 0, 0, mode->width, mode->height, mode->refreshRate);
         Logger::Instance().Log(Logger::Severity::Event, "Switched to Fullscreen mode");
     }
     else
     {
+        // 창 모드로 전환 (저장된 해상도 사용)
         glfwSetWindowMonitor(m_window, nullptr, m_windowedX, m_windowedY, m_windowedWidth, m_windowedHeight, 0);
         Logger::Instance().Log(Logger::Severity::Event, "Switched to Windowed mode");
     }
