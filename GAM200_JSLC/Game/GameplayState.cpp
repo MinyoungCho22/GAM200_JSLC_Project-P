@@ -1,4 +1,6 @@
-﻿#include "GameplayState.hpp"
+﻿// GameplayState.cpp
+
+#include "GameplayState.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -12,11 +14,12 @@
 #include <sstream>
 #include <iomanip>
 
-// 플레이어의 물리적 바닥 높이
 constexpr float GROUND_LEVEL = 230.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
 constexpr float ATTACK_RANGE = 200.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
+constexpr float GAME_WIDTH = 1920.0f;
+constexpr float GAME_HEIGHT = 1080.0f;
 
 GameplayState::GameplayState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
@@ -38,7 +41,6 @@ void GameplayState::Initialize()
 
     Engine& engine = gsm.GetEngine();
 
-    // --- 펄스 공급원 생성 ---
     float width1 = 51.f;
     float height1 = 63.f;
     float topLeftX1 = 410.f;
@@ -62,11 +64,10 @@ void GameplayState::Initialize()
     Math::Vec2 center3 = { topLeftX3 + (width3 / 2.0f), topLeftY3 - (height3 / 2.0f) };
     pulseSources.emplace_back();
     pulseSources.back().Initialize(center3, { width3, height3 }, 100.f);
-    // --- 펄스 공급원 설정 끝 ---
 
     droneManager = std::make_unique<DroneManager>();
 
-    m_pulseGauge.Initialize({ 80.f, engine.GetHeight() * 0.75f }, { 40.f, 300.f });
+    m_pulseGauge.Initialize({ 80.f, GAME_HEIGHT * 0.75f }, { 40.f, 300.f });
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
 
@@ -76,11 +77,9 @@ void GameplayState::Initialize()
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
-    // 정적 텍스트 및 FPS 초기 텍스트 베이킹
     m_debugToggleText = m_font->PrintToTexture(*m_fontShader, "Debug (TAB)");
-    m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ..."); // 초기값
+    m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ...");
 
-    // FPS 타이머 초기화 (hpp에서 이미 0.0으로 초기화됨)
     m_fpsTimer = 0.0;
     m_frameCount = 0;
 }
@@ -90,7 +89,6 @@ void GameplayState::Update(double dt)
     Engine& engine = gsm.GetEngine();
     auto& input = engine.GetInput();
 
-    // ESC 키 (기존 로직)
     if (input.IsKeyTriggered(Input::Key::Escape))
     {
         gsm.PushState(std::make_unique<SettingState>(gsm));
@@ -102,7 +100,6 @@ void GameplayState::Update(double dt)
         m_isDebugDraw = !m_isDebugDraw;
     }
 
-    // --- (기존 플레이어/게임 로직 ... ) ---
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerSize = player.GetSize();
     Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
@@ -165,33 +162,23 @@ void GameplayState::Update(double dt)
     const auto& pulse = player.GetPulseCore().getPulse();
     m_pulseGauge.Update(pulse.Value(), pulse.Max());
     m_room->Update(player);
-    // --- (기존 플레이어/게임 로직 끝) ---
 
-
-    // --- 동적 텍스트 베이킹 ---
-
-    // 1. FPS 텍스트 (1초마다 갱신)
     m_fpsTimer += dt;
     m_frameCount++;
 
-    if (m_fpsTimer >= 1.0) // 1초가 지났다면
+    if (m_fpsTimer >= 1.0)
     {
-        // FPS 텍스처를 새로 굽기
         int average_fps = static_cast<int>(m_frameCount / m_fpsTimer);
         std::stringstream ss_fps;
         ss_fps << "FPS: " << average_fps;
         m_fpsText = m_font->PrintToTexture(*m_fontShader, ss_fps.str());
 
-        // 타이머와 카운터 리셋
-        m_fpsTimer -= 1.0; // 0.0으로 리셋하는 것보다 1.0을 빼는 것이 더 정확
+        m_fpsTimer -= 1.0;
         m_frameCount = 0;
     }
-    // (1초가 지나지 않았으면 m_fpsText는 이전 텍스처를 그대로 사용)
 
-    // 2. 펄스 텍스트 (매 프레임 굽기)
-    // (값이 동일하면 Font 캐시가 알아서 처리하므로 효율에 문제없음)
     std::stringstream ss_pulse;
-    ss_pulse.precision(1); // 소수점 1자리
+    ss_pulse.precision(1);
     ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
 }
@@ -200,17 +187,46 @@ void GameplayState::Draw()
 {
     Engine& engine = gsm.GetEngine();
 
-    GL::Viewport(0, 0, engine.GetWidth(), engine.GetHeight());
-    GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    GL::Clear(GL_COLOR_BUFFER_BIT);
+    // 현재 프레임버퍼 크기 가져오기
+    int windowWidth, windowHeight;
+    glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
+
+    // 화면 비율 계산
+    float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
+    float gameAspect = GAME_WIDTH / GAME_HEIGHT;
+
+    int viewportX = 0;
+    int viewportY = 0;
+    int viewportWidth = windowWidth;
+    int viewportHeight = windowHeight;
+
+    // 레터박스/필러박스 계산
+    if (windowAspect > gameAspect)
+    {
+        // 화면이 더 넓음 -> 좌우에 필러박스
+        viewportWidth = static_cast<int>(windowHeight * gameAspect);
+        viewportX = (windowWidth - viewportWidth) / 2;
+    }
+    else if (windowAspect < gameAspect)
+    {
+        // 화면이 더 높음 -> 상하에 레터박스
+        viewportHeight = static_cast<int>(windowWidth / gameAspect);
+        viewportY = (windowHeight - viewportHeight) / 2;
+    }
+
+    // 게임 렌더링 영역 설정
+    GL::Viewport(viewportX, viewportY, viewportWidth, viewportHeight);
 
     Shader& textureShader = engine.GetTextureShader();
 
-    Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
+    // 게임 고정 해상도로 projection 생성
+    Math::Matrix projection = Math::Matrix::CreateOrtho(
+        0.0f, GAME_WIDTH,
+        0.0f, GAME_HEIGHT,
+        -1.0f, 1.0f
+    );
 
     m_room->Draw(engine, textureShader, projection);
-
-    // ... (펄스 공급원 그리기 주석) ...
 
     textureShader.use();
     textureShader.setMat4("projection", projection);
@@ -221,19 +237,16 @@ void GameplayState::Draw()
     colorShader->setMat4("projection", projection);
     m_pulseGauge.Draw(*colorShader);
 
-    // --- 텍스트 그리기 ---
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     m_fontShader->use();
     m_fontShader->setMat4("projection", projection);
 
-    // Y 좌표는 Bottom-Left (0, 0) 기준
-    m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, engine.GetHeight() - 40.f }, 32.0f);
-    m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, engine.GetHeight() - 80.f }, 32.0f);
-    m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, engine.GetHeight() - 120.f }, 32.0f);
+    m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
+    m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
+    m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, GAME_HEIGHT - 120.f }, 32.0f);
 
-    // Debug Draw 로직
     if (m_isDebugDraw)
     {
         m_room->DrawDebug(*m_debugRenderer, *colorShader, projection);

@@ -1,13 +1,19 @@
-﻿#include "Setting.hpp"
+﻿// Setting.cpp
+
+#include "Setting.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
+#include <GLFW/glfw3.h>
 
 #include <string>
 #include <sstream>
+
+constexpr float GAME_WIDTH = 1920.0f;
+constexpr float GAME_HEIGHT = 1080.0f;
 
 SettingState::SettingState(GameStateManager& gsm_ref)
     : gsm(gsm_ref), m_mainSelection(MainOption::Resume), m_overlayVAO(0), m_overlayVBO(0) {
@@ -42,9 +48,6 @@ void SettingState::Initialize()
     ss << recRes.x << " x " << recRes.y << " (Recommended)";
 
     m_resRecommendedText = m_font->PrintToTexture(*m_fontShader, ss.str());
-
-    //삭제 m_res1600Text = m_font->PrintToTexture(*m_fontShader, "1600 x 900");
-
 
     // --- 오버레이 VAO/VBO 생성 ---
     float vertices[] = {
@@ -105,21 +108,8 @@ void SettingState::Update(double dt)
             return;
         }
 
-        //
-        /*
-        if (input.IsKeyTriggered(Input::Key::W))
-        {
-            m_displaySelection = 0;
-        }
-        else if (input.IsKeyTriggered(Input::Key::S))
-        {
-            m_displaySelection = 1;
-        }
-        */
-
         if (input.IsKeyTriggered(Input::Key::Enter) || input.IsKeyTriggered(Input::Key::Space))
         {
-
             if (m_displaySelection == 0)
             {
                 Math::ivec2 res = gsm.GetEngine().GetRecommendedResolution();
@@ -133,16 +123,45 @@ void SettingState::Update(double dt)
 void SettingState::Draw()
 {
     Engine& engine = gsm.GetEngine();
-    float screenWidth = static_cast<float>(engine.GetWidth());
-    float screenHeight = static_cast<float>(engine.GetHeight());
 
-    GL::Viewport(0, 0, engine.GetWidth(), engine.GetHeight());
-    Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, screenWidth, 0.0f, screenHeight, -1.0f, 1.0f);
+    // 현재 프레임버퍼 크기 가져오기
+    int windowWidth, windowHeight;
+    glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
+
+    // 화면 비율 계산
+    float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
+    float gameAspect = GAME_WIDTH / GAME_HEIGHT;
+
+    int viewportX = 0;
+    int viewportY = 0;
+    int viewportWidth = windowWidth;
+    int viewportHeight = windowHeight;
+
+    // 레터박스/필러박스 계산
+    if (windowAspect > gameAspect)
+    {
+        // 화면이 더 넓음 -> 좌우에 필러박스
+        viewportWidth = static_cast<int>(windowHeight * gameAspect);
+        viewportX = (windowWidth - viewportWidth) / 2;
+    }
+    else if (windowAspect < gameAspect)
+    {
+        // 화면이 더 높음 -> 상하에 레터박스
+        viewportHeight = static_cast<int>(windowWidth / gameAspect);
+        viewportY = (windowHeight - viewportHeight) / 2;
+    }
+
+    // 게임 렌더링 영역 설정
+    GL::Viewport(viewportX, viewportY, viewportWidth, viewportHeight);
+
+    // 게임 고정 해상도로 projection 생성
+    Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT, -1.0f, 1.0f);
 
     // 1. 반투명 검은색 오버레이 그리기 (공통)
     m_colorShader->use();
     m_colorShader->setMat4("projection", projection);
-    Math::Matrix overlayModel = Math::Matrix::CreateTranslation({ screenWidth / 2.0f, screenHeight / 2.0f }) * Math::Matrix::CreateScale({ screenWidth, screenHeight });
+    Math::Matrix overlayModel = Math::Matrix::CreateTranslation({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }) *
+        Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
     m_colorShader->setMat4("model", overlayModel);
     m_colorShader->setVec4("objectColor", 0.0f, 0.0f, 0.0f, 0.7f);
 
@@ -162,8 +181,8 @@ void SettingState::Draw()
     if (m_currentPage == MenuPage::Main)
     {
         // --- 메인 메뉴 그리기 ---
-        Math::Vec2 settingPos = { screenWidth / 2.0f - 150.f, screenHeight / 2.0f + 50.f };
-        Math::Vec2 exitPos = { screenWidth / 2.0f - 150.f, screenHeight / 2.0f - 50.f };
+        Math::Vec2 settingPos = { GAME_WIDTH / 2.0f - 150.f, GAME_HEIGHT / 2.0f + 50.f };
+        Math::Vec2 exitPos = { GAME_WIDTH / 2.0f - 150.f, GAME_HEIGHT / 2.0f - 50.f };
 
         if (m_mainSelection == MainOption::Resume) // 'Setting'
         {
@@ -179,8 +198,7 @@ void SettingState::Draw()
     else if (m_currentPage == MenuPage::Display)
     {
         // --- 디스플레이 메뉴 그리기 ---
-        Math::Vec2 resRecPos = { screenWidth / 2.0f - 400.f, screenHeight / 2.0f + 50.f };
-
+        Math::Vec2 resRecPos = { GAME_WIDTH / 2.0f - 400.f, GAME_HEIGHT / 2.0f + 50.f };
 
         if (m_displaySelection == 0)
         {
@@ -195,7 +213,6 @@ void SettingState::Draw()
 
 void SettingState::Shutdown()
 {
-
     GL::DeleteVertexArrays(1, &m_overlayVAO);
     GL::DeleteBuffers(1, &m_overlayVBO);
     Logger::Instance().Log(Logger::Severity::Info, "SettingState Shutdown");
