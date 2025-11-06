@@ -2,25 +2,26 @@
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 
-// --- [수정] 방의 크기와 바닥 위치를 여기서 정의합니다 ---
-constexpr float ROOM_WIDTH = 1620.0f;
+// 방의 크기와 바닥 위치를 여기서 정의
+constexpr float ROOM_WIDTH = 1570.0f;
 constexpr float ROOM_HEIGHT = 660.0f;
-// ✅ top-left (180, 870)에 맞게 GROUND_LEVEL(minY)을 210.0f로 변경
+// 방의 '시각적' 바닥(빨간 박스)을 210.0f로 설정 (870 - 660 = 210)
 constexpr float GROUND_LEVEL = 210.0f;
 
-// ✅ [수정] Initialize에서 Engine& engine 인자 제거
-void Room::Initialize(const char* texturePath)
+void Room::Initialize(Engine& engine, const char* texturePath)
 {
     m_background = std::make_unique<Background>();
     m_background->Initialize(texturePath);
 
-    // ✅ [수정] 동적 계산 대신 요청하신 절대 좌표 180.0f를 사용합니다.
-    float minX = 180.0f;
-    float maxX = minX + ROOM_WIDTH; // 180 + 1620 = 1800
+    float screenWidth = static_cast<float>(engine.GetWidth()); // 1980
+
+    // 방의 절대 좌표 경계를 계산하고 저장
+    float minX = (screenWidth - ROOM_WIDTH) / 2.0f; // 180
+    float maxX = minX + ROOM_WIDTH; // 1800
     float minY = GROUND_LEVEL; // 210
     float maxY = minY + ROOM_HEIGHT; // 210 + 660 = 870
 
-    // 경계: X는 180~1800, Y는 210~870.
+    // 경계: X는 180~1800, Y는 210~870. 
     m_boundaries = { {minX, minY}, {maxX, maxY} };
 
     m_roomSize = { ROOM_WIDTH, ROOM_HEIGHT };
@@ -35,7 +36,6 @@ void Room::Shutdown()
     }
 }
 
-// ✅ [수정] Update에서 Engine& engine 인자 제거
 void Room::Update(Player& player)
 {
     Math::Vec2 centerPos = player.GetPosition();
@@ -56,6 +56,9 @@ void Room::Update(Player& player)
     {
         player.SetPosition({ centerPos.x, m_boundaries.top_right.y - halfSize.y });
     }
+
+    // 플레이어의 Y축 바닥 경계는 Player.cpp (230)에서 처리하므로
+    // Room.cpp (210)에서는 Y축 바닥 경계를 체크할 필요가 없음. (Player가 230 위에서 멈추기 때문)
 }
 
 void Room::Draw(Engine& engine, Shader& textureShader, const Math::Matrix& projection)
@@ -65,28 +68,7 @@ void Room::Draw(Engine& engine, Shader& textureShader, const Math::Matrix& proje
 
     Math::Vec2 screenSize = { (float)engine.GetWidth(), (float)engine.GetHeight() };
     Math::Vec2 screenCenter = screenSize * 0.5f;
-
-    Math::Vec2 imageSize = m_background->GetImageSize();
-    Math::Vec2 newScaleSize = screenSize;
-
-    if (imageSize.x > 0.0f && imageSize.y > 0.0f)
-    {
-        float screenAspect = screenSize.x / screenSize.y;
-        float imageAspect = imageSize.x / imageSize.y;
-
-        if (screenAspect > imageAspect)
-        {
-            newScaleSize.y = screenSize.y;
-            newScaleSize.x = screenSize.y * imageAspect;
-        }
-        else
-        {
-            newScaleSize.x = screenSize.x;
-            newScaleSize.y = screenSize.x / imageAspect;
-        }
-    }
-
-    Math::Matrix bg_model = Math::Matrix::CreateTranslation(screenCenter) * Math::Matrix::CreateScale(newScaleSize);
+    Math::Matrix bg_model = Math::Matrix::CreateTranslation(screenCenter) * Math::Matrix::CreateScale(screenSize);
 
     m_background->Draw(textureShader, bg_model);
 }
@@ -96,5 +78,7 @@ void Room::DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::M
     colorShader.use();
     colorShader.setMat4("projection", projection);
 
+    // 이 함수는 Room의 'GROUND_LEVEL = 210.0f' 기준으로 계산된 m_roomCenter를 사용하므로
+    // 항상 고정된 (180, 870) 위치에 빨간 박스를 그리게 됨.
     renderer.DrawBox(colorShader, m_roomCenter, m_roomSize, { 1.0f, 0.0f });
 }

@@ -7,6 +7,8 @@
 #include "DroneManager.hpp"
 #include "PulseGauge.hpp"
 #include "Room.hpp"
+#include "Font.hpp"
+#include "Setting.hpp"
 #include <memory>
 #include <vector>
 
@@ -25,8 +27,10 @@ public:
 private:
     GameStateManager& gsm;
     Player player;
-    std::unique_ptr<Shader> textureShader;
-    std::unique_ptr<Shader> colorShader;
+    std::unique_ptr<Shader> textureShader; // Player, Drone, Background용
+    std::unique_ptr<Shader> colorShader;   // Debug, UI용
+    std::unique_ptr<Shader> m_fontShader;  // ✅ [추가] 폰트 전용 셰이더
+
     std::vector<PulseSource> pulseSources;
     std::unique_ptr<PulseManager> pulseManager;
     std::unique_ptr<DroneManager> droneManager;
@@ -35,4 +39,5 @@ private:
     bool m_isDebugDraw = false;
     std::unique_ptr<Room> m_room;
     double m_logTimer = 0.0;
+    std::unique_ptr<Font> m_font;
 };

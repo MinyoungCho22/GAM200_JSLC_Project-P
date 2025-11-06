@@ -16,16 +16,12 @@ SplashState::SplashState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 void SplashState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "SplashState Initialize");
-    shader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
-    shader->use();
 
-    shader->setInt("ourTexture", 0);
-
+    // 정점 좌표를 (-0.5, -0.5) ~ (0.5, 0.5)로 설정 (중심점 기준)
     float vertices[] = {
         -0.5f,  0.5f,   0.0f, 1.0f,
          0.5f, -0.5f,   1.0f, 0.0f,
         -0.5f, -0.5f,   0.0f, 0.0f,
-
         -0.5f,  0.5f,   0.0f, 1.0f,
          0.5f,  0.5f,   1.0f, 1.0f,
          0.5f, -0.5f,   1.0f, 0.0f
@@ -78,24 +74,23 @@ void SplashState::Draw()
     GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
-    shader->use();
-
     Engine& engine = gsm.GetEngine();
-    // ✅ projection은 (0, 1920, 0, 1080) 기준으로 생성됨
+
+   
+    Shader& textureShader = engine.GetTextureShader();
+    textureShader.use();
+
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
 
-    // ✅ [수정] 이미지 원본 크기를 그대로 사용합니다.
-    Math::Vec2 imageSize = { (float)imageWidth, (float)imageHeight };
-    // ✅ [수정] 가상 스크린(1920x1080)의 중앙에 배치합니다.
+    Math::Vec2 imageSize = { static_cast<float>(imageWidth), static_cast<float>(imageHeight) };
     Math::Vec2 screenCenter = { engine.GetWidth() / 2.0f, engine.GetHeight() / 2.0f };
-
     Math::Matrix model = Math::Matrix::CreateTranslation(screenCenter) * Math::Matrix::CreateScale(imageSize);
 
-    shader->setMat4("model", model);
-    shader->setMat4("projection", projection);
+    textureShader.setMat4("model", model);
+    textureShader.setMat4("projection", projection);
 
-    shader->setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
-    shader->setBool("flipX", false);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureID);

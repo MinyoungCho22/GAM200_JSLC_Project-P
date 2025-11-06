@@ -1,21 +1,23 @@
-#pragma once
+ï»¿#pragma once
 #include <array>
 
-// GLFW/glfw3.h¸¦ Æ÷ÇÔÇÏ´Â ´ë½Å Àü¹æ ¼±¾ğÀ» »ç¿ë
+// GLFW/glfw3.hë¥¼ í¬í•¨í•˜ëŠ” ëŒ€ì‹  ì „ë°© ì„ ì–¸ì„ ì‚¬ìš©í•©ë‹ˆë‹¤.
 struct GLFWwindow;
 
-// Input ³×ÀÓ½ºÆäÀÌ½º ¾È¿¡ Å° enum°ú Å¬·¡½º¸¦ ¸ğµÎ Á¤ÀÇ
+// Input ë„¤ì„ìŠ¤í˜ì´ìŠ¤ ì•ˆì— í‚¤ enumê³¼ í´ë˜ìŠ¤ë¥¼ ëª¨ë‘ ì •ì˜í•©ë‹ˆë‹¤.
 namespace Input
 {
     enum Key {
+        // ì‹¤ì œ GLFW í‚¤ ì½”ë“œì™€ ë™ì¼í•œ ê°’
         Space = 32,
         A = 65,
         D = 68,
         E = 69,
         F = 70,
-        S = 83,
-        W = 87,
+        S = 83,     // âœ… [ì¶”ê°€] ë©”ë‰´ìš©
+        W = 87,     // âœ… [ì¶”ê°€] ë©”ë‰´ìš©
         Escape = 256,
+        Enter = 257, // âœ… [ì¶”ê°€] ë©”ë‰´ìš©
         Tab = 258,
         LeftShift = 340
     };
@@ -32,8 +34,6 @@ namespace Input
 
     private:
         GLFWwindow* m_window = nullptr;
-
-        // GLFW_KEY_LAST°¡ 348ÀÌ¹Ç·Î, ¹è¿­ Å©±â´Â 349 (0~348)·Î ¼³Á¤
 
         std::array<int, 349> m_keyState{};
         std::array<int, 349> m_keyStatePrevious{};

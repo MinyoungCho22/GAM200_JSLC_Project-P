@@ -153,12 +153,14 @@
     <ClCompile Include="Game\Background.cpp" />
     <ClCompile Include="Game\Drone.cpp" />
     <ClCompile Include="Game\DroneManager.cpp" />
+    <ClCompile Include="Game\Font.cpp" />
     <ClCompile Include="Game\GameplayState.cpp" />
     <ClCompile Include="Game\Player.cpp" />
     <ClCompile Include="Game\PulseGauge.cpp" />
     <ClCompile Include="Game\PulseManager.cpp" />
     <ClCompile Include="Game\PulseSource.cpp" />
     <ClCompile Include="Game\Room.cpp" />
+    <ClCompile Include="Game\Setting.cpp" />
     <ClCompile Include="Game\SplashState.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="OpenGL\Shader.cpp" />
@@ -181,6 +183,7 @@
     <ClInclude Include="Game\Background.hpp" />
     <ClInclude Include="Game\Drone.hpp" />
     <ClInclude Include="Game\DroneManager.hpp" />
+    <ClInclude Include="Game\Font.hpp" />
     <ClInclude Include="Game\GameplayState.hpp" />
     <ClInclude Include="Game\Player.hpp" />
     <ClInclude Include="Game\PulseGauge.hpp" />
@@ -188,6 +191,7 @@
     <ClInclude Include="Game\PulseSource.hpp" />
     <ClInclude Include="Game\PulseCore.hpp" />
     <ClInclude Include="Game\Room.hpp" />
+    <ClInclude Include="Game\Setting.hpp" />
     <ClInclude Include="Game\SplashState.hpp" />
     <ClInclude Include="OpenGL\GLWrapper.hpp" />
     <ClInclude Include="OpenGL\Shader.hpp" />

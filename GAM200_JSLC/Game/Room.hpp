@@ -1,4 +1,5 @@
-ï»¿#pragma once
+#pragma once
+#pragma once
 #include <memory>
 #include "../Engine/Vec2.hpp"
 #include "../Engine/Rect.hpp"
@@ -7,27 +8,31 @@
 #include "../Engine/DebugRenderer.hpp"
 
 class Shader;
-class Engine; // Engineì˜ ì „ë°© ì„ ì–¸
+class Engine;
 
 class Room
 {
 public:
     Room() = default;
 
-    // âœ… Initializeì—ì„œ Engine ì°¸ì¡° ì œê±°
-    void Initialize(const char* texturePath);
+    // ¿£ÁøÀ» ÂüÁ¶ÇÏ¿© ¹æÀÇ Å©±â¿Í °æ°è¸¦ ¼³Á¤ÇÏ°í, ¹è°æ ÀÌ¹ÌÁö¸¦ ·Îµå
+    void Initialize(Engine& engine, const char* texturePath);
 
+    // ¹è°æ ¸®¼Ò½º¸¦ ÇØÁ¦
     void Shutdown();
 
-    // âœ… Updateì—ì„œ Engine ì°¸ì¡° ì œê±° (ê²½ê³„ê°€ ê³ ì •ë˜ì—ˆìœ¼ë¯€ë¡œ)
+    // ÇÃ·¹ÀÌ¾îÀÇ À§Ä¡¸¦ ¹Ş¾Æ ¹æÀÇ °æ°è ¹ÛÀ¸·Î ³ª°¡Áö ¸øÇÏ°Ô Á¦ÇÑ
     void Update(Player& player);
 
+    // ¹è°æ ÀÌ¹ÌÁö¸¦ ±×¸²
     void Draw(Engine& engine, Shader& textureShader, const Math::Matrix& projection);
+
+    // µğ¹ö±× ¸ğµåÀÏ ¶§ ¹æÀÇ °æ°è¸¦ ±×¸²
     void DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::Matrix& projection);
 
 private:
     std::unique_ptr<Background> m_background;
-    Math::Rect m_boundaries;
+    Math::Rect m_boundaries; // ¹æÀÇ ½ÇÁ¦ °æ°è (minX, minY, maxX, maxY)
     Math::Vec2 m_roomSize;
     Math::Vec2 m_roomCenter;
 };
