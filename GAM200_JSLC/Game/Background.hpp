@@ -1,7 +1,8 @@
-#pragma once
+ï»¿#pragma once
 #include "../Engine/Matrix.hpp"
+#include "../Engine/Vec2.hpp" // Vec2ë¥¼ ì‚¬ìš©í•˜ê¸° ìœ„í•´ ì¶”ê°€
 
-// Shader Å¬·¡½ºÀÇ Àü¹æ ¼±¾ğ
+// Shader í´ë˜ìŠ¤ì˜ ì „ë°© ì„ ì–¸
 class Shader;
 
 class Background
@@ -9,17 +10,19 @@ class Background
 public:
     Background() = default;
 
-    // ÅØ½ºÃ³¸¦ ·ÎµåÇÏ°í ±×¸®±â À§ÇÑ VAO/VBO¸¦ ¼³Á¤ÇÕ´Ï´Ù.
     void Initialize(const char* texturePath);
-
-    // VAO/VBO/ÅØ½ºÃ³ ¸®¼Ò½º¸¦ ÇØÁ¦ÇÕ´Ï´Ù.
     void Shutdown();
-
-    // ¹è°æÀ» ±×¸³´Ï´Ù. ¼ÎÀÌ´õ¿Í ¸ğµ¨ Çà·ÄÀ» ¹Ş½À´Ï´Ù.
     void Draw(Shader& shader, const Math::Matrix& model);
+
+    // âœ… [ì¶”ê°€] ì›ë³¸ ì´ë¯¸ì§€ì˜ í¬ê¸°ë¥¼ ë°˜í™˜í•˜ëŠ” í•¨ìˆ˜
+    Math::Vec2 GetImageSize() const { return { (float)m_imageWidth, (float)m_imageHeight }; }
 
 private:
     unsigned int VAO = 0;
     unsigned int VBO = 0;
     unsigned int m_textureID = 0;
+
+    // âœ… [ì¶”ê°€] ì›ë³¸ ì´ë¯¸ì§€ì˜ ë„ˆë¹„ì™€ ë†’ì´
+    int m_imageWidth = 0;
+    int m_imageHeight = 0;
 };

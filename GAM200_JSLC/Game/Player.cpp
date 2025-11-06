@@ -13,6 +13,7 @@
 #pragma warning(pop)
 
 const float GRAVITY = -1500.0f;
+// ✅ [수정] 플레이어의 바닥 높이를 230.0f로 변경
 const float GROUND_LEVEL = 230.0f;
 
 void Player::Init(Math::Vec2 startPos, const char* texturePath)
@@ -126,7 +127,7 @@ void Player::Update(double dt)
     }
     else
     {
-        m_anim_current_frame = 0;
+        m_anim_current_frame = 3;
         m_anim_timer = 0.0f;
     }
 

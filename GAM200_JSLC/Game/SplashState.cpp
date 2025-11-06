@@ -7,7 +7,6 @@
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp" 
 
-
 #pragma warning(push, 0)
 #include <stb_image.h>
 #pragma warning(pop)
@@ -20,19 +19,16 @@ void SplashState::Initialize()
     shader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
     shader->use();
 
-
     shader->setInt("ourTexture", 0);
 
-    // 정점 좌표를 (-0.5, -0.5) ~ (0.5, 0.5)로 설정 (중심점 기준)
     float vertices[] = {
-        // positions      // texture Coords
-        -0.5f,  0.5f,   0.0f, 1.0f, // Top-left
-         0.5f, -0.5f,   1.0f, 0.0f, // Bottom-right
-        -0.5f, -0.5f,   0.0f, 0.0f, // Bottom-left
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f,
+        -0.5f, -0.5f,   0.0f, 0.0f,
 
-        -0.5f,  0.5f,   0.0f, 1.0f, // Top-left
-         0.5f,  0.5f,   1.0f, 1.0f, // Top-right
-         0.5f, -0.5f,   1.0f, 0.0f  // Bottom-right
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f,  0.5f,   1.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f
     };
 
     GL::GenVertexArrays(1, &VAO);
@@ -47,10 +43,11 @@ void SplashState::Initialize()
 
     GL::GenTextures(1, &textureID);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
+
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
@@ -78,24 +75,27 @@ void SplashState::Update(double dt)
 
 void SplashState::Draw()
 {
-    // 흰색 배경으로 지웁니다.
-    GL::ClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
     shader->use();
 
     Engine& engine = gsm.GetEngine();
+    // ✅ projection은 (0, 1920, 0, 1080) 기준으로 생성됨
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
-    Math::Vec2 imageSize = { static_cast<float>(imageWidth), static_cast<float>(imageHeight) };
+
+    // ✅ [수정] 이미지 원본 크기를 그대로 사용합니다.
+    Math::Vec2 imageSize = { (float)imageWidth, (float)imageHeight };
+    // ✅ [수정] 가상 스크린(1920x1080)의 중앙에 배치합니다.
     Math::Vec2 screenCenter = { engine.GetWidth() / 2.0f, engine.GetHeight() / 2.0f };
+
     Math::Matrix model = Math::Matrix::CreateTranslation(screenCenter) * Math::Matrix::CreateScale(imageSize);
 
     shader->setMat4("model", model);
     shader->setMat4("projection", projection);
 
-    // 플레이어 애니메이션으로 변경된 셰이더 상태를 리셋
-    shader->setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f); // 전체 텍스처 사용
-    shader->setBool("flipX", false); // 뒤집지 않음
+    shader->setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    shader->setBool("flipX", false);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureID);

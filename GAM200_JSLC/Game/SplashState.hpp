@@ -18,7 +18,8 @@ private:
     GameStateManager& gsm;
     std::unique_ptr<Shader> shader;
 
-    double timer = 3.0; // 3초 타이머
+    // ✅ [수정] 타이머를 3.0에서 2.0으로 변경
+    double timer = 2.0;
     unsigned int VAO = 0;
     unsigned int VBO = 0;
     unsigned int textureID = 0;
