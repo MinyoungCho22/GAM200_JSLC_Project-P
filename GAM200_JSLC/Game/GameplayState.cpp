@@ -347,4 +347,4 @@ void GameplayState::Shutdown()
     m_door->Shutdown();
 
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
-}
+}//
