@@ -14,7 +14,7 @@
 #include <sstream>
 #include <iomanip>
 
-constexpr float GROUND_LEVEL = 230.0f;
+constexpr float GROUND_LEVEL = 180.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
 constexpr float ATTACK_RANGE = 200.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
@@ -43,24 +43,24 @@ void GameplayState::Initialize()
 
     float width1 = 51.f;
     float height1 = 63.f;
-    float topLeftX1 = 410.f;
-    float topLeftY1 = 390.f;
+    float topLeftX1 = 424.f;
+    float topLeftY1 = 360.f;
     Math::Vec2 center1 = { topLeftX1 + (width1 / 2.0f), topLeftY1 - (height1 / 2.0f) };
     pulseSources.emplace_back();
     pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
 
-    float width2 = 208.f;
-    float height2 = 141.f;
-    float topLeftX2 = 673.f;
-    float topLeftY2 = 525.f;
+    float width2 = 215.f;
+    float height2 = 180.f;
+    float topLeftX2 = 692.f;
+    float topLeftY2 = 550.f;
     Math::Vec2 center2 = { topLeftX2 + (width2 / 2.0f), topLeftY2 - (height2 / 2.0f) };
     pulseSources.emplace_back();
     pulseSources.back().Initialize(center2, { width2, height2 }, 100.f);
 
     float width3 = 75.f;
     float height3 = 33.f;
-    float topLeftX3 = 1369.f;
-    float topLeftY3 = 270.f;
+    float topLeftX3 = 1414.f;
+    float topLeftY3 = 212.f;
     Math::Vec2 center3 = { topLeftX3 + (width3 / 2.0f), topLeftY3 - (height3 / 2.0f) };
     pulseSources.emplace_back();
     pulseSources.back().Initialize(center3, { width3, height3 }, 100.f);
@@ -102,7 +102,7 @@ void GameplayState::Update(double dt)
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerSize = player.GetSize();
-    Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
+    Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f + 50.0f };
 
     if (true)
     {
@@ -258,7 +258,7 @@ void GameplayState::Draw()
         Math::Vec2 playerSize = player.GetSize();
         m_debugRenderer->DrawCircle(*colorShader, playerCenter, ATTACK_RANGE, { 1.0f, 0.0f });
 
-        Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f };
+        Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f + 50.0f};
         m_debugRenderer->DrawBox(*colorShader, playerCenter, playerHitboxSize, { 0.0f, 1.0f });
 
         const auto& drones = droneManager->GetDrones();

@@ -4,9 +4,9 @@
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 
-constexpr float ROOM_WIDTH = 1570.0f;
-constexpr float ROOM_HEIGHT = 660.0f;
-constexpr float GROUND_LEVEL = 210.0f;
+constexpr float ROOM_WIDTH = 1620.0f;
+constexpr float ROOM_HEIGHT = 780.0f;
+constexpr float GROUND_LEVEL = 150.0f;
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
 

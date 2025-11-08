@@ -13,7 +13,7 @@
 #pragma warning(pop)
 
 const float GRAVITY = -1500.0f;
-const float GROUND_LEVEL = 230.0f;
+const float GROUND_LEVEL = 180.0f;
 
 void Player::Init(Math::Vec2 startPos, const char* texturePath)
 {
