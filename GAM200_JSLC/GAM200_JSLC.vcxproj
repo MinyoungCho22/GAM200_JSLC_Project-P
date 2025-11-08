@@ -151,10 +151,12 @@
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Engine\Window.cpp" />
     <ClCompile Include="Game\Background.cpp" />
+    <ClCompile Include="Game\Door.cpp" />
     <ClCompile Include="Game\Drone.cpp" />
     <ClCompile Include="Game\DroneManager.cpp" />
     <ClCompile Include="Game\Font.cpp" />
     <ClCompile Include="Game\GameplayState.cpp" />
+    <ClCompile Include="Game\Hallway.cpp" />
     <ClCompile Include="Game\Player.cpp" />
     <ClCompile Include="Game\PulseGauge.cpp" />
     <ClCompile Include="Game\PulseManager.cpp" />
@@ -181,10 +183,12 @@
     <ClInclude Include="Engine\Vec2.hpp" />
     <ClInclude Include="Engine\Window.hpp" />
     <ClInclude Include="Game\Background.hpp" />
+    <ClInclude Include="Game\Door.hpp" />
     <ClInclude Include="Game\Drone.hpp" />
     <ClInclude Include="Game\DroneManager.hpp" />
     <ClInclude Include="Game\Font.hpp" />
     <ClInclude Include="Game\GameplayState.hpp" />
+    <ClInclude Include="Game\Hallway.hpp" />
     <ClInclude Include="Game\Player.hpp" />
     <ClInclude Include="Game\PulseGauge.hpp" />
     <ClInclude Include="Game\PulseManager.hpp" />

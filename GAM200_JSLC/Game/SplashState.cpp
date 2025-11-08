@@ -1,4 +1,6 @@
-﻿#include "SplashState.hpp"
+﻿//SplashState.cpp
+
+#include "SplashState.hpp"
 #include "GameplayState.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"

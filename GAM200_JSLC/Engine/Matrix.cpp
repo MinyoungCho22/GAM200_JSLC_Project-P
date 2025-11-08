@@ -1,6 +1,6 @@
 #include "Matrix.hpp"
 #include <cstring>
-#include <cmath> // sin, cos 사용
+#include <cmath>
 
 namespace Math
 {
@@ -46,7 +46,7 @@ namespace Math
         return mat;
     }
 
-    // [추가] CreateRotation 함수 구현
+  
     Matrix Matrix::CreateRotation(float degrees)
     {
         Matrix mat = CreateIdentity();

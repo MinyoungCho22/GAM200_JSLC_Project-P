@@ -3,6 +3,8 @@
 #include "Room.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
+#include "Player.hpp"
+#include "../Engine/DebugRenderer.hpp"
 
 constexpr float ROOM_WIDTH = 1620.0f;
 constexpr float ROOM_HEIGHT = 780.0f;
@@ -16,13 +18,14 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_background->Initialize(texturePath);
 
     float screenWidth = GAME_WIDTH;
-
     float minX = (screenWidth - ROOM_WIDTH) / 2.0f;
     float maxX = minX + ROOM_WIDTH;
     float minY = GROUND_LEVEL;
     float maxY = minY + ROOM_HEIGHT;
 
-    m_boundaries = { {minX, minY}, {maxX, maxY} };
+    m_boundaries.bottom_left = Math::Vec2(minX, minY);
+    m_boundaries.top_right = Math::Vec2(maxX, maxY);
+
     m_roomSize = { ROOM_WIDTH, ROOM_HEIGHT };
     m_roomCenter = { minX + ROOM_WIDTH / 2.0f, minY + ROOM_HEIGHT / 2.0f };
 }
@@ -40,15 +43,18 @@ void Room::Update(Player& player)
     Math::Vec2 centerPos = player.GetPosition();
     Math::Vec2 halfSize = player.GetSize() * 0.5f;
 
+    // X축 왼쪽 경계 체크
     if (centerPos.x - halfSize.x < m_boundaries.bottom_left.x)
     {
         player.SetPosition({ m_boundaries.bottom_left.x + halfSize.x, centerPos.y });
     }
-    else if (centerPos.x + halfSize.x > m_boundaries.top_right.x)
+    // 오른쪽 경계는 활성화되어 있을 때만 체크
+    else if (m_rightBoundaryActive && centerPos.x + halfSize.x > m_boundaries.top_right.x)
     {
         player.SetPosition({ m_boundaries.top_right.x - halfSize.x, centerPos.y });
     }
 
+    // Y축 경계 체크 (천장)
     if (centerPos.y + halfSize.y > m_boundaries.top_right.y)
     {
         player.SetPosition({ centerPos.x, m_boundaries.top_right.y - halfSize.y });

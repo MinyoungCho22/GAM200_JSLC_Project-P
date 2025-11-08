@@ -79,7 +79,7 @@ void Engine::GameLoop()
         GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         GL::Clear(GL_COLOR_BUFFER_BIT);
 
-        // GameState::Draw()에서 viewport를 설정하고 그립니다
+        // GameState::Draw()에서 viewport를 설정하고 그림
         m_gameStateManager->Draw();
 
         glfwSwapBuffers(m_window);

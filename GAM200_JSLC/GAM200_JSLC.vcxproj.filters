@@ -91,6 +91,12 @@
     <ClCompile Include="Game\Setting.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Door.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Hallway.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -178,6 +184,12 @@
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\Setting.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Door.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Hallway.hpp">
       <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>

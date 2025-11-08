@@ -1,7 +1,8 @@
-#include "Input.hpp"
-#include <GLFW/glfw3.h> // Input.cpp만 GLFW 헤더를 포함하도록 하자
+//Input.cpp
 
-// 모든 함수 구현을 Input 네임스페이스 안에 두어야 함
+#include "Input.hpp"
+#include <GLFW/glfw3.h>
+
 namespace Input
 {
     void Input::Initialize(GLFWwindow* window)

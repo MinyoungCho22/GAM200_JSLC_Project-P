@@ -10,7 +10,7 @@ public:
     void Update(double dt);
     void Draw(const Shader& shader) const;
     void Shutdown();
-    void TakeHit(); // [추가]
+    void TakeHit();
 
     Math::Vec2 GetPosition() const { return m_position; }
     Math::Vec2 GetSize() const { return m_size; }
@@ -21,7 +21,7 @@ private:
     Math::Vec2 m_direction;
     Math::Vec2 m_size;
 
-    // [추가] 피격 상태 관리 변수
+    // 피격 상태 관리 변수
     bool m_isHit = false;
     float m_hitTimer = 0.0f;
     const float m_hitDuration = 0.5f; // 0.5초간 흔들림

@@ -6,7 +6,6 @@
 #include <cmath>
 
 #pragma warning(push, 0)
-// ✅ [수정] #define STB_IMAGE_IMPLEMENTATION 라인을 삭제
 #include <stb_image.h>
 #pragma warning(pop)
 

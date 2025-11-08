@@ -14,10 +14,10 @@ namespace Input
         D = 68,
         E = 69,
         F = 70,
-        S = 83,     // ✅ [추가] 메뉴용
-        W = 87,     // ✅ [추가] 메뉴용
+        S = 83,    
+        W = 87,     
         Escape = 256,
-        Enter = 257, // ✅ [추가] 메뉴용
+        Enter = 257, 
         Tab = 258,
         LeftShift = 340
     };

@@ -8,7 +8,8 @@
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Collision.hpp"
-#include "Setting.hpp" 
+#include "Setting.hpp"
+#include "Background.hpp"
 #include <GLFW/glfw3.h>
 #include <string>
 #include <sstream>
@@ -36,7 +37,7 @@ void GameplayState::Initialize()
     gsm.GetEngine().GetTextureShader().use();
     gsm.GetEngine().GetTextureShader().setInt("ourTexture", 0);
 
-    player.Init({ 300.0f, GROUND_LEVEL + 100.0f }, "Asset/player.png");
+    player.Init({ 300.0f, GROUND_LEVEL + 100.0f });
     pulseManager = std::make_unique<PulseManager>();
 
     Engine& engine = gsm.GetEngine();
@@ -65,6 +66,7 @@ void GameplayState::Initialize()
     pulseSources.emplace_back();
     pulseSources.back().Initialize(center3, { width3, height3 }, 100.f);
 
+
     droneManager = std::make_unique<DroneManager>();
 
     m_pulseGauge.Initialize({ 80.f, GAME_HEIGHT * 0.75f }, { 40.f, 300.f });
@@ -73,6 +75,16 @@ void GameplayState::Initialize()
 
     m_room = std::make_unique<Room>();
     m_room->Initialize(engine, "Asset/Room.png");
+
+    m_door = std::make_unique<Door>();
+    m_door->Initialize({ 1710.0f, 440.0f }, { 50.0f, 300.0f }, 20.0f);
+
+    m_hallway = std::make_unique<Hallway>();
+    m_hallway->Initialize();
+
+    // 카메라 초기화
+    m_camera.Initialize({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }, GAME_WIDTH, GAME_HEIGHT);
+    m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
 
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
@@ -127,6 +139,7 @@ void GameplayState::Update(double dt)
 
         if (input.IsKeyTriggered(Input::Key::F))
         {
+            bool attackedDrone = false;
             if (player.GetPulseCore().getPulse().Value() >= 20.0f)
             {
                 auto& drones = droneManager->GetDrones();
@@ -138,11 +151,43 @@ void GameplayState::Update(double dt)
                         player.GetPulseCore().getPulse().spend(20.0f);
                         drone.TakeHit();
                         Logger::Instance().Log(Logger::Severity::Event, "Drone has been hit!");
+                        attackedDrone = true;
                         break;
                     }
                 }
             }
+
+            if (!attackedDrone)
+            {
+                m_door->Update(player, true);
+            }
         }
+        else
+        {
+            m_door->Update(player, false);
+        }
+    }
+
+
+    // 문이 열렸는지 확인
+    if (m_door->ShouldLoadNextMap() && !m_doorOpened)
+    {
+        Logger::Instance().Log(Logger::Severity::Event, "Door opened! Hallway accessible.");
+        m_door->ResetMapTransition();
+        m_doorOpened = true;
+
+        m_room->SetRightBoundaryActive(false);
+        float cameraViewWidth = GAME_WIDTH; // 1920.0f
+        float roomToShow = cameraViewWidth * 0.20f; // 1920 * 0.2 = 384px // Room 보여줄만큼 설정
+
+        // 카메라의 새로운 최소 X좌표(월드 기준)
+        float newMinWorldX = GAME_WIDTH - roomToShow; // 1920 - 384 = 1536.0f
+
+        // 카메라의 경계를 (Room의 끝자락) ~ (Hallway의 끝)으로 설정
+        m_camera.SetBounds(
+            { newMinWorldX, 0.0f },
+            { GAME_WIDTH + Hallway::WIDTH, GAME_HEIGHT }
+        );
     }
 
     droneManager->Update(dt);
@@ -159,9 +204,14 @@ void GameplayState::Update(double dt)
         }
     }
 
+
     const auto& pulse = player.GetPulseCore().getPulse();
     m_pulseGauge.Update(pulse.Value(), pulse.Max());
     m_room->Update(player);
+    m_hallway->Update(dt);
+
+    // 카메라 업데이트
+    m_camera.Update(player.GetPosition(), 0.1f);
 
     m_fpsTimer += dt;
     m_frameCount++;
@@ -187,11 +237,9 @@ void GameplayState::Draw()
 {
     Engine& engine = gsm.GetEngine();
 
-    // 현재 프레임버퍼 크기 가져오기
     int windowWidth, windowHeight;
     glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
 
-    // 화면 비율 계산
     float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     float gameAspect = GAME_WIDTH / GAME_HEIGHT;
 
@@ -200,48 +248,59 @@ void GameplayState::Draw()
     int viewportWidth = windowWidth;
     int viewportHeight = windowHeight;
 
-    // 레터박스/필러박스 계산
     if (windowAspect > gameAspect)
     {
-        // 화면이 더 넓음 -> 좌우에 필러박스
         viewportWidth = static_cast<int>(windowHeight * gameAspect);
         viewportX = (windowWidth - viewportWidth) / 2;
     }
     else if (windowAspect < gameAspect)
     {
-        // 화면이 더 높음 -> 상하에 레터박스
         viewportHeight = static_cast<int>(windowWidth / gameAspect);
         viewportY = (windowHeight - viewportHeight) / 2;
     }
 
-    // 게임 렌더링 영역 설정
     GL::Viewport(viewportX, viewportY, viewportWidth, viewportHeight);
+
 
     Shader& textureShader = engine.GetTextureShader();
 
-    // 게임 고정 해상도로 projection 생성
-    Math::Matrix projection = Math::Matrix::CreateOrtho(
+    Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
         0.0f, GAME_WIDTH,
         0.0f, GAME_HEIGHT,
         -1.0f, 1.0f
     );
+    Math::Matrix view = m_camera.GetViewMatrix();
+    Math::Matrix projection = baseProjection * view;
 
-    m_room->Draw(engine, textureShader, projection);
+    textureShader.use();
+    textureShader.setMat4("projection", projection);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
 
+    // Room 배경 그리기
+    Math::Vec2 roomSize = { GAME_WIDTH, GAME_HEIGHT };
+    Math::Vec2 roomCenter = { GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f };
+    Math::Matrix roomModel = Math::Matrix::CreateTranslation(roomCenter) * Math::Matrix::CreateScale(roomSize);
+    textureShader.setMat4("model", roomModel);
+    m_room->GetBackground()->Draw(textureShader, roomModel);
+
+    m_hallway->Draw(textureShader); // 
+
+    // 게임 오브젝트 그리기
     textureShader.use();
     textureShader.setMat4("projection", projection);
     droneManager->Draw(textureShader);
     player.Draw(textureShader);
 
     colorShader->use();
-    colorShader->setMat4("projection", projection);
+    colorShader->setMat4("projection", baseProjection);
     m_pulseGauge.Draw(*colorShader);
 
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     m_fontShader->use();
-    m_fontShader->setMat4("projection", projection);
+    m_fontShader->setMat4("projection", baseProjection);
 
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
@@ -249,8 +308,6 @@ void GameplayState::Draw()
 
     if (m_isDebugDraw)
     {
-        m_room->DrawDebug(*m_debugRenderer, *colorShader, projection);
-
         colorShader->use();
         colorShader->setMat4("projection", projection);
 
@@ -258,7 +315,7 @@ void GameplayState::Draw()
         Math::Vec2 playerSize = player.GetSize();
         m_debugRenderer->DrawCircle(*colorShader, playerCenter, ATTACK_RANGE, { 1.0f, 0.0f });
 
-        Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f + 50.0f};
+        Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f + 50.0f };
         m_debugRenderer->DrawBox(*colorShader, playerCenter, playerHitboxSize, { 0.0f, 1.0f });
 
         const auto& drones = droneManager->GetDrones();
@@ -271,12 +328,15 @@ void GameplayState::Draw()
         {
             m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
         }
+
+        m_door->DrawDebug(*colorShader);
     }
 }
 
 void GameplayState::Shutdown()
 {
     m_room->Shutdown();
+    m_hallway->Shutdown();
     player.Shutdown();
     for (auto& source : pulseSources) {
         source.Shutdown();
@@ -284,6 +344,7 @@ void GameplayState::Shutdown()
     droneManager->Shutdown();
     m_pulseGauge.Shutdown();
     m_debugRenderer->Shutdown();
+    m_door->Shutdown();
 
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
 }

@@ -1,17 +1,22 @@
-﻿#pragma once
+﻿// GameplayState.hpp
+
+#pragma once
 #include "../Engine/GameState.hpp"
 #include "../Engine/DebugRenderer.hpp"
+#include "../Engine/Camera.hpp"
 #include "Player.hpp"
 #include "PulseSource.hpp"
 #include "PulseManager.hpp"
 #include "DroneManager.hpp"
 #include "PulseGauge.hpp"
 #include "Room.hpp"
-#include "Font.hpp" // ✅ Font.hpp 인클루드
+#include "Font.hpp"
 #include "Setting.hpp"
+#include "Door.hpp"
+#include "Hallway.hpp"
 #include <memory>
 #include <vector>
-#include <string> // ✅ std::string 추가
+#include <string>
 
 class Shader;
 class GameStateManager;
@@ -28,10 +33,9 @@ public:
 private:
     GameStateManager& gsm;
     Player player;
-    std::unique_ptr<Shader> textureShader; // Player, Drone, Background용
-    std::unique_ptr<Shader> colorShader;   // Debug, UI용
-    std::unique_ptr<Shader> m_fontShader;  // 폰트 전용 셰이더 (simple.vert/frag)
-
+    std::unique_ptr<Shader> textureShader;
+    std::unique_ptr<Shader> colorShader;
+    std::unique_ptr<Shader> m_fontShader;
     std::vector<PulseSource> pulseSources;
     std::unique_ptr<PulseManager> pulseManager;
     std::unique_ptr<DroneManager> droneManager;
@@ -39,14 +43,17 @@ private:
     std::unique_ptr<DebugRenderer> m_debugRenderer;
     bool m_isDebugDraw = false;
     std::unique_ptr<Room> m_room;
+    std::unique_ptr<Door> m_door;
     double m_logTimer = 0.0;
     std::unique_ptr<Font> m_font;
-
     double m_fpsTimer = 0.0;
     int m_frameCount = 0;
 
-    // ✅ [추가] FBO로 베이킹된 텍스트 텍스처를 저장할 변수
     CachedTextureInfo m_fpsText;
     CachedTextureInfo m_pulseText;
     CachedTextureInfo m_debugToggleText;
+
+    Camera m_camera;
+    std::unique_ptr<Hallway> m_hallway;
+    bool m_doorOpened = false;
 };

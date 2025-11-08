@@ -38,8 +38,6 @@ private:
     CachedTextureInfo m_exitText;
     CachedTextureInfo m_exitSelectedText;
 
-    // ✅ [수정] 디스플레이 메뉴 (Recommended 레이블이 텍스트에 포함됨)
     CachedTextureInfo m_resRecommendedText;     // "2560 x 1600 (Recommended)"
     CachedTextureInfo m_res1600Text;            // "1600 x 900"
-    // CachedTextureInfo m_recommendedLabelText; // <-- 삭제됨
 };

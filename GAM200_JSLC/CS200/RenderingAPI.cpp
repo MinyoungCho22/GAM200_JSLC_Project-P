@@ -6,21 +6,17 @@ namespace CS200
 {
     void RenderingAPI::Init()
     {
-        // 2D 렌더링을 위해 블렌딩(투명도 혼합) 기능을 활성화
         GL::Enable(GL_BLEND);
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); 
     }
 
     void RenderingAPI::SetClearColor(RGBA color)
     {
-        // OpenGL의 배경색 설정 함수를 호출
         GL::ClearColor(color.r, color.g, color.b, color.a);  
     }
 
     void RenderingAPI::Clear()
     {
-        // OpenGL의 화면 지우기 함수를 호출
-        // 지금은 색상 버퍼만 지우도록 하자
         GL::Clear(GL_COLOR_BUFFER_BIT); // 
     }
 }

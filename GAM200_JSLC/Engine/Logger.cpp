@@ -4,14 +4,14 @@
 #include <sstream>
 #include <cstdarg>
 
-// 싱글턴 인스턴스를 반환하는 함수 구현
+
 Logger& Logger::Instance()
 {
     static Logger instance;
     return instance;
 }
 
-// Private 생성자 구현
+
 Logger::Logger() : min_severity(Severity::Debug), use_console_output(true)
 {
     start_time_point = std::chrono::steady_clock::now();

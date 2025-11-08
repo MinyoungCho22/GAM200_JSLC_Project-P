@@ -16,6 +16,6 @@ public:
     std::vector<Drone>& GetDrones();
 
 private:
-    // [추가] Drone 객체들을 저장할 벡터 멤버 변수
+    // Drone 객체들을 저장할 벡터 멤버 변수
     std::vector<Drone> drones;
 };

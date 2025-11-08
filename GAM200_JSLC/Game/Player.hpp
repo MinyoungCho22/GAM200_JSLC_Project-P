@@ -1,13 +1,41 @@
-﻿#pragma once
+﻿// Player.hpp
+#pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
+#include <string>
 
 class Shader;
+
+// ✅ 애니메이션 상태를 enum으로 정의
+enum class AnimationState
+{
+    Idle,
+    Walking,
+    Jumping,
+    Crouching,
+    Dashing
+};
+
+// ✅ 애니메이션 데이터를 캡슐화한 구조체
+struct AnimationData
+{
+    unsigned int textureID = 0;
+    int texWidth = 0;
+    int texHeight = 0;
+    int frameWidth = 0;
+    int totalFrames = 0;
+    int currentFrame = 0;
+    float timer = 0.0f;
+    float frameDuration = 0.1f;
+
+    void Update(float dt);
+    void Reset();
+};
 
 class Player
 {
 public:
-    void Init(Math::Vec2 startPos, const char* texturePath);
+    void Init(Math::Vec2 startPos); // ✅ 텍스처 경로 파라미터 제거
     void Update(double dt);
     void Draw(const Shader& shader) const;
     void Shutdown();
@@ -18,30 +46,37 @@ public:
     void Crouch();
     void StopCrouch();
     void Dash();
-
     void TakeDamage(float amount);
     void SetPosition(Math::Vec2 new_pos);
+
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
     PulseCore& GetPulseCore() { return m_pulseCore; }
     bool IsDashing() const { return is_dashing; }
 
 private:
+    // ✅ 애니메이션 로드 헬퍼 함수
+    bool LoadAnimation(AnimationState state, const char* texturePath, int totalFrames, float frameDuration);
+
+    // ✅ 현재 애니메이션 상태 결정
+    AnimationState DetermineAnimationState() const;
+
+    // ✅ 애니메이션 데이터 맵
+    AnimationData m_animations[5]; // Idle, Walking, Jumping, Crouching, Dashing
+    AnimationState m_currentAnimState = AnimationState::Idle;
+
+    // 기존 멤버 변수들
     Math::Vec2 position{};
     Math::Vec2 velocity{};
     Math::Vec2 size{};
     bool is_on_ground = false;
     int last_move_direction = 1;
-
     PulseCore m_pulseCore{ 100.f, 20.f };
-
     bool is_crouching = false;
     Math::Vec2 original_size{};
-
     bool is_dashing = false;
     float dash_timer = 0.0f;
-
-    bool  m_isInvincible = false;
+    bool m_isInvincible = false;
     float m_invincibilityTimer = 0.0f;
     const float m_invincibilityDuration = 3.0f;
 
@@ -52,17 +87,6 @@ private:
 
     unsigned int VAO = 0;
     unsigned int VBO = 0;
-    unsigned int textureID = 0;
 
-    
-    int m_tex_width = 0;         // 전체 텍스처 시트의 너비
-    int m_tex_height = 0;        // 전체 텍스처 시트의 높이
-    int m_frame_width = 0;       // 프레임 하나의 너비
-
-    bool m_is_flipped = false;   // 좌우 반전 여부
-
-    int m_anim_total_frames = 7; // 애니메이션 총 프레임 수
-    int m_anim_current_frame = 0; // 현재 프레임 인덱스
-    float m_anim_timer = 0.0f;
-    float m_anim_frame_duration = 0.1f; // 1프레임당 0.1초 (10 FPS)
+    bool m_is_flipped = false;
 };

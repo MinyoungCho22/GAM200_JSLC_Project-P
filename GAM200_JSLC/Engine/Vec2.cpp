@@ -1,9 +1,11 @@
+//Vec2.hpp
+
 #include "Vec2.hpp"
 #include <cmath>
 
 namespace Math
 {
-    // [추가] ivec2 생성자 및 연산자 구현
+    // ivec2 생성자 및 연산자 구현
     ivec2::ivec2() : x(0), y(0) {}
     ivec2::ivec2(int x_val, int y_val) : x(x_val), y(y_val) {}
 

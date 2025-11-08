@@ -1,3 +1,5 @@
+//PulseGauge.cpp
+
 #include "PulseGauge.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -41,14 +43,14 @@ void PulseGauge::Update(float current_pulse, float max_pulse)
 
 void PulseGauge::Draw(Shader& shader)
 {
-    // 1. 배경 바 그리기 (어두운 회색)
+    // 배경 바 그리기 (어두운 회색)
     Math::Matrix background_model = Math::Matrix::CreateTranslation(m_position) * Math::Matrix::CreateScale(m_size);
     shader.setMat4("model", background_model);
     shader.setVec3("objectColor", 0.2f, 0.2f, 0.2f);
     GL::BindVertexArray(VAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
 
-    // 2. 펄스 바 그리기 (밝은 보라색)
+    // 펄스 바 그리기 (밝은 보라색)
     Math::Vec2 pulse_bar_size = { m_size.x, m_size.y * m_pulse_ratio };
     Math::Vec2 pulse_bar_position = { m_position.x, m_position.y - (m_size.y - pulse_bar_size.y) / 2.0f };
 
