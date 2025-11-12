@@ -1,12 +1,10 @@
-﻿// Player.hpp
-
-#pragma once
+﻿#pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
+#include "../Engine/Input.hpp"
 #include <string>
 
 class Shader;
-
 
 enum class AnimationState
 {
@@ -16,7 +14,6 @@ enum class AnimationState
     Crouching,
     Dashing
 };
-
 
 struct AnimationData
 {
@@ -37,7 +34,7 @@ class Player
 {
 public:
     void Init(Math::Vec2 startPos);
-    void Update(double dt);
+    void Update(double dt, Input::Input& input);
     void Draw(const Shader& shader) const;
     void Shutdown();
 
@@ -52,21 +49,17 @@ public:
 
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
+    Math::Vec2 GetHitboxSize() const;
     PulseCore& GetPulseCore() { return m_pulseCore; }
     bool IsDashing() const { return is_dashing; }
 
 private:
-
     bool LoadAnimation(AnimationState state, const char* texturePath, int totalFrames, float frameDuration);
-
-
     AnimationState DetermineAnimationState() const;
-
 
     AnimationData m_animations[5]; // Idle, Walking, Jumping, Crouching, Dashing
     AnimationState m_currentAnimState = AnimationState::Idle;
 
-    // 기존 멤버 변수들
     Math::Vec2 position{};
     Math::Vec2 velocity{};
     Math::Vec2 size{};

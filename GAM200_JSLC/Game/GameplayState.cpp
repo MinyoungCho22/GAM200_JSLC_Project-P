@@ -1,4 +1,4 @@
-﻿// GameplayState.cpp
+﻿//GameplayState.cpp
 
 #include "GameplayState.hpp"
 #include "../Engine/GameStateManager.hpp"
@@ -111,8 +111,7 @@ void GameplayState::Update(double dt)
     }
 
     Math::Vec2 playerCenter = player.GetPosition();
-    Math::Vec2 playerSize = player.GetSize();
-    Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f + 50.0f };
+    Math::Vec2 playerHitboxSize = player.GetHitboxSize();
 
     if (true)
     {
@@ -129,35 +128,27 @@ void GameplayState::Update(double dt)
 
         pulseManager->Update(playerCenter, playerHitboxSize, player, pulseSources, isPressingE, dt);
 
-        if (input.IsKeyPressed(Input::Key::A)) player.MoveLeft();
-        if (input.IsKeyPressed(Input::Key::D)) player.MoveRight();
-        if (input.IsKeyPressed(Input::Key::Space)) player.Jump();
-        if (input.IsKeyPressed(Input::Key::S)) player.Crouch();
-        else player.StopCrouch();
-        if (input.IsKeyPressed(Input::Key::LeftShift)) player.Dash();
-
         if (input.IsKeyTriggered(Input::Key::F))
         {
             bool attackedDrone = false;
             if (player.GetPulseCore().getPulse().Value() >= 20.0f)
             {
-
                 auto& roomDrones = droneManager->GetDrones();
                 for (auto& drone : roomDrones)
                 {
                     float distSq = (playerCenter - drone.GetPosition()).LengthSq();
 
-
+                    // 드론의 히트박스 크기 (디버그 드로우 기준 0.8배)
                     Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
-
+                    // 드론의 평균 반지름 계산 (x와 y의 평균 너비의 절반)
                     float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
 
-
+                    // 유효 공격 사거리 = 기본 사거리 + 드론 반지름
                     float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
-
+                    // 비교를 위해 제곱
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
 
-
+                    // 수정한 유효 사거리로 비교
                     if (distSq < effectiveAttackRangeSq)
                     {
                         player.GetPulseCore().getPulse().spend(20.0f);
@@ -221,7 +212,7 @@ void GameplayState::Update(double dt)
     }
 
     droneManager->Update(dt, player, playerHitboxSize);
-    player.Update(dt);
+    player.Update(dt, input);
 
     auto& drones = droneManager->GetDrones();
     for (auto& drone : drones)
@@ -355,10 +346,9 @@ void GameplayState::Draw()
         colorShader->setMat4("projection", projection);
 
         Math::Vec2 playerCenter = player.GetPosition();
-        Math::Vec2 playerSize = player.GetSize();
         m_debugRenderer->DrawCircle(*colorShader, playerCenter, ATTACK_RANGE, { 1.0f, 0.0f });
 
-        Math::Vec2 playerHitboxSize = { playerSize.x * 0.4f, playerSize.y * 0.8f + 50.0f };
+        Math::Vec2 playerHitboxSize = player.GetHitboxSize();
         m_debugRenderer->DrawBox(*colorShader, playerCenter, playerHitboxSize, { 0.0f, 1.0f });
 
         const auto& drones = droneManager->GetDrones();

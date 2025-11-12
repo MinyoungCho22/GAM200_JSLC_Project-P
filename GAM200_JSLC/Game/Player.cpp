@@ -1,6 +1,4 @@
-﻿// Player.cpp
-
-#include "Player.hpp"
+﻿#include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
@@ -18,7 +16,6 @@
 const float GRAVITY = -1500.0f;
 const float GROUND_LEVEL = 180.0f;
 
-// AnimationData 메서드 구현
 void AnimationData::Update(float dt)
 {
     timer += dt;
@@ -35,7 +32,6 @@ void AnimationData::Reset()
     timer = 0.0f;
 }
 
-// 애니메이션 로드 헬퍼 함수
 bool Player::LoadAnimation(AnimationState state, const char* texturePath, int totalFrames, float frameDuration)
 {
     int index = static_cast<int>(state);
@@ -101,15 +97,9 @@ void Player::Init(Math::Vec2 startPos)
     GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     GL::EnableVertexAttribArray(1);
 
-    // 애니메이션 로드 (경로가 여기에 모두 포함됨)
     LoadAnimation(AnimationState::Idle, "Asset/player_Idle.png", 10, 0.1f);
     LoadAnimation(AnimationState::Walking, "Asset/player_Walking.png", 7, 0.1f);
-    // 나중에 추가할 애니메이션:
-    // LoadAnimation(AnimationState::Jumping, "Asset/player_Jumping.png", 3, 0.1f);
-    // LoadAnimation(AnimationState::Crouching, "Asset/player_Crouching.png", 2, 0.15f);
-    // LoadAnimation(AnimationState::Dashing, "Asset/player_Dashing.png", 5, 0.08f);
 
-    // 크기 계산 (Walking 애니메이션 기준)
     AnimationData& walkAnim = m_animations[static_cast<int>(AnimationState::Walking)];
     float desiredWidth = 240.0f;
     float frameAspectRatio = static_cast<float>(walkAnim.texHeight) / static_cast<float>(walkAnim.frameWidth);
@@ -117,7 +107,6 @@ void Player::Init(Math::Vec2 startPos)
     original_size = size;
 }
 
-// 현재 애니메이션 상태 결정
 AnimationState Player::DetermineAnimationState() const
 {
     if (is_dashing)
@@ -129,8 +118,15 @@ AnimationState Player::DetermineAnimationState() const
     return AnimationState::Idle;
 }
 
-void Player::Update(double dt)
+void Player::Update(double dt, Input::Input& input)
 {
+    if (input.IsKeyPressed(Input::Key::A)) MoveLeft();
+    if (input.IsKeyPressed(Input::Key::D)) MoveRight();
+    if (input.IsKeyPressed(Input::Key::Space)) Jump();
+    if (input.IsKeyPressed(Input::Key::S)) Crouch();
+    else StopCrouch();
+    if (input.IsKeyPressed(Input::Key::LeftShift)) Dash();
+
     if (m_isInvincible)
     {
         m_invincibilityTimer -= static_cast<float>(dt);
@@ -172,14 +168,12 @@ void Player::Update(double dt)
         }
     }
 
-    // 웅크리고 있을 때는 애니메이션 고정
     if (is_crouching)
     {
         m_currentAnimState = AnimationState::Idle;
         m_animations[static_cast<int>(AnimationState::Idle)].currentFrame = 2;
         m_animations[static_cast<int>(AnimationState::Idle)].timer = 0.0f;
     }
-    // 점프 중일 때는 Walking 애니메이션의 5번째 프레임에 고정
     else if (!is_on_ground)
     {
         m_currentAnimState = AnimationState::Walking;
@@ -188,17 +182,12 @@ void Player::Update(double dt)
     }
     else
     {
-        // 땅에 있을 때만 애니메이션 상태 결정 및 업데이트
         AnimationState newState = DetermineAnimationState();
-
-        // 애니메이션 상태가 변경되면 리셋
         if (newState != m_currentAnimState)
         {
             m_animations[static_cast<int>(m_currentAnimState)].Reset();
             m_currentAnimState = newState;
         }
-
-        // 현재 애니메이션 업데이트
         m_animations[static_cast<int>(m_currentAnimState)].Update(static_cast<float>(dt));
     }
 
@@ -216,11 +205,10 @@ void Player::Draw(const Shader& shader) const
         }
     }
 
-    // Idle 애니메이션일 때는 가로 크기를 줄임
     Math::Vec2 drawSize = size;
     if (m_currentAnimState == AnimationState::Idle)
     {
-        drawSize.x *= 0.7f; // 가로 크기를 70%로 줄임 (원하는 비율로 조정 가능)
+        drawSize.x *= 0.7f;
     }
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(drawSize);
@@ -231,7 +219,6 @@ void Player::Draw(const Shader& shader) const
     shader.setMat4("model", model);
     shader.setBool("flipX", m_is_flipped);
 
-    // 현재 애니메이션 데이터 가져오기
     const AnimationData& currentAnim = m_animations[static_cast<int>(m_currentAnimState)];
 
     float frame_x_offset = static_cast<float>(currentAnim.currentFrame * currentAnim.frameWidth);
@@ -254,7 +241,6 @@ void Player::Shutdown()
     GL::DeleteVertexArrays(1, &VAO);
     GL::DeleteBuffers(1, &VBO);
 
-    // 모든 애니메이션 텍스처 삭제
     for (int i = 0; i < 5; ++i)
     {
         if (m_animations[i].textureID != 0)
@@ -274,6 +260,11 @@ void Player::TakeDamage(float amount)
 
     Logger::Instance().Log(Logger::Severity::Event, "Player took %.1f damage! Remaining pulse: %.1f",
         amount, m_pulseCore.getPulse().Value());
+}
+
+Math::Vec2 Player::GetHitboxSize() const
+{
+    return { size.x * 0.4f, size.y * 0.8f + 50.0f };
 }
 
 void Player::MoveLeft()
@@ -311,7 +302,6 @@ void Player::Crouch()
         position.y -= heightDiff / 2.0f;
         is_crouching = true;
 
-        // Idle 애니메이션의 3번째 프레임(인덱스 2)으로 고정
         m_currentAnimState = AnimationState::Idle;
         m_animations[static_cast<int>(AnimationState::Idle)].currentFrame = 2;
         m_animations[static_cast<int>(AnimationState::Idle)].timer = 0.0f;
