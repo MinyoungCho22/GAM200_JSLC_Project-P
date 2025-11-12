@@ -1,4 +1,6 @@
-﻿#include "GameplayState.hpp"
+﻿//GameplayState.cpp
+
+#include "GameplayState.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -345,8 +347,8 @@ void GameplayState::HandleRoomToHallwayTransition()
     float roomToShow = cameraViewWidth * 0.20f;
     float newMinWorldX = GAME_WIDTH - roomToShow;
 
-    float worldMaxX = std::max(GAME_WIDTH + Hallway::WIDTH, Rooftop::MIN_X + Rooftop::WIDTH);
-    float worldMaxY = m_rooftopAccessed ? (Rooftop::MIN_Y + Rooftop::HEIGHT) : GAME_HEIGHT;
+    float worldMaxX = GAME_WIDTH + Hallway::WIDTH;
+    float worldMaxY = GAME_HEIGHT;
 
     m_camera.SetBounds(
         { newMinWorldX, 0.0f },
@@ -393,6 +395,30 @@ void GameplayState::Draw()
 
     int windowWidth, windowHeight;
     glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
+
+    float r, g, b;
+    Math::Vec2 playerPos = player.GetPosition();
+
+    if (playerPos.y >= Rooftop::MIN_Y)
+    {
+        r = 1.0f; g = 1.0f; b = 1.0f; // White
+    }
+    else
+    {
+        if (playerPos.x < GAME_WIDTH)
+        {
+            r = 36.0f / 255.0f; g = 36.0f / 255.0f; b = 36.0f / 255.0f; // Room: Dark Gray
+        }
+        else
+        {
+            r = 1.0f; g = 1.0f; b = 1.0f; // White
+        }
+    }
+
+    GL::Viewport(0, 0, windowWidth, windowHeight);
+    GL::ClearColor(r, g, b, 1.0f);
+    GL::Clear(GL_COLOR_BUFFER_BIT);
+
 
     float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     float gameAspect = GAME_WIDTH / GAME_HEIGHT;
