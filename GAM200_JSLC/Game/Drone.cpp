@@ -1,6 +1,4 @@
-﻿// Drone.cpp
-
-#include "Drone.hpp"
+﻿#include "Drone.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -19,6 +17,7 @@ constexpr float GROUND_LEVEL = 180.0f;
 void Drone::Init(Math::Vec2 startPos, const char* texturePath)
 {
     m_position = startPos;
+    m_baseY = startPos.y;
     m_velocity = { 0.0f, 0.0f };
     m_direction = { 1.0f, 0.0f };
 
@@ -58,7 +57,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
         GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         GL::GenerateMipmap(GL_TEXTURE_2D);
 
-        float desiredWidth = 60.0f;
+        float desiredWidth = 120.0f;
         float aspectRatio = static_cast<float>(height) / static_cast<float>(width);
         m_size = { desiredWidth, desiredWidth * aspectRatio };
 
@@ -72,9 +71,6 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
     stbi_image_free(data);
 }
 
-
-// Drone.cpp의 Update 함수에 로그 추가
-// Drone.cpp의 Update 함수 수정
 void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize)
 {
     if (m_isDead) return;
@@ -112,7 +108,6 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize)
     Math::Vec2 toPlayer = player.GetPosition() - m_position;
     float distSq = toPlayer.LengthSq();
 
-    // 플레이어 히트박스를 고려한 실제 감지 거리 계산
     float playerHitboxRadius = (playerHitboxSize.x + playerHitboxSize.y) * 0.15f;
     float effectiveDetectionRange = DETECTION_RANGE + playerHitboxRadius;
     float effectiveDetectionRangeSq = effectiveDetectionRange * effectiveDetectionRange;
@@ -164,8 +159,17 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize)
             m_direction.x = -m_direction.x;
         }
 
+        m_bobTimer += static_cast<float>(dt);
+
         m_velocity = m_direction * m_speed;
-        m_position += m_velocity * static_cast<float>(dt);
+        m_position.x += m_velocity.x * static_cast<float>(dt);
+
+        const float bobAmplitude = 20.0f;
+        const float bobFrequency = 3.0f;
+
+        float bobOffset = std::sin(m_bobTimer * bobFrequency) * bobAmplitude;
+
+        m_position.y = m_baseY + bobOffset;
     }
 }
 

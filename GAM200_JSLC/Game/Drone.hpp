@@ -1,4 +1,5 @@
-﻿// Drone.hpp
+﻿//Drone.hpp
+
 #pragma once
 #include "../Engine/Vec2.hpp"
 
@@ -57,6 +58,9 @@ private:
 
     float m_speed = 200.0f;
     float m_moveTimer = 0.0f;
+
+    float m_baseY = 0.0f;
+    float m_bobTimer = 0.0f;
 
     unsigned int VAO = 0, VBO = 0, textureID = 0;
 };

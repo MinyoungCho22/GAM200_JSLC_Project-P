@@ -141,11 +141,24 @@ void GameplayState::Update(double dt)
             bool attackedDrone = false;
             if (player.GetPulseCore().getPulse().Value() >= 20.0f)
             {
+
                 auto& roomDrones = droneManager->GetDrones();
                 for (auto& drone : roomDrones)
                 {
                     float distSq = (playerCenter - drone.GetPosition()).LengthSq();
-                    if (distSq < ATTACK_RANGE_SQ)
+
+
+                    Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
+
+                    float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
+
+
+                    float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
+
+                    float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+
+
+                    if (distSq < effectiveAttackRangeSq)
                     {
                         player.GetPulseCore().getPulse().spend(20.0f);
                         drone.TakeHit();
@@ -157,7 +170,25 @@ void GameplayState::Update(double dt)
 
                 if (!attackedDrone)
                 {
-                    m_hallway->AttackDrone(playerCenter, ATTACK_RANGE_SQ, player);
+                    auto& hallwayDrones = m_hallway->GetDrones();
+                    for (auto& drone : hallwayDrones)
+                    {
+                        float distSq = (playerCenter - drone.GetPosition()).LengthSq();
+
+                        Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
+                        float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
+                        float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
+                        float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+
+                        if (distSq < effectiveAttackRangeSq)
+                        {
+                            player.GetPulseCore().getPulse().spend(20.0f);
+                            drone.TakeHit();
+                            Logger::Instance().Log(Logger::Severity::Event, "Hallway Drone has been hit!");
+                            attackedDrone = true;
+                            break;
+                        }
+                    }
                 }
             }
 
