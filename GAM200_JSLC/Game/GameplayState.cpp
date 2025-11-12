@@ -66,7 +66,6 @@ void GameplayState::Initialize()
     pulseSources.emplace_back();
     pulseSources.back().Initialize(center3, { width3, height3 }, 100.f);
 
-
     droneManager = std::make_unique<DroneManager>();
 
     m_pulseGauge.Initialize({ 80.f, GAME_HEIGHT * 0.75f }, { 40.f, 300.f });
@@ -82,7 +81,6 @@ void GameplayState::Initialize()
     m_hallway = std::make_unique<Hallway>();
     m_hallway->Initialize();
 
-    // 카메라 초기화
     m_camera.Initialize({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }, GAME_WIDTH, GAME_HEIGHT);
     m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
 
@@ -128,6 +126,7 @@ void GameplayState::Update(double dt)
         }
 
         bool isPressingE = input.IsKeyPressed(Input::Key::E);
+
         pulseManager->Update(playerCenter, playerHitboxSize, player, pulseSources, isPressingE, dt);
 
         if (input.IsKeyPressed(Input::Key::A)) player.MoveLeft();
@@ -142,18 +141,23 @@ void GameplayState::Update(double dt)
             bool attackedDrone = false;
             if (player.GetPulseCore().getPulse().Value() >= 20.0f)
             {
-                auto& drones = droneManager->GetDrones();
-                for (auto& drone : drones)
+                auto& roomDrones = droneManager->GetDrones();
+                for (auto& drone : roomDrones)
                 {
                     float distSq = (playerCenter - drone.GetPosition()).LengthSq();
                     if (distSq < ATTACK_RANGE_SQ)
                     {
                         player.GetPulseCore().getPulse().spend(20.0f);
                         drone.TakeHit();
-                        Logger::Instance().Log(Logger::Severity::Event, "Drone has been hit!");
+                        Logger::Instance().Log(Logger::Severity::Event, "Room Drone has been hit!");
                         attackedDrone = true;
                         break;
                     }
+                }
+
+                if (!attackedDrone)
+                {
+                    m_hallway->AttackDrone(playerCenter, ATTACK_RANGE_SQ, player);
                 }
             }
 
@@ -168,8 +172,6 @@ void GameplayState::Update(double dt)
         }
     }
 
-
-    // 문이 열렸는지 확인
     if (m_door->ShouldLoadNextMap() && !m_doorOpened)
     {
         Logger::Instance().Log(Logger::Severity::Event, "Door opened! Hallway accessible.");
@@ -177,40 +179,48 @@ void GameplayState::Update(double dt)
         m_doorOpened = true;
 
         m_room->SetRightBoundaryActive(false);
-        float cameraViewWidth = GAME_WIDTH; // 1920.0f
-        float roomToShow = cameraViewWidth * 0.20f; // 1920 * 0.2 = 384px // Room 보여줄만큼 설정
+        float cameraViewWidth = GAME_WIDTH;
+        float roomToShow = cameraViewWidth * 0.20f;
+        float newMinWorldX = GAME_WIDTH - roomToShow;
 
-        // 카메라의 새로운 최소 X좌표(월드 기준)
-        float newMinWorldX = GAME_WIDTH - roomToShow; // 1920 - 384 = 1536.0f
-
-        // 카메라의 경계를 (Room의 끝자락) ~ (Hallway의 끝)으로 설정
         m_camera.SetBounds(
             { newMinWorldX, 0.0f },
             { GAME_WIDTH + Hallway::WIDTH, GAME_HEIGHT }
         );
     }
 
-    droneManager->Update(dt);
+    droneManager->Update(dt, player, playerHitboxSize);
     player.Update(dt);
 
-    const auto& drones = droneManager->GetDrones();
-    for (const auto& drone : drones)
+    auto& drones = droneManager->GetDrones();
+    for (auto& drone : drones)
     {
-        Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
-        if (Collision::CheckAABB(playerCenter, playerHitboxSize, drone.GetPosition(), droneHitboxSize))
+        if (!drone.IsDead() && drone.ShouldDealDamage())
         {
             player.TakeDamage(20.0f);
+            drone.ResetDamageFlag();
             break;
         }
     }
 
-
     const auto& pulse = player.GetPulseCore().getPulse();
     m_pulseGauge.Update(pulse.Value(), pulse.Max());
     m_room->Update(player);
-    m_hallway->Update(dt);
 
-    // 카메라 업데이트
+    bool isPressingE = input.IsKeyPressed(Input::Key::E);
+    m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPressingE);
+
+    auto& hallwayDrones = m_hallway->GetDrones();
+    for (auto& drone : hallwayDrones)
+    {
+        if (!drone.IsDead() && drone.ShouldDealDamage())
+        {
+            player.TakeDamage(30.0f);
+            drone.ResetDamageFlag();
+            break;
+        }
+    }
+
     m_camera.Update(player.GetPosition(), 0.1f);
 
     m_fpsTimer += dt;
@@ -261,7 +271,6 @@ void GameplayState::Draw()
 
     GL::Viewport(viewportX, viewportY, viewportWidth, viewportHeight);
 
-
     Shader& textureShader = engine.GetTextureShader();
 
     Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
@@ -277,20 +286,23 @@ void GameplayState::Draw()
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
 
-    // Room 배경 그리기
     Math::Vec2 roomSize = { GAME_WIDTH, GAME_HEIGHT };
     Math::Vec2 roomCenter = { GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f };
     Math::Matrix roomModel = Math::Matrix::CreateTranslation(roomCenter) * Math::Matrix::CreateScale(roomSize);
     textureShader.setMat4("model", roomModel);
     m_room->GetBackground()->Draw(textureShader, roomModel);
 
-    m_hallway->Draw(textureShader); // 
+    m_hallway->Draw(textureShader);
 
-    // 게임 오브젝트 그리기
     textureShader.use();
     textureShader.setMat4("projection", projection);
     droneManager->Draw(textureShader);
     player.Draw(textureShader);
+
+    colorShader->use();
+    colorShader->setMat4("projection", projection);
+    droneManager->DrawRadars(*colorShader, *m_debugRenderer);
+    m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
 
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
@@ -321,10 +333,27 @@ void GameplayState::Draw()
         const auto& drones = droneManager->GetDrones();
         for (const auto& drone : drones)
         {
-            m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+            if (!drone.IsDead())
+            {
+                m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+            }
+        }
+
+        for (const auto& drone : m_hallway->GetDrones())
+        {
+            if (!drone.IsDead())
+            {
+                m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+                m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+            }
         }
 
         for (const auto& source : pulseSources)
+        {
+            m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
+        }
+
+        for (const auto& source : m_hallway->GetPulseSources())
         {
             m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
         }
@@ -347,4 +376,4 @@ void GameplayState::Shutdown()
     m_door->Shutdown();
 
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
-}//
+}

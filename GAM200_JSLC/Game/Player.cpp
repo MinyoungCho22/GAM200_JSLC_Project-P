@@ -12,6 +12,7 @@
 #pragma warning(push, 0)
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include "../Engine/Logger.hpp"
 #pragma warning(pop)
 
 const float GRAVITY = -1500.0f;
@@ -122,10 +123,6 @@ AnimationState Player::DetermineAnimationState() const
     if (is_dashing)
         return AnimationState::Walking;
 
-    // 점프 상태는 별도로 처리하지 않음 (Update에서 처리)
-    if (is_crouching)
-        return AnimationState::Walking;
-
     if (velocity.x != 0.0f)
         return AnimationState::Walking;
 
@@ -175,10 +172,16 @@ void Player::Update(double dt)
         }
     }
 
-    // 점프 중일 때는 애니메이션 상태를 변경하지 않고 프레임만 고정
-    if (!is_on_ground)
+    // 웅크리고 있을 때는 애니메이션 고정
+    if (is_crouching)
     {
-        // Walking 애니메이션의 5번째 프레임(인덱스 4)에 고정
+        m_currentAnimState = AnimationState::Idle;
+        m_animations[static_cast<int>(AnimationState::Idle)].currentFrame = 2;
+        m_animations[static_cast<int>(AnimationState::Idle)].timer = 0.0f;
+    }
+    // 점프 중일 때는 Walking 애니메이션의 5번째 프레임에 고정
+    else if (!is_on_ground)
+    {
         m_currentAnimState = AnimationState::Walking;
         m_animations[static_cast<int>(AnimationState::Walking)].currentFrame = 4;
         m_animations[static_cast<int>(AnimationState::Walking)].timer = 0.0f;
@@ -268,6 +271,9 @@ void Player::TakeDamage(float amount)
     m_pulseCore.getPulse().spend(amount);
     m_isInvincible = true;
     m_invincibilityTimer = m_invincibilityDuration;
+
+    Logger::Instance().Log(Logger::Severity::Event, "Player took %.1f damage! Remaining pulse: %.1f",
+        amount, m_pulseCore.getPulse().Value());
 }
 
 void Player::MoveLeft()
@@ -297,17 +303,31 @@ void Player::Jump()
 
 void Player::Crouch()
 {
-    if (is_on_ground && !is_dashing)
+    if (is_on_ground && !is_dashing && !is_crouching)
     {
-        is_crouching = true;
+        float oldHeight = size.y;
         size.y = original_size.y * 0.6f;
+        float heightDiff = oldHeight - size.y;
+        position.y -= heightDiff / 2.0f;
+        is_crouching = true;
+
+        // Idle 애니메이션의 3번째 프레임(인덱스 2)으로 고정
+        m_currentAnimState = AnimationState::Idle;
+        m_animations[static_cast<int>(AnimationState::Idle)].currentFrame = 2;
+        m_animations[static_cast<int>(AnimationState::Idle)].timer = 0.0f;
     }
 }
 
 void Player::StopCrouch()
 {
-    is_crouching = false;
-    size.y = original_size.y;
+    if (is_crouching)
+    {
+        float oldHeight = size.y;
+        size.y = original_size.y;
+        float heightDiff = size.y - oldHeight;
+        position.y += heightDiff / 2.0f;
+        is_crouching = false;
+    }
 }
 
 void Player::Dash()

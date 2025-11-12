@@ -1,3 +1,4 @@
+// DebugRenderer.cpp
 #include "DebugRenderer.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -9,9 +10,10 @@ void DebugRenderer::Initialize()
 {
     // --- Circle VAO ---
     GL::GenVertexArrays(1, &circleVAO);
-    GL::GenBuffers(1, &VBO);
+    unsigned int circleVBO;
+    GL::GenBuffers(1, &circleVBO);
     GL::BindVertexArray(circleVAO);
-    GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
+    GL::BindBuffer(GL_ARRAY_BUFFER, circleVBO);
 
     std::vector<float> vertices;
     float angle_step = 2.0f * 3.1415926535f / CIRCLE_SEGMENTS;
@@ -20,6 +22,7 @@ void DebugRenderer::Initialize()
         vertices.push_back(std::cos(angle_step * i));
         vertices.push_back(std::sin(angle_step * i));
     }
+
     GL::BufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
     GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     GL::EnableVertexAttribArray(0);
@@ -27,6 +30,7 @@ void DebugRenderer::Initialize()
     // --- Box VAO ---
     float box_vertices[] = { -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, -0.5f };
     unsigned int box_indices[] = { 0, 1, 1, 2, 2, 3, 3, 0 };
+
     GL::GenVertexArrays(1, &boxVAO);
     GL::GenBuffers(1, &VBO);
     GL::GenBuffers(1, &EBO);
@@ -38,6 +42,21 @@ void DebugRenderer::Initialize()
     GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     GL::EnableVertexAttribArray(0);
 
+    // --- Line VAO ---
+    float line_vertices[] = {
+        -0.5f, 0.0f,
+         0.5f, 0.0f
+    };
+
+    GL::GenVertexArrays(1, &lineVAO);
+    unsigned int lineVBO;
+    GL::GenBuffers(1, &lineVBO);
+    GL::BindVertexArray(lineVAO);
+    GL::BindBuffer(GL_ARRAY_BUFFER, lineVBO);
+    GL::BufferData(GL_ARRAY_BUFFER, sizeof(line_vertices), line_vertices, GL_STATIC_DRAW);
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    GL::EnableVertexAttribArray(0);
+
     GL::BindVertexArray(0);
 }
 
@@ -45,6 +64,7 @@ void DebugRenderer::Shutdown() const
 {
     GL::DeleteVertexArrays(1, &circleVAO);
     GL::DeleteVertexArrays(1, &boxVAO);
+    GL::DeleteVertexArrays(1, &lineVAO);
     GL::DeleteBuffers(1, &VBO);
     GL::DeleteBuffers(1, &EBO);
 }
@@ -68,5 +88,27 @@ void DebugRenderer::DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, Mat
 
     GL::BindVertexArray(boxVAO);
     GL::DrawElements(GL_LINES, 8, GL_UNSIGNED_INT, 0);
+    GL::BindVertexArray(0);
+}
+
+// DebugRenderer.cpp의 DrawLine 함수
+// DebugRenderer.cpp의 DrawLine 함수
+void DebugRenderer::DrawLine(const Shader& shader, Math::Vec2 start, Math::Vec2 end, float r, float g, float b) const
+{
+    Math::Vec2 direction = end - start;
+    float length = direction.Length();
+    Math::Vec2 center = (start + end) * 0.5f;
+
+    float angle = std::atan2(direction.y, direction.x) * (180.0f / 3.14159265359f);
+
+    Math::Matrix model = Math::Matrix::CreateTranslation(center) *
+        Math::Matrix::CreateRotation(angle) *
+        Math::Matrix::CreateScale({ length, 1.0f });
+
+    shader.setMat4("model", model);
+    shader.setVec3("objectColor", r, g, b);
+
+    GL::BindVertexArray(lineVAO);
+    GL::DrawArrays(GL_LINES, 0, 2);
     GL::BindVertexArray(0);
 }

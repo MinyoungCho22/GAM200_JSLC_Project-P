@@ -1,4 +1,5 @@
 ﻿// Player.hpp
+
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
@@ -6,7 +7,7 @@
 
 class Shader;
 
-// ✅ 애니메이션 상태를 enum으로 정의
+
 enum class AnimationState
 {
     Idle,
@@ -16,7 +17,7 @@ enum class AnimationState
     Dashing
 };
 
-// ✅ 애니메이션 데이터를 캡슐화한 구조체
+
 struct AnimationData
 {
     unsigned int textureID = 0;
@@ -35,7 +36,7 @@ struct AnimationData
 class Player
 {
 public:
-    void Init(Math::Vec2 startPos); // ✅ 텍스처 경로 파라미터 제거
+    void Init(Math::Vec2 startPos);
     void Update(double dt);
     void Draw(const Shader& shader) const;
     void Shutdown();
@@ -55,13 +56,13 @@ public:
     bool IsDashing() const { return is_dashing; }
 
 private:
-    // ✅ 애니메이션 로드 헬퍼 함수
+
     bool LoadAnimation(AnimationState state, const char* texturePath, int totalFrames, float frameDuration);
 
-    // ✅ 현재 애니메이션 상태 결정
+
     AnimationState DetermineAnimationState() const;
 
-    // ✅ 애니메이션 데이터 맵
+
     AnimationData m_animations[5]; // Idle, Walking, Jumping, Crouching, Dashing
     AnimationState m_currentAnimState = AnimationState::Idle;
 
@@ -78,7 +79,7 @@ private:
     float dash_timer = 0.0f;
     bool m_isInvincible = false;
     float m_invincibilityTimer = 0.0f;
-    const float m_invincibilityDuration = 3.0f;
+    const float m_invincibilityDuration = 2.0f;
 
     float move_speed = 300.0f;
     float jump_velocity = 600.0f;

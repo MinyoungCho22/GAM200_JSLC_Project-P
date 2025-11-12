@@ -1,21 +1,24 @@
+// DroneManager.hpp
 #pragma once
 #include <vector>
 #include "Drone.hpp"
 
 class Shader;
+class Player;
+class DebugRenderer;
 
 class DroneManager
 {
 public:
     void SpawnDrone(Math::Vec2 position, const char* texturePath);
-    void Update(double dt);
+    void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize);
     void Draw(const Shader& shader);
+    void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
 
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
 
 private:
-    // Drone °´Ã¼µéÀ» ÀúÀåÇÒ º¤ÅÍ ¸â¹ö º¯¼ö
     std::vector<Drone> drones;
 };
