@@ -71,7 +71,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath)
     stbi_image_free(data);
 }
 
-void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize)
+void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding)
 {
     if (m_isDead) return;
 
@@ -131,8 +131,17 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize)
             m_position.x = m_attackCenter.x + std::cos(radians) * m_attackRadius;
             m_position.y = m_attackCenter.y + std::sin(radians) * m_attackRadius;
         }
+
+        // [수정] 플레이어가 숨으면 공격 중지
+        if (isPlayerHiding)
+        {
+            m_isAttacking = false;
+            m_position = m_attackStartPos;
+            m_attackTimer = 0.0f;
+        }
     }
-    else if (distSq < effectiveDetectionRangeSq && m_attackCooldown <= 0.0f)
+    // [수정] 플레이어가 숨어있지 않을 때만 공격 감지
+    else if (!isPlayerHiding && distSq < effectiveDetectionRangeSq && m_attackCooldown <= 0.0f)
     {
         m_isAttacking = true;
         m_shouldDealDamage = true;
@@ -153,7 +162,8 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize)
     else
     {
         m_moveTimer += static_cast<float>(dt);
-        if (m_moveTimer > 3.0f)
+        // [수정] 순찰 반경 확대
+        if (m_moveTimer > 5.0f)
         {
             m_moveTimer = 0.0f;
             m_direction.x = -m_direction.x;
@@ -236,7 +246,7 @@ void Drone::Shutdown()
     GL::DeleteTextures(1, &textureID);
 }
 
-void Drone::TakeHit()
+void Drone::StartDeathSequence()
 {
     if (m_isHit || m_isDead) return;
 
@@ -247,4 +257,20 @@ void Drone::TakeHit()
     m_isAttacking = false;
 
     Logger::Instance().Log(Logger::Severity::Event, "Drone hit! Starting death sequence.");
+}
+
+void Drone::ApplyDamage(float dt)
+{
+    if (m_isHit || m_isDead) return;
+
+    m_damageTimer += dt;
+    if (m_damageTimer >= TIME_TO_DESTROY)
+    {
+        StartDeathSequence();
+    }
+}
+
+void Drone::ResetDamageTimer()
+{
+    m_damageTimer = 0.0f;
 }

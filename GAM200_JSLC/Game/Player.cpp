@@ -269,7 +269,8 @@ Math::Vec2 Player::GetHitboxSize() const
 
 void Player::MoveLeft()
 {
-    if (is_crouching || is_dashing) return;
+    // [수정] is_dashing 검사 제거
+    if (is_crouching) return;
     velocity.x -= move_speed;
     last_move_direction = -1;
     m_is_flipped = true;
@@ -277,7 +278,8 @@ void Player::MoveLeft()
 
 void Player::MoveRight()
 {
-    if (is_crouching || is_dashing) return;
+    // [수정] is_dashing 검사 제거
+    if (is_crouching) return;
     velocity.x += move_speed;
     last_move_direction = 1;
     m_is_flipped = false;
@@ -285,7 +287,8 @@ void Player::MoveRight()
 
 void Player::Jump()
 {
-    if (is_on_ground && !is_crouching && !is_dashing)
+    // [수정] is_dashing 검사 제거
+    if (is_on_ground && !is_crouching)
     {
         velocity.y = jump_velocity;
         is_on_ground = false;
@@ -333,4 +336,9 @@ void Player::Dash()
 void Player::SetPosition(Math::Vec2 new_pos)
 {
     position = new_pos;
+}
+
+bool Player::IsFacingRight() const
+{
+    return !m_is_flipped;
 }

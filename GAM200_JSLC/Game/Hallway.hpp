@@ -1,5 +1,4 @@
-﻿// Hallway.hpp
-#pragma once
+﻿#pragma once
 #include "../Engine/Vec2.hpp"
 #include "PulseSource.hpp"
 #include "DroneManager.hpp"
@@ -18,18 +17,23 @@ public:
     static constexpr float HEIGHT = 1080.0f;
 
     void Initialize();
-    void Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPressingE);
+    void Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player);
     void Draw(Shader& shader);
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
 
-    Math::Vec2 GetPosition() const { return m_position; }
-    Math::Vec2 GetSize() const { return m_size; }
+    // [수정] const Shader& -> Shader&
+    void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
 
-    const std::vector<PulseSource>& GetPulseSources() const { return m_pulseSources; }
+    Math::Vec2 GetPosition() const;
+    Math::Vec2 GetSize() const;
+
+    const std::vector<PulseSource>& GetPulseSources() const;
+    std::vector<PulseSource>& GetPulseSources();
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
-    void AttackDrone(Math::Vec2 playerPos, float attackRangeSq, Player& player);
+
+    bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
 
 private:
     std::unique_ptr<Background> m_background;
@@ -37,4 +41,7 @@ private:
     Math::Vec2 m_size;
     std::vector<PulseSource> m_pulseSources;
     std::unique_ptr<DroneManager> m_droneManager;
+
+    Math::Vec2 m_hidingSpotPos;
+    Math::Vec2 m_hidingSpotSize;
 };

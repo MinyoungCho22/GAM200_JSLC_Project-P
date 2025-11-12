@@ -1,6 +1,4 @@
-﻿//GameplayState.cpp
-
-#include "GameplayState.hpp"
+﻿#include "GameplayState.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -17,7 +15,7 @@
 
 constexpr float GROUND_LEVEL = 180.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
-constexpr float ATTACK_RANGE = 200.0f;
+constexpr float ATTACK_RANGE = 400.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
@@ -38,7 +36,9 @@ void GameplayState::Initialize()
     gsm.GetEngine().GetTextureShader().setInt("ourTexture", 0);
 
     player.Init({ 300.0f, GROUND_LEVEL + 100.0f });
+
     pulseManager = std::make_unique<PulseManager>();
+    pulseManager->Initialize();
 
     Engine& engine = gsm.GetEngine();
 
@@ -112,87 +112,90 @@ void GameplayState::Update(double dt)
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
+    bool isPressingE = input.IsKeyPressed(Input::Key::E);
 
-    if (true)
+    const float PULSE_COST_PER_SECOND = 0.5f;
+
+    m_logTimer += dt;
+    if (m_logTimer >= 0.5)
     {
-        m_logTimer += dt;
-        if (m_logTimer >= 0.5)
+        Logger::Instance().Log(Logger::Severity::Debug, "Player Pulse: %.1f / %.1f",
+            player.GetPulseCore().getPulse().Value(),
+            player.GetPulseCore().getPulse().Max());
+        m_logTimer -= 0.5;
+    }
+
+    pulseManager->Update(playerCenter, playerHitboxSize, player, pulseSources, m_hallway->GetPulseSources(), isPressingE, dt);
+
+    bool isPressingF = input.IsKeyPressed(Input::Key::F);
+    Drone* targetDrone = nullptr;
+
+    if (isPressingF)
+    {
+        if (player.GetPulseCore().getPulse().Value() > PULSE_COST_PER_SECOND * dt)
         {
-            Logger::Instance().Log(Logger::Severity::Debug, "Player Pulse: %.1f / %.1f",
-                player.GetPulseCore().getPulse().Value(),
-                player.GetPulseCore().getPulse().Max());
-            m_logTimer -= 0.5;
+            float closestDistSq = ATTACK_RANGE_SQ;
+
+            auto& roomDrones = droneManager->GetDrones();
+            for (auto& drone : roomDrones)
+            {
+                if (drone.IsDead() || drone.IsHit()) continue;
+                float distSq = (playerCenter - drone.GetPosition()).LengthSq();
+                Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
+                float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
+                float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
+                float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+                if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
+                {
+                    closestDistSq = distSq;
+                    targetDrone = &drone;
+                }
+            }
+
+            auto& hallwayDrones = m_hallway->GetDrones();
+            for (auto& drone : hallwayDrones)
+            {
+                if (drone.IsDead() || drone.IsHit()) continue;
+                float distSq = (playerCenter - drone.GetPosition()).LengthSq();
+                Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
+                float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
+                float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
+                float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+                if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
+                {
+                    closestDistSq = distSq;
+                    targetDrone = &drone;
+                }
+            }
         }
+    }
 
-        bool isPressingE = input.IsKeyPressed(Input::Key::E);
+    if (isPressingF && targetDrone != nullptr)
+    {
+        player.GetPulseCore().getPulse().spend(PULSE_COST_PER_SECOND * static_cast<float>(dt));
+        targetDrone->ApplyDamage(static_cast<float>(dt));
 
-        pulseManager->Update(playerCenter, playerHitboxSize, player, pulseSources, isPressingE, dt);
+        Math::Vec2 vfxStartPos = { playerCenter.x + (player.IsFacingRight() ? 1 : -1) * (playerHitboxSize.x / 2.0f), playerCenter.y };
+        pulseManager->UpdateAttackVFX(true, vfxStartPos, targetDrone->GetPosition());
+
+        m_door->Update(player, false);
+    }
+    else
+    {
+        pulseManager->UpdateAttackVFX(false, {}, {});
+        for (auto& drone : droneManager->GetDrones()) drone.ResetDamageTimer();
+        for (auto& drone : m_hallway->GetDrones()) drone.ResetDamageTimer();
 
         if (input.IsKeyTriggered(Input::Key::F))
         {
-            bool attackedDrone = false;
-            if (player.GetPulseCore().getPulse().Value() >= 20.0f)
-            {
-                auto& roomDrones = droneManager->GetDrones();
-                for (auto& drone : roomDrones)
-                {
-                    float distSq = (playerCenter - drone.GetPosition()).LengthSq();
-
-                    // 드론의 히트박스 크기 (디버그 드로우 기준 0.8배)
-                    Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
-                    // 드론의 평균 반지름 계산 (x와 y의 평균 너비의 절반)
-                    float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
-
-                    // 유효 공격 사거리 = 기본 사거리 + 드론 반지름
-                    float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
-                    // 비교를 위해 제곱
-                    float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
-
-                    // 수정한 유효 사거리로 비교
-                    if (distSq < effectiveAttackRangeSq)
-                    {
-                        player.GetPulseCore().getPulse().spend(20.0f);
-                        drone.TakeHit();
-                        Logger::Instance().Log(Logger::Severity::Event, "Room Drone has been hit!");
-                        attackedDrone = true;
-                        break;
-                    }
-                }
-
-                if (!attackedDrone)
-                {
-                    auto& hallwayDrones = m_hallway->GetDrones();
-                    for (auto& drone : hallwayDrones)
-                    {
-                        float distSq = (playerCenter - drone.GetPosition()).LengthSq();
-
-                        Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
-                        float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
-                        float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
-                        float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
-
-                        if (distSq < effectiveAttackRangeSq)
-                        {
-                            player.GetPulseCore().getPulse().spend(20.0f);
-                            drone.TakeHit();
-                            Logger::Instance().Log(Logger::Severity::Event, "Hallway Drone has been hit!");
-                            attackedDrone = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!attackedDrone)
-            {
-                m_door->Update(player, true);
-            }
+            m_door->Update(player, true);
         }
         else
         {
             m_door->Update(player, false);
         }
     }
+
 
     if (m_door->ShouldLoadNextMap() && !m_doorOpened)
     {
@@ -211,7 +214,7 @@ void GameplayState::Update(double dt)
         );
     }
 
-    droneManager->Update(dt, player, playerHitboxSize);
+    droneManager->Update(dt, player, playerHitboxSize, false);
     player.Update(dt, input);
 
     auto& drones = droneManager->GetDrones();
@@ -229,8 +232,7 @@ void GameplayState::Update(double dt)
     m_pulseGauge.Update(pulse.Value(), pulse.Max());
     m_room->Update(player);
 
-    bool isPressingE = input.IsKeyPressed(Input::Key::E);
-    m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPressingE);
+    m_hallway->Update(dt, playerCenter, playerHitboxSize, player);
 
     auto& hallwayDrones = m_hallway->GetDrones();
     for (auto& drone : hallwayDrones)
@@ -244,7 +246,6 @@ void GameplayState::Update(double dt)
     }
 
     m_camera.Update(player.GetPosition(), 0.1f);
-
     m_fpsTimer += dt;
     m_frameCount++;
 
@@ -254,7 +255,6 @@ void GameplayState::Update(double dt)
         std::stringstream ss_fps;
         ss_fps << "FPS: " << average_fps;
         m_fpsText = m_font->PrintToTexture(*m_fontShader, ss_fps.str());
-
         m_fpsTimer -= 1.0;
         m_frameCount = 0;
     }
@@ -321,6 +321,10 @@ void GameplayState::Draw()
     droneManager->Draw(textureShader);
     player.Draw(textureShader);
 
+    textureShader.use();
+    textureShader.setMat4("projection", projection);
+    pulseManager->DrawVFX(textureShader);
+
     colorShader->use();
     colorShader->setMat4("projection", projection);
     droneManager->DrawRadars(*colorShader, *m_debugRenderer);
@@ -379,6 +383,9 @@ void GameplayState::Draw()
             m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
         }
 
+        // [수정] colorShader 포인터를 역참조(*)하여 전달
+        m_hallway->DrawDebug(*colorShader, *m_debugRenderer);
+
         m_door->DrawDebug(*colorShader);
     }
 }
@@ -395,6 +402,7 @@ void GameplayState::Shutdown()
     m_pulseGauge.Shutdown();
     m_debugRenderer->Shutdown();
     m_door->Shutdown();
+    pulseManager->Shutdown();
 
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
 }

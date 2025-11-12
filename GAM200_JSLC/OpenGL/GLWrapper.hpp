@@ -21,6 +21,8 @@ namespace GL
 
     // State & Context
     static inline void Enable(GLenum cap) { glEnable(cap); }
+    // [추가됨] glDisable 래퍼 함수
+    static inline void Disable(GLenum cap) { glDisable(cap); }
     static inline void BlendFunc(GLenum sfactor, GLenum dfactor) { glBlendFunc(sfactor, dfactor); }
     static inline void ClearColor(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) { glClearColor(red, green, blue, alpha); }
     static inline void Clear(GLbitfield mask) { glClear(mask); }
@@ -36,7 +38,7 @@ namespace GL
     static inline void ActiveTexture(GLenum texture) { glActiveTexture(texture); }
     static inline void DeleteTextures(GLsizei n, const GLuint* textures) { glDeleteTextures(n, textures); }
 
-    // ✅ [추가] Framebuffers (FBO)
+    // Framebuffers (FBO)
     static inline void GenFramebuffers(GLsizei n, GLuint* framebuffers) { glGenFramebuffers(n, framebuffers); }
     static inline void BindFramebuffer(GLenum target, GLuint framebuffer) { glBindFramebuffer(target, framebuffer); }
     static inline void FramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level) { glFramebufferTexture2D(target, attachment, textarget, texture, level); }

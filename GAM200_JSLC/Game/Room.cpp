@@ -43,12 +43,11 @@ void Room::Update(Player& player)
     Math::Vec2 centerPos = player.GetPosition();
     Math::Vec2 halfSize = player.GetSize() * 0.5f;
 
-    // X축 왼쪽 경계 체크
     if (centerPos.x - halfSize.x < m_boundaries.bottom_left.x)
     {
         player.SetPosition({ m_boundaries.bottom_left.x + halfSize.x, centerPos.y });
     }
-    // 오른쪽 경계는 활성화되어 있을 때만 체크
+
     else if (m_rightBoundaryActive && centerPos.x + halfSize.x > m_boundaries.top_right.x)
     {
         player.SetPosition({ m_boundaries.top_right.x - halfSize.x, centerPos.y });

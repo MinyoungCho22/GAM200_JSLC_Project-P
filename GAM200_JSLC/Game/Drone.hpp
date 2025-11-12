@@ -1,6 +1,4 @@
-﻿//Drone.hpp
-
-#pragma once
+﻿#pragma once
 #include "../Engine/Vec2.hpp"
 
 class Shader;
@@ -11,11 +9,13 @@ class Drone
 {
 public:
     void Init(Math::Vec2 startPos, const char* texturePath);
-    void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize);
+    void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding);
     void Draw(const Shader& shader) const;
     void DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
-    void TakeHit();
+
+    void ApplyDamage(float dt);
+    void ResetDamageTimer();
 
     Math::Vec2 GetPosition() const { return m_position; }
     Math::Vec2 GetSize() const { return m_size; }
@@ -23,11 +23,15 @@ public:
     bool IsDead() const { return m_isDead; }
     bool ShouldDealDamage() const { return m_shouldDealDamage; }
     void ResetDamageFlag() { m_shouldDealDamage = false; }
+    bool IsHit() const { return m_isHit; }
 
     static constexpr float DETECTION_RANGE = 100.0f;
     static constexpr float DETECTION_RANGE_SQ = DETECTION_RANGE * DETECTION_RANGE;
+    static constexpr float TIME_TO_DESTROY = 2.0f;
 
 private:
+    void StartDeathSequence();
+
     Math::Vec2 m_position;
     Math::Vec2 m_velocity;
     Math::Vec2 m_direction;
@@ -39,6 +43,8 @@ private:
     float m_hitRotation = 0.0f;
     float m_fallSpeed = 0.0f;
     bool m_isDead = false;
+
+    float m_damageTimer = 0.0f;
 
     bool m_isAttacking = false;
     bool m_shouldDealDamage = false;

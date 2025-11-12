@@ -1,5 +1,4 @@
-﻿// Hallway.cpp
-#include "Hallway.hpp"
+﻿#include "Hallway.hpp"
 #include "Background.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -17,57 +16,53 @@ void Hallway::Initialize()
     m_size = { WIDTH, HEIGHT };
     m_position = { ROOM_WIDTH + WIDTH / 2.0f, HEIGHT / 2.0f };
 
-    float width = 210.f;
-    float height = 312.f;
-    float topLeftX = 3879.f;
-    float topLeftY = 708.f;
-
-    float bottomY = HEIGHT - topLeftY;
-
-    Math::Vec2 center = {
-        topLeftX + (width / 2.0f),
-        bottomY + (height / 2.0f)
+    float width1 = 210.f;
+    float height1 = 312.f;
+    float topLeftX1 = 3879.f;
+    float topLeftY1 = 708.f;
+    float bottomY1 = HEIGHT - topLeftY1;
+    Math::Vec2 center1 = {
+        topLeftX1 + (width1 / 2.0f),
+        bottomY1 + (height1 / 2.0f)
     };
-
     m_pulseSources.emplace_back();
-    m_pulseSources.back().Initialize(center, { width, height }, 100.f);
+    m_pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
+
+    float width2 = 381.f;
+    float height2 = 324.f;
+    float topLeftX2 = 2820.f;
+    float topLeftY2 = 923.f;
+    float bottomY2 = HEIGHT - topLeftY2;
+    m_hidingSpotPos = {
+        topLeftX2 + (width2 / 2.0f),
+        bottomY2 + (height2 / 2.0f)
+    };
+    m_hidingSpotSize = { width2, height2 };
 
     m_droneManager = std::make_unique<DroneManager>();
     m_droneManager->SpawnDrone({ 2500.0f, 400.0f }, "Asset/drone.png");
 }
 
-// Hallway.cpp의 Update 함수 수정
-void Hallway::Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPressingE)
+
+void Hallway::Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player)
 {
-    PulseSource* closest_source = nullptr;
-    float closest_dist_sq = -1.0f;
+    bool isHiding = IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
 
-    for (auto& source : m_pulseSources)
+    m_droneManager->Update(dt, player, playerHitboxSize, isHiding);
+
+    Math::Vec2 playerPos = player.GetPosition();
+    Math::Vec2 playerSize = player.GetSize();
+
+    float playerLeftEdge = playerPos.x - (playerSize.x / 2.0f);
+
+    const float barrierX = 7290.0f;
+
+    if (playerLeftEdge > barrierX)
     {
-        if (!source.HasPulse()) continue;
+        float correctedPlayerX = barrierX + (playerSize.x / 2.0f);
 
-        if (Collision::CheckAABB(playerCenter, playerHitboxSize, source.GetPosition(), source.GetSize()))
-        {
-            float dist_sq = (playerCenter - source.GetPosition()).LengthSq();
-
-            if (closest_source == nullptr || dist_sq < closest_dist_sq)
-            {
-                closest_source = &source;
-                closest_dist_sq = dist_sq;
-            }
-        }
+        player.SetPosition({ correctedPlayerX, playerPos.y });
     }
-
-    bool is_near_charger = (closest_source != nullptr);
-
-    auto result = player.GetPulseCore().tick(isPressingE, is_near_charger, false, dt);
-
-    if (result.charged && closest_source != nullptr)
-    {
-        closest_source->Drain(result.delta);
-    }
-
-    m_droneManager->Update(dt, player, playerHitboxSize);
 }
 
 void Hallway::Draw(Shader& shader)
@@ -102,6 +97,16 @@ void Hallway::Shutdown()
     }
 }
 
+Math::Vec2 Hallway::GetPosition() const
+{
+    return m_position;
+}
+
+Math::Vec2 Hallway::GetSize() const
+{
+    return m_size;
+}
+
 const std::vector<Drone>& Hallway::GetDrones() const
 {
     return m_droneManager->GetDrones();
@@ -112,21 +117,27 @@ std::vector<Drone>& Hallway::GetDrones()
     return m_droneManager->GetDrones();
 }
 
-void Hallway::AttackDrone(Math::Vec2 playerPos, float attackRangeSq, Player& player)
+const std::vector<PulseSource>& Hallway::GetPulseSources() const
 {
-    auto& drones = m_droneManager->GetDrones();
-    for (auto& drone : drones)
+    return m_pulseSources;
+}
+
+std::vector<PulseSource>& Hallway::GetPulseSources()
+{
+    return m_pulseSources;
+}
+
+bool Hallway::IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const
+{
+    if (!isPlayerCrouching)
     {
-        if (!drone.IsDead())
-        {
-            float distSq = (playerPos - drone.GetPosition()).LengthSq();
-            if (distSq < attackRangeSq)
-            {
-                player.GetPulseCore().getPulse().spend(20.0f);
-                drone.TakeHit();
-                Logger::Instance().Log(Logger::Severity::Event, "Hallway Drone has been hit!");
-                break;
-            }
-        }
+        return false;
     }
+
+    return Collision::CheckAABB(playerPos, playerHitboxSize, m_hidingSpotPos, m_hidingSpotSize);
+}
+
+void Hallway::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    debugRenderer.DrawBox(colorShader, m_hidingSpotPos, m_hidingSpotSize, { 0.3f, 1.0f });
 }

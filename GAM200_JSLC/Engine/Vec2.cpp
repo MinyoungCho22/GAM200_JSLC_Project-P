@@ -1,11 +1,8 @@
-//Vec2.hpp
-
 #include "Vec2.hpp"
 #include <cmath>
 
 namespace Math
 {
-    // ivec2 생성자 및 연산자 구현
     ivec2::ivec2() : x(0), y(0) {}
     ivec2::ivec2(int x_val, int y_val) : x(x_val), y(y_val) {}
 
@@ -20,12 +17,9 @@ namespace Math
     ivec2 operator*(int scalar, const ivec2& rhs) { return ivec2(rhs.x * scalar, rhs.y * scalar); }
     ivec2 operator/(const ivec2& lhs, int scalar) { return ivec2(lhs.x / scalar, lhs.y / scalar); }
 
-
-    // Vec2 생성자 구현
     Vec2::Vec2() : x(0.0f), y(0.0f) {}
     Vec2::Vec2(float x_val, float y_val) : x(x_val), y(y_val) {}
 
-    // Vec2 멤버 함수 구현
     float Vec2::Length() const
     {
         return std::sqrt(x * x + y * y);
@@ -57,18 +51,21 @@ namespace Math
         return Vec2();
     }
 
+    Vec2 Vec2::Perpendicular() const
+    {
+        return Vec2(-y, x);
+    }
+
     Vec2 Lerp(Vec2 a, Vec2 b, float t)
     {
         return a + (b - a) * t;
     }
 
-    // Vec2 멤버 연산자 구현
     Vec2& Vec2::operator+=(const Vec2& rhs) { x += rhs.x; y += rhs.y; return *this; }
     Vec2& Vec2::operator-=(const Vec2& rhs) { x -= rhs.x; y -= rhs.y; return *this; }
     Vec2& Vec2::operator*=(float scalar) { x *= scalar; y *= scalar; return *this; }
     Vec2& Vec2::operator/=(float scalar) { x /= scalar; y /= scalar; return *this; }
 
-    // Vec2 비-멤버 연산자 구현
     Vec2 operator+(const Vec2& lhs, const Vec2& rhs) { return Vec2(lhs.x + rhs.x, lhs.y + rhs.y); }
     Vec2 operator-(const Vec2& lhs, const Vec2& rhs) { return Vec2(lhs.x - rhs.x, lhs.y - rhs.y); }
     Vec2 operator*(const Vec2& lhs, float scalar) { return Vec2(lhs.x * scalar, lhs.y * scalar); }

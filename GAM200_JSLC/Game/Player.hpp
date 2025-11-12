@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
-#include "../Engine/Input.hpp"
+#include "../Engine/Input.hpp" 
 #include <string>
 
 class Shader;
@@ -52,12 +52,15 @@ public:
     Math::Vec2 GetHitboxSize() const;
     PulseCore& GetPulseCore() { return m_pulseCore; }
     bool IsDashing() const { return is_dashing; }
+    bool IsFacingRight() const;
+    bool IsCrouching() const { return is_crouching; } // [추가됨]
 
 private:
+
     bool LoadAnimation(AnimationState state, const char* texturePath, int totalFrames, float frameDuration);
     AnimationState DetermineAnimationState() const;
 
-    AnimationData m_animations[5]; // Idle, Walking, Jumping, Crouching, Dashing
+    AnimationData m_animations[5];
     AnimationState m_currentAnimState = AnimationState::Idle;
 
     Math::Vec2 position{};

@@ -1,4 +1,3 @@
-// DroneManager.cpp
 #include "DroneManager.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -10,15 +9,14 @@ void DroneManager::SpawnDrone(Math::Vec2 position, const char* texturePath)
     drones.back().Init(position, texturePath);
 }
 
-void DroneManager::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize)
+void DroneManager::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding)
 {
     for (auto& drone : drones)
     {
-        drone.Update(dt, player, playerHitboxSize);
+        drone.Update(dt, player, playerHitboxSize, isPlayerHiding);
     }
 }
 
-// DroneManager.cpp
 void DroneManager::Draw(const Shader& shader)
 {
     for (const auto& drone : drones)

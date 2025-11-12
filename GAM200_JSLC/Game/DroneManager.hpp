@@ -1,4 +1,3 @@
-// DroneManager.hpp
 #pragma once
 #include <vector>
 #include "Drone.hpp"
@@ -11,7 +10,7 @@ class DroneManager
 {
 public:
     void SpawnDrone(Math::Vec2 position, const char* texturePath);
-    void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize);
+    void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding);
     void Draw(const Shader& shader);
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
