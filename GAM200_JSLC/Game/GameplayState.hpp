@@ -1,4 +1,5 @@
-﻿// GameplayState.hpp에 추가
+﻿//GameplayState.hpp
+
 #pragma once
 #include "../Engine/GameState.hpp"
 #include "../Engine/DebugRenderer.hpp"
@@ -15,6 +16,8 @@
 #include "Hallway.hpp"
 #include "Rooftop.hpp"
 #include "TraceSystem.hpp" 
+#include "GameOver.hpp" 
+#include "MainMenu.hpp" 
 #include <memory>
 #include <vector>
 #include <string>
@@ -32,8 +35,8 @@ public:
     void Shutdown() override;
 
 private:
-    void HandleRoomToHallwayTransition();  // 추가
-    void HandleHallwayToRooftopTransition();  // 추가
+    void HandleRoomToHallwayTransition();
+    void HandleHallwayToRooftopTransition();
 
     GameStateManager& gsm;
     Player player;
@@ -48,7 +51,7 @@ private:
     bool m_isDebugDraw = false;
     std::unique_ptr<Room> m_room;
     std::unique_ptr<Door> m_door;
-    std::unique_ptr<Door> m_rooftopDoor;  // 추가: 옥상 문
+    std::unique_ptr<Door> m_rooftopDoor;
     double m_logTimer = 0.0;
     std::unique_ptr<Font> m_font;
     double m_fpsTimer = 0.0;
@@ -62,4 +65,7 @@ private:
     std::unique_ptr<TraceSystem> m_traceSystem;
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
+    bool m_isGameOver = false;
+
+    float m_cameraSmoothSpeed = 0.1f;
 };

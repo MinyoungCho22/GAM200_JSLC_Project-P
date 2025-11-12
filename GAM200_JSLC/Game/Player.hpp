@@ -49,8 +49,9 @@ public:
     void TakeDamage(float amount);
     void SetPosition(Math::Vec2 new_pos);
     void SetCurrentGroundLevel(float newGroundLevel);
-    void ResetVelocity() { velocity = Math::Vec2(0.0f, 0.0f); }
-    void SetOnGround(bool onGround) { is_on_ground = onGround; }
+    void ResetVelocity();
+    void SetOnGround(bool onGround);
+
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
     Math::Vec2 GetHitboxSize() const;
@@ -58,6 +59,7 @@ public:
     bool IsDashing() const { return is_dashing; }
     bool IsFacingRight() const;
     bool IsCrouching() const { return is_crouching; }
+    bool IsDead() const;
 
 private:
 

@@ -1,7 +1,7 @@
 ﻿//SplashState.cpp
 
 #include "SplashState.hpp"
-#include "GameplayState.hpp"
+#include "MainMenu.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -19,7 +19,6 @@ void SplashState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "SplashState Initialize");
 
-    // 정점 좌표를 (-0.5, -0.5) ~ (0.5, 0.5)로 설정 (중심점 기준)
     float vertices[] = {
         -0.5f,  0.5f,   0.0f, 1.0f,
          0.5f, -0.5f,   1.0f, 0.0f,
@@ -67,7 +66,7 @@ void SplashState::Update(double dt)
     timer -= dt;
     if (timer <= 0.0)
     {
-        gsm.ChangeState(std::make_unique<GameplayState>(gsm));
+        gsm.ChangeState(std::make_unique<MainMenu>(gsm));
     }
 }
 
@@ -78,7 +77,7 @@ void SplashState::Draw()
 
     Engine& engine = gsm.GetEngine();
 
-   
+
     Shader& textureShader = engine.GetTextureShader();
     textureShader.use();
 

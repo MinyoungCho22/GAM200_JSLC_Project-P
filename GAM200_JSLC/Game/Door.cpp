@@ -1,4 +1,4 @@
-﻿// Door.cpp
+﻿//Door.cpp
 
 #include "Door.hpp"
 #include "Player.hpp"
@@ -40,17 +40,19 @@ void Door::Update(Player& player, bool isInteractKeyPressed)
 {
     Math::Vec2 playerCenter = player.GetPosition();
 
-    float interactRange = 200.0f;
     if (m_doorType == DoorType::HallwayToRooftop)
     {
-        constexpr float ROOFTOP_TRIGGER_X_MIN = 7000.0f;
-        constexpr float ROOFTOP_TRIGGER_X_MAX = 7250.0f;
+        float minX = m_position.x - m_size.x / 2.0f;
+        float maxX = m_position.x + m_size.x / 2.0f;
+        float minY = m_position.y - m_size.y / 2.0f;
+        float maxY = m_position.y + m_size.y / 2.0f;
 
-        m_isPlayerNearby = (playerCenter.x > ROOFTOP_TRIGGER_X_MIN &&
-            playerCenter.x < ROOFTOP_TRIGGER_X_MAX);
+        m_isPlayerNearby = (playerCenter.x > minX && playerCenter.x < maxX &&
+            playerCenter.y > minY && playerCenter.y < maxY);
     }
     else
     {
+        float interactRange = 200.0f;
         float distSq = (playerCenter - m_position).LengthSq();
         float interactRangeSq = interactRange * interactRange;
         m_isPlayerNearby = (distSq < interactRangeSq);

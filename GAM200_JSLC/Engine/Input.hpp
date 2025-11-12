@@ -1,10 +1,9 @@
-﻿#pragma once
-#include <array>
+﻿//Input.hpp
 
-// GLFW/glfw3.h를 포함하는 대신 전방 선언을 사용합니다.
+#pragma once
+#include <array>
 struct GLFWwindow;
 
-// Input 네임스페이스 안에 키 enum과 클래스를 모두 정의합니다.
 namespace Input
 {
     enum Key {
@@ -14,12 +13,18 @@ namespace Input
         D = 68,
         E = 69,
         F = 70,
-        S = 83,    
-        W = 87,     
+        S = 83,
+        W = 87,
         Escape = 256,
-        Enter = 257, 
+        Enter = 257,
         Tab = 258,
-        LeftShift = 340
+        LeftShift = 340,
+
+        Right = 262,
+        Left = 263,
+        Down = 264,
+        Up = 265,
+        LeftControl = 341
     };
 
     class Input

@@ -1,4 +1,4 @@
-﻿// Player.cpp
+﻿//Player.cpp
 
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -123,6 +123,12 @@ AnimationState Player::DetermineAnimationState() const
 
 void Player::Update(double dt, Input::Input& input)
 {
+    if (IsDead())
+    {
+        velocity = { 0.0f, 0.0f };
+        return;
+    }
+
     if (input.IsKeyPressed(Input::Key::A)) MoveLeft();
     if (input.IsKeyPressed(Input::Key::D)) MoveRight();
     if (input.IsKeyPressed(Input::Key::Space)) Jump();
@@ -167,12 +173,8 @@ void Player::Update(double dt, Input::Input& input)
         if (velocity.y < 0)
         {
             velocity.y = 0;
-            is_on_ground = true;
         }
-    }
-    else
-    {
-        is_on_ground = false;
+        is_on_ground = true;
     }
 
     if (is_crouching)
@@ -201,9 +203,10 @@ void Player::Update(double dt, Input::Input& input)
     velocity.x = 0;
 }
 
+
 void Player::Draw(const Shader& shader) const
 {
-    if (m_isInvincible)
+    if (m_isInvincible && !IsDead())
     {
         if (fmod(m_invincibilityTimer, 0.2f) < 0.1f)
         {
@@ -349,4 +352,23 @@ bool Player::IsFacingRight() const
 void Player::SetCurrentGroundLevel(float newGroundLevel)
 {
     m_currentGroundLevel = newGroundLevel;
+}
+
+void Player::ResetVelocity()
+{
+    velocity = Math::Vec2(0.0f, 0.0f);
+}
+
+void Player::SetOnGround(bool onGround)
+{
+    is_on_ground = onGround;
+    if (onGround)
+    {
+        velocity.y = 0.0f;
+    }
+}
+
+bool Player::IsDead() const
+{
+    return m_pulseCore.getPulse().Value() <= 0;
 }

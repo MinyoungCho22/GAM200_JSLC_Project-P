@@ -72,7 +72,7 @@ void GameplayState::Initialize()
 
     droneManager = std::make_unique<DroneManager>();
 
-    m_pulseGauge.Initialize({ 80.f, GAME_HEIGHT * 0.75f }, { 40.f, 300.f });
+    m_pulseGauge.Initialize({ 75.f, GAME_HEIGHT * 0.75f - 20.0f }, { 40.f, 300.f });
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
 
@@ -83,7 +83,7 @@ void GameplayState::Initialize()
     m_door->Initialize({ 1710.0f, 440.0f }, { 50.0f, 300.0f }, 20.0f, DoorType::RoomToHallway);
 
     m_rooftopDoor = std::make_unique<Door>();
-    m_rooftopDoor->Initialize({ 7200.0f, 400.0f }, { 250.0f, 300.0f }, 20.0f, DoorType::HallwayToRooftop);
+    m_rooftopDoor->Initialize({ 7195.0f, 400.0f }, { 300.0f, 300.0f }, 20.0f, DoorType::HallwayToRooftop);
 
     m_hallway = std::make_unique<Hallway>();
     m_hallway->Initialize();
@@ -93,6 +93,7 @@ void GameplayState::Initialize()
 
     m_camera.Initialize({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }, GAME_WIDTH, GAME_HEIGHT);
     m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
+    m_cameraSmoothSpeed = 0.1f;
 
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
@@ -102,12 +103,19 @@ void GameplayState::Initialize()
 
     m_fpsTimer = 0.0;
     m_frameCount = 0;
+    m_isGameOver = false;
 }
 
 void GameplayState::Update(double dt)
 {
     Engine& engine = gsm.GetEngine();
     auto& input = engine.GetInput();
+
+    if (m_isGameOver)
+    {
+        gsm.ChangeState(std::make_unique<MainMenu>(gsm));
+        return;
+    }
 
     if (input.IsKeyTriggered(Input::Key::Escape))
     {
@@ -240,7 +248,6 @@ void GameplayState::Update(double dt)
     if (m_rooftopDoor->ShouldLoadNextMap() && !m_rooftopAccessed)
     {
         HandleHallwayToRooftopTransition();
-        return;
     }
 
     droneManager->Update(dt, player, playerHitboxSize, false);
@@ -290,9 +297,9 @@ void GameplayState::Update(double dt)
         }
     }
 
-    m_camera.Update(player.GetPosition(), 0.1f);
+    m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
 
-    static float cameraLogTimer = 0.0f;
+    static double cameraLogTimer = 0.0f;
     cameraLogTimer += dt;
     if (cameraLogTimer > 1.0f && m_rooftopAccessed)
     {
@@ -320,6 +327,11 @@ void GameplayState::Update(double dt)
     ss_pulse.precision(1);
     ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
+
+    if (player.IsDead())
+    {
+        gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver));
+    }
 }
 
 void GameplayState::HandleRoomToHallwayTransition()
@@ -333,10 +345,15 @@ void GameplayState::HandleRoomToHallwayTransition()
     float roomToShow = cameraViewWidth * 0.20f;
     float newMinWorldX = GAME_WIDTH - roomToShow;
 
+    float worldMaxX = std::max(GAME_WIDTH + Hallway::WIDTH, Rooftop::MIN_X + Rooftop::WIDTH);
+    float worldMaxY = m_rooftopAccessed ? (Rooftop::MIN_Y + Rooftop::HEIGHT) : GAME_HEIGHT;
+
     m_camera.SetBounds(
         { newMinWorldX, 0.0f },
-        { GAME_WIDTH + Hallway::WIDTH, GAME_HEIGHT }
+        { worldMaxX, worldMaxY }
     );
+
+    m_cameraSmoothSpeed = 0.1f;
 }
 
 void GameplayState::HandleHallwayToRooftopTransition()
@@ -351,9 +368,9 @@ void GameplayState::HandleHallwayToRooftopTransition()
     player.SetCurrentGroundLevel(newGroundLevel);
 
     float playerStartX = Rooftop::MIN_X + 300.0f;
-    float cameraTargetY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f);
+    float playerStartY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f);
 
-    player.SetPosition({ playerStartX, cameraTargetY });
+    player.SetPosition({ playerStartX, playerStartY });
     player.ResetVelocity();
     player.SetOnGround(false);
 
@@ -363,11 +380,11 @@ void GameplayState::HandleHallwayToRooftopTransition()
     float worldMaxY = Rooftop::MIN_Y + Rooftop::HEIGHT;
 
     m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
-    m_camera.SetPosition({ playerStartX, cameraTargetY });
+    m_cameraSmoothSpeed = 0.02f;
 
     Logger::Instance().Log(Logger::Severity::Event,
-        "Rooftop: Player=(%.1f, %.1f), Camera=(%.1f, %.1f), Ground=%.1f",
-        playerStartX, cameraTargetY, playerStartX, cameraTargetY, newGroundLevel);
+        "Rooftop: Player=(%.1f, %.1f), Ground=%.1f",
+        playerStartX, playerStartY, newGroundLevel);
 }
 
 void GameplayState::Draw()

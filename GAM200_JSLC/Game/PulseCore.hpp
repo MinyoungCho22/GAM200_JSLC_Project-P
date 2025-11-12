@@ -20,8 +20,13 @@ public:
 
     void spend(float amount) {
         if (amount <= 0.f) return;
-        if (pulse_value >= amount)
-            pulse_value -= amount;
+
+        // [수정] 펄스가 부족해도 0까지 소모하도록 변경
+        pulse_value -= amount;
+        if (pulse_value < 0.0f)
+        {
+            pulse_value = 0.0f;
+        }
     }
 
 private:
@@ -60,17 +65,14 @@ public:
         PulseTickResult r{};
         r.before = pulse.Value();
 
-        // 충전 로직
         if (wantsToCharge && canCharge) {
             float before = pulse.Value();
-            // 시간에 비례하여 충전할 양을 계산
             float amount_to_add = config.chargeRatePerSecond * static_cast<float>(dt);
             pulse.add(amount_to_add);
             r.delta += pulse.Value() - before;
             r.charged = true;
         }
 
-        // 대시 소모 로직 (현재는 매 프레임 소모. 추후 개선 가능)
         if (isDashing) {
             if (pulse.Value() >= config.dashCost) {
 

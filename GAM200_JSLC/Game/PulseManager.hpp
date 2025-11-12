@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿//PulseManager.hpp
+
+#pragma once
 #include "../Engine/Vec2.hpp"
 #include "Player.hpp" 
 #include <vector>

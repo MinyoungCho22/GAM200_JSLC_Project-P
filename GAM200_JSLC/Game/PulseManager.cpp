@@ -1,4 +1,6 @@
-﻿#include "PulseManager.hpp"
+﻿//PulseManager.cpp
+
+#include "PulseManager.hpp"
 #include "Player.hpp"
 #include "PulseSource.hpp"
 #include "../Game/PulseCore.hpp"

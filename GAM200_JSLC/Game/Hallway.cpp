@@ -1,4 +1,6 @@
-﻿#include "Hallway.hpp"
+﻿//Hallway.cpp
+
+#include "Hallway.hpp"
 #include "Background.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -6,6 +8,7 @@
 #include "../Engine/Collision.hpp"
 #include "../Engine/Logger.hpp"
 #include "../Engine/DebugRenderer.hpp"
+#include <algorithm> 
 
 constexpr float ROOM_WIDTH = 1920.0f;
 
@@ -39,6 +42,18 @@ void Hallway::Initialize()
     };
     m_hidingSpotSize = { width2, height2 };
 
+    float width3 = 369.f;
+    float height3 = 645.f;
+    float topLeftX3 = 7489.f;
+    float topLeftY3 = 973.f;
+    float bottomY3 = HEIGHT - topLeftY3;
+    m_obstaclePos = {
+        topLeftX3 + (width3 / 2.0f),
+        bottomY3 + (height3 / 2.0f)
+    };
+    m_obstacleSize = { width3, height3 };
+
+
     m_droneManager = std::make_unique<DroneManager>();
     m_droneManager->SpawnDrone({ 2500.0f, 400.0f }, "Asset/drone.png");
 }
@@ -51,11 +66,41 @@ void Hallway::Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitbox
     m_droneManager->Update(dt, player, playerHitboxSize, isHiding);
 
     Math::Vec2 playerPos = player.GetPosition();
-    Math::Vec2 playerSize = player.GetSize();
 
-    float playerLeftEdge = playerPos.x - (playerSize.x / 2.0f);
+    if (Collision::CheckAABB(playerPos, playerHitboxSize, m_obstaclePos, m_obstacleSize))
+    {
+        Math::Vec2 playerHalfSize = playerHitboxSize / 2.0f;
+        Math::Vec2 obsHalfSize = m_obstacleSize / 2.0f;
 
-    
+        Math::Vec2 obsMin = m_obstaclePos - obsHalfSize;
+        Math::Vec2 obsMax = m_obstaclePos + obsHalfSize;
+        Math::Vec2 playerMin = playerPos - playerHalfSize;
+        Math::Vec2 playerMax = playerPos + playerHalfSize;
+
+        float overlapX = std::min(playerMax.x, obsMax.x) - std::max(playerMin.x, obsMin.x);
+        float overlapY = std::min(playerMax.y, obsMax.y) - std::max(playerMin.y, obsMin.y);
+
+        Math::Vec2 newPos = playerPos;
+
+        if (overlapX < overlapY)
+        {
+            if (playerPos.x < m_obstaclePos.x)
+                newPos.x = obsMin.x - playerHalfSize.x;
+            else
+                newPos.x = obsMax.x + playerHalfSize.x;
+        }
+        else
+        {
+            if (playerPos.y < m_obstaclePos.y)
+                newPos.y = obsMin.y - playerHalfSize.y;
+            else
+                newPos.y = obsMax.y + playerHalfSize.y;
+
+            player.ResetVelocity();
+            player.SetOnGround(true);
+        }
+        player.SetPosition(newPos);
+    }
 }
 
 void Hallway::Draw(Shader& shader)
@@ -141,4 +186,5 @@ bool Hallway::IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, 
 void Hallway::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     debugRenderer.DrawBox(colorShader, m_hidingSpotPos, m_hidingSpotSize, { 0.3f, 1.0f });
+    debugRenderer.DrawBox(colorShader, m_obstaclePos, m_obstacleSize, { 1.0f, 0.0f });
 }

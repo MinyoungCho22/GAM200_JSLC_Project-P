@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿//Hallway.hpp
+
+#pragma once
 #include "../Engine/Vec2.hpp"
 #include "PulseSource.hpp"
 #include "DroneManager.hpp"
@@ -44,4 +46,7 @@ private:
 
     Math::Vec2 m_hidingSpotPos;
     Math::Vec2 m_hidingSpotSize;
+
+    Math::Vec2 m_obstaclePos;
+    Math::Vec2 m_obstacleSize;
 };
