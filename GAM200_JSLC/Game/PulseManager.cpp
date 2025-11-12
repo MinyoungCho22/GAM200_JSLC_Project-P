@@ -101,6 +101,7 @@ void PulseManager::UpdateAttackVFX(bool isAttacking, Math::Vec2 startPos, Math::
 void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitboxSize,
     Player& player, std::vector<PulseSource>& roomSources,
     std::vector<PulseSource>& hallwaySources,
+    std::vector<PulseSource>& rooftopSources, // [추가]
     bool is_interact_key_pressed, double dt)
 {
     m_vfxTimer += static_cast<float>(dt);
@@ -126,6 +127,11 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
         checkSource(source);
     }
     for (auto& source : hallwaySources)
+    {
+        checkSource(source);
+    }
+    // [추가] 옥상 펄스 소스도 확인
+    for (auto& source : rooftopSources)
     {
         checkSource(source);
     }

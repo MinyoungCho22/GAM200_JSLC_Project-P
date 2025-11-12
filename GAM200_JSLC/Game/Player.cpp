@@ -1,4 +1,6 @@
-﻿#include "Player.hpp"
+﻿// Player.cpp
+
+#include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
@@ -76,6 +78,7 @@ void Player::Init(Math::Vec2 startPos)
 {
     position = startPos;
     velocity = Math::Vec2(0.0f, 0.0f);
+    m_currentGroundLevel = GROUND_LEVEL;
 
     std::vector<float> vertices = {
         -0.5f,  0.5f,   0.0f, 1.0f,
@@ -158,14 +161,18 @@ void Player::Update(double dt, Input::Input& input)
 
     position += final_velocity * static_cast<float>(dt);
 
-    if (position.y - size.y / 2.0f < GROUND_LEVEL)
+    if (position.y - size.y / 2.0f <= m_currentGroundLevel)
     {
-        position.y = GROUND_LEVEL + size.y / 2.0f;
+        position.y = m_currentGroundLevel + size.y / 2.0f;
         if (velocity.y < 0)
         {
             velocity.y = 0;
             is_on_ground = true;
         }
+    }
+    else
+    {
+        is_on_ground = false;
     }
 
     if (is_crouching)
@@ -193,7 +200,6 @@ void Player::Update(double dt, Input::Input& input)
 
     velocity.x = 0;
 }
-
 
 void Player::Draw(const Shader& shader) const
 {
@@ -269,7 +275,6 @@ Math::Vec2 Player::GetHitboxSize() const
 
 void Player::MoveLeft()
 {
-    // [수정] is_dashing 검사 제거
     if (is_crouching) return;
     velocity.x -= move_speed;
     last_move_direction = -1;
@@ -278,7 +283,6 @@ void Player::MoveLeft()
 
 void Player::MoveRight()
 {
-    // [수정] is_dashing 검사 제거
     if (is_crouching) return;
     velocity.x += move_speed;
     last_move_direction = 1;
@@ -287,7 +291,6 @@ void Player::MoveRight()
 
 void Player::Jump()
 {
-    // [수정] is_dashing 검사 제거
     if (is_on_ground && !is_crouching)
     {
         velocity.y = jump_velocity;
@@ -341,4 +344,9 @@ void Player::SetPosition(Math::Vec2 new_pos)
 bool Player::IsFacingRight() const
 {
     return !m_is_flipped;
+}
+
+void Player::SetCurrentGroundLevel(float newGroundLevel)
+{
+    m_currentGroundLevel = newGroundLevel;
 }

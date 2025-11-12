@@ -161,9 +161,11 @@
     <ClCompile Include="Game\PulseGauge.cpp" />
     <ClCompile Include="Game\PulseManager.cpp" />
     <ClCompile Include="Game\PulseSource.cpp" />
+    <ClCompile Include="Game\Rooftop.cpp" />
     <ClCompile Include="Game\Room.cpp" />
     <ClCompile Include="Game\Setting.cpp" />
     <ClCompile Include="Game\SplashState.cpp" />
+    <ClCompile Include="Game\TraceSystem.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="OpenGL\Shader.cpp" />
   </ItemGroup>
@@ -194,9 +196,11 @@
     <ClInclude Include="Game\PulseManager.hpp" />
     <ClInclude Include="Game\PulseSource.hpp" />
     <ClInclude Include="Game\PulseCore.hpp" />
+    <ClInclude Include="Game\Rooftop.hpp" />
     <ClInclude Include="Game\Room.hpp" />
     <ClInclude Include="Game\Setting.hpp" />
     <ClInclude Include="Game\SplashState.hpp" />
+    <ClInclude Include="Game\TraceSystem.hpp" />
     <ClInclude Include="OpenGL\GLWrapper.hpp" />
     <ClInclude Include="OpenGL\Shader.hpp" />
   </ItemGroup>

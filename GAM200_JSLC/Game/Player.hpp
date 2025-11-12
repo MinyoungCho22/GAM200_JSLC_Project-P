@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿//Player.hpp
+
+#pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
 #include "../Engine/Input.hpp" 
@@ -46,14 +48,16 @@ public:
     void Dash();
     void TakeDamage(float amount);
     void SetPosition(Math::Vec2 new_pos);
-
+    void SetCurrentGroundLevel(float newGroundLevel);
+    void ResetVelocity() { velocity = Math::Vec2(0.0f, 0.0f); }
+    void SetOnGround(bool onGround) { is_on_ground = onGround; }
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
     Math::Vec2 GetHitboxSize() const;
     PulseCore& GetPulseCore() { return m_pulseCore; }
     bool IsDashing() const { return is_dashing; }
     bool IsFacingRight() const;
-    bool IsCrouching() const { return is_crouching; } // [추가됨]
+    bool IsCrouching() const { return is_crouching; }
 
 private:
 
@@ -76,6 +80,8 @@ private:
     bool m_isInvincible = false;
     float m_invincibilityTimer = 0.0f;
     const float m_invincibilityDuration = 2.0f;
+
+    float m_currentGroundLevel = 180.0f;
 
     float move_speed = 300.0f;
     float jump_velocity = 600.0f;

@@ -12,6 +12,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <algorithm> 
 
 constexpr float GROUND_LEVEL = 180.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
@@ -39,6 +40,9 @@ void GameplayState::Initialize()
 
     pulseManager = std::make_unique<PulseManager>();
     pulseManager->Initialize();
+
+    m_traceSystem = std::make_unique<TraceSystem>();
+    m_traceSystem->Initialize();
 
     Engine& engine = gsm.GetEngine();
 
@@ -76,10 +80,16 @@ void GameplayState::Initialize()
     m_room->Initialize(engine, "Asset/Room.png");
 
     m_door = std::make_unique<Door>();
-    m_door->Initialize({ 1710.0f, 440.0f }, { 50.0f, 300.0f }, 20.0f);
+    m_door->Initialize({ 1710.0f, 440.0f }, { 50.0f, 300.0f }, 20.0f, DoorType::RoomToHallway);
+
+    m_rooftopDoor = std::make_unique<Door>();
+    m_rooftopDoor->Initialize({ 7200.0f, 400.0f }, { 250.0f, 300.0f }, 20.0f, DoorType::HallwayToRooftop);
 
     m_hallway = std::make_unique<Hallway>();
     m_hallway->Initialize();
+
+    m_rooftop = std::make_unique<Rooftop>();
+    m_rooftop->Initialize();
 
     m_camera.Initialize({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }, GAME_WIDTH, GAME_HEIGHT);
     m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
@@ -113,6 +123,7 @@ void GameplayState::Update(double dt)
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
     bool isPressingE = input.IsKeyPressed(Input::Key::E);
+    bool isPressingF = input.IsKeyPressed(Input::Key::F);
 
     const float PULSE_COST_PER_SECOND = 0.5f;
 
@@ -125,9 +136,9 @@ void GameplayState::Update(double dt)
         m_logTimer -= 0.5;
     }
 
-    pulseManager->Update(playerCenter, playerHitboxSize, player, pulseSources, m_hallway->GetPulseSources(), isPressingE, dt);
+    pulseManager->Update(playerCenter, playerHitboxSize, player, pulseSources,
+        m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), isPressingE, dt);
 
-    bool isPressingF = input.IsKeyPressed(Input::Key::F);
     Drone* targetDrone = nullptr;
 
     if (isPressingF)
@@ -167,51 +178,69 @@ void GameplayState::Update(double dt)
                     targetDrone = &drone;
                 }
             }
+
+            auto& rooftopDrones = m_rooftop->GetDrones();
+            for (auto& drone : rooftopDrones)
+            {
+                if (drone.IsDead() || drone.IsHit()) continue;
+                float distSq = (playerCenter - drone.GetPosition()).LengthSq();
+                Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
+                float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
+                float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
+                float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+                if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
+                {
+                    closestDistSq = distSq;
+                    targetDrone = &drone;
+                }
+            }
         }
     }
 
     if (isPressingF && targetDrone != nullptr)
     {
         player.GetPulseCore().getPulse().spend(PULSE_COST_PER_SECOND * static_cast<float>(dt));
-        targetDrone->ApplyDamage(static_cast<float>(dt));
+
+        bool didDroneDie = targetDrone->ApplyDamage(static_cast<float>(dt));
+        if (didDroneDie)
+        {
+            m_traceSystem->OnDroneKilled(*droneManager);
+        }
 
         Math::Vec2 vfxStartPos = { playerCenter.x + (player.IsFacingRight() ? 1 : -1) * (playerHitboxSize.x / 2.0f), playerCenter.y };
         pulseManager->UpdateAttackVFX(true, vfxStartPos, targetDrone->GetPosition());
 
         m_door->Update(player, false);
+        m_rooftopDoor->Update(player, false);
     }
     else
     {
         pulseManager->UpdateAttackVFX(false, {}, {});
         for (auto& drone : droneManager->GetDrones()) drone.ResetDamageTimer();
         for (auto& drone : m_hallway->GetDrones()) drone.ResetDamageTimer();
+        for (auto& drone : m_rooftop->GetDrones()) drone.ResetDamageTimer();
 
         if (input.IsKeyTriggered(Input::Key::F))
         {
             m_door->Update(player, true);
+            m_rooftopDoor->Update(player, true);
         }
         else
         {
             m_door->Update(player, false);
+            m_rooftopDoor->Update(player, false);
         }
     }
 
-
     if (m_door->ShouldLoadNextMap() && !m_doorOpened)
     {
-        Logger::Instance().Log(Logger::Severity::Event, "Door opened! Hallway accessible.");
-        m_door->ResetMapTransition();
-        m_doorOpened = true;
+        HandleRoomToHallwayTransition();
+    }
 
-        m_room->SetRightBoundaryActive(false);
-        float cameraViewWidth = GAME_WIDTH;
-        float roomToShow = cameraViewWidth * 0.20f;
-        float newMinWorldX = GAME_WIDTH - roomToShow;
-
-        m_camera.SetBounds(
-            { newMinWorldX, 0.0f },
-            { GAME_WIDTH + Hallway::WIDTH, GAME_HEIGHT }
-        );
+    if (m_rooftopDoor->ShouldLoadNextMap() && !m_rooftopAccessed)
+    {
+        HandleHallwayToRooftopTransition();
+        return;
     }
 
     droneManager->Update(dt, player, playerHitboxSize, false);
@@ -230,9 +259,14 @@ void GameplayState::Update(double dt)
 
     const auto& pulse = player.GetPulseCore().getPulse();
     m_pulseGauge.Update(pulse.Value(), pulse.Max());
-    m_room->Update(player);
+
+    if (!m_rooftopAccessed)
+    {
+        m_room->Update(player);
+    }
 
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player);
+    m_rooftop->Update(dt, player, playerHitboxSize);
 
     auto& hallwayDrones = m_hallway->GetDrones();
     for (auto& drone : hallwayDrones)
@@ -245,7 +279,30 @@ void GameplayState::Update(double dt)
         }
     }
 
+    auto& rooftopDrones = m_rooftop->GetDrones();
+    for (auto& drone : rooftopDrones)
+    {
+        if (!drone.IsDead() && drone.ShouldDealDamage())
+        {
+            player.TakeDamage(20.0f);
+            drone.ResetDamageFlag();
+            break;
+        }
+    }
+
     m_camera.Update(player.GetPosition(), 0.1f);
+
+    static float cameraLogTimer = 0.0f;
+    cameraLogTimer += dt;
+    if (cameraLogTimer > 1.0f && m_rooftopAccessed)
+    {
+        Math::Vec2 camPos = m_camera.GetPosition();
+        Logger::Instance().Log(Logger::Severity::Debug,
+            "Camera: (%.1f, %.1f), Player: (%.1f, %.1f)",
+            camPos.x, camPos.y, playerCenter.x, playerCenter.y);
+        cameraLogTimer = 0.0f;
+    }
+
     m_fpsTimer += dt;
     m_frameCount++;
 
@@ -263,6 +320,54 @@ void GameplayState::Update(double dt)
     ss_pulse.precision(1);
     ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
+}
+
+void GameplayState::HandleRoomToHallwayTransition()
+{
+    Logger::Instance().Log(Logger::Severity::Event, "Door opened! Hallway accessible.");
+    m_door->ResetMapTransition();
+    m_doorOpened = true;
+
+    m_room->SetRightBoundaryActive(false);
+    float cameraViewWidth = GAME_WIDTH;
+    float roomToShow = cameraViewWidth * 0.20f;
+    float newMinWorldX = GAME_WIDTH - roomToShow;
+
+    m_camera.SetBounds(
+        { newMinWorldX, 0.0f },
+        { GAME_WIDTH + Hallway::WIDTH, GAME_HEIGHT }
+    );
+}
+
+void GameplayState::HandleHallwayToRooftopTransition()
+{
+    m_rooftopDoor->ResetMapTransition();
+    m_rooftopAccessed = true;
+
+    droneManager->ClearAllDrones();
+    m_hallway->ClearAllDrones();
+
+    float newGroundLevel = Rooftop::MIN_Y + GROUND_LEVEL;
+    player.SetCurrentGroundLevel(newGroundLevel);
+
+    float playerStartX = Rooftop::MIN_X + 300.0f;
+    float cameraTargetY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f);
+
+    player.SetPosition({ playerStartX, cameraTargetY });
+    player.ResetVelocity();
+    player.SetOnGround(false);
+
+    float worldMinX = Rooftop::MIN_X;
+    float worldMaxX = Rooftop::MIN_X + Rooftop::WIDTH;
+    float worldMinY = Rooftop::MIN_Y;
+    float worldMaxY = Rooftop::MIN_Y + Rooftop::HEIGHT;
+
+    m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
+    m_camera.SetPosition({ playerStartX, cameraTargetY });
+
+    Logger::Instance().Log(Logger::Severity::Event,
+        "Rooftop: Player=(%.1f, %.1f), Camera=(%.1f, %.1f), Ground=%.1f",
+        playerStartX, cameraTargetY, playerStartX, cameraTargetY, newGroundLevel);
 }
 
 void GameplayState::Draw()
@@ -315,6 +420,7 @@ void GameplayState::Draw()
     m_room->GetBackground()->Draw(textureShader, roomModel);
 
     m_hallway->Draw(textureShader);
+    m_rooftop->Draw(textureShader);
 
     textureShader.use();
     textureShader.setMat4("projection", projection);
@@ -329,6 +435,7 @@ void GameplayState::Draw()
     colorShader->setMat4("projection", projection);
     droneManager->DrawRadars(*colorShader, *m_debugRenderer);
     m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
+    m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
 
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
@@ -373,6 +480,15 @@ void GameplayState::Draw()
             }
         }
 
+        for (const auto& drone : m_rooftop->GetDrones())
+        {
+            if (!drone.IsDead())
+            {
+                m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+                m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+            }
+        }
+
         for (const auto& source : pulseSources)
         {
             m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
@@ -383,10 +499,10 @@ void GameplayState::Draw()
             m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
         }
 
-        // [수정] colorShader 포인터를 역참조(*)하여 전달
         m_hallway->DrawDebug(*colorShader, *m_debugRenderer);
-
+        m_rooftop->DrawDebug(*colorShader, *m_debugRenderer);
         m_door->DrawDebug(*colorShader);
+        m_rooftopDoor->DrawDebug(*colorShader);
     }
 }
 
@@ -394,6 +510,7 @@ void GameplayState::Shutdown()
 {
     m_room->Shutdown();
     m_hallway->Shutdown();
+    m_rooftop->Shutdown();
     player.Shutdown();
     for (auto& source : pulseSources) {
         source.Shutdown();
@@ -402,6 +519,7 @@ void GameplayState::Shutdown()
     m_pulseGauge.Shutdown();
     m_debugRenderer->Shutdown();
     m_door->Shutdown();
+    m_rooftopDoor->Shutdown();
     pulseManager->Shutdown();
 
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");

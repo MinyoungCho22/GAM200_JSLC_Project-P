@@ -55,14 +55,7 @@ void Hallway::Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitbox
 
     float playerLeftEdge = playerPos.x - (playerSize.x / 2.0f);
 
-    const float barrierX = 7290.0f;
-
-    if (playerLeftEdge > barrierX)
-    {
-        float correctedPlayerX = barrierX + (playerSize.x / 2.0f);
-
-        player.SetPosition({ correctedPlayerX, playerPos.y });
-    }
+    
 }
 
 void Hallway::Draw(Shader& shader)
@@ -94,6 +87,14 @@ void Hallway::Shutdown()
     if (m_droneManager)
     {
         m_droneManager->Shutdown();
+    }
+}
+
+void Hallway::ClearAllDrones()
+{
+    if (m_droneManager)
+    {
+        m_droneManager->ClearAllDrones();
     }
 }
 

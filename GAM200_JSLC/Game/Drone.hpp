@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿//Drone.hpp
+
+#pragma once
 #include "../Engine/Vec2.hpp"
 
 class Shader;
@@ -8,13 +10,13 @@ class DebugRenderer;
 class Drone
 {
 public:
-    void Init(Math::Vec2 startPos, const char* texturePath);
+    void Init(Math::Vec2 startPos, const char* texturePath, bool isTracer = false);
     void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding);
     void Draw(const Shader& shader) const;
     void DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
 
-    void ApplyDamage(float dt);
+    bool ApplyDamage(float dt);
     void ResetDamageTimer();
 
     Math::Vec2 GetPosition() const { return m_position; }
@@ -45,6 +47,9 @@ private:
     bool m_isDead = false;
 
     float m_damageTimer = 0.0f;
+    bool m_isTracer = false;
+    bool m_isChasing = false;
+    float m_lostTimer = 0.0f;
 
     bool m_isAttacking = false;
     bool m_shouldDealDamage = false;
@@ -62,7 +67,8 @@ private:
     const float m_radarRotationSpeed = 200.0f;
     const float m_radarLength = 100.0f;
 
-    float m_speed = 200.0f;
+    float m_baseSpeed = 200.0f;
+    float m_currentSpeed = 200.0f;
     float m_moveTimer = 0.0f;
 
     float m_baseY = 0.0f;

@@ -8,11 +8,12 @@
 #include "../Engine/Collision.hpp"
 #include "../Engine/Logger.hpp"
 
-void Door::Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost)
+void Door::Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost, DoorType type)
 {
     m_position = position;
     m_size = size;
     m_pulseCost = pulseCost;
+    m_doorType = type;
     m_isPlayerNearby = false;
     m_shouldLoadNextMap = false;
 
@@ -39,26 +40,40 @@ void Door::Update(Player& player, bool isInteractKeyPressed)
 {
     Math::Vec2 playerCenter = player.GetPosition();
 
-    // 플레이어와 문 사이의 거리 계산
-    float distSq = (playerCenter - m_position).LengthSq();
-    constexpr float INTERACT_RANGE = 200.0f;
-    constexpr float INTERACT_RANGE_SQ = INTERACT_RANGE * INTERACT_RANGE;
+    float interactRange = 200.0f;
+    if (m_doorType == DoorType::HallwayToRooftop)
+    {
+        constexpr float ROOFTOP_TRIGGER_X_MIN = 7000.0f;
+        constexpr float ROOFTOP_TRIGGER_X_MAX = 7250.0f;
 
-    // 사거리 내에 있는지 확인
-    m_isPlayerNearby = (distSq < INTERACT_RANGE_SQ);
+        m_isPlayerNearby = (playerCenter.x > ROOFTOP_TRIGGER_X_MIN &&
+            playerCenter.x < ROOFTOP_TRIGGER_X_MAX);
+    }
+    else
+    {
+        float distSq = (playerCenter - m_position).LengthSq();
+        float interactRangeSq = interactRange * interactRange;
+        m_isPlayerNearby = (distSq < interactRangeSq);
+    }
 
     if (m_isPlayerNearby && isInteractKeyPressed)
     {
         float currentPulse = player.GetPulseCore().getPulse().Value();
-
         if (currentPulse >= m_pulseCost)
         {
             player.GetPulseCore().getPulse().spend(m_pulseCost);
             m_shouldLoadNextMap = true;
 
-            Logger::Instance().Log(Logger::Severity::Event,
-                "Door opened! Pulse cost: %.1f, Remaining pulse: %.1f",
-                m_pulseCost, player.GetPulseCore().getPulse().Value());
+            if (m_doorType == DoorType::HallwayToRooftop)
+            {
+                Logger::Instance().Log(Logger::Severity::Event, "Rooftop Accessed!");
+            }
+            else
+            {
+                Logger::Instance().Log(Logger::Severity::Event,
+                    "Door opened! Pulse cost: %.1f, Remaining pulse: %.1f",
+                    m_pulseCost, player.GetPulseCore().getPulse().Value());
+            }
         }
         else
         {

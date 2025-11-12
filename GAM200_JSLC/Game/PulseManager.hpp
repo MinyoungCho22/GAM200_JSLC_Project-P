@@ -16,6 +16,7 @@ public:
     void Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitboxSize,
         Player& player, std::vector<PulseSource>& roomSources,
         std::vector<PulseSource>& hallwaySources,
+        std::vector<PulseSource>& rooftopSources,
         bool is_interact_key_pressed, double dt);
 
     void UpdateAttackVFX(bool isAttacking, Math::Vec2 startPos, Math::Vec2 endPos);

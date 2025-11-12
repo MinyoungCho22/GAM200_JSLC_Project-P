@@ -1,4 +1,6 @@
-﻿#pragma once
+// Rooftop.hpp
+
+#pragma once
 #include "../Engine/Vec2.hpp"
 #include "PulseSource.hpp"
 #include "DroneManager.hpp"
@@ -10,30 +12,30 @@ class Shader;
 class Player;
 class DebugRenderer;
 
-class Hallway
+class Rooftop
 {
 public:
-    static constexpr float WIDTH = 5940.0f;
+    static constexpr float WIDTH = 8400.0f;
     static constexpr float HEIGHT = 1080.0f;
+    static constexpr float MIN_X = 7860.0f;
+    static constexpr float MIN_Y = 1080.0f;
 
     void Initialize();
-    void Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player);
-    void Draw(Shader& shader);
+    void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
+    void Draw(Shader& shader) const;
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
-    void Shutdown();
     void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
+    void Shutdown();
 
-    void ClearAllDrones();
+    Math::Vec2 GetPosition() const { return m_position; }
+    Math::Vec2 GetSize() const { return m_size; }
 
-    Math::Vec2 GetPosition() const;
-    Math::Vec2 GetSize() const;
+    const std::vector<PulseSource>& GetPulseSources() const { return m_pulseSources; }
+    std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
 
-    const std::vector<PulseSource>& GetPulseSources() const;
-    std::vector<PulseSource>& GetPulseSources();
-    const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
-
-    bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
+    const std::vector<Drone>& GetDrones() const;
+    void ClearAllDrones();
 
 private:
     std::unique_ptr<Background> m_background;
@@ -41,7 +43,4 @@ private:
     Math::Vec2 m_size;
     std::vector<PulseSource> m_pulseSources;
     std::unique_ptr<DroneManager> m_droneManager;
-
-    Math::Vec2 m_hidingSpotPos;
-    Math::Vec2 m_hidingSpotSize;
 };

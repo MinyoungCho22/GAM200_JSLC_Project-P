@@ -97,6 +97,12 @@
     <ClCompile Include="Game\Hallway.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="Game\TraceSystem.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Rooftop.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -190,6 +196,12 @@
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\Hallway.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\TraceSystem.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Rooftop.hpp">
       <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>

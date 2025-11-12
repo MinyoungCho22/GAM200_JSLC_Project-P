@@ -6,6 +6,7 @@
 #include "../Engine/DebugRenderer.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include <cmath>
+#include <random>
 
 #pragma warning(push, 0)
 #include <stb_image.h>
@@ -14,12 +15,19 @@
 constexpr float PI = 3.14159265359f;
 constexpr float GROUND_LEVEL = 180.0f;
 
-void Drone::Init(Math::Vec2 startPos, const char* texturePath)
+std::default_random_engine drone_generator;
+std::uniform_real_distribution<float> drone_distribution(-1.0f, 1.0f);
+
+void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
 {
     m_position = startPos;
     m_baseY = startPos.y;
     m_velocity = { 0.0f, 0.0f };
     m_direction = { 1.0f, 0.0f };
+    m_isTracer = isTracer;
+    m_isChasing = false;
+    m_lostTimer = 0.0f;
+    m_currentSpeed = m_baseSpeed;
 
     float vertices[] = {
         -0.5f,  0.5f,     0.0f, 1.0f,
@@ -108,9 +116,20 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     Math::Vec2 toPlayer = player.GetPosition() - m_position;
     float distSq = toPlayer.LengthSq();
 
+    if (distSq < (600.0f * 600.0f))
+    {
+        m_currentSpeed = m_baseSpeed * 1.5f;
+    }
+    else
+    {
+        m_currentSpeed = m_baseSpeed;
+    }
+
     float playerHitboxRadius = (playerHitboxSize.x + playerHitboxSize.y) * 0.15f;
     float effectiveDetectionRange = DETECTION_RANGE + playerHitboxRadius;
     float effectiveDetectionRangeSq = effectiveDetectionRange * effectiveDetectionRange;
+
+    bool canDetectPlayer = !isPlayerHiding;
 
     if (m_isAttacking)
     {
@@ -132,16 +151,14 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
             m_position.y = m_attackCenter.y + std::sin(radians) * m_attackRadius;
         }
 
-        // [수정] 플레이어가 숨으면 공격 중지
-        if (isPlayerHiding)
+        if (!canDetectPlayer)
         {
             m_isAttacking = false;
             m_position = m_attackStartPos;
             m_attackTimer = 0.0f;
         }
     }
-    // [수정] 플레이어가 숨어있지 않을 때만 공격 감지
-    else if (!isPlayerHiding && distSq < effectiveDetectionRangeSq && m_attackCooldown <= 0.0f)
+    else if (canDetectPlayer && distSq < effectiveDetectionRangeSq && m_attackCooldown <= 0.0f)
     {
         m_isAttacking = true;
         m_shouldDealDamage = true;
@@ -161,25 +178,67 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     }
     else
     {
-        m_moveTimer += static_cast<float>(dt);
-        // [수정] 순찰 반경 확대
-        if (m_moveTimer > 5.0f)
+        if (m_isTracer)
         {
-            m_moveTimer = 0.0f;
-            m_direction.x = -m_direction.x;
+            if (canDetectPlayer)
+            {
+                m_isChasing = true;
+                m_lostTimer = 0.0f;
+                m_direction = toPlayer.GetNormalized();
+                m_velocity = m_direction * m_currentSpeed;
+                m_position += m_velocity * static_cast<float>(dt);
+            }
+            else
+            {
+                if (m_isChasing)
+                {
+                    m_isChasing = false;
+                    m_lostTimer = 1.0f;
+                    m_velocity = { 0.0f, 0.0f };
+                }
+
+                if (m_lostTimer > 0.0f)
+                {
+                    m_lostTimer -= static_cast<float>(dt);
+                    m_velocity = { 0.0f, 0.0f };
+                }
+                else
+                {
+                    m_moveTimer += static_cast<float>(dt);
+                    if (m_moveTimer > 3.0f)
+                    {
+                        m_moveTimer = 0.0f;
+                        float randX = drone_distribution(drone_generator);
+                        float randY = drone_distribution(drone_generator);
+                        m_direction = Math::Vec2(randX, randY).GetNormalized();
+                    }
+                    m_velocity = m_direction * m_currentSpeed;
+                    m_position += m_velocity * static_cast<float>(dt);
+                }
+            }
         }
+        else
+        {
+            m_moveTimer += static_cast<float>(dt);
+            if (m_moveTimer > 5.0f)
+            {
+                m_moveTimer = 0.0f;
+                m_direction.x = -m_direction.x;
+            }
 
-        m_bobTimer += static_cast<float>(dt);
+            m_bobTimer += static_cast<float>(dt);
 
-        m_velocity = m_direction * m_speed;
-        m_position.x += m_velocity.x * static_cast<float>(dt);
+            m_velocity.x = m_direction.x * m_currentSpeed;
+            m_velocity.y = 0.f;
+            m_position.x += m_velocity.x * static_cast<float>(dt);
 
-        const float bobAmplitude = 20.0f;
-        const float bobFrequency = 3.0f;
+            const float bobAmplitude = 20.0f;
+            const float bobFrequency = 3.0f;
 
-        float bobOffset = std::sin(m_bobTimer * bobFrequency) * bobAmplitude;
+            float bobOffset = std::sin(m_bobTimer * bobFrequency) * bobAmplitude;
 
-        m_position.y = m_baseY + bobOffset;
+            m_position.y = m_baseY + bobOffset;
+        }
     }
 }
 
@@ -201,6 +260,11 @@ void Drone::Draw(const Shader& shader) const
         float tiltAngle = m_attackAngle + 90.0f * m_attackDirection;
         rotationMatrix = Math::Matrix::CreateRotation(tiltAngle);
     }
+    else if (m_isTracer && m_velocity.LengthSq() > 0.0f)
+    {
+        float angle = std::atan2(m_velocity.y, m_velocity.x) * (180.0f / PI);
+        rotationMatrix = Math::Matrix::CreateRotation(angle);
+    }
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(m_size);
     Math::Matrix transMatrix = Math::Matrix::CreateTranslation(m_position);
@@ -209,7 +273,9 @@ void Drone::Draw(const Shader& shader) const
     shader.use();
     shader.setMat4("model", model);
     shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
-    shader.setBool("flipX", m_direction.x < 0.0f);
+
+    bool flipX = m_isTracer ? (m_velocity.x < 0.0f) : (m_direction.x < 0.0f);
+    shader.setBool("flipX", flipX);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
@@ -259,15 +325,17 @@ void Drone::StartDeathSequence()
     Logger::Instance().Log(Logger::Severity::Event, "Drone hit! Starting death sequence.");
 }
 
-void Drone::ApplyDamage(float dt)
+bool Drone::ApplyDamage(float dt)
 {
-    if (m_isHit || m_isDead) return;
+    if (m_isHit || m_isDead) return false;
 
     m_damageTimer += dt;
     if (m_damageTimer >= TIME_TO_DESTROY)
     {
         StartDeathSequence();
+        return true;
     }
+    return false;
 }
 
 void Drone::ResetDamageTimer()
