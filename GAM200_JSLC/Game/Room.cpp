@@ -1,10 +1,9 @@
-﻿// Room.cpp
-
-#include "Room.hpp"
+﻿#include "Room.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "Player.hpp"
 #include "../Engine/DebugRenderer.hpp"
+#include "../Engine/Collision.hpp"
 
 constexpr float ROOM_WIDTH = 1620.0f;
 constexpr float ROOM_HEIGHT = 780.0f;
@@ -17,6 +16,9 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_background = std::make_unique<Background>();
     m_background->Initialize(texturePath);
 
+    m_brightBackground = std::make_unique<Background>();
+    m_brightBackground->Initialize("Asset/Room_Bright.png");
+
     float screenWidth = GAME_WIDTH;
     float minX = (screenWidth - ROOM_WIDTH) / 2.0f;
     float maxX = minX + ROOM_WIDTH;
@@ -25,9 +27,46 @@ void Room::Initialize(Engine& engine, const char* texturePath)
 
     m_boundaries.bottom_left = Math::Vec2(minX, minY);
     m_boundaries.top_right = Math::Vec2(maxX, maxY);
-
     m_roomSize = { ROOM_WIDTH, ROOM_HEIGHT };
     m_roomCenter = { minX + ROOM_WIDTH / 2.0f, minY + ROOM_HEIGHT / 2.0f };
+
+    // Pulse Source 1
+    float width1 = 51.f;
+    float height1 = 63.f;
+    float topLeftX1 = 424.f;
+    float topLeftY1 = 360.f;
+    Math::Vec2 center1 = { topLeftX1 + (width1 / 2.0f), topLeftY1 - (height1 / 2.0f) };
+    m_pulseSources.emplace_back();
+    m_pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
+
+    // Pulse Source 2
+    float width2 = 215.f;
+    float height2 = 180.f;
+    float topLeftX2 = 692.f;
+    float topLeftY2 = 550.f;
+    Math::Vec2 center2 = { topLeftX2 + (width2 / 2.0f), topLeftY2 - (height2 / 2.0f) };
+    m_pulseSources.emplace_back();
+    m_pulseSources.back().Initialize(center2, { width2, height2 }, 100.f);
+
+    // Pulse Source 3
+    float width3 = 75.f;
+    float height3 = 33.f;
+    float topLeftX3 = 1414.f;
+    float topLeftY3 = 212.f;
+    Math::Vec2 center3 = { topLeftX3 + (width3 / 2.0f), topLeftY3 - (height3 / 2.0f) };
+    m_pulseSources.emplace_back();
+    m_pulseSources.back().Initialize(center3, { width3, height3 }, 100.f);
+
+    // 블라인드 위치/크기 설정
+    float blindWidth = 310.f;
+    float blindHeight = 300.f;
+    float blindTopLeftX = 1105.f;
+    float blindTopLeftY = 352.f;
+    float blindBottomY = GAME_HEIGHT - blindTopLeftY;
+
+    m_blindPos = { blindTopLeftX + (blindWidth / 2.0f), blindBottomY - (blindHeight / 2.0f) };
+    m_blindSize = { blindWidth, blindHeight };
+    m_isBright = false;
 }
 
 void Room::Shutdown()
@@ -36,9 +75,17 @@ void Room::Shutdown()
     {
         m_background->Shutdown();
     }
+    if (m_brightBackground)
+    {
+        m_brightBackground->Shutdown();
+    }
+    for (auto& source : m_pulseSources)
+    {
+        source.Shutdown();
+    }
 }
 
-void Room::Update(Player& player)
+void Room::Update(Player& player, double dt, Input::Input& input)
 {
     Math::Vec2 centerPos = player.GetPosition();
     Math::Vec2 halfSize = player.GetSize() * 0.5f;
@@ -47,33 +94,65 @@ void Room::Update(Player& player)
     {
         player.SetPosition({ m_boundaries.bottom_left.x + halfSize.x, centerPos.y });
     }
-
     else if (m_rightBoundaryActive && centerPos.x + halfSize.x > m_boundaries.top_right.x)
     {
         player.SetPosition({ m_boundaries.top_right.x - halfSize.x, centerPos.y });
     }
 
-    // Y축 경계 체크 (천장)
     if (centerPos.y + halfSize.y > m_boundaries.top_right.y)
     {
         player.SetPosition({ centerPos.x, m_boundaries.top_right.y - halfSize.y });
     }
+
+    bool playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
+
+    if (playerInBlindArea && input.IsKeyTriggered(Input::Key::F))
+    {
+        m_isBright = !m_isBright;
+    }
 }
 
-void Room::Draw(Engine& engine, Shader& textureShader, const Math::Matrix& projection)
+void Room::Draw(Shader& textureShader) const
 {
-    textureShader.use();
-    textureShader.setMat4("projection", projection);
-
     Math::Vec2 screenSize = { GAME_WIDTH, GAME_HEIGHT };
     Math::Vec2 screenCenter = screenSize * 0.5f;
     Math::Matrix bg_model = Math::Matrix::CreateTranslation(screenCenter) * Math::Matrix::CreateScale(screenSize);
-    m_background->Draw(textureShader, bg_model);
+
+    textureShader.setMat4("model", bg_model);
+
+    if (m_isBright)
+    {
+        m_brightBackground->Draw(textureShader, bg_model);
+    }
+    else
+    {
+        m_background->Draw(textureShader, bg_model);
+    }
 }
 
-void Room::DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::Matrix& projection)
+void Room::DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::Matrix& projection, const Player& player) const
 {
     colorShader.use();
     colorShader.setMat4("projection", projection);
+
     renderer.DrawBox(colorShader, m_roomCenter, m_roomSize, { 1.0f, 0.0f });
+
+    for (const auto& source : m_pulseSources)
+    {
+        renderer.DrawBox(colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
+    }
+
+    bool playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
+    Math::Vec2 debugColor = playerInBlindArea ? Math::Vec2(1.0f, 1.0f) : Math::Vec2(0.5f, 1.0f);
+    renderer.DrawBox(colorShader, m_blindPos, m_blindSize, debugColor);
+}
+
+bool Room::IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const
+{
+    if (!isPlayerCrouching)
+    {
+        return false;
+    }
+
+    return Collision::CheckAABB(playerPos, playerHitboxSize, m_blindPos, m_blindSize);
 }

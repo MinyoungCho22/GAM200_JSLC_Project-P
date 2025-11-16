@@ -1,6 +1,4 @@
-﻿//Hallway.cpp
-
-#include "Hallway.hpp"
+﻿#include "Hallway.hpp"
 #include "Background.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -59,11 +57,9 @@ void Hallway::Initialize()
 }
 
 
-void Hallway::Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player)
+void Hallway::Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPlayerHiding)
 {
-    bool isHiding = IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
-
-    m_droneManager->Update(dt, player, playerHitboxSize, isHiding);
+    m_droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
 
     Math::Vec2 playerPos = player.GetPosition();
 

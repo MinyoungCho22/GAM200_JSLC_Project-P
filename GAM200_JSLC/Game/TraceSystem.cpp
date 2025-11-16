@@ -30,7 +30,7 @@ void TraceSystem::SpawnTracerWave(DroneManager& droneManager)
 {
     Logger::Instance().Log(Logger::Severity::Event, "Spawning tracer wave!");
 
-    droneManager.SpawnDrone({ 1830.0f, 300.0f }, "Asset/drone.png", true);
-    droneManager.SpawnDrone({ 1820.0f, 500.0f }, "Asset/drone.png", true);
-    droneManager.SpawnDrone({ 1810.0f, 600.0f }, "Asset/drone.png", true);
+    droneManager.SpawnDrone({ 1830.0f, 300.0f }, "Asset/drone.png", true).SetBaseSpeed(100.0f);
+    droneManager.SpawnDrone({ 1820.0f, 500.0f }, "Asset/drone.png", true).SetBaseSpeed(150.0f);
+    droneManager.SpawnDrone({ 1810.0f, 600.0f }, "Asset/drone.png", true).SetBaseSpeed(200.0f);
 }

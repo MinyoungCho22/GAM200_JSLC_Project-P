@@ -48,30 +48,6 @@ void GameplayState::Initialize()
 
     Engine& engine = gsm.GetEngine();
 
-    float width1 = 51.f;
-    float height1 = 63.f;
-    float topLeftX1 = 424.f;
-    float topLeftY1 = 360.f;
-    Math::Vec2 center1 = { topLeftX1 + (width1 / 2.0f), topLeftY1 - (height1 / 2.0f) };
-    pulseSources.emplace_back();
-    pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
-
-    float width2 = 215.f;
-    float height2 = 180.f;
-    float topLeftX2 = 692.f;
-    float topLeftY2 = 550.f;
-    Math::Vec2 center2 = { topLeftX2 + (width2 / 2.0f), topLeftY2 - (height2 / 2.0f) };
-    pulseSources.emplace_back();
-    pulseSources.back().Initialize(center2, { width2, height2 }, 100.f);
-
-    float width3 = 75.f;
-    float height3 = 33.f;
-    float topLeftX3 = 1414.f;
-    float topLeftY3 = 212.f;
-    Math::Vec2 center3 = { topLeftX3 + (width3 / 2.0f), topLeftY3 - (height3 / 2.0f) };
-    pulseSources.emplace_back();
-    pulseSources.back().Initialize(center3, { width3, height3 }, 100.f);
-
     droneManager = std::make_unique<DroneManager>();
 
     m_pulseGauge.Initialize({ 75.f, GAME_HEIGHT * 0.75f - 20.0f }, { 40.f, 300.f });
@@ -104,7 +80,14 @@ void GameplayState::Initialize()
     m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ...");
 
     m_tutorial = std::make_unique<Tutorial>();
-    m_tutorial->Init(*m_font, *m_fontShader, center1, { width1, height1 });
+
+    auto& roomPulseSources = m_room->GetPulseSources();
+    if (!roomPulseSources.empty())
+    {
+        m_tutorial->Init(*m_font, *m_fontShader,
+            roomPulseSources[0].GetPosition(),
+            roomPulseSources[0].GetSize());
+    }
 
     float widthHiding = 381.f;
     float heightHiding = 324.f;
@@ -162,7 +145,7 @@ void GameplayState::Update(double dt)
         m_logTimer -= 0.5;
     }
 
-    pulseManager->Update(playerCenter, playerHitboxSize, player, pulseSources,
+    pulseManager->Update(playerCenter, playerHitboxSize, player, m_room->GetPulseSources(),
         m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), isPressingE, dt);
 
     Drone* targetDrone = nullptr;
@@ -268,7 +251,11 @@ void GameplayState::Update(double dt)
         HandleHallwayToRooftopTransition();
     }
 
-    droneManager->Update(dt, player, playerHitboxSize, false);
+    bool isPlayerHidingInRoom = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    bool isPlayerHidingInHallway = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    bool isPlayerHiding = isPlayerHidingInRoom || isPlayerHidingInHallway;
+
+    droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
     player.Update(dt, input);
 
     auto& drones = droneManager->GetDrones();
@@ -287,10 +274,10 @@ void GameplayState::Update(double dt)
 
     if (!m_rooftopAccessed)
     {
-        m_room->Update(player);
+        m_room->Update(player, dt, input);
     }
 
-    m_hallway->Update(dt, playerCenter, playerHitboxSize, player);
+    m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
     m_rooftop->Update(dt, player, playerHitboxSize);
 
     auto& hallwayDrones = m_hallway->GetDrones();
@@ -382,11 +369,11 @@ void GameplayState::HandleHallwayToRooftopTransition()
     droneManager->ClearAllDrones();
     m_hallway->ClearAllDrones();
 
-    float newGroundLevel = Rooftop::MIN_Y + GROUND_LEVEL;
+    float newGroundLevel = Rooftop::MIN_Y + GROUND_LEVEL + 200.0f;
     player.SetCurrentGroundLevel(newGroundLevel);
 
-    float playerStartX = Rooftop::MIN_X + 300.0f;
-    float playerStartY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f);
+    float playerStartX = Rooftop::MIN_X + 1550.0f;
+    float playerStartY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f + 200.0f);
 
     player.SetPosition({ playerStartX, playerStartY });
     player.ResetVelocity();
@@ -472,12 +459,7 @@ void GameplayState::Draw()
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
 
-    Math::Vec2 roomSize = { GAME_WIDTH, GAME_HEIGHT };
-    Math::Vec2 roomCenter = { GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f };
-    Math::Matrix roomModel = Math::Matrix::CreateTranslation(roomCenter) * Math::Matrix::CreateScale(roomSize);
-    textureShader.setMat4("model", roomModel);
-    m_room->GetBackground()->Draw(textureShader, roomModel);
-
+    m_room->Draw(textureShader);
     m_hallway->Draw(textureShader);
     m_rooftop->Draw(textureShader);
 
@@ -550,10 +532,7 @@ void GameplayState::Draw()
             }
         }
 
-        for (const auto& source : pulseSources)
-        {
-            m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
-        }
+        m_room->DrawDebug(*m_debugRenderer, *colorShader, projection, player);
 
         for (const auto& source : m_hallway->GetPulseSources())
         {
@@ -573,9 +552,6 @@ void GameplayState::Shutdown()
     m_hallway->Shutdown();
     m_rooftop->Shutdown();
     player.Shutdown();
-    for (auto& source : pulseSources) {
-        source.Shutdown();
-    }
     droneManager->Shutdown();
     m_pulseGauge.Shutdown();
     m_debugRenderer->Shutdown();

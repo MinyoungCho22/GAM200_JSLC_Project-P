@@ -1,6 +1,4 @@
-﻿//Hallway.hpp
-
-#pragma once
+﻿#pragma once
 #include "../Engine/Vec2.hpp"
 #include "PulseSource.hpp"
 #include "DroneManager.hpp"
@@ -19,7 +17,7 @@ public:
     static constexpr float HEIGHT = 1080.0f;
 
     void Initialize();
-    void Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player);
+    void Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPlayerHiding);
     void Draw(Shader& shader);
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
@@ -46,7 +44,6 @@ private:
 
     Math::Vec2 m_hidingSpotPos;
     Math::Vec2 m_hidingSpotSize;
-
     Math::Vec2 m_obstaclePos;
     Math::Vec2 m_obstacleSize;
 };

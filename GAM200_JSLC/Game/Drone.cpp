@@ -1,4 +1,6 @@
-﻿#include "Drone.hpp"
+﻿//Drone.cpp
+
+#include "Drone.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -17,6 +19,7 @@ constexpr float GROUND_LEVEL = 180.0f;
 
 std::default_random_engine drone_generator;
 std::uniform_real_distribution<float> drone_distribution(-1.0f, 1.0f);
+std::uniform_real_distribution<float> drone_angle_distribution(25.0f, 45.0f);
 
 void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
 {
@@ -28,6 +31,10 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     m_isChasing = false;
     m_lostTimer = 0.0f;
     m_currentSpeed = m_baseSpeed;
+
+    m_searchMaxAngle = drone_angle_distribution(drone_generator);
+    m_searchRotation = 0.0f;
+    m_searchDir = 1;
 
     float vertices[] = {
         -0.5f,  0.5f,     0.0f, 1.0f,
@@ -180,13 +187,16 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     {
         if (m_isTracer)
         {
+            Math::Vec2 targetVelocity;
             if (canDetectPlayer)
             {
                 m_isChasing = true;
                 m_lostTimer = 0.0f;
                 m_direction = toPlayer.GetNormalized();
-                m_velocity = m_direction * m_currentSpeed;
-                m_position += m_velocity * static_cast<float>(dt);
+                targetVelocity = m_direction * m_currentSpeed;
+
+                m_searchRotation = 0.0f;
+                m_searchDir = 1;
             }
             else
             {
@@ -194,28 +204,46 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
                 {
                     m_isChasing = false;
                     m_lostTimer = 1.0f;
-                    m_velocity = { 0.0f, 0.0f };
                 }
 
                 if (m_lostTimer > 0.0f)
                 {
                     m_lostTimer -= static_cast<float>(dt);
-                    m_velocity = { 0.0f, 0.0f };
+
+                    const float searchRotationSpeed = 120.0f;
+                    m_searchRotation += m_searchDir * searchRotationSpeed * static_cast<float>(dt);
+
+                    if (m_searchDir == 1 && m_searchRotation > m_searchMaxAngle)
+                    {
+                        m_searchRotation = m_searchMaxAngle;
+                        m_searchDir = -1;
+                    }
+                    else if (m_searchDir == -1 && m_searchRotation < -m_searchMaxAngle)
+                    {
+                        m_searchRotation = -m_searchMaxAngle;
+                        m_searchDir = 1;
+                    }
+
+                    targetVelocity = { 0.0f, 0.0f };
                 }
                 else
                 {
-                    m_moveTimer += static_cast<float>(dt);
-                    if (m_moveTimer > 3.0f)
-                    {
-                        m_moveTimer = 0.0f;
-                        float randX = drone_distribution(drone_generator);
-                        float randY = drone_distribution(drone_generator);
-                        m_direction = Math::Vec2(randX, randY).GetNormalized();
-                    }
-                    m_velocity = m_direction * m_currentSpeed;
-                    m_position += m_velocity * static_cast<float>(dt);
+                    m_direction = { 1.0f, 0.0f };
+                    targetVelocity = m_direction * m_currentSpeed;
+
+                    m_searchRotation = 0.0f;
+                    m_searchDir = 1;
                 }
             }
+
+            Math::Vec2 diff = targetVelocity - m_velocity;
+            float maxChange = m_acceleration * static_cast<float>(dt);
+            if (diff.LengthSq() > maxChange * maxChange)
+            {
+                diff = diff.GetNormalized() * maxChange;
+            }
+            m_velocity += diff;
+            m_position += m_velocity * static_cast<float>(dt);
         }
         else
         {
@@ -228,7 +256,20 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
 
             m_bobTimer += static_cast<float>(dt);
 
-            m_velocity.x = m_direction.x * m_currentSpeed;
+            float targetVelX = m_direction.x * m_currentSpeed;
+            float accel = m_acceleration * static_cast<float>(dt);
+
+            if (m_velocity.x < targetVelX)
+            {
+                m_velocity.x += accel;
+                if (m_velocity.x > targetVelX) m_velocity.x = targetVelX;
+            }
+            else if (m_velocity.x > targetVelX)
+            {
+                m_velocity.x -= accel;
+                if (m_velocity.x < targetVelX) m_velocity.x = targetVelX;
+            }
+
             m_velocity.y = 0.f;
             m_position.x += m_velocity.x * static_cast<float>(dt);
 
@@ -244,13 +285,12 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
 
 void Drone::Draw(const Shader& shader) const
 {
-    Math::Matrix rotationMatrix = Math::Matrix::CreateIdentity();
+    if (m_isDead) return;
 
-    if (m_isDead)
-    {
-        rotationMatrix = Math::Matrix::CreateRotation(m_hitRotation);
-    }
-    else if (m_isHit)
+    Math::Matrix rotationMatrix = Math::Matrix::CreateIdentity();
+    bool flipX = false;
+
+    if (m_isHit)
     {
         float wobble = std::sin(m_hitTimer * 20.0f) * 45.0f;
         rotationMatrix = Math::Matrix::CreateRotation(m_hitRotation + wobble);
@@ -260,10 +300,53 @@ void Drone::Draw(const Shader& shader) const
         float tiltAngle = m_attackAngle + 90.0f * m_attackDirection;
         rotationMatrix = Math::Matrix::CreateRotation(tiltAngle);
     }
-    else if (m_isTracer && m_velocity.LengthSq() > 0.0f)
+    else if (m_isTracer)
     {
-        float angle = std::atan2(m_velocity.y, m_velocity.x) * (180.0f / PI);
-        rotationMatrix = Math::Matrix::CreateRotation(angle);
+        if (m_lostTimer > 0.0f)
+        {
+            flipX = (m_direction.x < 0.0f);
+
+            float baseAngle = 0.0f;
+            if (flipX) {
+                baseAngle = std::atan2(m_direction.y, -m_direction.x) * (180.0f / PI);
+            }
+            else {
+                baseAngle = std::atan2(m_direction.y, m_direction.x) * (180.0f / PI);
+            }
+
+            rotationMatrix = Math::Matrix::CreateRotation(baseAngle + m_searchRotation);
+        }
+        else if (m_velocity.LengthSq() > 0.01f)
+        {
+            if (m_velocity.x < 0.0f)
+            {
+                flipX = true;
+                float angle = std::atan2(m_velocity.y, -m_velocity.x) * (180.0f / PI);
+                rotationMatrix = Math::Matrix::CreateRotation(angle);
+            }
+            else
+            {
+                flipX = false;
+                float angle = std::atan2(m_velocity.y, m_velocity.x) * (180.0f / PI);
+                rotationMatrix = Math::Matrix::CreateRotation(angle);
+            }
+        }
+        else
+        {
+            flipX = (m_direction.x < 0.0f);
+            float angle = 0.0f;
+            if (flipX) {
+                angle = std::atan2(m_direction.y, -m_direction.x) * (180.0f / PI);
+            }
+            else {
+                angle = std::atan2(m_direction.y, m_direction.x) * (180.0f / PI);
+            }
+            rotationMatrix = Math::Matrix::CreateRotation(angle);
+        }
+    }
+    else
+    {
+        flipX = (m_direction.x < 0.0f);
     }
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(m_size);
@@ -273,8 +356,6 @@ void Drone::Draw(const Shader& shader) const
     shader.use();
     shader.setMat4("model", model);
     shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
-
-    bool flipX = m_isTracer ? (m_velocity.x < 0.0f) : (m_direction.x < 0.0f);
     shader.setBool("flipX", flipX);
 
     GL::ActiveTexture(GL_TEXTURE0);

@@ -18,6 +18,7 @@ public:
 
     bool ApplyDamage(float dt);
     void ResetDamageTimer();
+    void SetBaseSpeed(float speed) { m_baseSpeed = speed; m_currentSpeed = speed; }
 
     Math::Vec2 GetPosition() const { return m_position; }
     Math::Vec2 GetSize() const { return m_size; }
@@ -29,7 +30,7 @@ public:
 
     static constexpr float DETECTION_RANGE = 100.0f;
     static constexpr float DETECTION_RANGE_SQ = DETECTION_RANGE * DETECTION_RANGE;
-    static constexpr float TIME_TO_DESTROY = 2.0f;
+    static constexpr float TIME_TO_DESTROY = 1.0f;
 
 private:
     void StartDeathSequence();
@@ -51,6 +52,10 @@ private:
     bool m_isChasing = false;
     float m_lostTimer = 0.0f;
 
+    float m_searchRotation = 0.0f;
+    float m_searchMaxAngle = 30.0f;
+    int m_searchDir = 1;
+
     bool m_isAttacking = false;
     bool m_shouldDealDamage = false;
     float m_attackCooldown = 0.0f;
@@ -70,6 +75,8 @@ private:
     float m_baseSpeed = 200.0f;
     float m_currentSpeed = 200.0f;
     float m_moveTimer = 0.0f;
+
+    float m_acceleration = 800.0f;
 
     float m_baseY = 0.0f;
     float m_bobTimer = 0.0f;
