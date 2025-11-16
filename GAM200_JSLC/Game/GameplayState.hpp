@@ -1,5 +1,4 @@
-﻿//GameplayState.hpp
-
+﻿// GameplayState.hpp
 #pragma once
 #include "../Engine/GameState.hpp"
 #include "../Engine/DebugRenderer.hpp"
@@ -17,7 +16,8 @@
 #include "Rooftop.hpp"
 #include "TraceSystem.hpp" 
 #include "GameOver.hpp" 
-#include "MainMenu.hpp" 
+#include "MainMenu.hpp"
+#include "Tutorial.hpp"
 #include <memory>
 #include <vector>
 #include <string>
@@ -63,9 +63,9 @@ private:
     std::unique_ptr<Hallway> m_hallway;
     std::unique_ptr<Rooftop> m_rooftop;
     std::unique_ptr<TraceSystem> m_traceSystem;
+    std::unique_ptr<Tutorial> m_tutorial;
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;
-
     float m_cameraSmoothSpeed = 0.1f;
 };

@@ -103,6 +103,20 @@ void GameplayState::Initialize()
     m_debugToggleText = m_font->PrintToTexture(*m_fontShader, "Debug (TAB)");
     m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ...");
 
+    m_tutorial = std::make_unique<Tutorial>();
+    m_tutorial->Init(*m_font, *m_fontShader, center1, { width1, height1 });
+
+    float widthHiding = 381.f;
+    float heightHiding = 324.f;
+    float topLeftXHiding = 2820.f;
+    float topLeftYHiding = 923.f;
+    float bottomYHiding = Hallway::HEIGHT - topLeftYHiding;
+    Math::Vec2 hidingSpotPos = {
+        topLeftXHiding + (widthHiding / 2.0f),
+        bottomYHiding + (heightHiding / 2.0f)
+    };
+    m_tutorial->AddHidingSpotMessage(*m_font, *m_fontShader, hidingSpotPos, { widthHiding, heightHiding });
+
     m_fpsTimer = 0.0;
     m_frameCount = 0;
     m_isGameOver = false;
@@ -129,6 +143,8 @@ void GameplayState::Update(double dt)
     {
         m_isDebugDraw = !m_isDebugDraw;
     }
+
+    m_tutorial->Update(static_cast<float>(dt), player, input, m_hallway.get());
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
@@ -401,17 +417,17 @@ void GameplayState::Draw()
 
     if (playerPos.y >= Rooftop::MIN_Y)
     {
-        r = 70.0f / 255.0f; g = 68.0f / 255.0f; b = 71.0f / 255.0f; // Hallway to Rooftop
+        r = 70.0f / 255.0f; g = 68.0f / 255.0f; b = 71.0f / 255.0f;
     }
     else
     {
         if (playerPos.x < GAME_WIDTH)
         {
-            r = 12.0f / 255.0f; g = 12.0f / 255.0f; b = 12.0f / 255.0f; // Room: Dark Gray
+            r = 12.0f / 255.0f; g = 12.0f / 255.0f; b = 12.0f / 255.0f;
         }
         else
         {
-            r = 70.0f / 255.0f; g =  68.0f / 255.0f; b = 71.0f / 255.0f; // Rooftop
+            r = 70.0f / 255.0f; g = 68.0f / 255.0f; b = 71.0f / 255.0f;
         }
     }
 
@@ -493,6 +509,8 @@ void GameplayState::Draw()
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, GAME_HEIGHT - 120.f }, 32.0f);
+
+    m_tutorial->Draw(*m_font, *m_fontShader);
 
     if (m_isDebugDraw)
     {
