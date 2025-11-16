@@ -16,7 +16,6 @@ class DebugRenderer;
 class Rooftop
 {
 public:
-
     static constexpr float WIDTH = 8400.0f;
     static constexpr float HEIGHT = 1080.0f;
 
@@ -34,12 +33,30 @@ public:
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
-    bool IsPlayerCloseToHole() const { return m_isPlayerClose; }
+
     void ClearAllDrones();
+    bool IsPlayerCloseToHole() const { return m_isPlayerClose; }
+    bool IsPlayerOnLift() const { return m_isPlayerOnLift; }
 
 private:
+    enum class LiftState
+    {
+        Idle,
+        Moving,
+        AtDestination
+    };
+
     std::unique_ptr<Background> m_background;
     std::unique_ptr<Background> m_closeBackground;
+
+    std::unique_ptr<Background> m_lift;
+    Math::Vec2 m_liftPos;
+    Math::Vec2 m_liftSize;
+    LiftState m_liftState = LiftState::Idle;
+    float m_liftTargetX = 0.0f;
+    float m_liftSpeed = 250.0f;
+    bool m_isPlayerOnLift = false;
+
     Math::Vec2 m_position;
     Math::Vec2 m_size;
     std::unique_ptr<DroneManager> m_droneManager;

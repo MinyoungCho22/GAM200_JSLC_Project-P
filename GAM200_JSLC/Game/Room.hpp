@@ -28,6 +28,8 @@ public:
 
     bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
 
+    bool IsPlayerInBlindArea() const { return m_playerInBlindArea; }
+
 private:
     std::unique_ptr<Background> m_background;
     std::unique_ptr<Background> m_brightBackground;
@@ -41,4 +43,6 @@ private:
     Math::Vec2 m_blindSize;
 
     bool m_isBright = false;
+
+    bool m_playerInBlindArea = false;
 };

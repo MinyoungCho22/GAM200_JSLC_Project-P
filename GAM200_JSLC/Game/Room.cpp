@@ -66,6 +66,7 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_blindPos = { blindTopLeftX + (blindWidth / 2.0f), blindBottomY - (blindHeight / 2.0f) };
     m_blindSize = { blindWidth, blindHeight };
     m_isBright = false;
+    m_playerInBlindArea = false;
 }
 
 void Room::Shutdown()
@@ -103,9 +104,9 @@ void Room::Update(Player& player, double dt, Input::Input& input)
         player.SetPosition({ centerPos.x, m_boundaries.top_right.y - halfSize.y });
     }
 
-    bool playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
+    m_playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
 
-    if (playerInBlindArea && input.IsKeyTriggered(Input::Key::F))
+    if (m_playerInBlindArea && input.IsKeyTriggered(Input::Key::F))
     {
         const float BLIND_TOGGLE_COST = 20.0f;
         Pulse& pulse = player.GetPulseCore().getPulse();
@@ -132,7 +133,7 @@ void Room::Draw(Shader& textureShader) const
     }
     else
     {
-        m_background->Draw(textureShader, bg_model);
+            m_background->Draw(textureShader, bg_model);
     }
 }
 
@@ -148,8 +149,7 @@ void Room::DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::M
         renderer.DrawBox(colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
     }
 
-    bool playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
-    Math::Vec2 debugColor = playerInBlindArea ? Math::Vec2(1.0f, 1.0f) : Math::Vec2(0.5f, 1.0f);
+    Math::Vec2 debugColor = m_playerInBlindArea ? Math::Vec2(1.0f, 1.0f) : Math::Vec2(0.5f, 1.0f);
     renderer.DrawBox(colorShader, m_blindPos, m_blindSize, debugColor);
 }
 

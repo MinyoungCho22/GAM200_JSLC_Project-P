@@ -1,3 +1,5 @@
+//TraceSystem.cpp
+
 #include "TraceSystem.hpp"
 #include "DroneManager.hpp"
 #include "../Engine/Logger.hpp"
@@ -41,7 +43,7 @@ void TraceSystem::SpawnTracerWave(DroneManager& droneManager, int warningLevel)
         droneManager.SpawnDrone({ 1830.0f, 300.0f }, "Asset/drone.png", true).SetBaseSpeed(100.0f);
         droneManager.SpawnDrone({ 1820.0f, 500.0f }, "Asset/drone.png", true).SetBaseSpeed(150.0f);
         droneManager.SpawnDrone({ 1810.0f, 600.0f }, "Asset/drone.png", true).SetBaseSpeed(200.0f);
-        droneManager.SpawnDrone({ 1800.0f, 400.0f }, "Asset/drone.png", true).SetBaseSpeed(120.0f); // 추가
-        droneManager.SpawnDrone({ 1790.0f, 700.0f }, "Asset/drone.png", true).SetBaseSpeed(180.0f); // 추가
+        droneManager.SpawnDrone({ 1800.0f, 400.0f }, "Asset/drone.png", true).SetBaseSpeed(120.0f);
+        droneManager.SpawnDrone({ 1790.0f, 700.0f }, "Asset/drone.png", true).SetBaseSpeed(180.0f);
     }
 }

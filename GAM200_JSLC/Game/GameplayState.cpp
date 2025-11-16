@@ -94,7 +94,12 @@ void GameplayState::Initialize()
         m_tutorial->AddHidingSpotMessage(*m_font, *m_fontShader, spot.pos, spot.size);
     }
 
+    m_tutorial->AddBlindMessage(*m_font, *m_fontShader);
     m_tutorial->AddHoleMessage(*m_font, *m_fontShader);
+    m_tutorial->AddRoomDoorMessage(*m_font, *m_fontShader);
+    m_tutorial->AddRooftopDoorMessage(*m_font, *m_fontShader);
+    m_tutorial->AddDroneCrashMessage(*m_font, *m_fontShader);
+    m_tutorial->AddLiftMessage(*m_font, *m_fontShader); // ★ 추가
 
     m_fpsTimer = 0.0;
     m_frameCount = 0;
@@ -123,7 +128,7 @@ void GameplayState::Update(double dt)
         m_isDebugDraw = !m_isDebugDraw;
     }
 
-    m_tutorial->Update(static_cast<float>(dt), player, input, m_hallway.get(), m_rooftop.get());
+    m_tutorial->Update(static_cast<float>(dt), player, input, m_room.get(), m_hallway.get(), m_rooftop.get(), m_door.get(), m_rooftopDoor.get());
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();

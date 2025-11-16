@@ -18,6 +18,24 @@ void Rooftop::Initialize()
     m_closeBackground = std::make_unique<Background>();
     m_closeBackground->Initialize("Asset/Rooftop_Close.png");
 
+    m_lift = std::make_unique<Background>();
+    m_lift->Initialize("Asset/Lift.png");
+
+    float liftWidth = 351.f;
+    float liftHeight = 345.f;
+    float liftTopLeftX = 13745.f;
+    float liftTopY = 1799.f;
+
+    m_liftPos = { liftTopLeftX + (liftWidth / 2.0f), liftTopY - (liftHeight / 2.0f) };
+    m_liftSize = { liftWidth, liftHeight };
+
+    float targetLeftEdgeX = 14928.0f;
+    m_liftTargetX = targetLeftEdgeX + (liftWidth / 2.0f);
+
+    m_liftState = LiftState::Idle;
+    m_isPlayerOnLift = false;
+    m_liftSpeed = 250.0f;
+
     m_size = { WIDTH, HEIGHT };
     m_position = { MIN_X + WIDTH / 2.0f, MIN_Y + HEIGHT / 2.0f };
 
@@ -31,43 +49,121 @@ void Rooftop::Initialize()
     m_debugBoxPos = { topLeftX + (width / 2.0f), game_Y_top - (height / 2.0f) };
     m_debugBoxSize = { width, height };
 
+    // Pulse Source 1
+    float pulseWidth1 = 333.f;
+    float pulseHeight1 = 240.f;
+    float pulseTopLeftX1 = 12521.f;
+    float pulseTopLeftY1 = 1700.f;
+    Math::Vec2 pulseCenter1 = { pulseTopLeftX1 + (pulseWidth1 / 2.0f), pulseTopLeftY1 - (pulseHeight1 / 2.0f) };
+    m_pulseSources.emplace_back();
+    m_pulseSources.back().Initialize(pulseCenter1, { pulseWidth1, pulseHeight1 }, 100.f);
+
+    // Pulse Source 2
+    float pulseWidth2 = 333.f;
+    float pulseHeight2 = 240.f;
+    float pulseTopLeftX2 = 12900.f;
+    float pulseTopLeftY2 = 1700.f;
+    Math::Vec2 pulseCenter2 = { pulseTopLeftX2 + (pulseWidth2 / 2.0f), pulseTopLeftY2 - (pulseHeight2 / 2.0f) };
+    m_pulseSources.emplace_back();
+    m_pulseSources.back().Initialize(pulseCenter2, { pulseWidth2, pulseHeight2 }, 100.f);
+
     m_isClose = false;
     m_isPlayerClose = false;
 }
 
 void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input)
 {
+    float oldLiftX = m_liftPos.x;
     Math::Vec2 playerPos = player.GetPosition();
-    Math::Vec2 playerHalfSize = playerHitboxSize / 2.0f;
-    Math::Vec2 playerMin = playerPos - playerHalfSize;
-    Math::Vec2 playerMax = playerPos + playerHalfSize;
 
-    Math::Vec2 boxHalfSize = m_debugBoxSize / 2.0f;
-    Math::Vec2 boxMin = m_debugBoxPos - boxHalfSize;
-    Math::Vec2 boxMax = m_debugBoxPos + boxHalfSize;
-    Math::Vec2 closestPointOnBox;
-    closestPointOnBox.x = std::clamp(playerPos.x, boxMin.x, boxMax.x);
-    closestPointOnBox.y = std::clamp(playerPos.y, boxMin.y, boxMax.y);
+    bool isPlayerInRooftop = (playerPos.y >= MIN_Y && playerPos.y <= MIN_Y + HEIGHT &&
+        playerPos.x >= MIN_X && playerPos.x <= MIN_X + WIDTH);
 
-    Math::Vec2 closestPointOnPlayer;
-    closestPointOnPlayer.x = std::clamp(closestPointOnBox.x, playerMin.x, playerMax.x);
-    closestPointOnPlayer.y = std::clamp(closestPointOnBox.y, playerMin.y, playerMax.y);
-
-    float distanceSq = (closestPointOnPlayer - closestPointOnBox).LengthSq();
-    const float PROXIMITY_RANGE_SQ = 100.0f * 100.0f;
-
-    m_isPlayerClose = (distanceSq <= PROXIMITY_RANGE_SQ);
-
-    if (m_isPlayerClose && input.IsKeyTriggered(Input::Key::F) && !m_isClose)
+    if (!isPlayerInRooftop)
     {
-        const float INTERACT_COST = 20.0f;
-        Pulse& pulse = player.GetPulseCore().getPulse();
+        return;
+    }
 
-        if (pulse.Value() >= INTERACT_COST)
+    {
+        Math::Vec2 playerHalfSize = playerHitboxSize / 2.0f;
+        Math::Vec2 playerMin = playerPos - playerHalfSize;
+        Math::Vec2 playerMax = playerPos + playerHalfSize;
+
+        Math::Vec2 boxHalfSize = m_debugBoxSize / 2.0f;
+        Math::Vec2 boxMin = m_debugBoxPos - boxHalfSize;
+        Math::Vec2 boxMax = m_debugBoxPos + boxHalfSize;
+        Math::Vec2 closestPointOnBox;
+        closestPointOnBox.x = std::clamp(playerPos.x, boxMin.x, boxMax.x);
+        closestPointOnBox.y = std::clamp(playerPos.y, boxMin.y, boxMax.y);
+
+        Math::Vec2 closestPointOnPlayer;
+        closestPointOnPlayer.x = std::clamp(closestPointOnBox.x, playerMin.x, playerMax.x);
+        closestPointOnPlayer.y = std::clamp(closestPointOnBox.y, playerMin.y, playerMax.y);
+
+        float distanceSq = (closestPointOnPlayer - closestPointOnBox).LengthSq();
+        const float PROXIMITY_RANGE_SQ = 100.0f * 100.0f;
+
+        m_isPlayerClose = (distanceSq <= PROXIMITY_RANGE_SQ);
+
+        if (m_isPlayerClose && input.IsKeyTriggered(Input::Key::F) && !m_isClose)
         {
-            pulse.spend(INTERACT_COST);
-            m_isClose = true;
+            const float INTERACT_COST = 10.0f;
+            Pulse& pulse = player.GetPulseCore().getPulse();
+
+            if (pulse.Value() >= INTERACT_COST)
+            {
+                pulse.spend(INTERACT_COST);
+                m_isClose = true;
+            }
         }
+    }
+
+    m_isPlayerOnLift = Collision::CheckAABB(player.GetPosition(), playerHitboxSize, m_liftPos, m_liftSize);
+
+    if (m_liftState == LiftState::Idle)
+    {
+        if (m_isPlayerOnLift && input.IsKeyTriggered(Input::Key::F))
+        {
+            const float LIFT_COST = 10.0f;
+            Pulse& pulse = player.GetPulseCore().getPulse();
+
+            if (pulse.Value() >= LIFT_COST)
+            {
+                pulse.spend(LIFT_COST);
+                m_liftState = LiftState::Moving;
+            }
+        }
+    }
+    else if (m_liftState == LiftState::Moving)
+    {
+        m_liftPos.x += m_liftSpeed * static_cast<float>(dt);
+
+        if (m_liftPos.x >= m_liftTargetX)
+        {
+            m_liftPos.x = m_liftTargetX;
+            m_liftState = LiftState::AtDestination;
+        }
+    }
+
+    float deltaX = m_liftPos.x - oldLiftX;
+    if (deltaX > 0 && m_isPlayerOnLift)
+    {
+        player.SetPosition({ player.GetPosition().x + deltaX, player.GetPosition().y });
+    }
+
+    Math::Vec2 currentPlayerPos = player.GetPosition();
+    Math::Vec2 playerHalfSize = playerHitboxSize * 0.5f;
+
+    float leftBoundary = MIN_X;
+    if (currentPlayerPos.x - playerHalfSize.x < leftBoundary)
+    {
+        player.SetPosition({ leftBoundary + playerHalfSize.x, currentPlayerPos.y });
+    }
+
+    float rightBoundary = MIN_X + WIDTH;
+    if (currentPlayerPos.x + playerHalfSize.x > rightBoundary)
+    {
+        player.SetPosition({ rightBoundary - playerHalfSize.x, currentPlayerPos.y });
     }
 
     m_droneManager->Update(dt, player, playerHitboxSize, false);
@@ -87,6 +183,10 @@ void Rooftop::Draw(Shader& shader) const
         m_background->Draw(shader, model);
     }
 
+    Math::Matrix liftModel = Math::Matrix::CreateTranslation(m_liftPos) * Math::Matrix::CreateScale(m_liftSize);
+    shader.setMat4("model", liftModel);
+    m_lift->Draw(shader, liftModel);
+
     m_droneManager->Draw(shader);
 }
 
@@ -104,6 +204,10 @@ void Rooftop::Shutdown()
     if (m_closeBackground)
     {
         m_closeBackground->Shutdown();
+    }
+    if (m_lift)
+    {
+        m_lift->Shutdown();
     }
 
     for (auto& source : m_pulseSources)
@@ -125,6 +229,19 @@ void Rooftop::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
     }
     Math::Vec2 debugColor = m_isPlayerClose ? Math::Vec2(0.0f, 1.0f) : Math::Vec2(1.0f, 0.0f);
     debugRenderer.DrawBox(colorShader, m_debugBoxPos, m_debugBoxSize, debugColor);
+
+    Math::Vec2 liftDebugColor = m_isPlayerOnLift ? Math::Vec2(0.0f, 1.0f) : Math::Vec2(1.0f, 0.0f);
+    debugRenderer.DrawBox(colorShader, m_liftPos, m_liftSize, liftDebugColor);
+
+    float leftBoundary = MIN_X;
+    float rightBoundary = MIN_X + WIDTH;
+    float boundaryHeight = HEIGHT;
+    Math::Vec2 leftBoundaryPos = { leftBoundary, MIN_Y + boundaryHeight / 2.0f };
+    Math::Vec2 rightBoundaryPos = { rightBoundary, MIN_Y + boundaryHeight / 2.0f };
+    Math::Vec2 boundarySize = { 10.0f, boundaryHeight };
+
+    debugRenderer.DrawBox(colorShader, leftBoundaryPos, boundarySize, { 1.0f, 0.0f });
+    debugRenderer.DrawBox(colorShader, rightBoundaryPos, boundarySize, { 1.0f, 0.0f });
 }
 
 const std::vector<Drone>& Rooftop::GetDrones() const
