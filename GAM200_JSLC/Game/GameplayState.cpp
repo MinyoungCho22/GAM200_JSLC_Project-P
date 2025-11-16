@@ -89,16 +89,12 @@ void GameplayState::Initialize()
             roomPulseSources[0].GetSize());
     }
 
-    float widthHiding = 381.f;
-    float heightHiding = 324.f;
-    float topLeftXHiding = 2820.f;
-    float topLeftYHiding = 923.f;
-    float bottomYHiding = Hallway::HEIGHT - topLeftYHiding;
-    Math::Vec2 hidingSpotPos = {
-        topLeftXHiding + (widthHiding / 2.0f),
-        bottomYHiding + (heightHiding / 2.0f)
-    };
-    m_tutorial->AddHidingSpotMessage(*m_font, *m_fontShader, hidingSpotPos, { widthHiding, heightHiding });
+    for (const auto& spot : m_hallway->GetHidingSpots())
+    {
+        m_tutorial->AddHidingSpotMessage(*m_font, *m_fontShader, spot.pos, spot.size);
+    }
+
+    m_tutorial->AddHoleMessage(*m_font, *m_fontShader);
 
     m_fpsTimer = 0.0;
     m_frameCount = 0;
@@ -127,7 +123,7 @@ void GameplayState::Update(double dt)
         m_isDebugDraw = !m_isDebugDraw;
     }
 
-    m_tutorial->Update(static_cast<float>(dt), player, input, m_hallway.get());
+    m_tutorial->Update(static_cast<float>(dt), player, input, m_hallway.get(), m_rooftop.get());
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
@@ -278,7 +274,7 @@ void GameplayState::Update(double dt)
     }
 
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
-    m_rooftop->Update(dt, player, playerHitboxSize);
+    m_rooftop->Update(dt, player, playerHitboxSize, input);
 
     auto& hallwayDrones = m_hallway->GetDrones();
     for (auto& drone : hallwayDrones)

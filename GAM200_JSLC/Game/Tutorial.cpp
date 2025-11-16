@@ -1,8 +1,9 @@
-// Tutorial.cpp
+//Tutorial.cpp
 
 #include "Tutorial.hpp"
 #include "Player.hpp"
 #include "Hallway.hpp"
+#include "Rooftop.hpp"
 #include "../Engine/Input.hpp"       
 #include "../Engine/Collision.hpp"    
 #include "../OpenGL/Shader.hpp" 
@@ -24,6 +25,7 @@ void Tutorial::Init(Font& font, Shader& atlasShader, Math::Vec2 pursePosition, M
     msg.textPosition = { GAME_WIDTH / 2.0f - 250.0f, 100.0f };
     msg.textHeight = 50.0f;
     msg.isActive = false;
+    msg.type = TutorialMessage::Type::Collision;
 
     m_messages.push_back(msg);
 }
@@ -38,19 +40,52 @@ void Tutorial::AddHidingSpotMessage(Font& font, Shader& atlasShader, Math::Vec2 
     msg.textPosition = { GAME_WIDTH / 2.0f - 450.0f, 100.0f };
     msg.textHeight = 50.0f;
     msg.isActive = false;
+    msg.type = TutorialMessage::Type::Collision;
 
     m_messages.push_back(msg);
 }
 
-void Tutorial::Update(float dt, Player& player, const Input::Input& input, Hallway* hallway)
+void Tutorial::AddHoleMessage(Font& font, Shader& atlasShader)
+{
+    TutorialMessage msg;
+    msg.text = "Press the F key to fill the hole with pulses";
+    msg.texture = font.PrintToTexture(atlasShader, msg.text);
+    msg.textPosition = { GAME_WIDTH / 2.0f - 400.0f, 100.0f };
+    msg.textHeight = 50.0f;
+    msg.isActive = false;
+    msg.type = TutorialMessage::Type::RooftopHole;
+
+    m_messages.push_back(msg);
+}
+
+void Tutorial::Update(float dt, Player& player, const Input::Input& input, Hallway* hallway, Rooftop* rooftop)
 {
     Math::Vec2 playerPos = player.GetPosition();
     Math::Vec2 playerSize = player.GetHitboxSize();
 
     for (auto& msg : m_messages)
     {
-        bool isColliding = Collision::CheckAABB(playerPos, playerSize, msg.targetPosition, msg.targetSize);
-        msg.isActive = isColliding;
+        switch (msg.type)
+        {
+        case TutorialMessage::Type::Collision:
+        {
+            bool isColliding = Collision::CheckAABB(playerPos, playerSize, msg.targetPosition, msg.targetSize);
+            msg.isActive = isColliding;
+            break;
+        }
+        case TutorialMessage::Type::RooftopHole:
+        {
+            if (rooftop != nullptr)
+            {
+                msg.isActive = rooftop->IsPlayerCloseToHole();
+            }
+            else
+            {
+                msg.isActive = false;
+            }
+            break;
+        }
+        }
     }
 }
 

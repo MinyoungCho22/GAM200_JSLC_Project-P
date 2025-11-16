@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿//Hallway.hpp
+
+#pragma once
 #include "../Engine/Vec2.hpp"
 #include "PulseSource.hpp"
 #include "DroneManager.hpp"
@@ -13,6 +15,13 @@ class DebugRenderer;
 class Hallway
 {
 public:
+
+    struct HidingSpot
+    {
+        Math::Vec2 pos;
+        Math::Vec2 size;
+    };
+
     static constexpr float WIDTH = 5940.0f;
     static constexpr float HEIGHT = 1080.0f;
 
@@ -33,6 +42,7 @@ public:
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
 
+    const std::vector<HidingSpot>& GetHidingSpots() const;
     bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
 
 private:
@@ -41,9 +51,8 @@ private:
     Math::Vec2 m_size;
     std::vector<PulseSource> m_pulseSources;
     std::unique_ptr<DroneManager> m_droneManager;
+    std::vector<HidingSpot> m_hidingSpots;
 
-    Math::Vec2 m_hidingSpotPos;
-    Math::Vec2 m_hidingSpotSize;
     Math::Vec2 m_obstaclePos;
     Math::Vec2 m_obstacleSize;
 };

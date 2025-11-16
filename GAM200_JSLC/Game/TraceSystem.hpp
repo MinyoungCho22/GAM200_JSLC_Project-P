@@ -1,7 +1,5 @@
-//TraceSystem.hpp
-
 #pragma once
-#include <vector>
+#include <memory>
 
 class DroneManager;
 
@@ -12,7 +10,8 @@ public:
     void OnDroneKilled(DroneManager& droneManager);
 
 private:
-    void SpawnTracerWave(DroneManager& droneManager);
+    // warningLevel 파라미터 추가
+    void SpawnTracerWave(DroneManager& droneManager, int warningLevel);
 
     int m_killCount = 0;
     int m_warningLevel = 0;

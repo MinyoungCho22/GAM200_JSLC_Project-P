@@ -1,13 +1,14 @@
-// Rooftop.hpp
+//Rooftop.hpp
 
 #pragma once
-#include "../Engine/Vec2.hpp"
+#include "Background.hpp"
 #include "PulseSource.hpp"
 #include "DroneManager.hpp"
+#include "../Engine/Vec2.hpp"
+#include "../Engine/Input.hpp" 
 #include <memory>
 #include <vector>
 
-class Background;
 class Shader;
 class Player;
 class DebugRenderer;
@@ -15,32 +16,38 @@ class DebugRenderer;
 class Rooftop
 {
 public:
+
     static constexpr float WIDTH = 8400.0f;
     static constexpr float HEIGHT = 1080.0f;
-    static constexpr float MIN_X = 7860.0f;
+
+    static constexpr float MIN_X = 8130.0f;
     static constexpr float MIN_Y = 1080.0f;
 
     void Initialize();
-    void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
+    void Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input);
     void Draw(Shader& shader) const;
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
-    void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
-
-    Math::Vec2 GetPosition() const { return m_position; }
-    Math::Vec2 GetSize() const { return m_size; }
+    void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
 
     const std::vector<PulseSource>& GetPulseSources() const { return m_pulseSources; }
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
-
-    std::vector<Drone>& GetDrones();
     const std::vector<Drone>& GetDrones() const;
+    std::vector<Drone>& GetDrones();
+    bool IsPlayerCloseToHole() const { return m_isPlayerClose; }
     void ClearAllDrones();
 
 private:
     std::unique_ptr<Background> m_background;
+    std::unique_ptr<Background> m_closeBackground;
     Math::Vec2 m_position;
     Math::Vec2 m_size;
-    std::vector<PulseSource> m_pulseSources;
     std::unique_ptr<DroneManager> m_droneManager;
+    std::vector<PulseSource> m_pulseSources;
+
+    Math::Vec2 m_debugBoxPos;
+    Math::Vec2 m_debugBoxSize;
+
+    bool m_isClose = false;
+    bool m_isPlayerClose = false;
 };

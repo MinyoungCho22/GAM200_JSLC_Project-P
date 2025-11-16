@@ -1,4 +1,4 @@
-// Tutorial.hpp
+//Tutorial.hpp
 
 #pragma once
 #include <string>
@@ -11,9 +11,17 @@ class Player;
 class Shader;
 class Font;
 class Hallway;
+class Rooftop;
 
 struct TutorialMessage
 {
+    enum class Type
+    {
+        Collision,
+        RooftopHole
+    };
+
+    Type type = Type::Collision;
     std::string text;
     CachedTextureInfo texture;
     Math::Vec2 targetPosition;
@@ -29,7 +37,8 @@ public:
     Tutorial();
     void Init(Font& font, Shader& atlasShader, Math::Vec2 pursePosition, Math::Vec2 purseSize);
     void AddHidingSpotMessage(Font& font, Shader& atlasShader, Math::Vec2 hidingSpotPos, Math::Vec2 hidingSpotSize);
-    void Update(float dt, Player& player, const Input::Input& input, Hallway* hallway = nullptr);
+    void AddHoleMessage(Font& font, Shader& atlasShader);
+    void Update(float dt, Player& player, const Input::Input& input, Hallway* hallway = nullptr, Rooftop* rooftop = nullptr);
     void Draw(Font& font, Shader& textureShader);
 
 private:

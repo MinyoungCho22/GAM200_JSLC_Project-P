@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿//Room.hpp
+
+#pragma once
 #include "Background.hpp"
 #include "PulseSource.hpp"
 #include "../Engine/Rect.hpp"

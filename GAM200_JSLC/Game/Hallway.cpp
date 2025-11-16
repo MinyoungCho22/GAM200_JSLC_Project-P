@@ -1,4 +1,6 @@
-﻿#include "Hallway.hpp"
+﻿//Hallway.cpp
+
+#include "Hallway.hpp"
 #include "Background.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -34,11 +36,23 @@ void Hallway::Initialize()
     float topLeftX2 = 2820.f;
     float topLeftY2 = 923.f;
     float bottomY2 = HEIGHT - topLeftY2;
-    m_hidingSpotPos = {
+    Math::Vec2 center2 = {
         topLeftX2 + (width2 / 2.0f),
         bottomY2 + (height2 / 2.0f)
     };
-    m_hidingSpotSize = { width2, height2 };
+    m_hidingSpots.emplace_back(HidingSpot{ center2, {width2, height2} });
+
+    float width_hs2 = 381.f;
+    float height_hs2 = 324.f;
+    float topLeftX_hs2 = 5620.f;
+    float topLeftY_hs2 = 923.f;
+    float bottomY_hs2 = HEIGHT - topLeftY_hs2;
+    Math::Vec2 center_hs2 = {
+        topLeftX_hs2 + (width_hs2 / 2.0f),
+        bottomY_hs2 + (height_hs2 / 2.0f)
+    };
+    m_hidingSpots.emplace_back(HidingSpot{ center_hs2, {width_hs2, height_hs2} });
+
 
     float width3 = 369.f;
     float height3 = 645.f;
@@ -54,6 +68,7 @@ void Hallway::Initialize()
 
     m_droneManager = std::make_unique<DroneManager>();
     m_droneManager->SpawnDrone({ 2500.0f, 400.0f }, "Asset/drone.png");
+    m_droneManager->SpawnDrone({ 5500.0f, 400.0f }, "Asset/drone.png");
 }
 
 
@@ -169,6 +184,11 @@ std::vector<PulseSource>& Hallway::GetPulseSources()
     return m_pulseSources;
 }
 
+const std::vector<Hallway::HidingSpot>& Hallway::GetHidingSpots() const
+{
+    return m_hidingSpots;
+}
+
 bool Hallway::IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const
 {
     if (!isPlayerCrouching)
@@ -176,11 +196,22 @@ bool Hallway::IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, 
         return false;
     }
 
-    return Collision::CheckAABB(playerPos, playerHitboxSize, m_hidingSpotPos, m_hidingSpotSize);
+    for (const auto& spot : m_hidingSpots)
+    {
+        if (Collision::CheckAABB(playerPos, playerHitboxSize, spot.pos, spot.size))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void Hallway::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
-    debugRenderer.DrawBox(colorShader, m_hidingSpotPos, m_hidingSpotSize, { 0.3f, 1.0f });
+    for (const auto& spot : m_hidingSpots)
+    {
+        debugRenderer.DrawBox(colorShader, spot.pos, spot.size, { 0.3f, 1.0f });
+    }
     debugRenderer.DrawBox(colorShader, m_obstaclePos, m_obstacleSize, { 1.0f, 0.0f });
 }

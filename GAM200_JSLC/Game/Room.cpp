@@ -1,9 +1,12 @@
-﻿#include "Room.hpp"
+﻿//Room.cpp
+
+#include "Room.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "Player.hpp"
 #include "../Engine/DebugRenderer.hpp"
 #include "../Engine/Collision.hpp"
+#include "../Game/PulseCore.hpp"
 
 constexpr float ROOM_WIDTH = 1620.0f;
 constexpr float ROOM_HEIGHT = 780.0f;
@@ -30,7 +33,6 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_roomSize = { ROOM_WIDTH, ROOM_HEIGHT };
     m_roomCenter = { minX + ROOM_WIDTH / 2.0f, minY + ROOM_HEIGHT / 2.0f };
 
-    // Pulse Source 1
     float width1 = 51.f;
     float height1 = 63.f;
     float topLeftX1 = 424.f;
@@ -39,7 +41,6 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_pulseSources.emplace_back();
     m_pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
 
-    // Pulse Source 2
     float width2 = 215.f;
     float height2 = 180.f;
     float topLeftX2 = 692.f;
@@ -48,7 +49,6 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_pulseSources.emplace_back();
     m_pulseSources.back().Initialize(center2, { width2, height2 }, 100.f);
 
-    // Pulse Source 3
     float width3 = 75.f;
     float height3 = 33.f;
     float topLeftX3 = 1414.f;
@@ -57,7 +57,6 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_pulseSources.emplace_back();
     m_pulseSources.back().Initialize(center3, { width3, height3 }, 100.f);
 
-    // 블라인드 위치/크기 설정
     float blindWidth = 310.f;
     float blindHeight = 300.f;
     float blindTopLeftX = 1105.f;
@@ -108,7 +107,14 @@ void Room::Update(Player& player, double dt, Input::Input& input)
 
     if (playerInBlindArea && input.IsKeyTriggered(Input::Key::F))
     {
-        m_isBright = !m_isBright;
+        const float BLIND_TOGGLE_COST = 20.0f;
+        Pulse& pulse = player.GetPulseCore().getPulse();
+
+        if (pulse.Value() >= BLIND_TOGGLE_COST)
+        {
+            pulse.spend(BLIND_TOGGLE_COST);
+            m_isBright = !m_isBright;
+        }
     }
 }
 
