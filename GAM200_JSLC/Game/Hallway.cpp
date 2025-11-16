@@ -21,7 +21,7 @@ void Hallway::Initialize()
 
     float width1 = 210.f;
     float height1 = 312.f;
-    float topLeftX1 = 3879.f;
+    float topLeftX1 = 2456.f;
     float topLeftY1 = 708.f;
     float bottomY1 = HEIGHT - topLeftY1;
     Math::Vec2 center1 = {

@@ -401,17 +401,17 @@ void GameplayState::Draw()
 
     if (playerPos.y >= Rooftop::MIN_Y)
     {
-        r = 1.0f; g = 1.0f; b = 1.0f; // White
+        r = 70.0f / 255.0f; g = 68.0f / 255.0f; b = 71.0f / 255.0f; // White
     }
     else
     {
         if (playerPos.x < GAME_WIDTH)
         {
-            r = 36.0f / 255.0f; g = 36.0f / 255.0f; b = 36.0f / 255.0f; // Room: Dark Gray
+            r = 12.0f / 255.0f; g = 12.0f / 255.0f; b = 12.0f / 255.0f; // Room: Dark Gray
         }
         else
         {
-            r = 1.0f; g = 1.0f; b = 1.0f; // White
+            r = 70.0f / 255.0f; g =  68.0f / 255.0f; b = 71.0f / 255.0f; // Rooftop
         }
     }
 
@@ -499,7 +499,7 @@ void GameplayState::Draw()
         colorShader->use();
         colorShader->setMat4("projection", projection);
 
-        Math::Vec2 playerCenter = player.GetPosition();
+        Math::Vec2 playerCenter = player.GetHitboxCenter();
         m_debugRenderer->DrawCircle(*colorShader, playerCenter, ATTACK_RANGE, { 1.0f, 0.0f });
 
         Math::Vec2 playerHitboxSize = player.GetHitboxSize();

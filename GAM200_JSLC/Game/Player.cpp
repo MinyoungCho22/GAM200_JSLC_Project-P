@@ -1,5 +1,4 @@
 ﻿//Player.cpp
-
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -102,6 +101,7 @@ void Player::Init(Math::Vec2 startPos)
 
     LoadAnimation(AnimationState::Idle, "Asset/player_Idle.png", 10, 0.1f);
     LoadAnimation(AnimationState::Walking, "Asset/player_Walking.png", 7, 0.1f);
+    LoadAnimation(AnimationState::Crouching, "Asset/player_Crouch.png", 2, 0.1f);
 
     AnimationData& walkAnim = m_animations[static_cast<int>(AnimationState::Walking)];
     float desiredWidth = 240.0f;
@@ -179,9 +179,24 @@ void Player::Update(double dt, Input::Input& input)
 
     if (is_crouching)
     {
-        m_currentAnimState = AnimationState::Idle;
-        m_animations[static_cast<int>(AnimationState::Idle)].currentFrame = 2;
-        m_animations[static_cast<int>(AnimationState::Idle)].timer = 0.0f;
+        m_currentAnimState = AnimationState::Crouching;
+
+        if (!m_crouchAnimationFinished)
+        {
+            m_animations[static_cast<int>(AnimationState::Crouching)].Update(static_cast<float>(dt));
+
+            if (m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame >= 1)
+            {
+                m_crouchAnimationFinished = true;
+                m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame = 1;
+                m_animations[static_cast<int>(AnimationState::Crouching)].timer = 0.0f;
+            }
+        }
+        else
+        {
+            m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame = 1;
+            m_animations[static_cast<int>(AnimationState::Crouching)].timer = 0.0f;
+        }
     }
     else if (!is_on_ground)
     {
@@ -203,7 +218,6 @@ void Player::Update(double dt, Input::Input& input)
     velocity.x = 0;
 }
 
-
 void Player::Draw(const Shader& shader) const
 {
     if (m_isInvincible && !IsDead())
@@ -215,13 +229,24 @@ void Player::Draw(const Shader& shader) const
     }
 
     Math::Vec2 drawSize = size;
-    if (m_currentAnimState == AnimationState::Idle)
+    Math::Vec2 drawPosition = position;
+
+    if (m_currentAnimState == AnimationState::Crouching)
+    {
+        float oldHeight = drawSize.y;
+        drawSize.x *= 0.7f;
+        drawSize.y *= 0.7f;
+
+        float heightDiff = oldHeight - drawSize.y;
+        drawPosition.y -= heightDiff / 2.0f;
+    }
+    else if (m_currentAnimState == AnimationState::Idle)
     {
         drawSize.x *= 0.7f;
     }
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(drawSize);
-    Math::Matrix transMatrix = Math::Matrix::CreateTranslation(position);
+    Math::Matrix transMatrix = Math::Matrix::CreateTranslation(drawPosition);
     Math::Matrix model = transMatrix * scaleMatrix;
 
     shader.use();
@@ -273,7 +298,33 @@ void Player::TakeDamage(float amount)
 
 Math::Vec2 Player::GetHitboxSize() const
 {
-    return { size.x * 0.4f, size.y * 0.8f + 50.0f };
+    if (is_crouching)
+    {
+        return { size.x * 0.4f, size.y * 0.5f };
+    }
+    else
+    {
+        return { size.x * 0.4f, size.y * 0.8f + 50.0f };
+    }
+}
+
+Math::Vec2 Player::GetHitboxCenter() const
+{
+    if (is_crouching)
+    {
+        // 발 위치 계산 (항상 동일)
+        float footY = position.y - (size.y / 2.0f);
+
+        // 앉았을 때 히트박스 높이
+        float crouchedHitboxHeight = size.y * 0.5f;
+
+        // 발 위치 + 히트박스 절반 = 히트박스 중심
+        return { position.x, footY + (crouchedHitboxHeight / 2.0f) };
+    }
+    else
+    {
+        return position;
+    }
 }
 
 void Player::MoveLeft()
@@ -305,15 +356,12 @@ void Player::Crouch()
 {
     if (is_on_ground && !is_dashing && !is_crouching)
     {
-        float oldHeight = size.y;
-        size.y = original_size.y * 0.6f;
-        float heightDiff = oldHeight - size.y;
-        position.y -= heightDiff / 2.0f;
         is_crouching = true;
+        m_crouchAnimationFinished = false;
 
-        m_currentAnimState = AnimationState::Idle;
-        m_animations[static_cast<int>(AnimationState::Idle)].currentFrame = 2;
-        m_animations[static_cast<int>(AnimationState::Idle)].timer = 0.0f;
+        m_currentAnimState = AnimationState::Crouching;
+        m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame = 0;
+        m_animations[static_cast<int>(AnimationState::Crouching)].timer = 0.0f;
     }
 }
 
@@ -321,11 +369,8 @@ void Player::StopCrouch()
 {
     if (is_crouching)
     {
-        float oldHeight = size.y;
-        size.y = original_size.y;
-        float heightDiff = size.y - oldHeight;
-        position.y += heightDiff / 2.0f;
         is_crouching = false;
+        m_crouchAnimationFinished = false;
     }
 }
 
