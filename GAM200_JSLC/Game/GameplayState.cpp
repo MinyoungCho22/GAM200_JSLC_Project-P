@@ -401,7 +401,7 @@ void GameplayState::Draw()
 
     if (playerPos.y >= Rooftop::MIN_Y)
     {
-        r = 70.0f / 255.0f; g = 68.0f / 255.0f; b = 71.0f / 255.0f; // White
+        r = 70.0f / 255.0f; g = 68.0f / 255.0f; b = 71.0f / 255.0f; // Hallway to Rooftop
     }
     else
     {

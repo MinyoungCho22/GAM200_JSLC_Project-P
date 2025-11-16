@@ -1,4 +1,5 @@
 ﻿//Player.cpp
+
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -312,13 +313,8 @@ Math::Vec2 Player::GetHitboxCenter() const
 {
     if (is_crouching)
     {
-        // 발 위치 계산 (항상 동일)
         float footY = position.y - (size.y / 2.0f);
-
-        // 앉았을 때 히트박스 높이
         float crouchedHitboxHeight = size.y * 0.5f;
-
-        // 발 위치 + 히트박스 절반 = 히트박스 중심
         return { position.x, footY + (crouchedHitboxHeight / 2.0f) };
     }
     else
