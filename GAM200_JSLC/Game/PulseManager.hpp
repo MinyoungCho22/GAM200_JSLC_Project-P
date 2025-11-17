@@ -33,7 +33,7 @@ private:
     bool m_isAttacking = false;
     bool m_isCharging = false;
     float m_vfxTimer = 0.0f;
-
+    double m_logTimer = 0.0;
     Math::Vec2 m_attackStartPos;
     Math::Vec2 m_attackEndPos;
 

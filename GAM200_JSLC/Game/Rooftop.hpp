@@ -8,6 +8,7 @@
 #include "../Engine/Input.hpp" 
 #include <memory>
 #include <vector>
+#include <string>
 
 class Shader;
 class Player;
@@ -18,7 +19,6 @@ class Rooftop
 public:
     static constexpr float WIDTH = 8400.0f;
     static constexpr float HEIGHT = 1080.0f;
-
     static constexpr float MIN_X = 8130.0f;
     static constexpr float MIN_Y = 1080.0f;
 
@@ -33,32 +33,40 @@ public:
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
-
     void ClearAllDrones();
+
     bool IsPlayerCloseToHole() const { return m_isPlayerClose; }
-    bool IsPlayerOnLift() const { return m_isPlayerOnLift; }
+    bool IsPlayerNearLift() const { return m_isPlayerNearLift; }
+    std::string GetLiftCountdownText() const;
 
 private:
     enum class LiftState
     {
         Idle,
+        Countdown,
         Moving,
         AtDestination
     };
 
     std::unique_ptr<Background> m_background;
     std::unique_ptr<Background> m_closeBackground;
-
     std::unique_ptr<Background> m_lift;
+
     Math::Vec2 m_liftPos;
     Math::Vec2 m_liftSize;
+    float m_liftInitialX = 0.0f;
+
     LiftState m_liftState = LiftState::Idle;
     float m_liftTargetX = 0.0f;
     float m_liftSpeed = 250.0f;
-    bool m_isPlayerOnLift = false;
+    float m_liftCountdown = 3.0f;
+    float m_liftDirection = 1.0f;
+    bool m_isPlayerNearLift = false;
+    bool m_isLiftActivated = false;
 
     Math::Vec2 m_position;
     Math::Vec2 m_size;
+
     std::unique_ptr<DroneManager> m_droneManager;
     std::vector<PulseSource> m_pulseSources;
 

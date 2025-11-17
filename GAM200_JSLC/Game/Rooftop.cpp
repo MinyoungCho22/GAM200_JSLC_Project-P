@@ -10,6 +10,7 @@
 #include "../Engine/Logger.hpp"
 #include "../Engine/DebugRenderer.hpp"
 #include <algorithm>
+#include <cmath>
 
 void Rooftop::Initialize()
 {
@@ -28,13 +29,17 @@ void Rooftop::Initialize()
 
     m_liftPos = { liftTopLeftX + (liftWidth / 2.0f), liftTopY - (liftHeight / 2.0f) };
     m_liftSize = { liftWidth, liftHeight };
+    m_liftInitialX = m_liftPos.x;
 
     float targetLeftEdgeX = 14928.0f;
     m_liftTargetX = targetLeftEdgeX + (liftWidth / 2.0f);
 
     m_liftState = LiftState::Idle;
-    m_isPlayerOnLift = false;
+    m_isPlayerNearLift = false;
     m_liftSpeed = 250.0f;
+    m_liftCountdown = 3.0f;
+    m_isLiftActivated = false;
+    m_liftDirection = 1.0f;
 
     m_size = { WIDTH, HEIGHT };
     m_position = { MIN_X + WIDTH / 2.0f, MIN_Y + HEIGHT / 2.0f };
@@ -118,11 +123,33 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         }
     }
 
-    m_isPlayerOnLift = Collision::CheckAABB(player.GetPosition(), playerHitboxSize, m_liftPos, m_liftSize);
+    {
+        Math::Vec2 playerHalfSize = playerHitboxSize / 2.0f;
+        Math::Vec2 liftHalfSize = m_liftSize / 2.0f;
+
+        Math::Vec2 liftMin = m_liftPos - liftHalfSize;
+        Math::Vec2 liftMax = m_liftPos + liftHalfSize;
+
+        Math::Vec2 closestPointOnLift;
+        closestPointOnLift.x = std::clamp(playerPos.x, liftMin.x, liftMax.x);
+        closestPointOnLift.y = std::clamp(playerPos.y, liftMin.y, liftMax.y);
+
+        Math::Vec2 playerMin = playerPos - playerHalfSize;
+        Math::Vec2 playerMax = playerPos + playerHalfSize;
+
+        Math::Vec2 closestPointOnPlayer;
+        closestPointOnPlayer.x = std::clamp(closestPointOnLift.x, playerMin.x, playerMax.x);
+        closestPointOnPlayer.y = std::clamp(closestPointOnLift.y, playerMin.y, playerMax.y);
+
+        float distanceSq = (closestPointOnPlayer - closestPointOnLift).LengthSq();
+        const float LIFT_PROXIMITY_RANGE_SQ = 150.0f * 150.0f;
+
+        m_isPlayerNearLift = (distanceSq <= LIFT_PROXIMITY_RANGE_SQ) && (m_liftState == LiftState::Idle);
+    }
 
     if (m_liftState == LiftState::Idle)
     {
-        if (m_isPlayerOnLift && input.IsKeyTriggered(Input::Key::F))
+        if (m_isPlayerNearLift && input.IsKeyTriggered(Input::Key::F))
         {
             const float LIFT_COST = 10.0f;
             Pulse& pulse = player.GetPulseCore().getPulse();
@@ -130,25 +157,76 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
             if (pulse.Value() >= LIFT_COST)
             {
                 pulse.spend(LIFT_COST);
-                m_liftState = LiftState::Moving;
+                m_liftState = LiftState::Countdown;
+                m_liftCountdown = 3.0f;
+                m_isLiftActivated = true;
+
+                if (m_liftPos.x < (m_liftInitialX + m_liftTargetX) / 2.0f)
+                {
+                    m_liftDirection = 1.0f;
+                }
+                else
+                {
+                    m_liftDirection = -1.0f;
+                }
+
+                Logger::Instance().Log(Logger::Severity::Event, "Lift activated! Countdown started.");
             }
+        }
+    }
+    else if (m_liftState == LiftState::Countdown)
+    {
+        m_liftCountdown -= static_cast<float>(dt);
+
+        if (m_liftCountdown <= 0.0f)
+        {
+            m_liftState = LiftState::Moving;
+            Logger::Instance().Log(Logger::Severity::Event, "Lift moving!");
         }
     }
     else if (m_liftState == LiftState::Moving)
     {
-        m_liftPos.x += m_liftSpeed * static_cast<float>(dt);
+        m_liftPos.x += m_liftSpeed * m_liftDirection * static_cast<float>(dt);
 
-        if (m_liftPos.x >= m_liftTargetX)
+        if (m_liftDirection > 0.0f)
         {
-            m_liftPos.x = m_liftTargetX;
-            m_liftState = LiftState::AtDestination;
+            if (m_liftPos.x >= m_liftTargetX)
+            {
+                m_liftPos.x = m_liftTargetX;
+                m_liftState = LiftState::AtDestination;
+            }
         }
+        else
+        {
+            if (m_liftPos.x <= m_liftInitialX)
+            {
+                m_liftPos.x = m_liftInitialX;
+                m_liftState = LiftState::AtDestination;
+            }
+        }
+    }
+    else if (m_liftState == LiftState::AtDestination)
+    {
+        m_liftState = LiftState::Idle;
+        m_isLiftActivated = false;
     }
 
     float deltaX = m_liftPos.x - oldLiftX;
-    if (deltaX > 0 && m_isPlayerOnLift)
+    if (m_isLiftActivated)
     {
-        player.SetPosition({ player.GetPosition().x + deltaX, player.GetPosition().y });
+        Math::Vec2 liftHalfSize = m_liftSize * 0.5f;
+        Math::Vec2 liftMin = m_liftPos - liftHalfSize;
+        Math::Vec2 liftMax = m_liftPos + liftHalfSize;
+
+        Math::Vec2 playerHalfSize = playerHitboxSize * 0.5f;
+        Math::Vec2 playerMin = playerPos - playerHalfSize;
+        Math::Vec2 playerMax = playerPos + playerHalfSize;
+
+        if (playerMax.x > liftMin.x && playerMin.x < liftMax.x &&
+            playerMax.y > liftMin.y && playerMin.y < liftMax.y)
+        {
+            player.SetPosition({ player.GetPosition().x + deltaX, player.GetPosition().y });
+        }
     }
 
     Math::Vec2 currentPlayerPos = player.GetPosition();
@@ -164,6 +242,82 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
     if (currentPlayerPos.x + playerHalfSize.x > rightBoundary)
     {
         player.SetPosition({ rightBoundary - playerHalfSize.x, currentPlayerPos.y });
+    }
+
+    if (!m_isClose)
+    {
+        Math::Vec2 holeHalfSize = m_debugBoxSize * 0.5f;
+        Math::Vec2 holeMin = m_debugBoxPos - holeHalfSize;
+        Math::Vec2 holeMax = m_debugBoxPos + holeHalfSize;
+
+        Math::Vec2 playerMin = currentPlayerPos - playerHalfSize;
+        Math::Vec2 playerMax = currentPlayerPos + playerHalfSize;
+
+        if (playerMax.x > holeMin.x && playerMin.x < holeMax.x &&
+            playerMax.y > holeMin.y && playerMin.y < holeMax.y)
+        {
+            float overlapLeft = playerMax.x - holeMin.x;
+            float overlapRight = holeMax.x - playerMin.x;
+            float overlapTop = playerMax.y - holeMin.y;
+            float overlapBottom = holeMax.y - playerMin.y;
+
+            float minOverlap = std::min({ overlapLeft, overlapRight, overlapTop, overlapBottom });
+
+            if (minOverlap == overlapLeft)
+            {
+                player.SetPosition({ holeMin.x - playerHalfSize.x, currentPlayerPos.y });
+            }
+            else if (minOverlap == overlapRight)
+            {
+                player.SetPosition({ holeMax.x + playerHalfSize.x, currentPlayerPos.y });
+            }
+            else if (minOverlap == overlapTop)
+            {
+                player.SetPosition({ currentPlayerPos.x, holeMin.y - playerHalfSize.y });
+            }
+            else if (minOverlap == overlapBottom)
+            {
+                player.SetPosition({ currentPlayerPos.x, holeMax.y + playerHalfSize.y });
+            }
+        }
+    }
+
+    if (!m_isLiftActivated)
+    {
+        Math::Vec2 liftHalfSize = m_liftSize * 0.5f;
+        Math::Vec2 liftMin = m_liftPos - liftHalfSize;
+        Math::Vec2 liftMax = m_liftPos + liftHalfSize;
+
+        Math::Vec2 playerMin = currentPlayerPos - playerHalfSize;
+        Math::Vec2 playerMax = currentPlayerPos + playerHalfSize;
+
+        if (playerMax.x > liftMin.x && playerMin.x < liftMax.x &&
+            playerMax.y > liftMin.y && playerMin.y < liftMax.y)
+        {
+            float overlapLeft = playerMax.x - liftMin.x;
+            float overlapRight = liftMax.x - playerMin.x;
+            float overlapTop = playerMax.y - liftMin.y;
+            float overlapBottom = liftMax.y - playerMin.y;
+
+            float minOverlap = std::min({ overlapLeft, overlapRight, overlapTop, overlapBottom });
+
+            if (minOverlap == overlapLeft)
+            {
+                player.SetPosition({ liftMin.x - playerHalfSize.x, currentPlayerPos.y });
+            }
+            else if (minOverlap == overlapRight)
+            {
+                player.SetPosition({ liftMax.x + playerHalfSize.x, currentPlayerPos.y });
+            }
+            else if (minOverlap == overlapTop)
+            {
+                player.SetPosition({ currentPlayerPos.x, liftMin.y - playerHalfSize.y });
+            }
+            else if (minOverlap == overlapBottom)
+            {
+                player.SetPosition({ currentPlayerPos.x, liftMax.y + playerHalfSize.y });
+            }
+        }
     }
 
     m_droneManager->Update(dt, player, playerHitboxSize, false);
@@ -230,7 +384,7 @@ void Rooftop::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
     Math::Vec2 debugColor = m_isPlayerClose ? Math::Vec2(0.0f, 1.0f) : Math::Vec2(1.0f, 0.0f);
     debugRenderer.DrawBox(colorShader, m_debugBoxPos, m_debugBoxSize, debugColor);
 
-    Math::Vec2 liftDebugColor = m_isPlayerOnLift ? Math::Vec2(0.0f, 1.0f) : Math::Vec2(1.0f, 0.0f);
+    Math::Vec2 liftDebugColor = m_isPlayerNearLift ? Math::Vec2(0.0f, 1.0f) : Math::Vec2(1.0f, 0.0f);
     debugRenderer.DrawBox(colorShader, m_liftPos, m_liftSize, liftDebugColor);
 
     float leftBoundary = MIN_X;
@@ -257,4 +411,14 @@ std::vector<Drone>& Rooftop::GetDrones()
 void Rooftop::ClearAllDrones()
 {
     m_droneManager->ClearAllDrones();
+}
+
+std::string Rooftop::GetLiftCountdownText() const
+{
+    if (m_liftState == LiftState::Countdown)
+    {
+        int seconds = static_cast<int>(std::ceil(m_liftCountdown));
+        return std::to_string(seconds) + " seconds before operation";
+    }
+    return "";
 }

@@ -21,7 +21,6 @@ public:
     void spend(float amount) {
         if (amount <= 0.f) return;
 
-        // [수정] 펄스가 부족해도 0까지 소모하도록 변경
         pulse_value -= amount;
         if (pulse_value < 0.0f)
         {

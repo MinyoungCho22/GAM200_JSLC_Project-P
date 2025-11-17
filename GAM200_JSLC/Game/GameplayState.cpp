@@ -14,7 +14,8 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
-#include <algorithm> 
+#include <algorithm>
+#include <cmath>
 
 constexpr float GROUND_LEVEL = 180.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
@@ -99,7 +100,7 @@ void GameplayState::Initialize()
     m_tutorial->AddRoomDoorMessage(*m_font, *m_fontShader);
     m_tutorial->AddRooftopDoorMessage(*m_font, *m_fontShader);
     m_tutorial->AddDroneCrashMessage(*m_font, *m_fontShader);
-    m_tutorial->AddLiftMessage(*m_font, *m_fontShader); // ★ 추가
+    m_tutorial->AddLiftMessage(*m_font, *m_fontShader);
 
     m_fpsTimer = 0.0;
     m_frameCount = 0;
@@ -492,6 +493,13 @@ void GameplayState::Draw()
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, GAME_HEIGHT - 120.f }, 32.0f);
+
+    std::string countdownText = m_rooftop->GetLiftCountdownText();
+    if (!countdownText.empty())
+    {
+        CachedTextureInfo countdownTexture = m_font->PrintToTexture(*m_fontShader, countdownText);
+        m_font->DrawBakedText(*m_fontShader, countdownTexture, { GAME_WIDTH / 2.0f - 250.0f, 100.0f }, 50.0f);
+    }
 
     m_tutorial->Draw(*m_font, *m_fontShader);
 

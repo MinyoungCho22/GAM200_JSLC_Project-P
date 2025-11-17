@@ -78,6 +78,8 @@ void PulseManager::Initialize()
     GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     GL::EnableVertexAttribArray(1);
     GL::BindVertexArray(0);
+
+    m_logTimer = 0.0;
 }
 
 void PulseManager::Shutdown()
@@ -107,6 +109,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     bool is_interact_key_pressed, double dt)
 {
     m_vfxTimer += static_cast<float>(dt);
+    m_logTimer += dt;
 
     PulseSource* closest_source = nullptr;
     float closest_dist_sq = -1.0f;
@@ -144,7 +147,12 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     if (result.charged && closest_source != nullptr)
     {
         closest_source->Drain(result.delta);
-        Logger::Instance().Log(Logger::Severity::Debug, "Charging pulse! Amount: %f", result.delta);
+
+        if (m_logTimer >= 2.0)
+        {
+            Logger::Instance().Log(Logger::Severity::Debug, "Charging pulse! Amount: %f", result.delta);
+            m_logTimer -= 2.0;
+        }
 
         m_isCharging = true;
         m_chargeStartPos = closest_source->GetPosition();

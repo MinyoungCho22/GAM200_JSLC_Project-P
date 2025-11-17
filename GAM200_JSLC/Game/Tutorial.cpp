@@ -219,7 +219,7 @@ void Tutorial::Update(float dt, Player& player, const Input::Input& input, Room*
             }
             case TutorialMessage::Type::LiftInteraction:
             {
-                msg.isActive = (rooftop != nullptr) && rooftop->IsPlayerOnLift();
+                msg.isActive = (rooftop != nullptr) && rooftop->IsPlayerNearLift();
                 break;
             }
             default:
