@@ -1,6 +1,4 @@
-﻿//Drone.hpp
-
-#pragma once
+﻿#pragma once
 #include "../Engine/Vec2.hpp"
 
 class Shader;
@@ -59,7 +57,7 @@ private:
     bool m_isAttacking = false;
     bool m_shouldDealDamage = false;
     float m_attackCooldown = 0.0f;
-    const float m_attackCooldownDuration = 1.0f;
+    const float m_attackCooldownDuration = 2.0f;
     float m_attackTimer = 0.0f;
     const float m_attackDuration = 1.0f;
     Math::Vec2 m_attackStartPos;
@@ -80,6 +78,6 @@ private:
 
     float m_baseY = 0.0f;
     float m_bobTimer = 0.0f;
-
+    float m_groundLevel = 180.0f;
     unsigned int VAO = 0, VBO = 0, textureID = 0;
 };

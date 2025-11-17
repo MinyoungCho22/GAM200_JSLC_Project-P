@@ -1,6 +1,4 @@
-﻿//Drone.cpp
-
-#include "Drone.hpp"
+﻿#include "Drone.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -16,6 +14,8 @@
 
 constexpr float PI = 3.14159265359f;
 constexpr float GROUND_LEVEL = 180.0f;
+constexpr float ROOFTOP_GROUND_LEVEL = 1460.0f;
+constexpr float ROOFTOP_MIN_Y = 1080.0f;
 
 std::default_random_engine drone_generator;
 std::uniform_real_distribution<float> drone_distribution(-1.0f, 1.0f);
@@ -31,6 +31,15 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     m_isChasing = false;
     m_lostTimer = 0.0f;
     m_currentSpeed = m_baseSpeed;
+
+    if (startPos.y >= ROOFTOP_MIN_Y)
+    {
+        m_groundLevel = ROOFTOP_GROUND_LEVEL;
+    }
+    else
+    {
+        m_groundLevel = GROUND_LEVEL;
+    }
 
     m_searchMaxAngle = drone_angle_distribution(drone_generator);
     m_searchRotation = 0.0f;
@@ -106,9 +115,9 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         m_fallSpeed += 800.0f * static_cast<float>(dt);
         m_position.y -= m_fallSpeed * static_cast<float>(dt);
 
-        if (m_position.y < GROUND_LEVEL + m_size.y / 2.0f)
+        if (m_position.y < m_groundLevel + m_size.y / 2.0f)
         {
-            m_position.y = GROUND_LEVEL + m_size.y / 2.0f;
+            m_position.y = m_groundLevel + m_size.y / 2.0f;
             m_isDead = true;
             Logger::Instance().Log(Logger::Severity::Event, "Drone destroyed and landed on ground!");
         }
@@ -285,14 +294,16 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
 
 void Drone::Draw(const Shader& shader) const
 {
-    if (m_isDead) return;
-
     Math::Matrix rotationMatrix = Math::Matrix::CreateIdentity();
     bool flipX = false;
 
-    if (m_isHit)
+    if (m_isHit || m_isDead)
     {
-        float wobble = std::sin(m_hitTimer * 20.0f) * 45.0f;
+        float wobble = 0.0f;
+        if (m_isHit)
+        {
+            wobble = std::sin(m_hitTimer * 20.0f) * 45.0f;
+        }
         rotationMatrix = Math::Matrix::CreateRotation(m_hitRotation + wobble);
     }
     else if (m_isAttacking)

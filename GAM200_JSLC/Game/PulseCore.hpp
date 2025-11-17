@@ -36,7 +36,7 @@ private:
 struct PulseConfig {
     float chargeRatePerSecond = 50.f;
     float attackCost = 20.f;
-    float dashCost = 15.f;
+    float dashCost = 3.f;
 };
 
 struct PulseTickResult {

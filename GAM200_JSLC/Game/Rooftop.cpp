@@ -46,6 +46,12 @@ void Rooftop::Initialize()
 
     m_droneManager = std::make_unique<DroneManager>();
 
+    m_droneManager->SpawnDrone({ 8700.0f, 1700.0f }, "Asset/drone.png", false);
+    m_droneManager->SpawnDrone({ 13500.0f, 1900.0f }, "Asset/drone.png", true);
+    m_droneManager->SpawnDrone({ 14500.0f, 1750.0f }, "Asset/drone.png", true);
+    m_droneManager->SpawnDrone({ 15500.0f, 1700.0f }, "Asset/drone.png", false);
+    m_droneManager->SpawnDrone({ 17250.0f, 1800.0f }, "Asset/drone.png", true);
+
     float width = 785.f;
     float height = 172.f;
     float topLeftX = 9951.f;
@@ -54,7 +60,6 @@ void Rooftop::Initialize()
     m_debugBoxPos = { topLeftX + (width / 2.0f), game_Y_top - (height / 2.0f) };
     m_debugBoxSize = { width, height };
 
-    // Pulse Source 1
     float pulseWidth1 = 333.f;
     float pulseHeight1 = 240.f;
     float pulseTopLeftX1 = 12521.f;
@@ -63,7 +68,6 @@ void Rooftop::Initialize()
     m_pulseSources.emplace_back();
     m_pulseSources.back().Initialize(pulseCenter1, { pulseWidth1, pulseHeight1 }, 100.f);
 
-    // Pulse Source 2
     float pulseWidth2 = 333.f;
     float pulseHeight2 = 240.f;
     float pulseTopLeftX2 = 12900.f;

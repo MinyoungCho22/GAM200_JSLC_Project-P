@@ -1,6 +1,4 @@
-﻿//GameplayState.cpp
-
-#include "GameplayState.hpp"
+﻿#include "GameplayState.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -136,7 +134,7 @@ void GameplayState::Update(double dt)
     bool isPressingE = input.IsKeyPressed(Input::Key::E);
     bool isPressingF = input.IsKeyPressed(Input::Key::F);
 
-    const float PULSE_COST_PER_SECOND = 0.5f;
+    const float PULSE_COST_PER_SECOND = 1.0f;
 
     m_logTimer += dt;
     if (m_logTimer >= 0.5)
@@ -265,7 +263,7 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            player.TakeDamage(20.0f);
+            player.TakeDamage(10.0f);
             drone.ResetDamageFlag();
             break;
         }
@@ -287,7 +285,7 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            player.TakeDamage(30.0f);
+            player.TakeDamage(10.0f);
             drone.ResetDamageFlag();
             break;
         }
@@ -298,7 +296,7 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            player.TakeDamage(20.0f);
+            player.TakeDamage(10.0f);
             drone.ResetDamageFlag();
             break;
         }
@@ -367,9 +365,6 @@ void GameplayState::HandleHallwayToRooftopTransition()
 {
     m_rooftopDoor->ResetMapTransition();
     m_rooftopAccessed = true;
-
-    droneManager->ClearAllDrones();
-    m_hallway->ClearAllDrones();
 
     float newGroundLevel = Rooftop::MIN_Y + GROUND_LEVEL + 200.0f;
     player.SetCurrentGroundLevel(newGroundLevel);

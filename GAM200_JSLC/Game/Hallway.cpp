@@ -1,6 +1,4 @@
-﻿//Hallway.cpp
-
-#include "Hallway.hpp"
+﻿#include "Hallway.hpp"
 #include "Background.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
