@@ -1,3 +1,5 @@
+//Door.hpp
+
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include <memory>
@@ -25,11 +27,11 @@ public:
     bool IsPlayerNearby() const { return m_isPlayerNearby; }
 
 private:
-    Math::Vec2 m_position;
-    Math::Vec2 m_size;
-    float m_pulseCost;
-    DoorType m_doorType;
-    bool m_isPlayerNearby;
-    bool m_shouldLoadNextMap;
-    unsigned int VAO, VBO;
+    Math::Vec2 m_position{};
+    Math::Vec2 m_size{};
+    float m_pulseCost = 0.0f;
+    DoorType m_doorType = DoorType::RoomToHallway;
+    bool m_isPlayerNearby = false;
+    bool m_shouldLoadNextMap = false;
+    unsigned int VAO = 0, VBO = 0;
 };

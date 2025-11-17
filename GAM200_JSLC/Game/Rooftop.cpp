@@ -116,7 +116,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
 
         if (m_isPlayerClose && input.IsKeyTriggered(Input::Key::F) && !m_isClose)
         {
-            const float INTERACT_COST = 10.0f;
+            const float INTERACT_COST = 5.0f;
             Pulse& pulse = player.GetPulseCore().getPulse();
 
             if (pulse.Value() >= INTERACT_COST)
@@ -155,7 +155,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
     {
         if (m_isPlayerNearLift && input.IsKeyTriggered(Input::Key::F))
         {
-            const float LIFT_COST = 10.0f;
+            const float LIFT_COST = 8.0f;
             Pulse& pulse = player.GetPulseCore().getPulse();
 
             if (pulse.Value() >= LIFT_COST)

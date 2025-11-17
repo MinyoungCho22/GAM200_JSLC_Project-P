@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿//Drone.hpp
+
+#pragma once
 #include "../Engine/Vec2.hpp"
 
 class Shader;

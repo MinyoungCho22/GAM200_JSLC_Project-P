@@ -1,3 +1,5 @@
+// Tutorial.hpp
+
 #pragma once
 #include <string>
 #include <vector>
@@ -23,19 +25,18 @@ struct TutorialMessage
         DoorInteractionRoom,
         DoorInteractionRooftop,
         DroneCrashHint,
-        LiftInteraction,
-        LiftCooldown
+        LiftInteraction
     };
 
-    std::string id;
+    std::string id = "";
     Type type = Type::Collision;
-    std::string text;
+    std::string text = "";
     CachedTextureInfo texture;
-    Math::Vec2 targetPosition;
-    Math::Vec2 targetSize;
-    Math::Vec2 textPosition;
-    float textHeight;
-    bool isActive;
+    Math::Vec2 targetPosition = { 0.0f, 0.0f };
+    Math::Vec2 targetSize = { 0.0f, 0.0f };
+    Math::Vec2 textPosition = { 0.0f, 0.0f };
+    float textHeight = 0.0f;
+    bool isActive = false;
     bool isPermanentlyDisabled = false;
     float timer = 0.0f;
     float duration = -1.0f;
@@ -53,7 +54,6 @@ public:
     void AddRooftopDoorMessage(Font& font, Shader& atlasShader);
     void AddDroneCrashMessage(Font& font, Shader& atlasShader);
     void AddLiftMessage(Font& font, Shader& atlasShader);
-    void AddLiftCooldownMessage(Font& font, Shader& atlasShader);
     void Update(float dt, Player& player, const Input::Input& input, Room* room = nullptr, Hallway* hallway = nullptr, Rooftop* rooftop = nullptr, Door* roomDoor = nullptr, Door* rooftopDoor = nullptr);
     void Draw(Font& font, Shader& textureShader);
 
