@@ -208,7 +208,6 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
     else if (m_liftState == LiftState::AtDestination)
     {
         m_liftState = LiftState::Idle;
-        //m_isLiftActivated = false;
     }
 
     float deltaX = m_liftPos.x - oldLiftX;
