@@ -208,7 +208,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
     else if (m_liftState == LiftState::AtDestination)
     {
         m_liftState = LiftState::Idle;
-        m_isLiftActivated = false;
+        //m_isLiftActivated = false;
     }
 
     float deltaX = m_liftPos.x - oldLiftX;
@@ -282,7 +282,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         }
     }
 
-    if (!m_isLiftActivated)
+    if (!m_isLiftActivated && m_liftState != LiftState::AtDestination)
     {
         Math::Vec2 liftHalfSize = m_liftSize * 0.5f;
         Math::Vec2 liftMin = m_liftPos - liftHalfSize;
@@ -319,7 +319,23 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
             }
         }
     }
+    if (m_liftState == LiftState::Idle && m_isLiftActivated)
+    {
+        Math::Vec2 liftHalfSize = m_liftSize * 0.5f;
+        Math::Vec2 liftMin = m_liftPos - liftHalfSize;
+        Math::Vec2 liftMax = m_liftPos + liftHalfSize;
 
+        Math::Vec2 playerMin = currentPlayerPos - playerHalfSize;
+        Math::Vec2 playerMax = currentPlayerPos + playerHalfSize;
+
+        bool isPlayerStillOnLift = (playerMax.x > liftMin.x && playerMin.x < liftMax.x &&
+            playerMax.y > liftMin.y && playerMin.y < liftMax.y);
+
+        if (!isPlayerStillOnLift)
+        {
+            m_isLiftActivated = false;
+        }
+    }
     m_droneManager->Update(dt, player, playerHitboxSize, false);
 }
 
