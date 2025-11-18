@@ -1,34 +1,40 @@
-language,filename,blank,comment,code,"http://cloc.sourceforge.net v 1.64  T=0.05 s (608.3 files/s, 100560.9 lines/s)"
-C++,.\Game\GameplayState.cpp,106,0,461,
-C++,.\Game\Drone.cpp,66,0,370,
-C++,.\Game\Rooftop.cpp,73,1,369,
-C++,.\Game\Player.cpp,63,1,351,
-C++,.\Game\PulseManager.cpp,52,1,232,
-C++,.\Game\Font.cpp,62,26,223,
-C++,.\Game\Tutorial.cpp,254,1,213,
-C++,.\Game\Hallway.cpp,36,0,179,
-C++,.\Game\Setting.cpp,33,19,167,
-C++,.\Engine\Engine.cpp,33,4,166,
-C++,.\Engine\Window.cpp,27,0,155,
-C++,.\Game\Room.cpp,27,1,136,
-C++,.\Game\Door.cpp,14,1,96,
-C++,.\OpenGL\Shader.cpp,16,0,95,
-C++,.\Engine\DebugRenderer.cpp,18,6,90,
-C++,.\Game\SplashState.cpp,20,1,88,
-C++,.\Game\GameOver.cpp,17,0,83,
-C++,.\Game\Background.cpp,19,1,63,
-C++,.\Engine\Logger.cpp,14,0,62,
-C++,.\Engine\Matrix.cpp,8,0,62,
-C++,.\Engine\Vec2.cpp,13,0,62,
-C++,.\Game\PulseGauge.cpp,10,3,56,
-C++,.\Game\PulseSource.cpp,10,1,55,
-C++,.\Game\DroneManager.cpp,9,1,54,
-C++,.\Game\MainMenu.cpp,14,1,48,
-C++,.\Engine\Camera.cpp,11,5,46,
-C++,.\Engine\GameStateManager.cpp,7,0,45,
-C++,.\Game\TraceSystem.cpp,6,1,42,
-C++,.\Engine\Input.cpp,7,5,27,
-C++,.\CS200\RenderingAPI.cpp,3,0,19,
-C++,.\Engine\Collision.cpp,4,3,18,
-C++,.\main.cpp,4,3,15,
-,,,,4148,
+language,,primary contributor,,filename,blank,comment,code
+C++,,Minyoung Cho,,.\Game\GameplayState.cpp,106,0,461
+C++,,Jisu Son,,.\Game\Drone.cpp,67,1,370
+C++,,Minyoung Cho,,.\Game\Rooftop.cpp,73,1,369
+C++,,Seoyoung Jung,,.\Game\Player.cpp,63,1,351
+C++,,Seoyoung Jung,,.\Game\PulseManager.cpp,52,1,232
+C++,,Ryungjae Lee,,.\Game\Font.cpp,62,26,223
+C++,,Ryungjae Lee,,.\Game\Tutorial.cpp,254,1,213
+C++,,Minyoung Cho,,.\Game\Hallway.cpp,36,0,179
+C++,,Ryungjae Lee,,.\Game\Setting.cpp,33,19,167
+C++,,Ryungjae Lee,,.\Engine\Engine.cpp,33,4,166
+C++,,Jisu Son,,.\Engine\Window.cpp,27,0,155
+C++,,Minyoung Cho,,.\Game\Room.cpp,27,1,136
+C++,,Jisu Son,,.\Game\Door.cpp,14,1,96
+C++,,Ryungjae Lee,,.\OpenGL\Shader.cpp,16,0,95
+C++,,Jisu Son,,.\Engine\DebugRenderer.cpp,18,6,90
+C++,,Ryungjae Lee,,.\Game\SplashState.cpp,20,1,88
+C++,,Seoyoung Jung,,.\Game\GameOver.cpp,17,0,83
+C++,,Jisu Son,,.\Game\Background.cpp,19,1,63
+C++,,Jisu Son,,.\Engine\Logger.cpp,14,0,62
+C++,,Seoyoung Jung,,.\Engine\Matrix.cpp,8,0,62
+C++,,Seoyoung Jung,,.\Engine\Vec2.cpp,13,0,62
+C++,,Seoyoung Jung,,.\Game\PulseGauge.cpp,10,3,56
+C++,,Seoyoung Jung,,.\Game\PulseSource.cpp,10,1,55
+C++,,Jisu Son,,.\Game\DroneManager.cpp,9,1,54
+C++,,Seoyoung Jung,,.\Game\MainMenu.cpp,14,1,48
+C++,,Seoyoung Jung,,.\Engine\Camera.cpp,11,5,46
+C++,,Jisu Son,,.\Engine\GameStateManager.cpp,7,0,45
+C++,,Jisu Son,,.\Game\TraceSystem.cpp,6,1,42
+C++,,Ryungjae Lee,,.\Engine\Input.cpp,7,5,27
+C++,,Ryungjae Lee,,.\CS200\RenderingAPI.cpp,3,0,19
+C++,,Ryungjae Lee,,.\Engine\Collision.cpp,4,3,18
+C++,,Seoyoung Jung,,.\main.cpp,4,3,15
+,,,,,,,4148
+,,,,,,,
+Name of Team Member,,,Total Lines,,,,
+Minyoung Cho,,,Total Lines: 1145,,,,
+Jisu Son,,,Total Lines: 977,,,,
+Seoyoung Jung,,,Total Lines: 1010,,,,
+RyungJae Lee,,,Total Lines: 1016,,,,
