@@ -85,12 +85,50 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
     float oldLiftX = m_liftPos.x;
     Math::Vec2 playerPos = player.GetPosition();
 
-    bool isPlayerInRooftop = (playerPos.y >= MIN_Y && playerPos.y <= MIN_Y + HEIGHT &&
+    bool isPlayerInRooftop = (playerPos.y >= MIN_Y - 1000.0f && playerPos.y <= MIN_Y + HEIGHT &&
         playerPos.x >= MIN_X && playerPos.x <= MIN_X + WIDTH);
 
     if (!isPlayerInRooftop)
     {
         return;
+    }
+
+    Math::Vec2 liftHalfSizeCheck = m_liftSize / 2.0f;
+    Math::Vec2 liftMinCheck = m_liftPos - liftHalfSizeCheck;
+    Math::Vec2 liftMaxCheck = m_liftPos + liftHalfSizeCheck;
+
+    Math::Vec2 playerHalfCheck = playerHitboxSize / 2.0f;
+    Math::Vec2 playerMinCheck = playerPos - playerHalfCheck;
+    Math::Vec2 playerMaxCheck = playerPos + playerHalfCheck;
+
+    bool isTouchingLift = (playerMaxCheck.x > liftMinCheck.x && playerMinCheck.x < liftMaxCheck.x &&
+        playerMaxCheck.y > liftMinCheck.y && playerMinCheck.y < liftMaxCheck.y);
+
+    float safeGroundY = MIN_Y + 180.0f + 200.0f;
+    float abyssGroundY = MIN_Y - 800.0f;
+
+    float abyssStartX = m_liftInitialX - (m_liftSize.x / 2.0f) + 20.0f;
+    float abyssEndX = m_liftTargetX + (m_liftSize.x / 2.0f) - 20.0f;
+
+    if (playerPos.x > abyssStartX && playerPos.x < abyssEndX)
+    {
+        if (isTouchingLift)
+        {
+            player.SetCurrentGroundLevel(safeGroundY);
+        }
+        else
+        {
+            player.SetCurrentGroundLevel(abyssGroundY);
+
+            if (playerPos.y > abyssGroundY + 50.0f)
+            {
+                player.SetOnGround(false);
+            }
+        }
+    }
+    else
+    {
+        player.SetCurrentGroundLevel(safeGroundY);
     }
 
     {
@@ -322,6 +360,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
             }
         }
     }
+
     if (m_liftState == LiftState::Idle && m_isLiftActivated)
     {
         Math::Vec2 liftHalfSize = m_liftSize * 0.5f;
@@ -339,6 +378,18 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
             m_isLiftActivated = false;
         }
     }
+
+    if (currentPlayerPos.x > abyssStartX && currentPlayerPos.x < abyssEndX)
+    {
+        if (!isTouchingLift && currentPlayerPos.y < 1500.0f)
+        {
+            const float DEATH_DRAIN_RATE = 100.0f;
+            player.GetPulseCore().getPulse().spend(DEATH_DRAIN_RATE * static_cast<float>(dt));
+
+            Logger::Instance().Log(Logger::Severity::Event, "Falling into abyss! Pulse draining...");
+        }
+    }
+
     m_droneManager->Update(dt, player, playerHitboxSize, false);
 }
 
