@@ -68,6 +68,10 @@ void GameplayState::Initialize()
     m_rooftop = std::make_unique<Rooftop>();
     m_rooftop->Initialize();
 
+    m_underground = std::make_unique<Underground>();
+    m_underground->Initialize();
+    m_undergroundAccessed = false;
+
     m_camera.Initialize({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }, GAME_WIDTH, GAME_HEIGHT);
     m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
     m_cameraSmoothSpeed = 0.1f;
@@ -125,6 +129,14 @@ void GameplayState::Update(double dt)
     if (input.IsKeyTriggered(Input::Key::Tab))
     {
         m_isDebugDraw = !m_isDebugDraw;
+    }
+
+    if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num3))
+    {
+        if (!m_rooftopAccessed)
+        {
+            HandleHallwayToRooftopTransition();
+        }
     }
 
     m_tutorial->Update(static_cast<float>(dt), player, input, m_room.get(), m_hallway.get(), m_rooftop.get(), m_door.get(), m_rooftopDoor.get());
@@ -203,6 +215,25 @@ void GameplayState::Update(double dt)
                     targetDrone = &drone;
                 }
             }
+
+            if (m_undergroundAccessed)
+            {
+                auto& undergroundDrones = m_underground->GetDrones();
+                for (auto& drone : undergroundDrones)
+                {
+                    if (drone.IsDead() || drone.IsHit()) continue;
+                    float distSq = (playerCenter - drone.GetPosition()).LengthSq();
+                    Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
+                    float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
+                    float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
+                    float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
+                    {
+                        closestDistSq = distSq;
+                        targetDrone = &drone;
+                    }
+                }
+            }
         }
     }
 
@@ -228,6 +259,10 @@ void GameplayState::Update(double dt)
         for (auto& drone : droneManager->GetDrones()) drone.ResetDamageTimer();
         for (auto& drone : m_hallway->GetDrones()) drone.ResetDamageTimer();
         for (auto& drone : m_rooftop->GetDrones()) drone.ResetDamageTimer();
+        if (m_undergroundAccessed)
+        {
+            for (auto& drone : m_underground->GetDrones()) drone.ResetDamageTimer();
+        }
 
         if (input.IsKeyTriggered(Input::Key::F))
         {
@@ -249,6 +284,15 @@ void GameplayState::Update(double dt)
     if (m_rooftopDoor->ShouldLoadNextMap() && !m_rooftopAccessed)
     {
         HandleHallwayToRooftopTransition();
+    }
+
+    if (m_rooftopAccessed && !m_undergroundAccessed)
+    {
+        float transitionX = Rooftop::MIN_X + Rooftop::WIDTH - 50.0f;
+        if (player.GetPosition().x > transitionX)
+        {
+            HandleRooftopToUndergroundTransition();
+        }
     }
 
     bool isPlayerHidingInRoom = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
@@ -280,6 +324,11 @@ void GameplayState::Update(double dt)
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
     m_rooftop->Update(dt, player, playerHitboxSize, input);
 
+    if (m_undergroundAccessed)
+    {
+        m_underground->Update(dt, player, playerHitboxSize);
+    }
+
     auto& hallwayDrones = m_hallway->GetDrones();
     for (auto& drone : hallwayDrones)
     {
@@ -299,6 +348,20 @@ void GameplayState::Update(double dt)
             player.TakeDamage(10.0f);
             drone.ResetDamageFlag();
             break;
+        }
+    }
+
+    if (m_undergroundAccessed)
+    {
+        auto& undergroundDrones = m_underground->GetDrones();
+        for (auto& drone : undergroundDrones)
+        {
+            if (!drone.IsDead() && drone.ShouldDealDamage())
+            {
+                player.TakeDamage(20.0f);
+                drone.ResetDamageFlag();
+                break;
+            }
         }
     }
 
@@ -389,6 +452,35 @@ void GameplayState::HandleHallwayToRooftopTransition()
         playerStartX, playerStartY, newGroundLevel);
 }
 
+void GameplayState::HandleRooftopToUndergroundTransition()
+{
+    m_undergroundAccessed = true;
+
+    m_rooftop->ClearAllDrones();
+
+    float playerStartX = Underground::MIN_X + 100.0f;
+    float playerStartY = Underground::MIN_Y + 300.0f;
+
+    float newGroundLevel = Underground::MIN_Y + 120.0f;
+    player.SetCurrentGroundLevel(newGroundLevel);
+
+    player.SetPosition({ playerStartX, playerStartY });
+    player.ResetVelocity();
+    player.SetOnGround(false);
+
+    float worldMinX = Underground::MIN_X;
+    float worldMaxX = Underground::MIN_X + Underground::WIDTH;
+    float worldMinY = Underground::MIN_Y;
+    float worldMaxY = Underground::MIN_Y + Underground::HEIGHT;
+
+    m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
+
+    m_cameraSmoothSpeed = 0.05f;
+
+    Logger::Instance().Log(Logger::Severity::Event,
+        "Transition to Underground! Player=(%.1f, %.1f)", playerStartX, playerStartY);
+}
+
 void GameplayState::Draw()
 {
     Engine& engine = gsm.GetEngine();
@@ -402,6 +494,10 @@ void GameplayState::Draw()
     if (playerPos.y >= Rooftop::MIN_Y)
     {
         r = 70.0f / 255.0f; g = 68.0f / 255.0f; b = 71.0f / 255.0f;
+    }
+    else if (playerPos.y <= Underground::MIN_Y + Underground::HEIGHT)
+    {
+        r = 30.0f / 255.0f; g = 30.0f / 255.0f; b = 35.0f / 255.0f;
     }
     else
     {
@@ -458,6 +554,7 @@ void GameplayState::Draw()
     m_room->Draw(textureShader);
     m_hallway->Draw(textureShader);
     m_rooftop->Draw(textureShader);
+    m_underground->Draw(textureShader);
 
     textureShader.use();
     textureShader.setMat4("projection", projection);
@@ -473,10 +570,12 @@ void GameplayState::Draw()
     droneManager->DrawRadars(*colorShader, *m_debugRenderer);
     m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
     m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
+    m_underground->DrawRadars(*colorShader, *m_debugRenderer);
 
     droneManager->DrawGauges(*colorShader, *m_debugRenderer);
     m_hallway->DrawGauges(*colorShader, *m_debugRenderer);
     m_rooftop->DrawGauges(*colorShader, *m_debugRenderer);
+    m_underground->DrawGauges(*colorShader, *m_debugRenderer);
 
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
@@ -539,6 +638,15 @@ void GameplayState::Draw()
             }
         }
 
+        for (const auto& drone : m_underground->GetDrones())
+        {
+            if (!drone.IsDead())
+            {
+                m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+                m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+            }
+        }
+
         m_room->DrawDebug(*m_debugRenderer, *colorShader, projection, player);
 
         for (const auto& source : m_hallway->GetPulseSources())
@@ -548,6 +656,7 @@ void GameplayState::Draw()
 
         m_hallway->DrawDebug(*colorShader, *m_debugRenderer);
         m_rooftop->DrawDebug(*colorShader, *m_debugRenderer);
+        m_underground->DrawDebug(*colorShader, *m_debugRenderer);
         m_door->DrawDebug(*colorShader);
         m_rooftopDoor->DrawDebug(*colorShader);
     }
@@ -558,6 +667,7 @@ void GameplayState::Shutdown()
     m_room->Shutdown();
     m_hallway->Shutdown();
     m_rooftop->Shutdown();
+    m_underground->Shutdown();
     player.Shutdown();
     droneManager->Shutdown();
     m_pulseGauge.Shutdown();

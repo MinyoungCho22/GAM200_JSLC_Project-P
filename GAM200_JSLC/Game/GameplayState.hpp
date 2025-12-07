@@ -19,6 +19,7 @@
 #include "GameOver.hpp" 
 #include "MainMenu.hpp"
 #include "Tutorial.hpp"
+#include "Underground.hpp"
 #include <memory>
 #include <vector>
 #include <string>
@@ -65,6 +66,9 @@ private:
     std::unique_ptr<Rooftop> m_rooftop;
     std::unique_ptr<TraceSystem> m_traceSystem;
     std::unique_ptr<Tutorial> m_tutorial;
+    std::unique_ptr<Underground> m_underground;
+    bool m_undergroundAccessed = false;
+    void HandleRooftopToUndergroundTransition();
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;

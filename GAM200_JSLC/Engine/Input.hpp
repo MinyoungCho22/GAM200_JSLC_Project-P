@@ -1,6 +1,4 @@
-﻿//Input.hpp
-
-#pragma once
+﻿#pragma once
 #include <array>
 struct GLFWwindow;
 
@@ -9,6 +7,11 @@ namespace Input
     enum Key {
         // 실제 GLFW 키 코드와 동일한 값
         Space = 32,
+
+        Num1 = 49,
+        Num2 = 50,
+        Num3 = 51,
+
         A = 65,
         D = 68,
         E = 69,
@@ -18,12 +21,13 @@ namespace Input
         Escape = 256,
         Enter = 257,
         Tab = 258,
-        LeftShift = 340,
 
         Right = 262,
         Left = 263,
         Down = 264,
         Up = 265,
+
+        LeftShift = 340,
         LeftControl = 341
     };
 
