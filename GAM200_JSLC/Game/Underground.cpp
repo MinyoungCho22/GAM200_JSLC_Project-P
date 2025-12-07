@@ -15,7 +15,6 @@ void Underground::Initialize()
     m_position = { MIN_X + WIDTH / 2.0f, MIN_Y + HEIGHT / 2.0f };
 
     m_droneManager = std::make_unique<DroneManager>();
-    // 필요한 경우 드론 추가: m_droneManager->SpawnDrone(...)
 }
 
 void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
