@@ -432,6 +432,45 @@ bool Drone::ApplyDamage(float dt)
     return false;
 }
 
+void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    if (m_isDead || m_damageTimer <= 0.0f) return;
+
+    float barWidth = 100.0f;
+    float barHeight = 15.0f;
+    float yOffset = m_size.y / 2.0f + 30.0f;
+
+    Math::Vec2 barCenterPos = { m_position.x, m_position.y + yOffset };
+
+    Math::Vec2 bgSize = { barWidth + 4.0f, barHeight + 4.0f };
+    Math::Matrix bgModel = Math::Matrix::CreateTranslation(barCenterPos) * Math::Matrix::CreateScale(bgSize);
+
+    colorShader.setMat4("model", bgModel);
+    colorShader.setVec3("objectColor", 0.0f, 0.0f, 0.0f);
+
+    GL::BindVertexArray(VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+
+    float ratio = m_damageTimer / TIME_TO_DESTROY;
+    if (ratio > 1.0f) ratio = 1.0f;
+
+    float fillWidth = barWidth * ratio;
+
+    float leftEdgeX = barCenterPos.x - (barWidth / 2.0f);
+    float fillCenterX = leftEdgeX + (fillWidth / 2.0f);
+
+    Math::Vec2 fgPos = { fillCenterX, barCenterPos.y };
+    Math::Vec2 fgSize = { fillWidth, barHeight };
+
+    Math::Matrix fgModel = Math::Matrix::CreateTranslation(fgPos) * Math::Matrix::CreateScale(fgSize);
+
+    colorShader.setMat4("model", fgModel);
+    colorShader.setVec3("objectColor", 1.0f, 0.0f, 0.0f);
+
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
+}
+
 void Drone::ResetDamageTimer()
 {
     m_damageTimer = 0.0f;

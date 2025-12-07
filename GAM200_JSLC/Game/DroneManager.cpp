@@ -43,6 +43,13 @@ void DroneManager::Shutdown()
         drone.Shutdown();
     }
 }
+void DroneManager::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    for (const auto& drone : drones)
+    {
+        drone.DrawGauge(colorShader, debugRenderer);
+    }
+}
 
 void DroneManager::ClearAllDrones()
 {

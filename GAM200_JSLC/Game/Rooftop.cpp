@@ -419,6 +419,11 @@ void Rooftop::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer
     m_droneManager->DrawRadars(colorShader, debugRenderer);
 }
 
+void Rooftop::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    m_droneManager->DrawGauges(colorShader, debugRenderer);
+}
+
 void Rooftop::Shutdown()
 {
     if (m_background)

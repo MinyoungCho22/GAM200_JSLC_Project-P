@@ -126,6 +126,11 @@ void Hallway::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer
     m_droneManager->DrawRadars(colorShader, debugRenderer);
 }
 
+void Hallway::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    m_droneManager->DrawGauges(colorShader, debugRenderer);
+}
+
 void Hallway::Shutdown()
 {
     if (m_background)

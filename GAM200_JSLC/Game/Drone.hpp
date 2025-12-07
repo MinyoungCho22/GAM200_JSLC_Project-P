@@ -14,6 +14,7 @@ public:
     void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding);
     void Draw(const Shader& shader) const;
     void DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) const;
+    void DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
 
     bool ApplyDamage(float dt);

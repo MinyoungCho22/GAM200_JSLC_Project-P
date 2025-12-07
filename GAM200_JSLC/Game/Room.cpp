@@ -106,7 +106,7 @@ void Room::Update(Player& player, double dt, Input::Input& input)
 
     m_playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
 
-    if (m_playerInBlindArea && input.IsKeyTriggered(Input::Key::F))
+    if (m_playerInBlindArea && input.IsKeyTriggered(Input::Key::F) && !m_isBright)
     {
         const float BLIND_TOGGLE_COST = 20.0f;
         Pulse& pulse = player.GetPulseCore().getPulse();
@@ -114,7 +114,7 @@ void Room::Update(Player& player, double dt, Input::Input& input)
         if (pulse.Value() >= BLIND_TOGGLE_COST)
         {
             pulse.spend(BLIND_TOGGLE_COST);
-            m_isBright = !m_isBright;
+            m_isBright = true;
         }
     }
 }

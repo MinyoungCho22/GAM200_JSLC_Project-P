@@ -29,6 +29,7 @@ public:
     void Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPlayerHiding);
     void Draw(Shader& shader);
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
+    void DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
     void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
 

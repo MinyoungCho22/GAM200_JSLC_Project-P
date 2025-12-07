@@ -419,7 +419,6 @@ void GameplayState::Draw()
     GL::ClearColor(r, g, b, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
-
     float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     float gameAspect = GAME_WIDTH / GAME_HEIGHT;
 
@@ -474,6 +473,10 @@ void GameplayState::Draw()
     droneManager->DrawRadars(*colorShader, *m_debugRenderer);
     m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
     m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
+
+    droneManager->DrawGauges(*colorShader, *m_debugRenderer);
+    m_hallway->DrawGauges(*colorShader, *m_debugRenderer);
+    m_rooftop->DrawGauges(*colorShader, *m_debugRenderer);
 
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);

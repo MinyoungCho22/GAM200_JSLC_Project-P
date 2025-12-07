@@ -15,6 +15,7 @@ public:
     void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding);
     void Draw(const Shader& shader);
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
+    void DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
     void ClearAllDrones();
 
