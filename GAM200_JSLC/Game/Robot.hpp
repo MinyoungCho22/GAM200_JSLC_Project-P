@@ -14,6 +14,7 @@ struct ObstacleInfo {
 enum class RobotState {
     Patrol,
     Chase,
+    Retreat,
     Windup,
     Attack,
     Recover,
@@ -75,7 +76,7 @@ private:
     const float PATROL_SPEED = 100.0f;
     const float CHASE_SPEED = 250.0f;
     const float DETECTION_RANGE = 800.0f;
-    const float ATTACK_RANGE = 250.0f;
+    const float ATTACK_RANGE = 350.0f;
 
     const float WINDUP_TIME = 0.8f;
     const float ATTACK_DURATION = 0.2f;

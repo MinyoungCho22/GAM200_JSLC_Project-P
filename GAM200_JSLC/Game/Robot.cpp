@@ -133,6 +133,15 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         }
         break;
 
+    case RobotState::Retreat:
+        m_velocity.x = m_directionX * PATROL_SPEED;
+
+        if (m_stateTimer <= 0.0f)
+        {
+            m_state = RobotState::Chase;
+        }
+        break;
+
     case RobotState::Windup:
         m_velocity.x = 0.0f;
         if (m_stateTimer <= 0.0f)
@@ -146,31 +155,30 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     case RobotState::Attack:
         m_velocity.x = 0.0f;
 
-        if (!m_hasDealtDamage && distToPlayer < ATTACK_RANGE + 50.0f)
+        // 빨간 박스(경고 박스)와 플레이어 히트박스 충돌 검사
+        if (!m_hasDealtDamage)
         {
-            bool hit = false;
+            // DrawAlert에서 그리는 빨간 박스와 동일한 크기 및 위치
+            Math::Vec2 attackBoxSize = { 600.0f, 50.0f }; // 너비 600, 높이 50
+            Math::Vec2 attackBoxPos = { 0.0f, 0.0f };
 
             if (m_currentAttack == AttackType::LowSweep)
             {
-                if (std::abs(playerPos.y - m_position.y) < 100.0f)
-                {
-                    hit = true;
-                }
+                // DrawAlert의 LowSweep 박스 위치 계산식
+                attackBoxPos = { m_position.x, m_position.y - m_size.y / 2.0f + 50.0f };
             }
             else if (m_currentAttack == AttackType::HighSweep)
             {
-                if (!player.IsCrouching())
-                {
-                    hit = true;
-                }
+                // DrawAlert의 HighSweep 박스 위치 계산식
+                attackBoxPos = { m_position.x, m_position.y + m_size.y / 2.0f - 50.0f };
             }
 
-            if (hit)
+            // 플레이어가 실제 빨간 박스 안에 들어와 있는지 체크 (AABB 충돌)
+            if (Collision::CheckAABB(player.GetHitboxCenter(), player.GetHitboxSize(), attackBoxPos, attackBoxSize))
             {
-                // 데미지 20 적용
                 player.TakeDamage(20.0f);
-                m_hasDealtDamage = true; // 이번 공격에서는 더 이상 데미지 없음
-                Logger::Instance().Log(Logger::Severity::Event, "Player Hit by Robot!");
+                m_hasDealtDamage = true;
+                Logger::Instance().Log(Logger::Severity::Event, "Player Hit by Robot (Inside Attack Box)!");
             }
         }
 
@@ -207,11 +215,11 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     float halfW = m_size.x / 4.0f;
     if (nextPos.x - halfW < mapMinX) {
         nextPos.x = mapMinX + halfW;
-        if (m_state == RobotState::Patrol) m_directionX = 1.0f;
+        if (m_state == RobotState::Patrol || m_state == RobotState::Retreat) m_directionX = 1.0f;
     }
     if (nextPos.x + halfW > mapMaxX) {
         nextPos.x = mapMaxX - halfW;
-        if (m_state == RobotState::Patrol) m_directionX = -1.0f;
+        if (m_state == RobotState::Patrol || m_state == RobotState::Retreat) m_directionX = -1.0f;
     }
 
     for (const auto& obs : obstacles)
@@ -221,7 +229,22 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             if (m_velocity.x > 0) nextPos.x = obs.pos.x - obs.size.x / 2.0f - halfW;
             else if (m_velocity.x < 0) nextPos.x = obs.pos.x + obs.size.x / 2.0f + halfW;
 
-            if (m_state == RobotState::Patrol) m_directionX *= -1.0f;
+            if (m_state == RobotState::Patrol)
+            {
+                m_directionX *= -1.0f;
+            }
+            else if (m_state == RobotState::Chase)
+            {
+                m_state = RobotState::Retreat;
+                m_directionX *= -1.0f;
+                m_stateTimer = 1.5f;
+                Logger::Instance().Log(Logger::Severity::Event, "Robot hit wall, Retreating!");
+            }
+            else if (m_state == RobotState::Retreat)
+            {
+                m_directionX *= -1.0f;
+            }
+
             break;
         }
     }
@@ -323,20 +346,17 @@ void Robot::DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     if (m_state == RobotState::Dead) return;
 
-    // 공격 전조(Windup) 또는 공격 중(Attack)일 때 힌트 표시
     if (m_state == RobotState::Windup || m_state == RobotState::Attack)
     {
-        // Low Sweep: 하단(발 쪽)에 빨간 박스 -> 점프 유도
         if (m_currentAttack == AttackType::LowSweep)
         {
             float yPos = m_position.y - m_size.y / 2.0f + 50.0f;
-            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 300.0f, 50.0f }, { 1.0f, 0.0f });
+            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 600.0f, 50.0f }, { 1.0f, 0.0f });
         }
-        // High Sweep: 상단(머리 쪽)에 빨간 박스 -> 숙이기 유도
         else if (m_currentAttack == AttackType::HighSweep)
         {
             float yPos = m_position.y + m_size.y / 2.0f - 50.0f;
-            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 300.0f, 50.0f }, { 1.0f, 0.0f });
+            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 600.0f, 50.0f }, { 1.0f, 0.0f });
         }
     }
 }
@@ -347,7 +367,6 @@ void Robot::TakeDamage(float amount)
 
     m_hp -= amount;
 
-    // 피격 시 잠시 경직
     m_state = RobotState::Stagger;
     m_stateTimer = 0.3f;
 
