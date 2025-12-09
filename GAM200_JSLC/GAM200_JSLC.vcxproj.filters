@@ -118,6 +118,9 @@
     <ClCompile Include="Game\Robot.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\Sound.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -233,6 +236,9 @@
     </ClInclude>
     <ClInclude Include="Game\Robot.hpp">
       <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Sound.hpp">
+      <Filter>Engine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

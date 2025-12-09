@@ -148,6 +148,7 @@
     <ClCompile Include="Engine\Input.cpp" />
     <ClCompile Include="Engine\Logger.cpp" />
     <ClCompile Include="Engine\Matrix.cpp" />
+    <ClCompile Include="Engine\Sound.cpp" />
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Engine\Window.cpp" />
     <ClCompile Include="Game\Background.cpp" />
@@ -187,6 +188,7 @@
     <ClInclude Include="Engine\Logger.hpp" />
     <ClInclude Include="Engine\Matrix.hpp" />
     <ClInclude Include="Engine\Rect.hpp" />
+    <ClInclude Include="Engine\Sound.hpp" />
     <ClInclude Include="Engine\Vec2.hpp" />
     <ClInclude Include="Engine\Window.hpp" />
     <ClInclude Include="Game\Background.hpp" />

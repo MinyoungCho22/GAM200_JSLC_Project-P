@@ -14,6 +14,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <cmath>
+#include "../Engine/Sound.hpp"
 
 constexpr float GROUND_LEVEL = 180.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
@@ -421,6 +422,8 @@ void GameplayState::Update(double dt)
     {
         gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver));
     }
+
+    SoundSystem::Instance().Update();
 }
 
 void GameplayState::HandleRoomToHallwayTransition()

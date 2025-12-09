@@ -152,7 +152,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
 
         m_isPlayerClose = (distanceSq <= PROXIMITY_RANGE_SQ);
 
-        if (m_isPlayerClose && input.IsKeyTriggered(Input::Key::F) && !m_isClose)
+        if (m_isPlayerClose && input.IsKeyTriggered(Input::Key::J) && !m_isClose)
         {
             const float INTERACT_COST = 5.0f;
             Pulse& pulse = player.GetPulseCore().getPulse();
@@ -191,7 +191,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
 
     if (m_liftState == LiftState::Idle)
     {
-        if (m_isPlayerNearLift && input.IsKeyTriggered(Input::Key::F))
+        if (m_isPlayerNearLift && input.IsKeyTriggered(Input::Key::J))
         {
             const float LIFT_COST = 8.0f;
             Pulse& pulse = player.GetPulseCore().getPulse();
