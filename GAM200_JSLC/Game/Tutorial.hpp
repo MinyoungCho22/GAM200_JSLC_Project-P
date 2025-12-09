@@ -54,6 +54,7 @@ public:
     void AddRooftopDoorMessage(Font& font, Shader& atlasShader);
     void AddDroneCrashMessage(Font& font, Shader& atlasShader);
     void AddLiftMessage(Font& font, Shader& atlasShader);
+    void DisableAll();
     void Update(float dt, Player& player, const Input::Input& input, Room* room = nullptr, Hallway* hallway = nullptr, Rooftop* rooftop = nullptr, Door* roomDoor = nullptr, Door* rooftopDoor = nullptr);
     void Draw(Font& font, Shader& textureShader);
 

@@ -19,6 +19,7 @@ public:
         Player& player, std::vector<PulseSource>& roomSources,
         std::vector<PulseSource>& hallwaySources,
         std::vector<PulseSource>& rooftopSources,
+        std::vector<PulseSource>& undergroundSources,
         bool is_interact_key_pressed, double dt);
 
     void UpdateAttackVFX(bool isAttacking, Math::Vec2 startPos, Math::Vec2 endPos);

@@ -135,6 +135,7 @@ void GameplayState::Update(double dt)
     {
         if (!m_rooftopAccessed)
         {
+            m_tutorial->DisableAll();
             HandleHallwayToRooftopTransition();
         }
     }
@@ -143,6 +144,7 @@ void GameplayState::Update(double dt)
     {
         if (!m_undergroundAccessed)
         {
+            m_tutorial->DisableAll();
             HandleRooftopToUndergroundTransition();
         }
     }
@@ -151,8 +153,9 @@ void GameplayState::Update(double dt)
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
-    bool isPressingE = input.IsKeyPressed(Input::Key::E);
-    bool isPressingF = input.IsKeyPressed(Input::Key::F);
+
+    bool isPressingInteract = input.IsKeyPressed(Input::Key::I);
+    bool isPressingAttack = input.IsKeyPressed(Input::Key::J);
 
     const float PULSE_COST_PER_SECOND = 1.0f;
 
@@ -166,11 +169,11 @@ void GameplayState::Update(double dt)
     }
 
     pulseManager->Update(playerCenter, playerHitboxSize, player, m_room->GetPulseSources(),
-        m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), isPressingE, dt);
+        m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(), isPressingInteract, dt);
 
     Drone* targetDrone = nullptr;
 
-    if (isPressingF)
+    if (isPressingAttack)
     {
         if (player.GetPulseCore().getPulse().Value() > PULSE_COST_PER_SECOND * dt)
         {
@@ -245,7 +248,7 @@ void GameplayState::Update(double dt)
         }
     }
 
-    if (isPressingF && targetDrone != nullptr)
+    if (isPressingAttack && targetDrone != nullptr)
     {
         player.GetPulseCore().getPulse().spend(PULSE_COST_PER_SECOND * static_cast<float>(dt));
 
@@ -272,7 +275,7 @@ void GameplayState::Update(double dt)
             for (auto& drone : m_underground->GetDrones()) drone.ResetDamageTimer();
         }
 
-        if (input.IsKeyTriggered(Input::Key::F))
+        if (input.IsKeyTriggered(Input::Key::J))
         {
             m_door->Update(player, true);
             m_rooftopDoor->Update(player, true);

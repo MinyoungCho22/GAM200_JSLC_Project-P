@@ -53,6 +53,7 @@ public:
     Math::Vec2 GetSize() const { return size; }
     Math::Vec2 GetHitboxSize() const;
     Math::Vec2 GetHitboxCenter() const;
+    Math::Vec2 GetVelocity() const { return velocity; }
     PulseCore& GetPulseCore() { return m_pulseCore; }
     bool IsDashing() const { return is_dashing; }
     bool IsFacingRight() const;
@@ -86,4 +87,6 @@ private:
     unsigned int VAO = 0;
     unsigned int VBO = 0;
     bool m_is_flipped = false;
+    bool can_double_jump = false;
+    bool is_double_jumping = false;
 };

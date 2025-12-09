@@ -1,5 +1,6 @@
 #pragma once
 #include "../Engine/Vec2.hpp"
+#include "../Game/PulseSource.hpp"
 #include <memory>
 #include <vector>
 
@@ -24,6 +25,13 @@ public:
         Math::Vec2 size;
     };
 
+    struct Ramp
+    {
+        Math::Vec2 pos;
+        Math::Vec2 size;
+        bool isLeftLow;
+    };
+
     void Initialize();
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
     void Draw(Shader& shader) const;
@@ -36,6 +44,8 @@ public:
     std::vector<Drone>& GetDrones();
     void ClearAllDrones();
 
+    std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
+
 private:
     std::unique_ptr<Background> m_background;
     Math::Vec2 m_position;
@@ -43,4 +53,8 @@ private:
     std::unique_ptr<DroneManager> m_droneManager;
 
     std::vector<Obstacle> m_obstacles;
+
+    std::vector<Ramp> m_ramps;
+
+    std::vector<PulseSource> m_pulseSources;
 };

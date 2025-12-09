@@ -163,6 +163,7 @@
     <ClCompile Include="Game\PulseGauge.cpp" />
     <ClCompile Include="Game\PulseManager.cpp" />
     <ClCompile Include="Game\PulseSource.cpp" />
+    <ClCompile Include="Game\Robot.cpp" />
     <ClCompile Include="Game\Rooftop.cpp" />
     <ClCompile Include="Game\Room.cpp" />
     <ClCompile Include="Game\Setting.cpp" />
@@ -202,6 +203,7 @@
     <ClInclude Include="Game\PulseManager.hpp" />
     <ClInclude Include="Game\PulseSource.hpp" />
     <ClInclude Include="Game\PulseCore.hpp" />
+    <ClInclude Include="Game\Robot.hpp" />
     <ClInclude Include="Game\Rooftop.hpp" />
     <ClInclude Include="Game\Room.hpp" />
     <ClInclude Include="Game\Setting.hpp" />

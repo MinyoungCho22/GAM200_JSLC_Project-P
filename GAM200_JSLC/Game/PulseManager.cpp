@@ -106,6 +106,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     Player& player, std::vector<PulseSource>& roomSources,
     std::vector<PulseSource>& hallwaySources,
     std::vector<PulseSource>& rooftopSources,
+    std::vector<PulseSource>& undergroundSources,
     bool is_interact_key_pressed, double dt)
 {
     m_vfxTimer += static_cast<float>(dt);
@@ -137,6 +138,10 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     }
 
     for (auto& source : rooftopSources)
+    {
+        checkSource(source);
+    }
+    for (auto& source : undergroundSources)
     {
         checkSource(source);
     }

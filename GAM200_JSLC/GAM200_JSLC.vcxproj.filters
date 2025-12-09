@@ -115,6 +115,9 @@
     <ClCompile Include="Game\Underground.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Robot.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\Engine.hpp">
@@ -226,6 +229,9 @@
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\Underground.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Robot.hpp">
       <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>

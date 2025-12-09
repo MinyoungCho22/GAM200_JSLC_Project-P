@@ -79,6 +79,8 @@ void Player::Init(Math::Vec2 startPos)
     position = startPos;
     velocity = Math::Vec2(0.0f, 0.0f);
     m_currentGroundLevel = GROUND_LEVEL;
+    can_double_jump = false;
+    is_double_jumping = false;
 
     std::vector<float> vertices = {
         -0.5f,  0.5f,   0.0f, 1.0f,
@@ -137,7 +139,9 @@ void Player::Update(double dt, Input::Input& input)
 
     if (input.IsKeyPressed(Input::Key::A)) MoveLeft();
     if (input.IsKeyPressed(Input::Key::D)) MoveRight();
-    if (input.IsKeyPressed(Input::Key::Space)) Jump();
+
+    if (input.IsKeyTriggered(Input::Key::Space)) Jump();
+
     if (input.IsKeyPressed(Input::Key::S)) Crouch();
     else StopCrouch();
     if (input.IsKeyPressed(Input::Key::LeftShift)) Dash();
@@ -178,6 +182,8 @@ void Player::Update(double dt, Input::Input& input)
             velocity.y = 0;
         }
         is_on_ground = true;
+        is_double_jumping = false;
+        can_double_jump = false;
     }
 
 
@@ -205,7 +211,11 @@ void Player::Update(double dt, Input::Input& input)
     else if (!is_on_ground)
     {
         m_currentAnimState = AnimationState::Walking;
-        m_animations[static_cast<int>(AnimationState::Walking)].currentFrame = 4;
+
+
+        int airFrame = is_double_jumping ? 5 : 4;
+
+        m_animations[static_cast<int>(AnimationState::Walking)].currentFrame = airFrame;
         m_animations[static_cast<int>(AnimationState::Walking)].timer = 0.0f;
     }
     else
@@ -314,20 +324,11 @@ Math::Vec2 Player::GetHitboxSize() const
 
 Math::Vec2 Player::GetHitboxCenter() const
 {
-    if (is_crouching)
-    {
+    Math::Vec2 currentHitboxSize = GetHitboxSize();
+    float spriteFootY = position.y - (size.y / 2.0f);
+    float hitboxCenterY = spriteFootY + (currentHitboxSize.y / 2.0f);
 
-        float footY = position.y - (size.y / 2.0f);
-
-
-        float crouchedHitboxHalfHeight = (size.y * 0.5f) / 2.0f;
-
-        return { position.x, footY + crouchedHitboxHalfHeight };
-    }
-    else
-    {
-        return position;
-    }
+    return { position.x, hitboxCenterY };
 }
 
 void Player::MoveLeft()
@@ -352,6 +353,14 @@ void Player::Jump()
     {
         velocity.y = jump_velocity;
         is_on_ground = false;
+        can_double_jump = true;
+        is_double_jumping = false;
+    }
+    else if (can_double_jump && !is_crouching)
+    {
+        velocity.y = jump_velocity;
+        can_double_jump = false;
+        is_double_jumping = true;
     }
 }
 
