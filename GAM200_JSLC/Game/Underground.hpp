@@ -15,8 +15,14 @@ class Underground
 public:
     static constexpr float WIDTH = 7920.0f;
     static constexpr float HEIGHT = 1080.0f;
-    static constexpr float MIN_X = 16260.0f; // Rooftop(8400) + Hallway(1920) 등을 고려해 우측에 배치
+    static constexpr float MIN_X = 16260.0f;
     static constexpr float MIN_Y = -2000.0f;
+
+    struct Obstacle
+    {
+        Math::Vec2 pos;
+        Math::Vec2 size;
+    };
 
     void Initialize();
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
@@ -35,4 +41,6 @@ private:
     Math::Vec2 m_position;
     Math::Vec2 m_size;
     std::unique_ptr<DroneManager> m_droneManager;
+
+    std::vector<Obstacle> m_obstacles;
 };

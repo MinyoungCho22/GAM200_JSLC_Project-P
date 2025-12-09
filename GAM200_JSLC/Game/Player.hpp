@@ -80,7 +80,7 @@ private:
     const float m_invincibilityDuration = 2.0f;
     float m_currentGroundLevel = 180.0f;
     float move_speed = 300.0f;
-    float jump_velocity = 600.0f;
+    float jump_velocity = 900.0f;
     float dash_speed = 900.0f;
     float dash_duration = 0.15f;
     unsigned int VAO = 0;

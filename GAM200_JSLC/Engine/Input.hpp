@@ -11,6 +11,7 @@ namespace Input
         Num1 = 49,
         Num2 = 50,
         Num3 = 51,
+        Num4 = 52,
 
         A = 65,
         D = 68,

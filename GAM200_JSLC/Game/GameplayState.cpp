@@ -139,6 +139,14 @@ void GameplayState::Update(double dt)
         }
     }
 
+    if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num4))
+    {
+        if (!m_undergroundAccessed)
+        {
+            HandleRooftopToUndergroundTransition();
+        }
+    }
+
     m_tutorial->Update(static_cast<float>(dt), player, input, m_room.get(), m_hallway.get(), m_rooftop.get(), m_door.get(), m_rooftopDoor.get());
 
     Math::Vec2 playerCenter = player.GetPosition();
@@ -454,6 +462,8 @@ void GameplayState::HandleHallwayToRooftopTransition()
 
 void GameplayState::HandleRooftopToUndergroundTransition()
 {
+    m_rooftopAccessed = true;
+
     m_undergroundAccessed = true;
 
     m_rooftop->ClearAllDrones();

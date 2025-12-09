@@ -130,6 +130,11 @@ void Player::Update(double dt, Input::Input& input)
         return;
     }
 
+    if (velocity.y < 0.0f)
+    {
+        is_on_ground = false;
+    }
+
     if (input.IsKeyPressed(Input::Key::A)) MoveLeft();
     if (input.IsKeyPressed(Input::Key::D)) MoveRight();
     if (input.IsKeyPressed(Input::Key::Space)) Jump();
@@ -155,10 +160,7 @@ void Player::Update(double dt, Input::Input& input)
         }
     }
 
-    if (!is_on_ground)
-    {
-        velocity.y += GRAVITY * static_cast<float>(dt);
-    }
+    velocity.y += GRAVITY * static_cast<float>(dt);
 
     Math::Vec2 final_velocity = velocity;
     if (is_dashing)
@@ -177,6 +179,7 @@ void Player::Update(double dt, Input::Input& input)
         }
         is_on_ground = true;
     }
+
 
     if (is_crouching)
     {
@@ -313,9 +316,13 @@ Math::Vec2 Player::GetHitboxCenter() const
 {
     if (is_crouching)
     {
+
         float footY = position.y - (size.y / 2.0f);
-        float crouchedHitboxHeight = size.y * 0.5f;
-        return { position.x, footY + (crouchedHitboxHeight / 2.0f) };
+
+
+        float crouchedHitboxHalfHeight = (size.y * 0.5f) / 2.0f;
+
+        return { position.x, footY + crouchedHitboxHalfHeight };
     }
     else
     {
