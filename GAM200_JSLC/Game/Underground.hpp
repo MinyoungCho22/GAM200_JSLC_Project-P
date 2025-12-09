@@ -1,6 +1,7 @@
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseSource.hpp"
+#include "Robot.hpp" 
 #include <memory>
 #include <vector>
 
@@ -46,6 +47,8 @@ public:
 
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
 
+    std::vector<Robot>& GetRobots() { return m_robots; }
+
 private:
     std::unique_ptr<Background> m_background;
     Math::Vec2 m_position;
@@ -53,8 +56,7 @@ private:
     std::unique_ptr<DroneManager> m_droneManager;
 
     std::vector<Obstacle> m_obstacles;
-
     std::vector<Ramp> m_ramps;
-
     std::vector<PulseSource> m_pulseSources;
+    std::vector<Robot> m_robots;
 };

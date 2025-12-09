@@ -19,6 +19,30 @@ void Underground::Initialize()
 
     m_droneManager = std::make_unique<DroneManager>();
 
+    // 로봇 4마리 생성
+    std::vector<float> spawnXCoords = { 19513.0f, 18525.0f, 22793.0f, 23669.0f };
+    float centerY = MIN_Y + 800.0f;
+
+    for (float x : spawnXCoords)
+    {
+        m_robots.emplace_back();
+        m_robots.back().Init({ x, centerY });
+    }
+
+
+    // 첫 번째 장애물 근처 (1584 위치)
+    m_droneManager->SpawnDrone({ MIN_X + 1728.0f, -1350.0f }, "Asset/Drone.png", false);
+
+    // 두 번째 점프 구간 근처 (2466 위치)
+    m_droneManager->SpawnDrone({ MIN_X + 2746.0f, -1450.0f }, "Asset/Drone.png", false);
+
+    // 세 번째 장애물 근처 (4116 위치)
+    m_droneManager->SpawnDrone({ MIN_X + 4260.0f, -1350.0f }, "Asset/Drone.png", false);
+
+    // 네 번째 장애물(드론) 근처 (6825 위치)
+    m_droneManager->SpawnDrone({ MIN_X + 6973.0f, -1350.0f }, "Asset/Drone.png", false);
+
+
     auto AddObstacle = [&](float topLeftX, float topLeftY, float width, float height) {
         float worldCenterX = MIN_X + topLeftX + (width / 2.0f);
         float worldCenterY = MIN_Y + (HEIGHT - topLeftY) - (height / 2.0f);
@@ -40,15 +64,15 @@ void Underground::Initialize()
 
     AddPulseSource(243.f, 480.f, 408.f, 132.f);
     AddObstacle(939.f, 834.f, 561.f, 162.f);
-    AddObstacle(1584.f, 627.f, 288.f, 369.f);
+    AddObstacle(1584.f, 627.f, 288.f, 369.f); // 드론 1 배치
     AddPulseSource(1949.f, 309.f, 69.f, 255.f);
-    AddObstacle(2466.f, 834.f, 561.f, 162.f);
+    AddObstacle(2466.f, 834.f, 561.f, 162.f); // 드론 2 배치
     AddObstacle(3471.f, 834.f, 561.f, 162.f);
-    AddObstacle(4116.f, 627.f, 288.f, 369.f);
+    AddObstacle(4116.f, 627.f, 288.f, 369.f); // 드론 3 배치
     AddPulseSource(4485.f, 309.f, 69.f, 255.f);
     AddObstacle(5235.f, 834.f, 561.f, 162.f);
     AddPulseSource(5847.f, 375.f, 1013.f, 477.f);
-    AddObstacle(6825.f, 627.f, 296.f, 369.f);
+    AddObstacle(6825.f, 627.f, 296.f, 369.f); // 드론 4 배치
 
     float rampStartX = 23400.0f;
     float rampBottomY = -2010.0f;
@@ -62,6 +86,20 @@ void Underground::Initialize()
 void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
 {
     m_droneManager->Update(dt, player, playerHitboxSize, false);
+
+    // 모든 로봇 업데이트
+    std::vector<ObstacleInfo> obstacleInfos;
+    for (const auto& obs : m_obstacles) {
+        obstacleInfos.push_back({ obs.pos, obs.size });
+    }
+
+    float mapMinX = MIN_X;
+    float mapMaxX = MIN_X + WIDTH;
+
+    for (auto& robot : m_robots)
+    {
+        robot.Update(dt, player, obstacleInfos, mapMinX, mapMaxX);
+    }
 
     Math::Vec2 currentHitboxCenter = player.GetHitboxCenter();
     Math::Vec2 playerHalfSize = playerHitboxSize / 2.0f;
@@ -153,6 +191,13 @@ void Underground::Draw(Shader& shader) const
     Math::Matrix model = Math::Matrix::CreateTranslation(m_position) * Math::Matrix::CreateScale(m_size);
     shader.setMat4("model", model);
     m_background->Draw(shader, model);
+
+    // 모든 로봇 그리기
+    for (const auto& robot : m_robots)
+    {
+        robot.Draw(shader);
+    }
+
     m_droneManager->Draw(shader);
 }
 
@@ -164,6 +209,13 @@ void Underground::DrawRadars(const Shader& colorShader, DebugRenderer& debugRend
 void Underground::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     m_droneManager->DrawGauges(colorShader, debugRenderer);
+
+    // 모든 로봇 게이지 그리기
+    for (const auto& robot : m_robots)
+    {
+        robot.DrawGauge(colorShader, debugRenderer);
+        robot.DrawAlert(colorShader, debugRenderer);
+    }
 }
 
 void Underground::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
@@ -180,7 +232,16 @@ void Underground::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) c
 
     for (const auto& ramp : m_ramps)
     {
-        debugRenderer.DrawBox(colorShader, ramp.pos, ramp.size, { 1.0f, 1.0f }); // 노란색
+        debugRenderer.DrawBox(colorShader, ramp.pos, ramp.size, { 1.0f, 1.0f });
+    }
+
+    // 모든 로봇 히트박스 그리기
+    for (const auto& robot : m_robots)
+    {
+        if (!robot.IsDead())
+        {
+            debugRenderer.DrawBox(colorShader, robot.GetPosition(), robot.GetSize(), { 0.0f, 1.0f });
+        }
     }
 }
 
@@ -188,6 +249,12 @@ void Underground::Shutdown()
 {
     if (m_background) m_background->Shutdown();
     if (m_droneManager) m_droneManager->Shutdown();
+
+    // 모든 로봇 정리
+    for (auto& robot : m_robots)
+    {
+        robot.Shutdown();
+    }
 
     for (auto& source : m_pulseSources)
     {

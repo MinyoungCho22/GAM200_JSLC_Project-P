@@ -172,6 +172,7 @@ void GameplayState::Update(double dt)
         m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(), isPressingInteract, dt);
 
     Drone* targetDrone = nullptr;
+    Robot* targetRobot = nullptr;
 
     if (isPressingAttack)
     {
@@ -179,58 +180,9 @@ void GameplayState::Update(double dt)
         {
             float closestDistSq = ATTACK_RANGE_SQ;
 
-            auto& roomDrones = droneManager->GetDrones();
-            for (auto& drone : roomDrones)
-            {
-                if (drone.IsDead() || drone.IsHit()) continue;
-                float distSq = (playerCenter - drone.GetPosition()).LengthSq();
-                Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
-                float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
-                float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
-                float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
-                if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
-                {
-                    closestDistSq = distSq;
-                    targetDrone = &drone;
-                }
-            }
-
-            auto& hallwayDrones = m_hallway->GetDrones();
-            for (auto& drone : hallwayDrones)
-            {
-                if (drone.IsDead() || drone.IsHit()) continue;
-                float distSq = (playerCenter - drone.GetPosition()).LengthSq();
-                Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
-                float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
-                float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
-                float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
-                if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
-                {
-                    closestDistSq = distSq;
-                    targetDrone = &drone;
-                }
-            }
-
-            auto& rooftopDrones = m_rooftop->GetDrones();
-            for (auto& drone : rooftopDrones)
-            {
-                if (drone.IsDead() || drone.IsHit()) continue;
-                float distSq = (playerCenter - drone.GetPosition()).LengthSq();
-                Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
-                float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
-                float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
-                float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
-                if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
-                {
-                    closestDistSq = distSq;
-                    targetDrone = &drone;
-                }
-            }
-
-            if (m_undergroundAccessed)
-            {
-                auto& undergroundDrones = m_underground->GetDrones();
-                for (auto& drone : undergroundDrones)
+            // 드론 탐색
+            auto checkDrones = [&](std::vector<Drone>& drones) {
+                for (auto& drone : drones)
                 {
                     if (drone.IsDead() || drone.IsHit()) continue;
                     float distSq = (playerCenter - drone.GetPosition()).LengthSq();
@@ -242,24 +194,78 @@ void GameplayState::Update(double dt)
                     {
                         closestDistSq = distSq;
                         targetDrone = &drone;
+                        targetRobot = nullptr;
+                    }
+                }
+                };
+
+            checkDrones(droneManager->GetDrones());
+            checkDrones(m_hallway->GetDrones());
+            checkDrones(m_rooftop->GetDrones());
+            if (m_undergroundAccessed) checkDrones(m_underground->GetDrones());
+
+            // 로봇 탐색 
+            if (m_undergroundAccessed)
+            {
+                // 벡터 받아오기
+                auto& robots = m_underground->GetRobots();
+
+                for (auto& robot : robots)
+                {
+                    if (robot.IsDead()) continue; // 죽은 로봇 제외
+
+                    float distSq = (playerCenter - robot.GetPosition()).LengthSq();
+
+                    Math::Vec2 robotSize = robot.GetSize();
+                    float robotRadius = (robotSize.x + robotSize.y) * 0.25f;
+
+                    float effectiveAttackRange = ATTACK_RANGE + robotRadius;
+                    float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+
+                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
+                    {
+                        closestDistSq = distSq;
+                        targetRobot = &robot;
+                        targetDrone = nullptr; // 로봇이 더 가까우면 드론 타겟 해제
                     }
                 }
             }
         }
     }
 
-    if (isPressingAttack && targetDrone != nullptr)
+    // 공격 실행 및 데미지 적용
+    if (isPressingAttack && (targetDrone != nullptr || targetRobot != nullptr))
     {
         player.GetPulseCore().getPulse().spend(PULSE_COST_PER_SECOND * static_cast<float>(dt));
 
-        bool didDroneDie = targetDrone->ApplyDamage(static_cast<float>(dt));
-        if (didDroneDie)
+        Math::Vec2 targetPos;
+
+        if (targetDrone != nullptr)
         {
-            m_traceSystem->OnDroneKilled(*droneManager);
+            bool didDroneDie = targetDrone->ApplyDamage(static_cast<float>(dt));
+            if (didDroneDie)
+            {
+                m_traceSystem->OnDroneKilled(*droneManager, player.GetPosition());
+            }
+            targetPos = targetDrone->GetPosition();
+        }
+        else if (targetRobot != nullptr)
+        {
+            // 로봇 공격 데미지 계산 
+            float damagePerSecond = 30.0f; // 기본 데미지 (사거리 내)
+
+            // 로봇과 플레이어가 접촉했는지 확인
+            if (Collision::CheckAABB(playerCenter, playerHitboxSize, targetRobot->GetPosition(), targetRobot->GetSize()))
+            {
+                damagePerSecond = 50.0f; // 접촉 시 데미지 증가
+            }
+
+            targetRobot->TakeDamage(damagePerSecond * static_cast<float>(dt));
+            targetPos = targetRobot->GetPosition();
         }
 
         Math::Vec2 vfxStartPos = { playerCenter.x + (player.IsFacingRight() ? 1 : -1) * (playerHitboxSize.x / 2.0f), playerCenter.y };
-        pulseManager->UpdateAttackVFX(true, vfxStartPos, targetDrone->GetPosition());
+        pulseManager->UpdateAttackVFX(true, vfxStartPos, targetPos);
 
         m_door->Update(player, false);
         m_rooftopDoor->Update(player, false);
