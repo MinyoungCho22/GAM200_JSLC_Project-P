@@ -49,7 +49,7 @@ void GameplayState::Initialize()
 
     droneManager = std::make_unique<DroneManager>();
 
-    m_pulseGauge.Initialize({ 75.f, GAME_HEIGHT * 0.75f - 20.0f }, { 40.f, 300.f });
+    m_pulseGauge.Initialize({ 75.f, GAME_HEIGHT * 0.75f - 70.0f }, { 40.f, 300.f });
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
 
@@ -413,6 +413,10 @@ void GameplayState::Update(double dt)
     ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
 
+    std::stringstream ss_warning;
+    ss_warning << "Warning Level: " << m_traceSystem->GetWarningLevel();
+    m_warningLevelText = m_font->PrintToTexture(*m_fontShader, ss_warning.str());
+
     if (player.IsDead())
     {
         gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver));
@@ -609,7 +613,7 @@ void GameplayState::Draw()
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, GAME_HEIGHT - 120.f }, 32.0f);
-
+    m_font->DrawBakedText(*m_fontShader, m_warningLevelText, { 20.f, GAME_HEIGHT - 160.f }, 32.0f);
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())
     {

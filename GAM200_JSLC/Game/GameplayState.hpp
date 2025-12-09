@@ -61,6 +61,7 @@ private:
     CachedTextureInfo m_fpsText;
     CachedTextureInfo m_pulseText;
     CachedTextureInfo m_debugToggleText;
+    CachedTextureInfo m_warningLevelText;
     Camera m_camera;
     std::unique_ptr<Hallway> m_hallway;
     std::unique_ptr<Rooftop> m_rooftop;

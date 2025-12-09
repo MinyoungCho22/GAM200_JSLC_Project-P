@@ -9,7 +9,7 @@ public:
     void Initialize();
 
     void OnDroneKilled(DroneManager& droneManager, Math::Vec2 spawnOrigin);
-
+    int GetWarningLevel() const { return m_warningLevel; }
 private:
     void SpawnTracerWave(DroneManager& droneManager, int warningLevel, Math::Vec2 origin);
 
