@@ -38,7 +38,7 @@ void GameplayState::Initialize()
     gsm.GetEngine().GetTextureShader().use();
     gsm.GetEngine().GetTextureShader().setInt("ourTexture", 0);
 
-    player.Init({ 300.0f, GROUND_LEVEL + 100.0f });
+    player.Init({ 200.0f, GROUND_LEVEL + 100.0f });
 
     pulseManager = std::make_unique<PulseManager>();
     pulseManager->Initialize();

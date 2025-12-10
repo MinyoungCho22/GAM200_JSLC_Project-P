@@ -6,7 +6,7 @@
 
 class Pulse {
 public:
-    explicit Pulse(float max = 100.0f, float start = 100.0f)
+    explicit Pulse(float max = 100.0f, float start = 20.0f)
         : pulse_max(max), pulse_value(start) {
     }
 
@@ -50,7 +50,7 @@ struct PulseTickResult {
 
 class PulseCore {
 public:
-    explicit PulseCore(float maxPulse = 100.f, float startPulse = 100.f, PulseConfig cfg = {})
+    explicit PulseCore(float maxPulse = 100.f, float startPulse = 20.f, PulseConfig cfg = {})
         : pulse(maxPulse, startPulse), config(cfg) {
     }
 
