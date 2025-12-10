@@ -8,7 +8,6 @@
 #include <stb_image.h>
 #pragma warning(pop)
 
-// GetPixel 헬퍼 구현 (RGBA 4채널)
 unsigned int Font::GetPixel(const unsigned char* data, int x, int y, int width, int channels) const
 {
     // stbi_load(false) 기준. (0,0)은 Top-Left
@@ -140,18 +139,15 @@ CachedTextureInfo Font::PrintToTexture(Shader& atlasShader, const std::string& t
         return { 0, 0, 0 };
     }
 
-    // 캐시 확인
     auto it = m_textCache.find(text);
     if (it != m_textCache.end())
     {
-        return it->second; // 캐시 히트
+        return it->second;
     }
 
-    // 캐시 미스: 새 텍스처 베이킹
     CachedTextureInfo newTextureInfo = BakeTextToTexture(atlasShader, text);
-    newTextureInfo.text = text; // 캐시 정보에 원본 텍스트 저장
+    newTextureInfo.text = text;
 
-    // 캐시에 저장
     m_textCache[text] = newTextureInfo;
     return newTextureInfo;
 }
@@ -164,18 +160,16 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
         return { 0, 0, 0 };
     }
 
-    // 새 타겟 텍스처 생성 (비어 있음)
     unsigned int newTexID = 0;
     GL::GenTextures(1, &newTexID);
     GL::BindTexture(GL_TEXTURE_2D, newTexID);
     GL::TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textSize.x, textSize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    // FBO 텍스처에도 GL_NEAREST 적용
+
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    // FBO 설정: 렌더링 대상을 이 텍스처로 변경
     GL::BindFramebuffer(GL_FRAMEBUFFER, m_fboID);
     GL::FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, newTexID, 0);
 
@@ -186,7 +180,6 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
         return { 0, 0, 0 };
     }
 
-    // FBO에 그리기
     GL::Viewport(0, 0, textSize.x, textSize.y);
     GL::ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
@@ -195,6 +188,8 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(textSize.x), 0.0f, static_cast<float>(textSize.y), -1.0f, 1.0f);
     atlasShader.setMat4("projection", projection);
     atlasShader.setBool("flipX", false);
+
+    atlasShader.setFloat("alpha", 1.0f);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, m_atlasTextureID);
@@ -209,7 +204,7 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
         auto it = m_charToRectMap.find(c);
         if (it == m_charToRectMap.end()) continue;
 
-        const auto& char_rect = it->second; // 타입: Math::IRect
+        const auto& char_rect = it->second;
 
         const Math::ivec2 char_size = {
             char_rect.top_right.x - char_rect.bottom_left.x,
@@ -223,28 +218,18 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
         Math::Matrix model = Math::Matrix::CreateTranslation(charCenter) * Math::Matrix::CreateScale({ static_cast<float>(char_size.x), static_cast<float>(char_size.y) });
         atlasShader.setMat4("model", model);
 
-        // UV Y좌표 계산 (stbi_load(false) 기준)
-
         float uv_x = static_cast<float>(char_rect.bottom_left.x) / m_atlasWidth;
         float uv_w = static_cast<float>(char_size.x) / m_atlasWidth;
         float uv_h = static_cast<float>(char_size.y) / m_atlasHeight;
         float uv_y = 1.0f - (static_cast<float>(char_rect.top_right.y) / m_atlasHeight);
 
-        // 1픽셀 보정으로 변경
-
-        // 1. 좌우 경계 보정 (X축) - 반 픽셀
         const float pixel_epsilon_x = 0.5f / m_atlasWidth;
         uv_x += pixel_epsilon_x;
         uv_w -= 2.0f * pixel_epsilon_x;
 
-        // 2. 상하 경계 보정 (Y축) - 1 픽셀
-        // 폰트 아틀라스의 y=0 (흰색)과 y=1 (글자 시작) 사이를 피하기 위해
-        // UV의 '위쪽'(top)을 1픽셀 내리고,
-        // UV의 '아래쪽'(bottom)을 1픽셀 올림
         const float one_pixel_y = 1.0f / m_atlasHeight;
-
-        uv_y += one_pixel_y; // UV의 bottom을 1픽셀 올림
-        uv_h -= 2.0f * one_pixel_y; // UV의 height를 2픽셀 줄임 (위 1, 아래 1)
+        uv_y += one_pixel_y;
+        uv_h -= 2.0f * one_pixel_y;
 
         atlasShader.setVec4("spriteRect", uv_x, uv_y, uv_w, uv_h);
 
@@ -253,7 +238,6 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
         current_x += char_size.x;
     }
 
-    // 원래 프레임버퍼(화면)로 복귀
     GL::BindFramebuffer(GL_FRAMEBUFFER, 0);
 
     return { newTexID, textSize.x, textSize.y };
@@ -277,13 +261,14 @@ void Font::DrawBakedText(Shader& textureShader, const CachedTextureInfo& texture
         position.y + renderHeight / 2.0f
     };
 
-   
     Math::Matrix model = Math::Matrix::CreateTranslation(center) *
         Math::Matrix::CreateScale({ renderWidth, -renderHeight });
     textureShader.setMat4("model", model);
 
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
+
+    textureShader.setFloat("alpha", 1.0f);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureInfo.textureID);

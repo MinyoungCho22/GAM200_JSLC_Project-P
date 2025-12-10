@@ -1,6 +1,4 @@
-﻿//SplashState.cpp
-
-#include "SplashState.hpp"
+﻿#include "SplashState.hpp"
 #include "MainMenu.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
@@ -18,6 +16,9 @@ SplashState::SplashState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 void SplashState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "SplashState Initialize");
+
+    timer = fadeInDuration + holdDuration + fadeOutDuration;
+    currentAlpha = 0.0f;
 
     float vertices[] = {
         -0.5f,  0.5f,   0.0f, 1.0f,
@@ -64,6 +65,24 @@ void SplashState::Initialize()
 void SplashState::Update(double dt)
 {
     timer -= dt;
+
+    if (timer > (holdDuration + fadeOutDuration))
+    {
+        double timePassed = (fadeInDuration + holdDuration + fadeOutDuration) - timer;
+        currentAlpha = static_cast<float>(timePassed / fadeInDuration);
+    }
+    else if (timer > fadeOutDuration)
+    {
+        currentAlpha = 1.0f;
+    }
+    else
+    {
+        currentAlpha = static_cast<float>(timer / fadeOutDuration);
+    }
+
+    if (currentAlpha < 0.0f) currentAlpha = 0.0f;
+    if (currentAlpha > 1.0f) currentAlpha = 1.0f;
+
     if (timer <= 0.0)
     {
         gsm.ChangeState(std::make_unique<MainMenu>(gsm));
@@ -75,8 +94,10 @@ void SplashState::Draw()
     GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
-    Engine& engine = gsm.GetEngine();
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    Engine& engine = gsm.GetEngine();
 
     Shader& textureShader = engine.GetTextureShader();
     textureShader.use();
@@ -92,12 +113,15 @@ void SplashState::Draw()
 
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
+    textureShader.setFloat("alpha", currentAlpha);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
     GL::BindVertexArray(VAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
     GL::BindVertexArray(0);
+
+    GL::Disable(GL_BLEND);
 }
 
 void SplashState::Shutdown()
@@ -105,5 +129,12 @@ void SplashState::Shutdown()
     GL::DeleteVertexArrays(1, &VAO);
     GL::DeleteBuffers(1, &VBO);
     GL::DeleteTextures(1, &textureID);
+
+    Engine& engine = gsm.GetEngine();
+    Shader& textureShader = engine.GetTextureShader();
+
+    textureShader.use();
+    textureShader.setFloat("alpha", 1.0f);
+
     Logger::Instance().Log(Logger::Severity::Info, "SplashState Shutdown");
 }

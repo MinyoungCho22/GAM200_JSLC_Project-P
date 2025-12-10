@@ -59,6 +59,9 @@ void Robot::Init(Math::Vec2 startPos)
     m_textureHighID = LoadTexture("Asset/Robot_High.png");
     m_textureLowID = LoadTexture("Asset/Robot_Low.png");
 
+    m_soundHigh.Load("Asset/Robot_High.mp3", false);
+    m_soundLow.Load("Asset/Robot_Low.mp3", false);
+
     float scaleFactor = 1.0f;
     m_size = { 396.0f * scaleFactor, 450.0f * scaleFactor };
 
@@ -92,6 +95,11 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     float fDt = static_cast<float>(dt);
     m_stateTimer -= fDt;
     m_attackCooldownTimer -= fDt;
+
+    if (m_staggerCooldown > 0.0f)
+    {
+        m_staggerCooldown -= fDt;
+    }
 
     Math::Vec2 playerPos = player.GetPosition();
     float distToPlayer = std::abs(playerPos.x - m_position.x);
@@ -155,6 +163,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         {
             m_state = RobotState::Attack;
             m_stateTimer = ATTACK_DURATION;
+            m_hasPlayedAttackSound = false;
             Logger::Instance().Log(Logger::Severity::Event, "Robot Attack! Type: %d", (int)m_currentAttack);
         }
         break;
@@ -162,20 +171,31 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     case RobotState::Attack:
         m_velocity.x = 0.0f;
 
+        if (!m_hasPlayedAttackSound)
+        {
+            if (m_currentAttack == AttackType::HighSweep)
+            {
+                m_soundHigh.Play();
+            }
+            else if (m_currentAttack == AttackType::LowSweep)
+            {
+                m_soundLow.Play();
+            }
+            m_hasPlayedAttackSound = true;
+        }
 
         if (!m_hasDealtDamage)
         {
-
-            Math::Vec2 attackBoxSize = { 600.0f, 50.0f };
+            Math::Vec2 attackBoxSize = { 500.0f, 150.0f }; //////////////////////////////////////////////////////////////////
             Math::Vec2 attackBoxPos = { 0.0f, 0.0f };
 
             if (m_currentAttack == AttackType::LowSweep)
             {
-                attackBoxPos = { m_position.x, m_position.y - m_size.y / 2.0f + 50.0f };
+                attackBoxPos = { m_position.x, m_position.y - m_size.y / 2.0f + 75.0f };
             }
             else if (m_currentAttack == AttackType::HighSweep)
             {
-                attackBoxPos = { m_position.x, m_position.y + m_size.y / 2.0f - 50.0f };
+                attackBoxPos = { m_position.x, m_position.y + m_size.y / 2.0f - 75.0f };
             }
 
             if (Collision::CheckAABB(player.GetHitboxCenter(), player.GetHitboxSize(), attackBoxPos, attackBoxSize))
@@ -363,13 +383,13 @@ void Robot::DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const
     {
         if (m_currentAttack == AttackType::LowSweep)
         {
-            float yPos = m_position.y - m_size.y / 2.0f + 50.0f;
-            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 600.0f, 50.0f }, { 1.0f, 0.0f });
+            float yPos = m_position.y - m_size.y / 2.0f + 75.0f;
+            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 500.0f, 150.0f }, { 1.0f, 0.0f });
         }
         else if (m_currentAttack == AttackType::HighSweep)
         {
-            float yPos = m_position.y + m_size.y / 2.0f - 50.0f;
-            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 600.0f, 50.0f }, { 1.0f, 0.0f });
+            float yPos = m_position.y + m_size.y / 2.0f - 75.0f;
+            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 500.0f, 150.0f }, { 1.0f, 0.0f }); ///////////////////////////////////////
         }
     }
 }
@@ -380,8 +400,13 @@ void Robot::TakeDamage(float amount)
 
     m_hp -= amount;
 
-    m_state = RobotState::Stagger;
-    m_stateTimer = 0.3f;
+    if (m_staggerCooldown <= 0.0f)
+    {
+        m_state = RobotState::Stagger;
+        m_stateTimer = 0.3f;
+        m_staggerCooldown = STAGGER_COOLDOWN_DURATION;
+        Logger::Instance().Log(Logger::Severity::Event, "Robot Staggered!");
+    }
 
     if (m_hp <= 0.0f)
     {
@@ -398,4 +423,6 @@ void Robot::Shutdown()
     GL::DeleteTextures(1, &m_textureID);
     GL::DeleteTextures(1, &m_textureHighID);
     GL::DeleteTextures(1, &m_textureLowID);
+    m_soundHigh.Stop();
+    m_soundLow.Stop();
 }

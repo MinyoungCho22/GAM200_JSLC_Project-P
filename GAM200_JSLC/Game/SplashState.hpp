@@ -17,7 +17,12 @@ public:
 private:
     GameStateManager& gsm;
 
-    double timer = 2.0;
+    double timer = 0.0;
+    float currentAlpha = 0.0f;
+    const double fadeInDuration = 1.0;
+    const double holdDuration = 2.0;
+    const double fadeOutDuration = 1.0;
+
     unsigned int VAO = 0;
     unsigned int VBO = 0;
     unsigned int textureID = 0;
