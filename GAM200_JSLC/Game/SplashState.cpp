@@ -20,6 +20,10 @@ void SplashState::Initialize()
     timer = fadeInDuration + holdDuration + fadeOutDuration;
     currentAlpha = 0.0f;
 
+    logoSound.Load("Asset/DigiPen.mp3");
+    logoSound.Play();
+    logoSound.SetVolume(0.0f);
+
     float vertices[] = {
         -0.5f,  0.5f,   0.0f, 1.0f,
          0.5f, -0.5f,   1.0f, 0.0f,
@@ -64,6 +68,8 @@ void SplashState::Initialize()
 
 void SplashState::Update(double dt)
 {
+    SoundSystem::Instance().Update();
+
     timer -= dt;
 
     if (timer > (holdDuration + fadeOutDuration))
@@ -82,6 +88,8 @@ void SplashState::Update(double dt)
 
     if (currentAlpha < 0.0f) currentAlpha = 0.0f;
     if (currentAlpha > 1.0f) currentAlpha = 1.0f;
+
+    logoSound.SetVolume(currentAlpha);
 
     if (timer <= 0.0)
     {
@@ -126,6 +134,7 @@ void SplashState::Draw()
 
 void SplashState::Shutdown()
 {
+    logoSound.Stop();
     GL::DeleteVertexArrays(1, &VAO);
     GL::DeleteBuffers(1, &VBO);
     GL::DeleteTextures(1, &textureID);

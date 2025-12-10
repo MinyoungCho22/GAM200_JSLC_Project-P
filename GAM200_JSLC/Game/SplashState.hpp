@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "../Engine/GameState.hpp"
+#include "../Engine/Sound.hpp"
 #include <memory>
 
 class GameStateManager;
@@ -28,4 +29,6 @@ private:
     unsigned int textureID = 0;
     int imageWidth = 0;
     int imageHeight = 0;
+
+    Sound logoSound;
 };
