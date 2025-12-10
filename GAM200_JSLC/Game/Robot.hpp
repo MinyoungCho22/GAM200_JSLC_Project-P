@@ -32,9 +32,7 @@ class Robot
 {
 public:
     void Init(Math::Vec2 startPos);
-
     void Update(double dt, Player& player, const std::vector<ObstacleInfo>& obstacles, float mapMinX, float mapMaxX);
-
     void Draw(const Shader& shader) const;
     void DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const;
@@ -48,7 +46,13 @@ public:
 private:
     void DecideAttackPattern();
 
+    unsigned int LoadTexture(const char* path);
+
     unsigned int m_textureID = 0;
+
+    unsigned int m_textureHighID = 0;
+    unsigned int m_textureLowID = 0;
+
     unsigned int m_VAO = 0;
     unsigned int m_VBO = 0;
 
@@ -69,7 +73,6 @@ private:
     int m_consecutiveAttackCount = 0;
     float m_attackCooldownTimer = 0.0f;
 
-    // 공격 판정 중복 방지 플래그
     bool m_hasDealtDamage = false;
 
     const float GRAVITY = -1500.0f;

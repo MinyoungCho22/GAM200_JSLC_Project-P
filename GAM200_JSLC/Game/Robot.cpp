@@ -17,17 +17,11 @@
 static std::default_random_engine robot_gen;
 static std::uniform_real_distribution<float> robot_dist(0.0f, 1.0f);
 
-void Robot::Init(Math::Vec2 startPos)
+unsigned int Robot::LoadTexture(const char* path)
 {
-    m_position = startPos;
-    m_velocity = { 0.0f, 0.0f };
-    m_hp = 100.0f;
-    m_state = RobotState::Patrol;
-
-    const char* texturePath = "Asset/Robot.png";
-
-    GL::GenTextures(1, &m_textureID);
-    GL::BindTexture(GL_TEXTURE_2D, m_textureID);
+    unsigned int textureID;
+    GL::GenTextures(1, &textureID);
+    GL::BindTexture(GL_TEXTURE_2D, textureID);
 
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -36,24 +30,37 @@ void Robot::Init(Math::Vec2 startPos)
 
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load(texturePath, &width, &height, &nrChannels, 0);
+    unsigned char* data = stbi_load(path, &width, &height, &nrChannels, 0);
 
     if (data)
     {
         GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
         GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         GL::GenerateMipmap(GL_TEXTURE_2D);
-
-        float scaleFactor = 1.0f;
-        m_size = { 396.0f * scaleFactor, 450.0f * scaleFactor };
-
         stbi_image_free(data);
-        Logger::Instance().Log(Logger::Severity::Info, "Robot initialized at (%.1f, %.1f)", startPos.x, startPos.y);
+        Logger::Instance().Log(Logger::Severity::Info, "Robot Texture Loaded: %s", path);
     }
     else
     {
-        Logger::Instance().Log(Logger::Severity::Error, "Failed to load Robot texture: %s", texturePath);
+        Logger::Instance().Log(Logger::Severity::Error, "Failed to load texture: %s", path);
+        stbi_image_free(data);
     }
+    return textureID;
+}
+
+void Robot::Init(Math::Vec2 startPos)
+{
+    m_position = startPos;
+    m_velocity = { 0.0f, 0.0f };
+    m_hp = 100.0f;
+    m_state = RobotState::Patrol;
+
+    m_textureID = LoadTexture("Asset/Robot.png");
+    m_textureHighID = LoadTexture("Asset/Robot_High.png");
+    m_textureLowID = LoadTexture("Asset/Robot_Low.png");
+
+    float scaleFactor = 1.0f;
+    m_size = { 396.0f * scaleFactor, 450.0f * scaleFactor };
 
     float vertices[] = {
         -0.5f,  0.5f,   0.0f, 1.0f,
@@ -155,25 +162,22 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     case RobotState::Attack:
         m_velocity.x = 0.0f;
 
-        // 빨간 박스(경고 박스)와 플레이어 히트박스 충돌 검사
+
         if (!m_hasDealtDamage)
         {
-            // DrawAlert에서 그리는 빨간 박스와 동일한 크기 및 위치
-            Math::Vec2 attackBoxSize = { 600.0f, 50.0f }; // 너비 600, 높이 50
+
+            Math::Vec2 attackBoxSize = { 600.0f, 50.0f };
             Math::Vec2 attackBoxPos = { 0.0f, 0.0f };
 
             if (m_currentAttack == AttackType::LowSweep)
             {
-                // DrawAlert의 LowSweep 박스 위치 계산식
                 attackBoxPos = { m_position.x, m_position.y - m_size.y / 2.0f + 50.0f };
             }
             else if (m_currentAttack == AttackType::HighSweep)
             {
-                // DrawAlert의 HighSweep 박스 위치 계산식
                 attackBoxPos = { m_position.x, m_position.y + m_size.y / 2.0f - 50.0f };
             }
 
-            // 플레이어가 실제 빨간 박스 안에 들어와 있는지 체크 (AABB 충돌)
             if (Collision::CheckAABB(player.GetHitboxCenter(), player.GetHitboxSize(), attackBoxPos, attackBoxSize))
             {
                 player.TakeDamage(20.0f);
@@ -313,8 +317,23 @@ void Robot::Draw(const Shader& shader) const
     shader.setBool("flipX", flipX);
     shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
 
+    unsigned int textureToBind = m_textureID;
+
+    if (m_state == RobotState::Windup || m_state == RobotState::Attack)
+    {
+        if (m_currentAttack == AttackType::HighSweep)
+        {
+            textureToBind = m_textureHighID;
+        }
+        else if (m_currentAttack == AttackType::LowSweep)
+        {
+            textureToBind = m_textureLowID;
+        }
+    }
+
     GL::ActiveTexture(GL_TEXTURE0);
-    GL::BindTexture(GL_TEXTURE_2D, m_textureID);
+    GL::BindTexture(GL_TEXTURE_2D, textureToBind);
+
     GL::BindVertexArray(m_VAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
     GL::BindVertexArray(0);
@@ -323,22 +342,16 @@ void Robot::Draw(const Shader& shader) const
 void Robot::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     if (m_state == RobotState::Dead) return;
-
     float barWidth = 150.0f;
     float barHeight = 15.0f;
     float yOffset = m_size.y / 2.0f + 30.0f;
-
     Math::Vec2 barPos = { m_position.x, m_position.y + yOffset };
-
     debugRenderer.DrawBox(colorShader, barPos, { barWidth + 4.0f, barHeight + 4.0f }, { 0.0f, 0.0f });
-
     float ratio = m_hp / m_maxHp;
     if (ratio < 0.0f) ratio = 0.0f;
     float fillWidth = barWidth * ratio;
-
     float leftEdge = barPos.x - (barWidth / 2.0f);
     float fillCenterX = leftEdge + (fillWidth / 2.0f);
-
     debugRenderer.DrawBox(colorShader, { fillCenterX, barPos.y }, { fillWidth, barHeight }, { 1.0f, 0.0f });
 }
 
@@ -383,4 +396,6 @@ void Robot::Shutdown()
     GL::DeleteVertexArrays(1, &m_VAO);
     GL::DeleteBuffers(1, &m_VBO);
     GL::DeleteTextures(1, &m_textureID);
+    GL::DeleteTextures(1, &m_textureHighID);
+    GL::DeleteTextures(1, &m_textureLowID);
 }
