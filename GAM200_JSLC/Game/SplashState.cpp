@@ -16,7 +16,8 @@ SplashState::SplashState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 void SplashState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "SplashState Initialize");
-
+    GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    GL::Clear(GL_COLOR_BUFFER_BIT);
     timer = fadeInDuration + holdDuration + fadeOutDuration;
     currentAlpha = 0.0f;
 
@@ -69,7 +70,7 @@ void SplashState::Initialize()
 void SplashState::Update(double dt)
 {
     SoundSystem::Instance().Update();
-
+    
     timer -= dt;
 
     if (timer > (holdDuration + fadeOutDuration))

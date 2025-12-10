@@ -1,5 +1,3 @@
-//MainMenu.hpp
-
 #pragma once
 #include "../Engine/GameState.hpp"
 #include "Font.hpp"
@@ -22,5 +20,7 @@ private:
 
     std::unique_ptr<Font> m_font;
     std::unique_ptr<Shader> m_fontShader;
+
     CachedTextureInfo m_promptText;
+    CachedTextureInfo m_titleText;
 };

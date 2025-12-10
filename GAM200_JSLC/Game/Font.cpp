@@ -8,6 +8,7 @@
 #include <stb_image.h>
 #pragma warning(pop)
 
+
 unsigned int Font::GetPixel(const unsigned char* data, int x, int y, int width, int channels) const
 {
     // stbi_load(false) 기준. (0,0)은 Top-Left
@@ -21,7 +22,6 @@ unsigned int Font::GetPixel(const unsigned char* data, int x, int y, int width, 
 
 void Font::Initialize(const char* fontAtlasPath)
 {
-    // stbi_load(false) (엔진의 다른 텍스처 로딩과 일관성 유지)
     stbi_set_flip_vertically_on_load(false);
 
     int width, height, nrChannels;
@@ -79,7 +79,6 @@ void Font::Initialize(const char* fontAtlasPath)
     GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
     GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 
-    // GL_NEAREST는 여기서 사용
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -88,7 +87,7 @@ void Font::Initialize(const char* fontAtlasPath)
     stbi_image_free(data);
 
     std::vector<float> vertices = {
-        // positions   // texture Coords
+        // positions    // texture Coords
         -0.5f,  0.5f,  0.0f, 1.0f, // Top-left
          0.5f, -0.5f,  1.0f, 0.0f, // Bottom-right
         -0.5f, -0.5f,  0.0f, 0.0f, // Bottom-left
@@ -139,15 +138,18 @@ CachedTextureInfo Font::PrintToTexture(Shader& atlasShader, const std::string& t
         return { 0, 0, 0 };
     }
 
+    // 캐시 확인
     auto it = m_textCache.find(text);
     if (it != m_textCache.end())
     {
-        return it->second;
+        return it->second; // 캐시 히트
     }
 
+    // 캐시 미스: 새 텍스처 베이킹
     CachedTextureInfo newTextureInfo = BakeTextToTexture(atlasShader, text);
-    newTextureInfo.text = text;
+    newTextureInfo.text = text; // 캐시 정보에 원본 텍스트 저장
 
+    // 캐시에 저장
     m_textCache[text] = newTextureInfo;
     return newTextureInfo;
 }
@@ -165,8 +167,11 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
     GL::BindTexture(GL_TEXTURE_2D, newTexID);
     GL::TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textSize.x, textSize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
-    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // FBO 텍스처를 확대할 때 부드럽게 보이도록 GL_LINEAR 사용
+    // GL_NEAREST -> GL_LINEAR로 변경
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
@@ -188,7 +193,6 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(textSize.x), 0.0f, static_cast<float>(textSize.y), -1.0f, 1.0f);
     atlasShader.setMat4("projection", projection);
     atlasShader.setBool("flipX", false);
-
     atlasShader.setFloat("alpha", 1.0f);
 
     GL::ActiveTexture(GL_TEXTURE0);
@@ -218,16 +222,22 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
         Math::Matrix model = Math::Matrix::CreateTranslation(charCenter) * Math::Matrix::CreateScale({ static_cast<float>(char_size.x), static_cast<float>(char_size.y) });
         atlasShader.setMat4("model", model);
 
+
         float uv_x = static_cast<float>(char_rect.bottom_left.x) / m_atlasWidth;
         float uv_w = static_cast<float>(char_size.x) / m_atlasWidth;
         float uv_h = static_cast<float>(char_size.y) / m_atlasHeight;
         float uv_y = 1.0f - (static_cast<float>(char_rect.top_right.y) / m_atlasHeight);
 
+
+
+
         const float pixel_epsilon_x = 0.5f / m_atlasWidth;
         uv_x += pixel_epsilon_x;
         uv_w -= 2.0f * pixel_epsilon_x;
 
+
         const float one_pixel_y = 1.0f / m_atlasHeight;
+
         uv_y += one_pixel_y;
         uv_h -= 2.0f * one_pixel_y;
 
@@ -260,6 +270,7 @@ void Font::DrawBakedText(Shader& textureShader, const CachedTextureInfo& texture
         position.x + renderWidth / 2.0f,
         position.y + renderHeight / 2.0f
     };
+
 
     Math::Matrix model = Math::Matrix::CreateTranslation(center) *
         Math::Matrix::CreateScale({ renderWidth, -renderHeight });

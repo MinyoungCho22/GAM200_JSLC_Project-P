@@ -1,5 +1,3 @@
-//MainMenu.cpp
-
 #include "MainMenu.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Input.hpp"
@@ -20,6 +18,8 @@ void MainMenu::Initialize()
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
+    // 타이틀과 안내 문구 텍스처
+    m_titleText = m_font->PrintToTexture(*m_fontShader, "Blue Heart");
     m_promptText = m_font->PrintToTexture(*m_fontShader, "Press ENTER to help the protagonist!");
 }
 
@@ -43,15 +43,25 @@ void MainMenu::Draw()
 
     m_fontShader->use();
     m_fontShader->setMat4("projection", projection);
+    m_fontShader->setFloat("alpha", 1.0f);
 
-    float textHeight = 60.0f;
-    float textWidth = m_promptText.width * (textHeight / m_font->m_fontHeight);
-    Math::Vec2 textPos = {
-        (GAME_WIDTH - textWidth) / 2.0f,
-        (GAME_HEIGHT / 2.0f)
+    // 타이틀 (Blue Heart) - 화면 중앙보다 조금 위
+    float titleHeight = 150.0f; // 타이틀 크기를 키움
+    float titleWidth = m_titleText.width * (titleHeight / m_font->m_fontHeight);
+    Math::Vec2 titlePos = {
+        (GAME_WIDTH - titleWidth) / 2.0f,
+        (GAME_HEIGHT / 2.0f) + 150.0f // Y축 +방향으로 올려서 배치
     };
+    m_font->DrawBakedText(*m_fontShader, m_titleText, titlePos, titleHeight);
 
-    m_font->DrawBakedText(*m_fontShader, m_promptText, textPos, textHeight);
+    // 안내 문구 (Press ENTER...) - 화면 아래쪽으로 내림
+    float promptHeight = 50.0f; // 안내 문구는 작게
+    float promptWidth = m_promptText.width * (promptHeight / m_font->m_fontHeight);
+    Math::Vec2 promptPos = {
+        (GAME_WIDTH - promptWidth) / 2.0f,
+        (GAME_HEIGHT / 2.0f) - 300.0f // Y축 -방향으로 내려서 배치
+    };
+    m_font->DrawBakedText(*m_fontShader, m_promptText, promptPos, promptHeight);
 
     GL::Disable(GL_BLEND);
 }
