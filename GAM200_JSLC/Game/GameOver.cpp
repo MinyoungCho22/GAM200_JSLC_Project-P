@@ -96,11 +96,15 @@ void GameOver::Draw()
             DrawRect(x, y, w, t, r, g, b);          // 하단 바
             break;
         case 'R':
-            DrawRect(x, y, t, h, r, g, b);          // 좌측 기둥
-            DrawRect(x, y + h - t, w, t, r, g, b);  // 상단 바
-            DrawRect(x + w - t, y + h * 0.5f, t, h * 0.5f, r, g, b); // 우측 상단 둥근 부분
-            DrawRect(x, y + h * 0.5f, w, t, r, g, b); // 중간 바
-            DrawRect(x + w - t, y, t, h * 0.5f, r, g, b); // 우측 하단 다리
+            DrawRect(x, y, t, h, r, g, b);          // 좌측 기둥 (Left Pillar)
+            DrawRect(x, y + h - t, w, t, r, g, b);  // 상단 바 (Top Bar)
+            DrawRect(x + w - t, y + h * 0.5f, t, h * 0.5f, r, g, b); // 우측 상단 둥근 부분 (Right Top)
+            DrawRect(x, y + h * 0.5f, w, t, r, g, b); // 중간 바 (Middle Bar)
+
+            // 다리 윗부분: 중간 바 바로 아래, 약간 안쪽으로 들여서 그림
+            DrawRect(x + w - 2.0f * t, y + h * 0.25f, t, h * 0.25f, r, g, b);
+            // 다리 아랫부분: 바닥 쪽, 가장 우측에 그림
+            DrawRect(x + w - t, y, t, h * 0.25f, r, g, b);
             break;
         case 'M':
             DrawRect(x, y, t, h, r, g, b);          // 좌측 기둥
