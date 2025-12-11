@@ -498,14 +498,19 @@ void GameplayState::HandleHallwayToRooftopTransition()
     player.ResetVelocity();
     player.SetOnGround(false);
 
+    // Dynamic Camera Adjustment for Verticality (Rooftop Level)
     float worldMinX = Rooftop::MIN_X;
     float worldMaxX = Rooftop::MIN_X + Rooftop::WIDTH;
     float worldMinY = Rooftop::MIN_Y;
     float worldMaxY = Rooftop::MIN_Y + Rooftop::HEIGHT;
 
+    // Re-calculate camera bounds to fit the new vertical structure
     m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
+
+    // Adjust interpolation speed for tighter tracking on high-risk platforms
     m_cameraSmoothSpeed = 0.02f;
 
+    // Log transition for QA debugging
     Logger::Instance().Log(Logger::Severity::Event,
         "Rooftop: Player=(%.1f, %.1f), Ground=%.1f",
         playerStartX, playerStartY, newGroundLevel);

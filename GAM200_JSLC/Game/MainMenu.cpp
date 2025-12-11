@@ -22,9 +22,8 @@ void MainMenu::Initialize()
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
-    m_promptText = m_font->PrintToTexture(*m_fontShader, "Press ENTER to help the Jayce!");
+    m_promptText = m_font->PrintToTexture(*m_fontShader, "Press ENTER to help the Sia!");
     m_shapeShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
-
 
     float vertices[] = {
         0.0f, 0.0f, // Bottom-Left
@@ -70,7 +69,6 @@ void MainMenu::Draw()
 
     GL::BindVertexArray(m_shapeVAO);
 
-
     auto DrawRect = [&](float x, float y, float w, float h, float r, float g, float b) {
         Math::Matrix model = Math::Matrix::CreateTranslation({ x, y }) * Math::Matrix::CreateScale({ w, h });
         m_shapeShader->setMat4("model", model);
@@ -78,68 +76,58 @@ void MainMenu::Draw()
         GL::DrawArrays(GL_TRIANGLES, 0, 6);
         };
 
-
     auto DrawLetter = [&](char letter, float x, float y, float size, float r, float g, float b) {
         float t = size * 0.15f;
-        float h = size;
+        float h = size; 
         float w = size * 0.7f;
 
         switch (letter) {
-        case 'O':
-            DrawRect(x, y, w, t, r, g, b);          // 하단
+        case 'N':
+            // 좌측 기둥
+            DrawRect(x, y, t, h, r, g, b);
+            // 우측 기둥
+            DrawRect(x + w - t, y, t, h, r, g, b);
+
+            // N의 대각선
+            // 상단 작은 블록
+            DrawRect(x + t, y + h * 0.6f, t, h * 0.2f, r, g, b);
+            // 중간 블록
+            DrawRect(x + t * 1.5f, y + h * 0.4f, t, h * 0.2f, r, g, b);
+            // 하단 작은 블록 (우측 기둥과 연결)
+            DrawRect(x + t * 2.5f, y + h * 0.2f, t * 0.5f, h * 0.2f, r, g, b);
+            break;
+        case 'o':
+   
+            DrawRect(x, y, w, t, r, g, b);          // 하단 (바닥에 붙임)
             DrawRect(x, y + h - t, w, t, r, g, b);  // 상단
-            DrawRect(x, y, t, h, r, g, b);          // 좌측
-            DrawRect(x + w - t, y, t, h, r, g, b);  // 우측
+            DrawRect(x, y, t, h, r, g, b);          // 좌측 기둥 (전체 높이)
+            DrawRect(x + w - t, y, t, h, r, g, b);  // 우측 기둥 (전체 높이)
             break;
-        case 'V':
-            DrawRect(x, y + h * 0.3f, t, h * 0.7f, r, g, b);         // 좌측 기둥
-            DrawRect(x + w - t, y + h * 0.3f, t, h * 0.7f, r, g, b); // 우측 기둥
-            DrawRect(x + t, y, t, h * 0.3f, r, g, b);                // 좌측 하단 대각 느낌
-            DrawRect(x + w - 2 * t, y, t, h * 0.3f, r, g, b);          // 우측 하단 대각 느낌
-            DrawRect(x + 2 * t, y, w - 4 * t, t, r, g, b);               // 바닥 점
+        case '.':
+            DrawRect(x + t, y, t * 1.5f, t * 1.5f, r, g, b); // 바닥 점
             break;
-        case 'E':
-            DrawRect(x, y, t, h, r, g, b);          // 좌측 기둥
-            DrawRect(x, y, w, t, r, g, b);          // 하단
-            DrawRect(x, y + h - t, w, t, r, g, b);  // 상단
-            DrawRect(x, y + h / 2 - t / 2, w * 0.7f, t, r, g, b); // 중간
+        case '9':
+            DrawRect(x, y + h - t, w, t, r, g, b);          // 상단
+            DrawRect(x, y + h / 2, t, h / 2, r, g, b);      // 좌측 상단
+            DrawRect(x + w - t, y, t, h, r, g, b);          // 우측 전체
+            DrawRect(x, y + h / 2, w, t, r, g, b);          // 중간
+            DrawRect(x, y, w, t, r, g, b);                  // 하단
             break;
-        case 'R':
-            DrawRect(x, y, t, h, r, g, b);          // 좌측 기둥
-            DrawRect(x, y + h - t, w, t, r, g, b);  // 상단
-            DrawRect(x + w - t, y + h / 2, t, h / 2, r, g, b); // 우측 상단
-            DrawRect(x, y + h / 2 - t / 2, w, t, r, g, b);     // 중간
-            DrawRect(x + w - t, y, t, h / 2, r, g, b);         // 우측 하단 다리
-            break;
-        case 'C':
-            DrawRect(x, y, t, h, r, g, b);          // 좌측
-            DrawRect(x, y, w, t, r, g, b);          // 하단
-            DrawRect(x, y + h - t, w, t, r, g, b);  // 상단
-            break;
-        case 'L':
-            DrawRect(x, y, t, h, r, g, b);          // 좌측
-            DrawRect(x, y, w, t, r, g, b);          // 하단
-            break;
-        case 'K':
-            DrawRect(x, y, t, h, r, g, b);          // 좌측 기둥
-            // 상단 대각선 (2개 블록)
-            DrawRect(x + t, y + h * 0.6f, t * 1.5f, h * 0.2f, r, g, b);
-            DrawRect(x + t * 2.5f, y + h * 0.75f, t * 1.5f, h * 0.25f, r, g, b);
-            // 하단 대각선 (2개 블록)
-            DrawRect(x + t, y + h * 0.25f, t * 1.5f, h * 0.2f, r, g, b);
-            DrawRect(x + t * 2.5f, y, t * 1.5f, h * 0.3f, r, g, b);
+        case ' ': // 공백
             break;
         }
         };
 
-    // 글리치 효과 계산
-    std::string title = "OVERCLOCK";
-    float startX = (GAME_WIDTH - (title.length() * 110.0f)) / 2.0f; // 중앙 정렬 얼추 계산
-    float startY = GAME_HEIGHT / 2.0f + 100.0f;
-    float fontSize = 130.0f;
-    float spacing = fontSize * 0.8f;
+    std::string title = "No. 99";
 
-    bool isGlitch = (rand() % 100) < 5; // 5% 확률로 글리치 발생
+    // 중앙 정렬 계산
+    float fontSize = 150.0f;
+    float spacing = fontSize * 0.8f;
+    float startX = (GAME_WIDTH - (title.length() * spacing)) / 2.0f;
+    float startY = GAME_HEIGHT / 2.0f + 100.0f;
+
+    // 글리치 효과 계산
+    bool isGlitch = (rand() % 100) < 5; // 5% 확률
     float glitchX = 0.0f;
     float glitchY = 0.0f;
 
@@ -149,12 +137,11 @@ void MainMenu::Draw()
         glitchY = (float)(rand() % 20 - 10);
     }
 
-    // 그림자 레이어 (네온 핑크, 글리치 시 흔들림)
+    // 그림자 레이어 (네온 핑크)
     for (size_t i = 0; i < title.length(); ++i)
     {
         float x = startX + i * spacing + glitchX;
         float y = startY + glitchY;
-        // 약간 우측 하단
         DrawLetter(title[i], x + 8.0f, y - 8.0f, fontSize, 1.0f, 0.0f, 1.0f);
     }
 
@@ -168,18 +155,17 @@ void MainMenu::Draw()
 
     GL::BindVertexArray(0);
 
+    // 안내 문구
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     m_fontShader->use();
     m_fontShader->setMat4("projection", projection);
 
-    // Alpha값 깜빡임 (0.2 ~ 1.0 사이 반복)
     float pulse = (static_cast<float>(std::sin(m_glitchTimer * 3.0f)) + 1.0f) * 0.5f;
     float alpha = pulse * 0.8f + 0.2f;
     m_fontShader->setFloat("alpha", alpha);
 
-    // 안내 문구 (Press ENTER...) - 화면 하단 배치
     float promptHeight = 40.0f;
     float promptWidth = m_promptText.width * (promptHeight / m_font->m_fontHeight);
     Math::Vec2 promptPos = {

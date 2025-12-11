@@ -14,6 +14,9 @@
 #include <stb_image.h>
 #pragma warning(pop)
 
+// 공격 시 돌진 속도 정의
+constexpr float ATTACK_DASH_SPEED = 800.0f;
+
 static std::default_random_engine robot_gen;
 static std::uniform_real_distribution<float> robot_dist(0.0f, 1.0f);
 
@@ -174,7 +177,8 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
 
     case RobotState::Attack:
-        m_velocity.x = 0.0f;
+        // 공격 상태: 플레이어 쪽으로 빠르게 대시
+        m_velocity.x = m_directionX * ATTACK_DASH_SPEED;
 
         if (!m_hasPlayedAttackSound)
         {
@@ -305,7 +309,9 @@ void Robot::Draw(const Shader& shader) const
 
     unsigned int textureToBind = m_textureID;
 
-    if (m_state == RobotState::Windup || m_state == RobotState::Attack)
+    // [수정] Windup(준비) 상태일 때는 기본 이미지를 유지하고,
+    // 오직 Attack(공격) 상태일 때만 상단/하단 공격 이미지를 바인딩합니다.
+    if (m_state == RobotState::Attack)
     {
         if (m_currentAttack == AttackType::HighSweep)
         {
