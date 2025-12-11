@@ -1,6 +1,4 @@
-﻿//Hallway.hpp
-
-#pragma once
+﻿#pragma once
 #include "../Engine/Vec2.hpp"
 #include "PulseSource.hpp"
 #include "DroneManager.hpp"
@@ -27,7 +25,11 @@ public:
 
     void Initialize();
     void Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPlayerHiding);
+
     void Draw(Shader& shader);
+
+    void DrawForeground(Shader& shader);
+
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
@@ -48,6 +50,9 @@ public:
 
 private:
     std::unique_ptr<Background> m_background;
+
+    std::unique_ptr<Background> m_railing;
+
     Math::Vec2 m_position;
     Math::Vec2 m_size;
     std::vector<PulseSource> m_pulseSources;

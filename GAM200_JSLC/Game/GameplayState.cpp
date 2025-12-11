@@ -626,7 +626,7 @@ void GameplayState::Draw()
     textureShader.setMat4("projection", projection);
     droneManager->Draw(textureShader);
     player.Draw(textureShader);
-
+    m_hallway->DrawForeground(textureShader);
     textureShader.use();
     textureShader.setMat4("projection", projection);
     pulseManager->DrawVFX(textureShader);

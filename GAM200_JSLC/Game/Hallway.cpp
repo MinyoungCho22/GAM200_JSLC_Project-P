@@ -7,6 +7,7 @@
 #include "../Engine/Logger.hpp"
 #include "../Engine/DebugRenderer.hpp"
 #include <algorithm> 
+#include <cmath>
 
 constexpr float ROOM_WIDTH = 1920.0f;
 
@@ -14,6 +15,10 @@ void Hallway::Initialize()
 {
     m_background = std::make_unique<Background>();
     m_background->Initialize("Asset/Hallway.png");
+
+    m_railing = std::make_unique<Background>();
+    m_railing->Initialize("Asset/Railing.png");
+
     m_size = { WIDTH, HEIGHT };
     m_position = { ROOM_WIDTH + WIDTH / 2.0f, HEIGHT / 2.0f };
 
@@ -121,6 +126,31 @@ void Hallway::Draw(Shader& shader)
     m_droneManager->Draw(shader);
 }
 
+
+void Hallway::DrawForeground(Shader& shader)
+{
+    if (!m_railing) return;
+
+    float railW = 240.0f;
+    float railH = 207.0f;
+
+    int railCount = static_cast<int>(std::ceil(WIDTH / railW));
+
+    float startX = ROOM_WIDTH + (railW / 2.0f);
+    float startY = railH / 2.0f;
+
+    for (int i = 0; i < railCount; ++i)
+    {
+        Math::Vec2 railPos = { startX + (i * railW), startY };
+        Math::Vec2 railSize = { railW, railH };
+
+        Math::Matrix railModel = Math::Matrix::CreateTranslation(railPos) * Math::Matrix::CreateScale(railSize);
+
+        shader.setMat4("model", railModel);
+        m_railing->Draw(shader, railModel);
+    }
+}
+
 void Hallway::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     m_droneManager->DrawRadars(colorShader, debugRenderer);
@@ -136,6 +166,11 @@ void Hallway::Shutdown()
     if (m_background)
     {
         m_background->Shutdown();
+    }
+
+    if (m_railing)
+    {
+        m_railing->Shutdown();
     }
 
     for (auto& source : m_pulseSources)
