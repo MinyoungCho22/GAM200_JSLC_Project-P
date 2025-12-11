@@ -1,6 +1,4 @@
-﻿//Door.cpp
-
-#include "Door.hpp"
+﻿#include "Door.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -16,6 +14,7 @@ void Door::Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost, Doo
     m_doorType = type;
     m_isPlayerNearby = false;
     m_shouldLoadNextMap = false;
+    m_isOpened = false;
 
     float vertices[] = {
         -0.5f,  0.5f,
@@ -38,6 +37,8 @@ void Door::Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost, Doo
 
 void Door::Update(Player& player, bool isInteractKeyPressed)
 {
+    if (m_isOpened) return;
+
     Math::Vec2 playerCenter = player.GetPosition();
 
     if (m_doorType == DoorType::HallwayToRooftop)
@@ -65,6 +66,7 @@ void Door::Update(Player& player, bool isInteractKeyPressed)
         {
             player.GetPulseCore().getPulse().spend(m_pulseCost);
             m_shouldLoadNextMap = true;
+            m_isOpened = true;
 
             if (m_doorType == DoorType::HallwayToRooftop)
             {
@@ -94,7 +96,9 @@ void Door::DrawDebug(Shader& shader) const
 
     shader.setMat4("model", model);
 
-    if (m_isPlayerNearby)
+    if (m_isOpened)
+        shader.setVec3("objectColor", 0.5f, 0.5f, 0.5f);
+    else if (m_isPlayerNearby)
         shader.setVec3("objectColor", 0.0f, 1.0f, 0.0f);
     else
         shader.setVec3("objectColor", 1.0f, 1.0f, 0.0f);

@@ -1,5 +1,3 @@
-//Door.hpp
-
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include <memory>
@@ -25,6 +23,7 @@ public:
     void ResetMapTransition() { m_shouldLoadNextMap = false; }
 
     bool IsPlayerNearby() const { return m_isPlayerNearby; }
+    bool IsOpened() const { return m_isOpened; }
 
 private:
     Math::Vec2 m_position{};
@@ -33,5 +32,6 @@ private:
     DoorType m_doorType = DoorType::RoomToHallway;
     bool m_isPlayerNearby = false;
     bool m_shouldLoadNextMap = false;
+    bool m_isOpened = false;
     unsigned int VAO = 0, VBO = 0;
 };

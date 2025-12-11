@@ -108,6 +108,7 @@ void GameplayState::Initialize()
     m_fpsTimer = 0.0;
     m_frameCount = 0;
     m_isGameOver = false;
+    m_doorOpened = false;
 }
 
 void GameplayState::Update(double dt)
@@ -130,6 +131,20 @@ void GameplayState::Update(double dt)
     if (input.IsKeyTriggered(Input::Key::Tab))
     {
         m_isDebugDraw = !m_isDebugDraw;
+    }
+
+    if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num2))
+    {
+        if (!m_doorOpened)
+        {
+            m_tutorial->DisableAll();
+            HandleRoomToHallwayTransition();
+
+            player.SetPosition({ 2000.0f, GROUND_LEVEL + 100.0f });
+            player.ResetVelocity();
+
+            Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleported to Hallway");
+        }
     }
 
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num3))
@@ -181,7 +196,6 @@ void GameplayState::Update(double dt)
         {
             float closestDistSq = ATTACK_RANGE_SQ;
 
-            // 드론 탐색
             auto checkDrones = [&](std::vector<Drone>& drones) {
                 for (auto& drone : drones)
                 {
@@ -205,15 +219,13 @@ void GameplayState::Update(double dt)
             checkDrones(m_rooftop->GetDrones());
             if (m_undergroundAccessed) checkDrones(m_underground->GetDrones());
 
-            // 로봇 탐색 
             if (m_undergroundAccessed)
             {
-                // 벡터 받아오기
                 auto& robots = m_underground->GetRobots();
 
                 for (auto& robot : robots)
                 {
-                    if (robot.IsDead()) continue; // 죽은 로봇 제외
+                    if (robot.IsDead()) continue;
 
                     float distSq = (playerCenter - robot.GetPosition()).LengthSq();
 
@@ -227,14 +239,13 @@ void GameplayState::Update(double dt)
                     {
                         closestDistSq = distSq;
                         targetRobot = &robot;
-                        targetDrone = nullptr; // 로봇이 더 가까우면 드론 타겟 해제
+                        targetDrone = nullptr;
                     }
                 }
             }
         }
     }
 
-    // 공격 실행 및 데미지 적용
     if (isPressingAttack && (targetDrone != nullptr || targetRobot != nullptr))
     {
         player.GetPulseCore().getPulse().spend(PULSE_COST_PER_SECOND * static_cast<float>(dt));
@@ -252,13 +263,11 @@ void GameplayState::Update(double dt)
         }
         else if (targetRobot != nullptr)
         {
-            // 로봇 공격 데미지 계산 
-            float damagePerSecond = 30.0f; // 기본 데미지 (사거리 내)
+            float damagePerSecond = 30.0f;
 
-            // 로봇과 플레이어가 접촉했는지 확인
             if (Collision::CheckAABB(playerCenter, playerHitboxSize, targetRobot->GetPosition(), targetRobot->GetSize()))
             {
-                damagePerSecond = 50.0f; // 접촉 시 데미지 증가
+                damagePerSecond = 50.0f;
             }
 
             targetRobot->TakeDamage(damagePerSecond * static_cast<float>(dt));
@@ -284,7 +293,15 @@ void GameplayState::Update(double dt)
 
         if (input.IsKeyTriggered(Input::Key::J))
         {
-            m_door->Update(player, true);
+            if (m_room->IsBlindOpen())
+            {
+                m_door->Update(player, true);
+            }
+            else
+            {
+                m_door->Update(player, false);
+            }
+
             m_rooftopDoor->Update(player, true);
         }
         else
@@ -319,6 +336,22 @@ void GameplayState::Update(double dt)
 
     droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
     player.Update(dt, input);
+
+    if (m_doorOpened)
+    {
+        float leftLimit = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + 235.0f;
+
+        if (player.GetPosition().x < leftLimit)
+        {
+            player.SetPosition({ leftLimit, player.GetPosition().y });
+
+            Math::Vec2 currentVel = player.GetVelocity();
+            if (currentVel.x < 0.0f)
+            {
+                player.ResetVelocity();
+            }
+        }
+    }
 
     auto& drones = droneManager->GetDrones();
     for (auto& drone : drones)

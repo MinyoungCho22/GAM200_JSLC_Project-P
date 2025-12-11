@@ -1,6 +1,4 @@
-﻿//Room.hpp
-
-#pragma once
+﻿#pragma once
 #include "Background.hpp"
 #include "PulseSource.hpp"
 #include "../Engine/Rect.hpp"
@@ -29,6 +27,7 @@ public:
     bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
 
     bool IsPlayerInBlindArea() const { return m_playerInBlindArea; }
+    bool IsBlindOpen() const { return m_isBright; }
 
 private:
     std::unique_ptr<Background> m_background;

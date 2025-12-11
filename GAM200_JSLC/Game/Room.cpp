@@ -1,6 +1,4 @@
-﻿//Room.cpp
-
-#include "Room.hpp"
+﻿#include "Room.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "Player.hpp"
@@ -133,7 +131,7 @@ void Room::Draw(Shader& textureShader) const
     }
     else
     {
-            m_background->Draw(textureShader, bg_model);
+        m_background->Draw(textureShader, bg_model);
     }
 }
 

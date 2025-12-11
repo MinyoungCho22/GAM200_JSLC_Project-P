@@ -32,7 +32,7 @@ void Underground::Initialize()
         m_robots.back().Init({ x, robotY });
     }
 
-    float droneY = MIN_Y + 650.0f;
+    float droneY = MIN_Y + 550.0f;
 
     // 드론 속도 개별 설정
     // 1번 드론
