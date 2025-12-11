@@ -1,6 +1,6 @@
 #pragma once
 #include "../Engine/GameState.hpp"
-#include "Font.hpp"
+#include "../Game/Font.hpp"
 #include <memory>
 
 class GameStateManager;
@@ -22,5 +22,10 @@ private:
     std::unique_ptr<Shader> m_fontShader;
 
     CachedTextureInfo m_promptText;
-    CachedTextureInfo m_titleText;
+
+    std::unique_ptr<Shader> m_shapeShader;
+    unsigned int m_shapeVAO = 0;
+    unsigned int m_shapeVBO = 0;
+
+    double m_glitchTimer = 0.0;
 };

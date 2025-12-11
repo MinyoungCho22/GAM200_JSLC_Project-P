@@ -76,10 +76,13 @@ private:
     float m_staggerCooldown = 0.0f;
     bool m_hasDealtDamage = false;
 
+    float m_spawnX = 0.0f;
+    const float PATROL_RANGE = 1000.0f;
+
     const float GRAVITY = -1500.0f;
     const float PATROL_SPEED = 100.0f;
     const float CHASE_SPEED = 250.0f;
-    const float DETECTION_RANGE = 800.0f;
+    const float DETECTION_RANGE = 500.0f;
     const float ATTACK_RANGE = 350.0f;
     const float STAGGER_COOLDOWN_DURATION = 3.0f;
     const float WINDUP_TIME = 0.8f;

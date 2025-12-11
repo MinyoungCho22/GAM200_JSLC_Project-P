@@ -51,9 +51,11 @@ unsigned int Robot::LoadTexture(const char* path)
 void Robot::Init(Math::Vec2 startPos)
 {
     m_position = startPos;
+    m_spawnX = startPos.x;
     m_velocity = { 0.0f, 0.0f };
     m_hp = 100.0f;
     m_state = RobotState::Patrol;
+    m_directionX = 1.0f;
 
     m_textureID = LoadTexture("Asset/Robot.png");
     m_textureHighID = LoadTexture("Asset/Robot_High.png");
@@ -108,10 +110,13 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     switch (m_state)
     {
     case RobotState::Patrol:
-        if (m_stateTimer <= 0.0f)
+        if (m_position.x > m_spawnX + PATROL_RANGE)
         {
-            m_directionX = (robot_dist(robot_gen) > 0.5f) ? 1.0f : -1.0f;
-            m_stateTimer = 2.0f + robot_dist(robot_gen) * 2.0f;
+            m_directionX = -1.0f;
+        }
+        else if (m_position.x < m_spawnX - PATROL_RANGE)
+        {
+            m_directionX = 1.0f;
         }
         m_velocity.x = m_directionX * PATROL_SPEED;
 
@@ -142,7 +147,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
                 m_velocity.x = 0.0f;
             }
         }
-        else if (distToPlayer > DETECTION_RANGE * 1.5f)
+        else if (distToPlayer > DETECTION_RANGE)
         {
             m_state = RobotState::Patrol;
         }
@@ -186,7 +191,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
 
         if (!m_hasDealtDamage)
         {
-            Math::Vec2 attackBoxSize = { 500.0f, 150.0f }; //////////////////////////////////////////////////////////////////
+            Math::Vec2 attackBoxSize = { 590.0f, 150.0f };
             Math::Vec2 attackBoxPos = { 0.0f, 0.0f };
 
             if (m_currentAttack == AttackType::LowSweep)
@@ -246,52 +251,13 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         if (m_state == RobotState::Patrol || m_state == RobotState::Retreat) m_directionX = -1.0f;
     }
 
-    for (const auto& obs : obstacles)
-    {
-        if (Collision::CheckAABB(nextPos, { halfW * 2, m_size.y }, obs.pos, obs.size))
-        {
-            if (m_velocity.x > 0) nextPos.x = obs.pos.x - obs.size.x / 2.0f - halfW;
-            else if (m_velocity.x < 0) nextPos.x = obs.pos.x + obs.size.x / 2.0f + halfW;
-
-            if (m_state == RobotState::Patrol)
-            {
-                m_directionX *= -1.0f;
-            }
-            else if (m_state == RobotState::Chase)
-            {
-                m_state = RobotState::Retreat;
-                m_directionX *= -1.0f;
-                m_stateTimer = 1.5f;
-                Logger::Instance().Log(Logger::Severity::Event, "Robot hit wall, Retreating!");
-            }
-            else if (m_state == RobotState::Retreat)
-            {
-                m_directionX *= -1.0f;
-            }
-
-            break;
-        }
-    }
     m_position.x = nextPos.x;
 
     m_isOnGround = false;
     nextPos = m_position;
     nextPos.y += m_velocity.y * fDt;
 
-    for (const auto& obs : obstacles)
-    {
-        if (Collision::CheckAABB(nextPos, { halfW * 2, m_size.y }, obs.pos, obs.size))
-        {
-            if (m_velocity.y < 0 && m_position.y > obs.pos.y)
-            {
-                nextPos.y = obs.pos.y + obs.size.y / 2.0f + m_size.y / 2.0f;
-                m_velocity.y = 0.0f;
-                m_isOnGround = true;
-            }
-        }
-    }
-
-    float groundLimit = -1860.0f;
+    float groundLimit = -1910.0f;
     if (nextPos.y - m_size.y / 2.0f < groundLimit)
     {
         nextPos.y = groundLimit + m_size.y / 2.0f;
@@ -384,12 +350,12 @@ void Robot::DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const
         if (m_currentAttack == AttackType::LowSweep)
         {
             float yPos = m_position.y - m_size.y / 2.0f + 75.0f;
-            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 500.0f, 150.0f }, { 1.0f, 0.0f });
+            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 590.0f, 150.0f }, { 1.0f, 0.0f });
         }
         else if (m_currentAttack == AttackType::HighSweep)
         {
             float yPos = m_position.y + m_size.y / 2.0f - 75.0f;
-            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 500.0f, 150.0f }, { 1.0f, 0.0f }); ///////////////////////////////////////
+            debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 590.0f, 150.0f }, { 1.0f, 0.0f });
         }
     }
 }

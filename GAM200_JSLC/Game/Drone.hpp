@@ -1,6 +1,4 @@
-﻿//Drone.hpp
-
-#pragma once
+﻿#pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Engine/Sound.hpp"
 
@@ -20,7 +18,7 @@ public:
 
     bool ApplyDamage(float dt);
     void ResetDamageTimer();
-    void SetBaseSpeed(float speed) { m_baseSpeed = speed; m_currentSpeed = speed; }
+    void SetBaseSpeed(float speed);
 
     Math::Vec2 GetPosition() const { return m_position; }
     Math::Vec2 GetSize() const { return m_size; }
@@ -30,7 +28,7 @@ public:
     void ResetDamageFlag() { m_shouldDealDamage = false; }
     bool IsHit() const { return m_isHit; }
 
-    static constexpr float DETECTION_RANGE = 100.0f;
+    static constexpr float DETECTION_RANGE = 150.0f;
     static constexpr float DETECTION_RANGE_SQ = DETECTION_RANGE * DETECTION_RANGE;
     static constexpr float TIME_TO_DESTROY = 1.0f;
 
@@ -72,7 +70,7 @@ private:
 
     float m_radarAngle = 0.0f;
     const float m_radarRotationSpeed = 200.0f;
-    const float m_radarLength = 100.0f;
+    const float m_radarLength = 150.0f;
 
     float m_baseSpeed = 200.0f;
     float m_currentSpeed = 200.0f;

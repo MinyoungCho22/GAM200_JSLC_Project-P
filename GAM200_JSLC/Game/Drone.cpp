@@ -45,11 +45,10 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     m_searchRotation = 0.0f;
     m_searchDir = 1;
 
-    // 사운드 로드 및 재생 (처음엔 볼륨 0)
     if (m_moveSound.Load("Asset/drone_3.mp3", true))
     {
-        m_moveSound.Play();          // 재생
-        m_moveSound.SetVolume(0.0f); // 볼륨을 0으로 설정
+        m_moveSound.Play();
+        m_moveSound.SetVolume(0.0f);
     }
 
     float vertices[] = {
@@ -102,6 +101,12 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     stbi_image_free(data);
 }
 
+void Drone::SetBaseSpeed(float speed)
+{
+    m_baseSpeed = speed;
+    m_currentSpeed = speed;
+}
+
 void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding)
 {
     if (m_isDead)
@@ -110,8 +115,6 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         return;
     }
 
-    // 거리 기반 볼륨 조절
-    // 움직이거나 추적 중일 때
     if (m_velocity.LengthSq() > 10.0f || m_isChasing)
     {
         if (!m_moveSound.IsPlaying())
@@ -121,13 +124,10 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
 
         float distToPlayer = (player.GetPosition() - m_position).Length();
 
-        // 800 거리 밖에서는 안 들림
         float maxAudibleDist = 800.0f;
 
-        // 최대 볼륨 0.5
         float maxVolume = 0.5f;
 
-        // 거리가 가까울수록 1.0, 멀수록 0.0
         float volumeRatio = 1.0f - (distToPlayer / maxAudibleDist);
         if (volumeRatio < 0.0f) volumeRatio = 0.0f;
 
@@ -135,7 +135,6 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     }
     else
     {
-        // 멈추면 소리 끔
         m_moveSound.SetVolume(0.0f);
     }
 
@@ -332,7 +331,6 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     }
 }
 
-// ... (Draw, DrawRadar, Shutdown 등 기존 코드 유지)
 void Drone::Draw(const Shader& shader) const
 {
     Math::Matrix rotationMatrix = Math::Matrix::CreateIdentity();
@@ -421,7 +419,7 @@ void Drone::DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) c
 {
     if (m_isDead) return;
 
-    const int numLines = 12;
+    const int numLines = 14;
     const float sweepAngle = 45.0f;
     float halfSweep = sweepAngle / 2.0f;
 
@@ -435,6 +433,7 @@ void Drone::DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) c
 
         float brightness = 1.0f - (std::abs(i - numLines / 2.0f) / (numLines / 2.0f)) * 0.7f;
         debugRenderer.DrawLine(colorShader, m_position, lineEnd, brightness, 0.0f, 0.0f);
+
     }
 }
 

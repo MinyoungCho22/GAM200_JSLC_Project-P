@@ -487,7 +487,7 @@ void GameplayState::HandleRooftopToUndergroundTransition()
     float playerStartX = Underground::MIN_X + 100.0f;
     float playerStartY = Underground::MIN_Y + 300.0f;
 
-    float newGroundLevel = Underground::MIN_Y + 120.0f;
+    float newGroundLevel = Underground::MIN_Y + 90.0f;
     player.SetCurrentGroundLevel(newGroundLevel);
 
     player.SetPosition({ playerStartX, playerStartY });
