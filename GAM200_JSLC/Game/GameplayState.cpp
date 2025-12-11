@@ -334,6 +334,8 @@ void GameplayState::Update(double dt)
     bool isPlayerHidingInHallway = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     bool isPlayerHiding = isPlayerHidingInRoom || isPlayerHidingInHallway;
 
+    player.SetHiding(isPlayerHiding);
+
     droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
     player.Update(dt, input);
 

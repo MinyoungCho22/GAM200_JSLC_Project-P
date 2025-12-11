@@ -1,6 +1,4 @@
-﻿//Player.hpp
-
-#pragma once
+﻿#pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
 #include "../Engine/Input.hpp" 
@@ -49,6 +47,9 @@ public:
     void SetCurrentGroundLevel(float newGroundLevel);
     void ResetVelocity();
     void SetOnGround(bool onGround);
+
+    void SetHiding(bool hiding) { m_isHiding = hiding; }
+
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
     Math::Vec2 GetHitboxSize() const;
@@ -89,4 +90,5 @@ private:
     bool m_is_flipped = false;
     bool can_double_jump = false;
     bool is_double_jumping = false;
+    bool m_isHiding = false;
 };

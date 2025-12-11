@@ -1,6 +1,4 @@
-﻿//Player.cpp
-
-#include "Player.hpp"
+﻿#include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
@@ -267,6 +265,15 @@ void Player::Draw(const Shader& shader) const
     shader.setMat4("model", model);
     shader.setBool("flipX", m_is_flipped);
 
+    if (m_isHiding)
+    {
+        shader.setFloat("alpha", 0.5f);
+    }
+    else
+    {
+        shader.setFloat("alpha", 1.0f);
+    }
+
     const AnimationData& currentAnim = m_animations[static_cast<int>(m_currentAnimState)];
 
     float frame_x_offset = static_cast<float>(currentAnim.currentFrame * currentAnim.frameWidth);
@@ -282,6 +289,8 @@ void Player::Draw(const Shader& shader) const
     GL::BindVertexArray(VAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
     GL::BindVertexArray(0);
+
+    shader.setFloat("alpha", 1.0f);
 }
 
 void Player::Shutdown()

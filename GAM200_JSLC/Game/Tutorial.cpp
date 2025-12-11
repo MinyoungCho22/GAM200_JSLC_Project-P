@@ -5,7 +5,7 @@
 #include "Room.hpp"
 #include "Door.hpp"
 #include "../Engine/Input.hpp"        
-#include "../Engine/Collision.hpp"     
+#include "../Engine/Collision.hpp"      
 #include "../OpenGL/Shader.hpp" 
 
 constexpr float GAME_WIDTH = 1920.0f;
@@ -219,12 +219,12 @@ void Tutorial::Update(float dt, Player& player, const Input::Input& input, Room*
             }
             case TutorialMessage::Type::DoorInteractionRoom:
             {
-                msg.isActive = (roomDoor != nullptr && roomDoor->IsPlayerNearby());
+                msg.isActive = (roomDoor != nullptr && roomDoor->IsPlayerNearby() && !roomDoor->IsOpened());
                 break;
             }
             case TutorialMessage::Type::DoorInteractionRooftop:
             {
-                msg.isActive = (rooftopDoor != nullptr && rooftopDoor->IsPlayerNearby());
+                msg.isActive = (rooftopDoor != nullptr && rooftopDoor->IsPlayerNearby() && !rooftopDoor->IsOpened());
                 break;
             }
             case TutorialMessage::Type::LiftInteraction:
