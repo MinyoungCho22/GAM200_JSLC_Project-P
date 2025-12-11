@@ -175,7 +175,7 @@ void MainMenu::Draw()
     m_fontShader->setMat4("projection", projection);
 
     // Alpha°ª ±ôºıÀÓ (0.2 ~ 1.0 »çÀÌ ¹İº¹)
-    float pulse = (std::sin(m_glitchTimer * 3.0f) + 1.0f) * 0.5f;
+    float pulse = (static_cast<float>(std::sin(m_glitchTimer * 3.0f)) + 1.0f) * 0.5f;
     float alpha = pulse * 0.8f + 0.2f;
     m_fontShader->setFloat("alpha", alpha);
 
