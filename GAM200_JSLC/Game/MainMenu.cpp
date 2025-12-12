@@ -22,7 +22,7 @@ void MainMenu::Initialize()
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
-    m_promptText = m_font->PrintToTexture(*m_fontShader, "Press ENTER to help the Sia!");
+    m_promptText = m_font->PrintToTexture(*m_fontShader, "Press ENTER to help the City!");
     m_shapeShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
 
     float vertices[] = {
