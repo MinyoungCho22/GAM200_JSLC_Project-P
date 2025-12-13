@@ -35,8 +35,8 @@ SETTING -
 MAIN KEY
   - 'A' - MOVE LEFT
   - 'D' - MOVE RIGHT
-  - 'E' - ABSORB PURSE
-  - 'F' - FUNCTION KEY(OPEN DOOR, OPEN WINDOW, ETC)
+  - 'I' - ABSORB PURSE
+  - 'J' - FUNCTION KEY(OPEN DOOR, OPEN WINDOW, ETC)
   - 'S' - CROUCH, HIDE, ETC
   - 'SPACE' - JUMP
                            
