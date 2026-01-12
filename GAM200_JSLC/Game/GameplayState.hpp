@@ -4,6 +4,7 @@
 #include "../Engine/GameState.hpp"
 #include "../Engine/DebugRenderer.hpp"
 #include "../Engine/Camera.hpp"
+#include "../Engine/Sound.hpp"
 #include "Player.hpp"
 #include "PulseSource.hpp"
 #include "PulseManager.hpp"
@@ -74,4 +75,6 @@ private:
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;
     float m_cameraSmoothSpeed = 0.1f;
+
+    Sound m_bgm;
 };

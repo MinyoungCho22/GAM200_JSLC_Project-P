@@ -109,6 +109,13 @@ void GameplayState::Initialize()
     m_frameCount = 0;
     m_isGameOver = false;
     m_doorOpened = false;
+
+    if (m_bgm.Load("Asset/BackgroundMusic.mp3", true))
+    {
+        m_bgm.SetVolume(0.5f); // 볼륨 조절 (0.0f ~ 1.0f)
+        m_bgm.Play();
+    }
+
 }
 
 void GameplayState::Update(double dt)
@@ -741,6 +748,6 @@ void GameplayState::Shutdown()
     m_door->Shutdown();
     m_rooftopDoor->Shutdown();
     pulseManager->Shutdown();
-
+    m_bgm.Stop();
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
 }
