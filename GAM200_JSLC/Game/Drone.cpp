@@ -5,6 +5,7 @@
 #include "../Engine/Logger.hpp"
 #include "../Engine/DebugRenderer.hpp"
 #include "../OpenGL/GLWrapper.hpp"
+#include "../OpenGL/QuadMesh.hpp"
 #include <cmath>
 #include <random>
 
@@ -50,25 +51,6 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
         m_moveSound.Play();
         m_moveSound.SetVolume(0.0f);
     }
-
-    float vertices[] = {
-        -0.5f,  0.5f,   0.0f, 1.0f,
-         0.5f, -0.5f,   1.0f, 0.0f,
-        -0.5f, -0.5f,   0.0f, 0.0f,
-        -0.5f,  0.5f,   0.0f, 1.0f,
-         0.5f,  0.5f,   1.0f, 1.0f,
-         0.5f, -0.5f,   1.0f, 0.0f
-    };
-
-    GL::GenVertexArrays(1, &VAO);
-    GL::GenBuffers(1, &VBO);
-    GL::BindVertexArray(VAO);
-    GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
-    GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    GL::EnableVertexAttribArray(0);
-    GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    GL::EnableVertexAttribArray(1);
 
     GL::GenTextures(1, &textureID);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
@@ -410,9 +392,9 @@ void Drone::Draw(const Shader& shader) const
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
-    GL::BindVertexArray(VAO);
-    GL::DrawArrays(GL_TRIANGLES, 0, 6);
-    GL::BindVertexArray(0);
+    OpenGL::QuadMesh::Bind();
+    OpenGL::QuadMesh::Draw();
+    OpenGL::QuadMesh::Unbind();
 }
 
 void Drone::DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) const
@@ -439,8 +421,6 @@ void Drone::DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) c
 
 void Drone::Shutdown()
 {
-    GL::DeleteVertexArrays(1, &VAO);
-    GL::DeleteBuffers(1, &VBO);
     GL::DeleteTextures(1, &textureID);
     m_moveSound.Stop();
 }
@@ -487,8 +467,8 @@ void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
     colorShader.setMat4("model", bgModel);
     colorShader.setVec3("objectColor", 0.0f, 0.0f, 0.0f);
 
-    GL::BindVertexArray(VAO);
-    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    OpenGL::QuadMesh::Bind();
+    OpenGL::QuadMesh::Draw();
 
     float ratio = m_damageTimer / TIME_TO_DESTROY;
     if (ratio > 1.0f) ratio = 1.0f;
@@ -506,8 +486,8 @@ void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
     colorShader.setMat4("model", fgModel);
     colorShader.setVec3("objectColor", 1.0f, 0.0f, 0.0f);
 
-    GL::DrawArrays(GL_TRIANGLES, 0, 6);
-    GL::BindVertexArray(0);
+    OpenGL::QuadMesh::Draw();
+    OpenGL::QuadMesh::Unbind();
 }
 
 void Drone::ResetDamageTimer()

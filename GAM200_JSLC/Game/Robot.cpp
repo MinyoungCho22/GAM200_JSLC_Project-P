@@ -1,4 +1,4 @@
-#include "Robot.hpp"
+ï»¿#include "Robot.hpp"
 #include "Player.hpp" 
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -14,7 +14,7 @@
 #include <stb_image.h>
 #pragma warning(pop)
 
-// °ø°Ý ½Ã µ¹Áø ¼Óµµ Á¤ÀÇ
+// Robot attack dash speed
 constexpr float ATTACK_DASH_SPEED = 800.0f;
 
 static std::default_random_engine robot_gen;
@@ -177,7 +177,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
 
     case RobotState::Attack:
-        // °ø°Ý »óÅÂ: ÇÃ·¹ÀÌ¾î ÂÊÀ¸·Î ºü¸£°Ô ´ë½Ã
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
         m_velocity.x = m_directionX * ATTACK_DASH_SPEED;
 
         if (!m_hasPlayedAttackSound)
@@ -309,8 +309,8 @@ void Robot::Draw(const Shader& shader) const
 
     unsigned int textureToBind = m_textureID;
 
-    // [¼öÁ¤] Windup(ÁØºñ) »óÅÂÀÏ ¶§´Â ±âº» ÀÌ¹ÌÁö¸¦ À¯ÁöÇÏ°í,
-    // ¿ÀÁ÷ Attack(°ø°Ý) »óÅÂÀÏ ¶§¸¸ »ó´Ü/ÇÏ´Ü °ø°Ý ÀÌ¹ÌÁö¸¦ ¹ÙÀÎµùÇÕ´Ï´Ù.
+    // [ï¿½ï¿½ï¿½ï¿½] Windup(ï¿½Øºï¿½) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½âº» ï¿½Ì¹ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½,
+    // ï¿½ï¿½ï¿½ï¿½ Attack(ï¿½ï¿½ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½/ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¹ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Îµï¿½ï¿½Õ´Ï´ï¿½.
     if (m_state == RobotState::Attack)
     {
         if (m_currentAttack == AttackType::HighSweep)

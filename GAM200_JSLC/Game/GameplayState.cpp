@@ -355,16 +355,25 @@ void GameplayState::Update(double dt)
         }
     }
 
-    auto& drones = droneManager->GetDrones();
-    for (auto& drone : drones)
-    {
-        if (!drone.IsDead() && drone.ShouldDealDamage())
+    // Helper lambda to process drone damage
+    auto processDroneDamage = [this](std::vector<Drone>& drones, float damage) -> bool {
+        for (auto& drone : drones)
         {
-            player.TakeDamage(10.0f);
-            drone.ResetDamageFlag();
-            break;
+            if (!drone.IsDead() && drone.ShouldDealDamage())
+            {
+                player.TakeDamage(damage);
+                drone.ResetDamageFlag();
+                return true;
+            }
         }
-    }
+        return false;
+    };
+
+    // Process drone damage from all sources
+    if (processDroneDamage(droneManager->GetDrones(), 10.0f)) {}
+    else if (processDroneDamage(m_hallway->GetDrones(), 10.0f)) {}
+    else if (processDroneDamage(m_rooftop->GetDrones(), 10.0f)) {}
+    else if (m_undergroundAccessed && processDroneDamage(m_underground->GetDrones(), 20.0f)) {}
 
     const auto& pulse = player.GetPulseCore().getPulse();
     m_pulseGauge.Update(pulse.Value(), pulse.Max());
@@ -380,42 +389,6 @@ void GameplayState::Update(double dt)
     if (m_undergroundAccessed)
     {
         m_underground->Update(dt, player, playerHitboxSize);
-    }
-
-    auto& hallwayDrones = m_hallway->GetDrones();
-    for (auto& drone : hallwayDrones)
-    {
-        if (!drone.IsDead() && drone.ShouldDealDamage())
-        {
-            player.TakeDamage(10.0f);
-            drone.ResetDamageFlag();
-            break;
-        }
-    }
-
-    auto& rooftopDrones = m_rooftop->GetDrones();
-    for (auto& drone : rooftopDrones)
-    {
-        if (!drone.IsDead() && drone.ShouldDealDamage())
-        {
-            player.TakeDamage(10.0f);
-            drone.ResetDamageFlag();
-            break;
-        }
-    }
-
-    if (m_undergroundAccessed)
-    {
-        auto& undergroundDrones = m_underground->GetDrones();
-        for (auto& drone : undergroundDrones)
-        {
-            if (!drone.IsDead() && drone.ShouldDealDamage())
-            {
-                player.TakeDamage(20.0f);
-                drone.ResetDamageFlag();
-                break;
-            }
-        }
     }
 
     m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
@@ -445,8 +418,7 @@ void GameplayState::Update(double dt)
     }
 
     std::stringstream ss_pulse;
-    ss_pulse.precision(1);
-    ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
+    ss_pulse << std::fixed << std::setprecision(1) << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
 
     std::stringstream ss_warning;
@@ -579,7 +551,7 @@ void GameplayState::Draw()
 
     GL::Viewport(0, 0, windowWidth, windowHeight);
     GL::ClearColor(r, g, b, 1.0f);
-    GL::Clear(GL_COLOR_BUFFER_BIT);
+    GL::Clear(0x00004000); // GL_COLOR_BUFFER_BIT
 
     float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     float gameAspect = GAME_WIDTH / GAME_HEIGHT;
@@ -647,8 +619,8 @@ void GameplayState::Draw()
     colorShader->setMat4("projection", baseProjection);
     m_pulseGauge.Draw(*colorShader);
 
-    GL::Enable(GL_BLEND);
-    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    GL::Enable(0x0BE2); // GL_BLEND
+    GL::BlendFunc(0x0302, 0x0303); // GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
 
     m_fontShader->use();
     m_fontShader->setMat4("projection", baseProjection);

@@ -5,7 +5,8 @@
 #include "GameStateManager.hpp"
 #include "../Game/SplashState.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include "../OpenGL/Shader.hpp" 
+#include "../OpenGL/Shader.hpp"
+#include "../OpenGL/QuadMesh.hpp"
 #include <GLFW/glfw3.h>
 #include <algorithm> 
 
@@ -52,6 +53,9 @@ bool Engine::Initialize(const std::string& windowTitle)
 
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Initialize shared quad mesh for sprite rendering
+    OpenGL::QuadMesh::Initialize();
 
     m_gameStateManager = std::make_unique<GameStateManager>(*this);
     m_gameStateManager->PushState(std::make_unique<SplashState>(*m_gameStateManager));
@@ -194,6 +198,10 @@ void Engine::RequestShutdown()
 void Engine::Shutdown()
 {
     m_gameStateManager->Clear();
+    
+    // Shutdown shared quad mesh
+    OpenGL::QuadMesh::Shutdown();
+    
     if (m_window) {
         glfwDestroyWindow(m_window);
         m_window = nullptr;

@@ -2,6 +2,7 @@
 #include "Background.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp"
+#include "../OpenGL/QuadMesh.hpp"
 #include <iostream>
 
 #pragma warning(push, 0)
@@ -33,36 +34,10 @@ void Background::Initialize(const char* texturePath)
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     stbi_image_free(data);
-
-    float vertices[] = {
-        -0.5f,  0.5f,   0.0f, 1.0f,
-         0.5f, -0.5f,   1.0f, 0.0f,
-        -0.5f, -0.5f,   0.0f, 0.0f,
-
-        -0.5f,  0.5f,   0.0f, 1.0f,
-         0.5f,  0.5f,   1.0f, 1.0f,
-         0.5f, -0.5f,   1.0f, 0.0f
-    };
-
-    GL::GenVertexArrays(1, &VAO);
-    GL::GenBuffers(1, &VBO);
-    GL::BindVertexArray(VAO);
-
-    GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
-    GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    GL::EnableVertexAttribArray(0);
-    GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    GL::EnableVertexAttribArray(1);
-
-    GL::BindVertexArray(0);
 }
 
 void Background::Shutdown()
 {
-    GL::DeleteVertexArrays(1, &VAO);
-    GL::DeleteBuffers(1, &VBO);
     GL::DeleteTextures(1, &m_textureID);
 }
 
@@ -76,8 +51,7 @@ void Background::Draw(Shader& shader, const Math::Matrix& model)
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, m_textureID);
 
-    GL::BindVertexArray(VAO);
-    GL::DrawArrays(GL_TRIANGLES, 0, 6);
-
-    GL::BindVertexArray(0);
+    OpenGL::QuadMesh::Bind();
+    OpenGL::QuadMesh::Draw();
+    OpenGL::QuadMesh::Unbind();
 }

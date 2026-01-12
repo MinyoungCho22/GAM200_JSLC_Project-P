@@ -66,24 +66,28 @@
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.exe</TargetExt>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</GenerateManifest>
+    <LocalDebuggerWorkingDirectory Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:/Users/minyo/Desktop/DigiPen_Arc/GAM200/GAM200_JSLC_Project-P/build/bin/Debug</LocalDebuggerWorkingDirectory>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\build\bin\Release\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GAM200_JSLC.dir\Release\</IntDir>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GAM200_JSLC</TargetName>
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.exe</TargetExt>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</GenerateManifest>
+    <LocalDebuggerWorkingDirectory Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:/Users/minyo/Desktop/DigiPen_Arc/GAM200/GAM200_JSLC_Project-P/build/bin/Release</LocalDebuggerWorkingDirectory>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\build\bin\MinSizeRel\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">GAM200_JSLC.dir\MinSizeRel\</IntDir>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">GAM200_JSLC</TargetName>
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.exe</TargetExt>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkIncremental>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</GenerateManifest>
+    <LocalDebuggerWorkingDirectory Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:/Users/minyo/Desktop/DigiPen_Arc/GAM200/GAM200_JSLC_Project-P/build/bin/MinSizeRel</LocalDebuggerWorkingDirectory>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\build\bin\RelWithDebInfo\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">GAM200_JSLC.dir\RelWithDebInfo\</IntDir>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">GAM200_JSLC</TargetName>
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.exe</TargetExt>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</LinkIncremental>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</GenerateManifest>
+    <LocalDebuggerWorkingDirectory Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:/Users/minyo/Desktop/DigiPen_Arc/GAM200/GAM200_JSLC_Project-P/build/bin/RelWithDebInfo</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -461,40 +465,82 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\CS200\RGBA.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\CS200\RenderingAPI.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\CS200\RenderingAPI.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Camera.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Camera.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Collision.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Collision.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\DebugRenderer.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\DebugRenderer.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Engine.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Engine.hpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\GameState.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\GameStateManager.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\GameStateManager.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Input.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Input.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Logger.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Logger.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Matrix.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Matrix.hpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Rect.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Sound.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Sound.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Vec2.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Vec2.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Window.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Window.hpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\fmod.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Background.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Background.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Door.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Door.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Drone.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Drone.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\DroneManager.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\DroneManager.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Font.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Font.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameOver.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameOver.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameplayState.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameplayState.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Hallway.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Hallway.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\MainMenu.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\MainMenu.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Player.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Player.hpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseCore.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseGauge.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseGauge.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseManager.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseManager.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseSource.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseSource.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Robot.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Robot.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Rooftop.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Rooftop.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Room.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Room.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Setting.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Setting.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\SplashState.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\SplashState.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\TraceSystem.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\TraceSystem.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Tutorial.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Tutorial.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Underground.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Underground.hpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\GLWrapper.hpp" />
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\QuadMesh.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\QuadMesh.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shader.cpp" />
+    <ClInclude Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shader.hpp" />
     <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\main.cpp" />
   </ItemGroup>
   <ItemGroup />

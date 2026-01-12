@@ -22,7 +22,4 @@ private:
 
     float m_max_pulse = 0.0f;
     float m_current_pulse = 0.0f;
-
-    unsigned int VAO = 0;
-    unsigned int VBO = 0;
 };

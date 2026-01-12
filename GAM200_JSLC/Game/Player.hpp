@@ -85,8 +85,6 @@ private:
     float jump_velocity = 900.0f;
     float dash_speed = 900.0f;
     float dash_duration = 0.15f;
-    unsigned int VAO = 0;
-    unsigned int VBO = 0;
     bool m_is_flipped = false;
     bool can_double_jump = false;
     bool is_double_jumping = false;

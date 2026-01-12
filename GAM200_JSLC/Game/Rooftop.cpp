@@ -46,11 +46,11 @@ void Rooftop::Initialize()
 
     m_droneManager = std::make_unique<DroneManager>();
 
-    m_droneManager->SpawnDrone({ 8700.0f, 1700.0f }, "Asset/drone.png", false);
-    m_droneManager->SpawnDrone({ 13500.0f, 1900.0f }, "Asset/drone.png", true);
-    m_droneManager->SpawnDrone({ 14500.0f, 1750.0f }, "Asset/drone.png", true);
-    m_droneManager->SpawnDrone({ 15500.0f, 1700.0f }, "Asset/drone.png", false);
-    m_droneManager->SpawnDrone({ 17250.0f, 1800.0f }, "Asset/drone.png", true);
+    m_droneManager->SpawnDrone({ 8700.0f, 1700.0f }, "Asset/Drone.png", false);
+    m_droneManager->SpawnDrone({ 13500.0f, 1900.0f }, "Asset/Drone.png", true);
+    m_droneManager->SpawnDrone({ 14500.0f, 1750.0f }, "Asset/Drone.png", true);
+    m_droneManager->SpawnDrone({ 15500.0f, 1700.0f }, "Asset/Drone.png", false);
+    m_droneManager->SpawnDrone({ 17250.0f, 1800.0f }, "Asset/Drone.png", true);
 
     float width = 785.f;
     float height = 172.f;

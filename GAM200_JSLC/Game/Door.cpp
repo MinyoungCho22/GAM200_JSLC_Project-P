@@ -3,6 +3,7 @@
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
+#include "../OpenGL/QuadMesh.hpp"
 #include "../Engine/Collision.hpp"
 #include "../Engine/Logger.hpp"
 
@@ -15,24 +16,6 @@ void Door::Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost, Doo
     m_isPlayerNearby = false;
     m_shouldLoadNextMap = false;
     m_isOpened = false;
-
-    float vertices[] = {
-        -0.5f,  0.5f,
-         0.5f,  0.5f,
-        -0.5f, -0.5f,
-         0.5f,  0.5f,
-         0.5f, -0.5f,
-        -0.5f, -0.5f
-    };
-
-    GL::GenVertexArrays(1, &VAO);
-    GL::GenBuffers(1, &VBO);
-    GL::BindVertexArray(VAO);
-    GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
-    GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    GL::EnableVertexAttribArray(0);
-    GL::BindVertexArray(0);
 }
 
 void Door::Update(Player& player, bool isInteractKeyPressed, bool canProceed)
@@ -111,13 +94,11 @@ void Door::DrawDebug(Shader& shader) const
     else
         shader.setVec3("objectColor", 1.0f, 1.0f, 0.0f);
 
-    GL::BindVertexArray(VAO);
-    GL::DrawArrays(GL_TRIANGLES, 0, 6);
-    GL::BindVertexArray(0);
+    OpenGL::QuadMesh::Bind();
+    OpenGL::QuadMesh::Draw();
+    OpenGL::QuadMesh::Unbind();
 }
 
 void Door::Shutdown()
 {
-    GL::DeleteVertexArrays(1, &VAO);
-    GL::DeleteBuffers(1, &VBO);
 }

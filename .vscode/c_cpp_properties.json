@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/GAM200_JSLC",
-                "C:/vcpkg/installed/x64-windows/include"
+                "C:/vcpkg/installed/x64-windows/include",
+                "C:/vcpkg/installed/x64-windows/include/GL"
             ],
             "defines": [
                 "_DEBUG",

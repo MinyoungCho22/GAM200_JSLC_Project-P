@@ -6,15 +6,41 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Visual Studio에서 폴더 구조로 파일 표시
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/GAM200_JSLC/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/GAM200_JSLC/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/GAM200_JSLC/OpenGL/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/GAM200_JSLC/OpenGL/*.hpp
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
+
+# Visual Studio에서 원본 폴더 구조로 파일 그룹화
+foreach(SOURCE_FILE ${PROJECT_SOURCES})
+    # 상대 경로 계산
+    file(RELATIVE_PATH RELATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR} ${SOURCE_FILE})
+    # 디렉토리 경로 추출
+    get_filename_component(SOURCE_DIR ${RELATIVE_PATH} DIRECTORY)
+    # 슬래시를 백슬래시로 변환 (Visual Studio 형식)
+    if(SOURCE_DIR)
+        string(REPLACE "/" "\\" SOURCE_DIR ${SOURCE_DIR})
+        source_group("${SOURCE_DIR}" FILES ${SOURCE_FILE})
+    else()
+        source_group("" FILES ${SOURCE_FILE})
+    endif()
+endforeach()
+
+# Set working directory for Visual Studio debugger
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>"
+)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/GAM200_JSLC

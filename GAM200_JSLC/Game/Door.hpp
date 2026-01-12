@@ -33,5 +33,4 @@ private:
     bool m_isPlayerNearby = false;
     bool m_shouldLoadNextMap = false;
     bool m_isOpened = false;
-    unsigned int VAO = 0, VBO = 0;
 };
