@@ -1,8 +1,11 @@
 //Sound.cpp
 
+// Visual Studio에서는 pragma comment로 링크, CMake에서는 CMakeLists.txt에서 링크
+#ifndef CMAKE_BUILD
 #pragma comment(lib, "Engine/fmod_vc.lib")
-#include "Sound.hpp"
+#endif
 #include "Logger.hpp"
+#include "Sound.hpp"
 #include <iostream>
 
 
@@ -32,7 +35,7 @@ bool SoundSystem::Initialize()
         return false;
     }
 
-    Logger::Instance().Log(Logger::Severity::Info, "FMOD Audio System Initialized.");
+    //Logger::Instance().Log(Logger::Severity::Info, "FMOD Audio System Initialized.");
     return true;
 }
 

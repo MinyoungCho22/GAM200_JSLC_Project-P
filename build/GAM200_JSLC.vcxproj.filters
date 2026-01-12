@@ -1,0 +1,118 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\CS200\RenderingAPI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Collision.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\DebugRenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Engine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\GameStateManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Input.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Logger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Matrix.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Sound.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Vec2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Window.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Background.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Door.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Drone.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\DroneManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Font.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameOver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameplayState.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Hallway.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\MainMenu.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Player.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseGauge.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseSource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Robot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Rooftop.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Room.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Setting.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\SplashState.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\TraceSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Tutorial.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Underground.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\GAM200_JSLC\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\minyo\Desktop\DigiPen_Arc\GAM200\GAM200_JSLC_Project-P\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{75725DDB-58F2-316E-A768-6C12599373A0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
