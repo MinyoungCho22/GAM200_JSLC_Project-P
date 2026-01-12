@@ -4,3 +4,15 @@ Release/
 x64/
 /GameLog.txt
 GAM200_JSLC/GameLog.txt
+
+# CMake build files
+build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.cmake
+!CMakeLists.txt
+
+# CMake cache JSON files
+buildW.cmakeWa*.json
+*.cmakeWa*.json

@@ -12,29 +12,6 @@
             "environment": [],
             "console": "externalTerminal",
             "preLaunchTask": "CMake: Build Debug"
-        },
-        {
-            "name": "Release",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/bin/Release/GAM200_JSLC.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build/bin/Release",
-            "environment": [],
-            "console": "externalTerminal",
-            "preLaunchTask": "CMake: Build Release"
-        },
-        {
-            "name": "Run (No Build)",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/bin/Debug/GAM200_JSLC.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build/bin/Debug",
-            "environment": [],
-            "console": "externalTerminal"
         }
     ]
 }

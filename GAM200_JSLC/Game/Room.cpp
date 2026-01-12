@@ -31,6 +31,7 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_roomSize = { ROOM_WIDTH, ROOM_HEIGHT };
     m_roomCenter = { minX + ROOM_WIDTH / 2.0f, minY + ROOM_HEIGHT / 2.0f };
 
+    // 콘센트 (펄스 공급원)
     float width1 = 51.f;
     float height1 = 63.f;
     float topLeftX1 = 424.f;
@@ -39,14 +40,18 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_pulseSources.emplace_back();
     m_pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
 
+    // TV (펄스 주입 단서로 변경 - 펄스 공급원에서 제거)
     float width2 = 215.f;
     float height2 = 180.f;
     float topLeftX2 = 692.f;
     float topLeftY2 = 550.f;
-    Math::Vec2 center2 = { topLeftX2 + (width2 / 2.0f), topLeftY2 - (height2 / 2.0f) };
-    m_pulseSources.emplace_back();
-    m_pulseSources.back().Initialize(center2, { width2, height2 }, 100.f);
+    float tvBottomY = GAME_HEIGHT - topLeftY2;
+    m_tvPos = { topLeftX2 + (width2 / 2.0f), tvBottomY - (height2 / 2.0f) };
+    m_tvSize = { width2, height2 };
+    m_isTVActivated = false;
+    m_playerInTVArea = false;
 
+    // 휴대폰 (펄스 공급원)
     float width3 = 75.f;
     float height3 = 33.f;
     float topLeftX3 = 1414.f;
@@ -103,7 +108,9 @@ void Room::Update(Player& player, double dt, Input::Input& input)
     }
 
     m_playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
+    m_playerInTVArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_tvPos, m_tvSize);
 
+    // 블라인드 상호작용 (펄스 주입 단서)
     if (m_playerInBlindArea && input.IsKeyTriggered(Input::Key::J) && !m_isBright)
     {
         const float BLIND_TOGGLE_COST = 20.0f;
@@ -113,6 +120,19 @@ void Room::Update(Player& player, double dt, Input::Input& input)
         {
             pulse.spend(BLIND_TOGGLE_COST);
             m_isBright = true;
+        }
+    }
+
+    // TV 상호작용 (펄스 주입 단서)
+    if (m_playerInTVArea && input.IsKeyTriggered(Input::Key::J) && !m_isTVActivated)
+    {
+        const float TV_ACTIVATE_COST = 20.0f;
+        Pulse& pulse = player.GetPulseCore().getPulse();
+
+        if (pulse.Value() >= TV_ACTIVATE_COST)
+        {
+            pulse.spend(TV_ACTIVATE_COST);
+            m_isTVActivated = true;
         }
     }
 }
@@ -147,8 +167,11 @@ void Room::DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::M
         renderer.DrawBox(colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
     }
 
-    Math::Vec2 debugColor = m_playerInBlindArea ? Math::Vec2(1.0f, 1.0f) : Math::Vec2(0.5f, 1.0f);
-    renderer.DrawBox(colorShader, m_blindPos, m_blindSize, debugColor);
+    Math::Vec2 blindDebugColor = m_playerInBlindArea ? Math::Vec2(1.0f, 1.0f) : Math::Vec2(0.5f, 1.0f);
+    renderer.DrawBox(colorShader, m_blindPos, m_blindSize, blindDebugColor);
+
+    Math::Vec2 tvDebugColor = m_playerInTVArea ? Math::Vec2(1.0f, 0.0f) : Math::Vec2(0.5f, 0.0f);
+    renderer.DrawBox(colorShader, m_tvPos, m_tvSize, tvDebugColor);
 }
 
 bool Room::IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const

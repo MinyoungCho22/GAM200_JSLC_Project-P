@@ -300,20 +300,13 @@ void GameplayState::Update(double dt)
 
         if (input.IsKeyTriggered(Input::Key::J))
         {
-            if (m_room->IsBlindOpen())
-            {
-                m_door->Update(player, true);
-            }
-            else
-            {
-                m_door->Update(player, false);
-            }
-
+            // TV와 블라인드 모두 펄스 주입해야 문 열 수 있음
+            m_door->Update(player, true, m_room->CanProceed());
             m_rooftopDoor->Update(player, true);
         }
         else
         {
-            m_door->Update(player, false);
+            m_door->Update(player, false, m_room->CanProceed());
             m_rooftopDoor->Update(player, false);
         }
     }

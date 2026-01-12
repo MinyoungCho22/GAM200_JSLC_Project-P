@@ -35,7 +35,7 @@ void Door::Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost, Doo
     GL::BindVertexArray(0);
 }
 
-void Door::Update(Player& player, bool isInteractKeyPressed)
+void Door::Update(Player& player, bool isInteractKeyPressed, bool canProceed)
 {
     if (m_isOpened) return;
 
@@ -61,6 +61,14 @@ void Door::Update(Player& player, bool isInteractKeyPressed)
 
     if (m_isPlayerNearby && isInteractKeyPressed)
     {
+        // RoomToHallway 문은 TV와 블라인드에 펄스 주입해야 열 수 있음
+        if (m_doorType == DoorType::RoomToHallway && !canProceed)
+        {
+            Logger::Instance().Log(Logger::Severity::Info,
+                "You must inject pulse into the TV and blinds to open the door.");
+            return;
+        }
+
         float currentPulse = player.GetPulseCore().getPulse().Value();
         if (currentPulse >= m_pulseCost)
         {

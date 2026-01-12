@@ -28,6 +28,8 @@ public:
 
     bool IsPlayerInBlindArea() const { return m_playerInBlindArea; }
     bool IsBlindOpen() const { return m_isBright; }
+    bool IsTVActivated() const { return m_isTVActivated; }
+    bool CanProceed() const { return m_isBright && m_isTVActivated; }
 
 private:
     std::unique_ptr<Background> m_background;
@@ -40,8 +42,11 @@ private:
 
     Math::Vec2 m_blindPos;
     Math::Vec2 m_blindSize;
-
     bool m_isBright = false;
-
     bool m_playerInBlindArea = false;
+
+    Math::Vec2 m_tvPos;
+    Math::Vec2 m_tvSize;
+    bool m_isTVActivated = false;
+    bool m_playerInTVArea = false;
 };
