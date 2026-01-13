@@ -1,9 +1,10 @@
+//Logger.cpp
+
 #include "Logger.hpp"
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <cstdarg>
-
 
 Logger& Logger::Instance()
 {
@@ -11,18 +12,39 @@ Logger& Logger::Instance()
     return instance;
 }
 
-
-Logger::Logger() : min_severity(Severity::Debug), use_console_output(true)
+Logger::Logger() 
+    : min_severity(Severity::Debug), use_console_output(true)
 {
     start_time_point = std::chrono::steady_clock::now();
+}
+
+Logger::~Logger()
+{
+    if (log_file.is_open())
+    {
+        log_file.close();
+    }
 }
 
 void Logger::Initialize(Severity severity, bool use_console)
 {
     min_severity = severity;
     use_console_output = use_console;
+
+    // Open file in write mode (overwrite)
     log_file.open("GameLog.txt", std::ios::out | std::ios::trunc);
-    Log(Severity::Info, "Logger initialized.");
+    
+    if (log_file.is_open())
+    {
+        Log(Severity::Info, "Logger initialized.");
+    }
+    else
+    {
+        if (use_console_output)
+        {
+            std::cout << "[Logger] Error: Could not open GameLog.txt for writing." << std::endl;
+        }
+    }
 }
 
 void Logger::Log(Severity severity, const char* format, ...)
@@ -53,7 +75,7 @@ void Logger::Log(Severity severity, const char* format, ...)
     if (log_file.is_open())
     {
         log_file << formatted_message << std::endl;
-        log_file.flush();
+        log_file.flush(); 
     }
 
     if (use_console_output)

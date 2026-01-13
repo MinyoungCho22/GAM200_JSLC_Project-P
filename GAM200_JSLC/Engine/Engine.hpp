@@ -1,4 +1,6 @@
-﻿#pragma once
+//Engine.hpp
+
+#pragma once
 #include <string>
 #include <memory>
 #include "Input.hpp"

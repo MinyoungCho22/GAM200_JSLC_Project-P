@@ -1,12 +1,11 @@
-﻿// Engine.cpp
+// Engine.cpp
 
 #include "Engine.hpp"
 #include "Logger.hpp"
 #include "GameStateManager.hpp"
 #include "../Game/SplashState.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include "../OpenGL/Shader.hpp"
-#include "../OpenGL/QuadMesh.hpp"
+#include "../OpenGL/Shader.hpp" 
 #include <GLFW/glfw3.h>
 #include <algorithm> 
 
@@ -15,6 +14,7 @@ Engine::~Engine() = default;
 
 bool Engine::Initialize(const std::string& windowTitle)
 {
+    Logger::Instance().Initialize(Logger::Severity::Debug, true);
     Logger::Instance().Log(Logger::Severity::Event, "Engine Start");
 
     if (!glfwInit()) {
@@ -54,9 +54,6 @@ bool Engine::Initialize(const std::string& windowTitle)
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Initialize shared quad mesh for sprite rendering
-    OpenGL::QuadMesh::Initialize();
-
     m_gameStateManager = std::make_unique<GameStateManager>(*this);
     m_gameStateManager->PushState(std::make_unique<SplashState>(*m_gameStateManager));
 
@@ -76,14 +73,12 @@ void Engine::GameLoop()
         m_input->Update();
         Update();
 
-        // 전체 화면을 검은색으로 클리어 (레터박스 영역)
         int windowWidth, windowHeight;
         glfwGetFramebufferSize(m_window, &windowWidth, &windowHeight);
         GL::Viewport(0, 0, windowWidth, windowHeight);
         GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         GL::Clear(GL_COLOR_BUFFER_BIT);
 
-        // GameState::Draw()에서 viewport를 설정하고 그림
         m_gameStateManager->Draw();
 
         glfwSwapBuffers(m_window);
@@ -162,7 +157,6 @@ void Engine::FramebufferSizeCallback(GLFWwindow* window, int width, int height)
 
 void Engine::OnFramebufferResize(int newScreenWidth, int newScreenHeight)
 {
-    // 이 함수는 로그만 남기고 실제 viewport 설정은 각 State의 Draw()에서 처리
     Logger::Instance().Log(Logger::Severity::Event,
         "Framebuffer resized to %d x %d", newScreenWidth, newScreenHeight);
 }
@@ -198,10 +192,6 @@ void Engine::RequestShutdown()
 void Engine::Shutdown()
 {
     m_gameStateManager->Clear();
-    
-    // Shutdown shared quad mesh
-    OpenGL::QuadMesh::Shutdown();
-    
     if (m_window) {
         glfwDestroyWindow(m_window);
         m_window = nullptr;

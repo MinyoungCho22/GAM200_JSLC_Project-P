@@ -1,7 +1,5 @@
-// Link library: pragma comment for Visual Studio, CMakeLists.txt for CMake
-#ifndef CMAKE_BUILD
-#pragma comment(lib, "Engine/fmod_vc.lib")
-#endif
+//Sound.cpp
+
 #include "Sound.hpp"
 #include "Logger.hpp"
 #include <iostream>
@@ -61,6 +59,11 @@ Sound::Sound() : m_sound(nullptr), m_channel(nullptr), m_isLoaded(false)
 
 Sound::~Sound()
 {
+    if (m_sound != nullptr)
+    {
+        m_sound->release();
+        m_sound = nullptr;
+    }
 }
 
 bool Sound::Load(const std::string& filepath, bool loop)

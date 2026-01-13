@@ -1,4 +1,4 @@
-﻿// GameplayState.hpp
+// GameplayState.hpp
 
 #pragma once
 #include "../Engine/GameState.hpp"
@@ -75,6 +75,5 @@ private:
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;
     float m_cameraSmoothSpeed = 0.1f;
-
     Sound m_bgm;
 };

@@ -1,3 +1,5 @@
+//Background.hpp
+
 #pragma once
 #include "../Engine/Matrix.hpp"
 
@@ -13,5 +15,7 @@ public:
     void Draw(Shader& shader, const Math::Matrix& model);
 
 private:
+    unsigned int VAO = 0;
+    unsigned int VBO = 0;
     unsigned int m_textureID = 0;
 };

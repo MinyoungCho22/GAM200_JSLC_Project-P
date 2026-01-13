@@ -1,3 +1,5 @@
+//Robot.hpp
+
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Engine/Sound.hpp"
@@ -50,12 +52,12 @@ private:
     unsigned int LoadTexture(const char* path);
 
     unsigned int m_textureID = 0;
+
     unsigned int m_textureHighID = 0;
     unsigned int m_textureLowID = 0;
 
     unsigned int m_VAO = 0;
     unsigned int m_VBO = 0;
-
 
     Math::Vec2 m_position;
     Math::Vec2 m_size;

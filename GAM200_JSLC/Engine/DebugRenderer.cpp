@@ -1,4 +1,5 @@
 // DebugRenderer.cpp
+
 #include "DebugRenderer.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -10,6 +11,7 @@ void DebugRenderer::Initialize()
 {
     // --- Circle VAO ---
     GL::GenVertexArrays(1, &circleVAO);
+    unsigned int circleVBO;
     GL::GenBuffers(1, &circleVBO);
     GL::BindVertexArray(circleVAO);
     GL::BindBuffer(GL_ARRAY_BUFFER, circleVBO);
@@ -48,6 +50,7 @@ void DebugRenderer::Initialize()
     };
 
     GL::GenVertexArrays(1, &lineVAO);
+    unsigned int lineVBO;
     GL::GenBuffers(1, &lineVBO);
     GL::BindVertexArray(lineVAO);
     GL::BindBuffer(GL_ARRAY_BUFFER, lineVBO);
@@ -61,10 +64,8 @@ void DebugRenderer::Initialize()
 void DebugRenderer::Shutdown() const
 {
     GL::DeleteVertexArrays(1, &circleVAO);
-    GL::DeleteBuffers(1, &circleVBO);
     GL::DeleteVertexArrays(1, &boxVAO);
     GL::DeleteVertexArrays(1, &lineVAO);
-    GL::DeleteBuffers(1, &lineVBO);
     GL::DeleteBuffers(1, &VBO);
     GL::DeleteBuffers(1, &EBO);
 }
@@ -91,8 +92,6 @@ void DebugRenderer::DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, Mat
     GL::BindVertexArray(0);
 }
 
-// DebugRenderer.cpp�� DrawLine �Լ�
-// DebugRenderer.cpp�� DrawLine �Լ�
 void DebugRenderer::DrawLine(const Shader& shader, Math::Vec2 start, Math::Vec2 end, float r, float g, float b) const
 {
     Math::Vec2 direction = end - start;

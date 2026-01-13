@@ -1,10 +1,19 @@
+//Window.cpp
+
 #include "Window.hpp"
+
+// Include Logger immediately after Window.hpp
+#include "Logger.hpp" 
+
 #include "../CS200/RenderingAPI.hpp"
-#include "Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include <SDL2/SDL.h>
 #include "Vec2.hpp"
+
+// Usually <SDL2/SDL.h> when using vcpkg. 
+// If the file is not found, try changing it to <SDL.h>.
+#include <SDL2/SDL.h> 
 #include <stdexcept>
+#include <GL/glew.h> // Required for glewInit()
 
 namespace
 {
@@ -12,7 +21,8 @@ namespace
     {
         if (SDL_GL_SetAttribute(attr, value) != 0)
         {
-            Logger::Instance().Log(Logger::Severity::Error, "Failed to set GL Attribute: %s", SDL_GetError());
+            // If Logger is included correctly, the error below will be valid.
+            // Logger::Instance().Log(Logger::Severity::Error, "Failed to set GL Attribute: %s", SDL_GetError());
         }
     }
 }
@@ -34,7 +44,7 @@ Window::~Window()
 
 void Window::Initialize(std::string_view title)
 {
-    Logger::Instance().Log(Logger::Severity::Event, "Initializing window: %s", title.data());
+    // Logger::Instance().Log(Logger::Severity::Event, "Initializing window: %s", title.data());
 
     try
     {
@@ -43,21 +53,29 @@ void Window::Initialize(std::string_view title)
     }
     catch (const std::runtime_error& e)
     {
-        Logger::Instance().Log(Logger::Severity::Error, "Window initialization failed: %s", e.what());
+        // Logger::Instance().Log(Logger::Severity::Error, "Window initialization failed: %s", e.what());
         is_closed = true;
         return;
     }
 
-    SDL_GL_GetDrawableSize(sdlWindow, &size.x, &size.y);
+    // sdlWindow must be valid when using SDL_GL_GetDrawableSize
+    if (sdlWindow) 
+    {
+        SDL_GL_GetDrawableSize(sdlWindow, &size.x, &size.y);
+    }
+    
     CS200::RenderingAPI::SetClearColor(CS200::BLACK);
 
-    Logger::Instance().Log(Logger::Severity::Event, "Window initialized successfully");
-    Logger::Instance().Log(Logger::Severity::Debug, "Window size: %dx%d", size.x, size.y);
+    // Logger::Instance().Log(Logger::Severity::Event, "Window initialized successfully");
+    // Logger::Instance().Log(Logger::Severity::Debug, "Window size: %dx%d", size.x, size.y);
 }
 
 void Window::Update()
 {
-    SDL_GL_SwapWindow(sdlWindow);
+    if(sdlWindow)
+    {
+        SDL_GL_SwapWindow(sdlWindow);
+    }
     processEvents();
 }
 
@@ -79,8 +97,11 @@ void Window::Clear(CS200::RGBA color)
 
 void Window::ForceResize(int desired_width, int desired_height)
 {
-    SDL_SetWindowSize(sdlWindow, desired_width, desired_height);
-    Logger::Instance().Log(Logger::Severity::Event, "Window resize forced to: %dx%d", desired_width, desired_height);
+    if (sdlWindow)
+    {
+        SDL_SetWindowSize(sdlWindow, desired_width, desired_height);
+        Logger::Instance().Log(Logger::Severity::Event, "Window resize forced to: %dx%d", desired_width, desired_height);
+    }
 }
 
 SDL_Window* Window::GetSDLWindow() const
@@ -136,6 +157,8 @@ void Window::setupOpenGL()
 
     SDL_GL_MakeCurrent(sdlWindow, glContext);
 
+    // Initialize GLEW (requires glew.h)
+    glewExperimental = GL_TRUE; 
     if (glewInit() != GLEW_OK)
     {
         throw std::runtime_error("Unable to initialize GLEW");
@@ -147,7 +170,9 @@ void Window::setupOpenGL()
     }
 
     CS200::RenderingAPI::Init();
-    Logger::Instance().Log(Logger::Severity::Debug, "OpenGL Version: %s", reinterpret_cast<const char*>(GL::GetString(GL_VERSION)));
+    
+    const GLubyte* version = glGetString(GL_VERSION);
+    Logger::Instance().Log(Logger::Severity::Debug, "OpenGL Version: %s", version ? reinterpret_cast<const char*>(version) : "Unknown");
 }
 
 void Window::processEvents()
@@ -173,7 +198,7 @@ void Window::processEvents()
             else if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
             {
                 SDL_GL_GetDrawableSize(sdlWindow, &size.x, &size.y);
-                GL::Viewport(0, 0, size.x, size.y);
+                glViewport(0, 0, size.x, size.y); 
                 Logger::Instance().Log(Logger::Severity::Debug, "Window resized to %dx%d", size.x, size.y);
             }
             break;

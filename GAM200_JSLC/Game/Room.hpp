@@ -1,4 +1,6 @@
-﻿#pragma once
+// Room.hpp
+
+#pragma once
 #include "Background.hpp"
 #include "PulseSource.hpp"
 #include "../Engine/Rect.hpp"
@@ -11,6 +13,11 @@ class Shader;
 class Player;
 class DebugRenderer;
 
+/**
+ * @class Room
+ * @brief Represents a contained indoor level environment with its own boundaries, 
+ * interactive objects (PulseSources), and specific mechanics like "Blinds."
+ */
 class Room
 {
 public:
@@ -18,35 +25,37 @@ public:
     void Shutdown();
     void Update(Player& player, double dt, Input::Input& input);
     void Draw(Shader& textureShader) const;
+    
+    // Renders visual representations of hitboxes and interactive zones
     void DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::Matrix& projection, const Player& player) const;
 
     void SetRightBoundaryActive(bool active) { m_rightBoundaryActive = active; }
     Background* GetBackground() { return m_background.get(); }
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
 
+    /**
+     * @brief Checks if the player is currently hidden within a specific zone (e.g., behind blinds).
+     */
     bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
 
     bool IsPlayerInBlindArea() const { return m_playerInBlindArea; }
     bool IsBlindOpen() const { return m_isBright; }
-    bool IsTVActivated() const { return m_isTVActivated; }
-    bool CanProceed() const { return m_isBright && m_isTVActivated; }
 
 private:
-    std::unique_ptr<Background> m_background;
-    std::unique_ptr<Background> m_brightBackground;
-    Math::Rect m_boundaries;
+    std::unique_ptr<Background> m_background;       // Normal (dark) state background
+    std::unique_ptr<Background> m_brightBackground; // Bright state background (blinds open)
+    
+    Math::Rect m_boundaries;     // Physical movement limits for the player
     Math::Vec2 m_roomCenter;
     Math::Vec2 m_roomSize;
-    bool m_rightBoundaryActive = true;
+    
+    bool m_rightBoundaryActive = true; // Determines if the player can exit to the right
     std::vector<PulseSource> m_pulseSources;
 
+    // Blind interaction zone properties
     Math::Vec2 m_blindPos;
     Math::Vec2 m_blindSize;
-    bool m_isBright = false;
-    bool m_playerInBlindArea = false;
 
-    Math::Vec2 m_tvPos;
-    Math::Vec2 m_tvSize;
-    bool m_isTVActivated = false;
-    bool m_playerInTVArea = false;
+    bool m_isBright = false;           // Current lighting state of the room
+    bool m_playerInBlindArea = false;  // Whether the player is overlapping with the blind trigger
 };

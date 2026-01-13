@@ -1,3 +1,5 @@
+//PulseGauge.hpp
+
 #pragma once
 #include "../Engine/Vec2.hpp"
 
@@ -17,4 +19,7 @@ private:
     Math::Vec2 m_position;
     Math::Vec2 m_size;
     float m_pulse_ratio = 0.2f;
+
+    unsigned int VAO = 0;
+    unsigned int VBO = 0;
 };

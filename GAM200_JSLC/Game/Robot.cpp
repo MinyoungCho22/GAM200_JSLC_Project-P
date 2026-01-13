@@ -1,4 +1,6 @@
-﻿#include "Robot.hpp"
+//Robot.cpp
+
+#include "Robot.hpp"
 #include "Player.hpp" 
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -14,9 +16,9 @@
 #include <stb_image.h>
 #pragma warning(pop)
 
-// Robot attack dash speed
 constexpr float ATTACK_DASH_SPEED = 800.0f;
 
+// Random number generation for robot behavior
 static std::default_random_engine robot_gen;
 static std::uniform_real_distribution<float> robot_dist(0.0f, 1.0f);
 
@@ -26,6 +28,7 @@ unsigned int Robot::LoadTexture(const char* path)
     GL::GenTextures(1, &textureID);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
 
+    // Set texture wrapping/filtering options
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -60,6 +63,7 @@ void Robot::Init(Math::Vec2 startPos)
     m_state = RobotState::Patrol;
     m_directionX = 1.0f;
 
+    // Load necessary assets
     m_textureID = LoadTexture("Asset/Robot.png");
     m_textureHighID = LoadTexture("Asset/Robot_High.png");
     m_textureLowID = LoadTexture("Asset/Robot_Low.png");
@@ -70,6 +74,7 @@ void Robot::Init(Math::Vec2 startPos)
     float scaleFactor = 1.0f;
     m_size = { 396.0f * scaleFactor, 450.0f * scaleFactor };
 
+    // Quad vertices: Position (x, y) and UV (u, v)
     float vertices[] = {
         -0.5f,  0.5f,   0.0f, 1.0f,
          0.5f, -0.5f,   1.0f, 0.0f,
@@ -86,8 +91,10 @@ void Robot::Init(Math::Vec2 startPos)
     GL::BindBuffer(GL_ARRAY_BUFFER, m_VBO);
     GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+    // Position attribute
     GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     GL::EnableVertexAttribArray(0);
+    // Texture Coordinate attribute
     GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     GL::EnableVertexAttribArray(1);
     GL::BindVertexArray(0);
@@ -110,9 +117,11 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     float distToPlayer = std::abs(playerPos.x - m_position.x);
     float heightDiff = std::abs(playerPos.y - m_position.y);
 
+    // FSM State Logic
     switch (m_state)
     {
     case RobotState::Patrol:
+        // Reverse direction at patrol boundaries
         if (m_position.x > m_spawnX + PATROL_RANGE)
         {
             m_directionX = -1.0f;
@@ -123,6 +132,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         }
         m_velocity.x = m_directionX * PATROL_SPEED;
 
+        // Transition to Chase if player is detected
         if (distToPlayer < DETECTION_RANGE && heightDiff < 300.0f)
         {
             m_state = RobotState::Chase;
@@ -142,7 +152,6 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
                 m_state = RobotState::Windup;
                 m_stateTimer = WINDUP_TIME;
                 m_velocity.x = 0.0f;
-
                 m_hasDealtDamage = false;
             }
             else
@@ -158,7 +167,6 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
 
     case RobotState::Retreat:
         m_velocity.x = m_directionX * PATROL_SPEED;
-
         if (m_stateTimer <= 0.0f)
         {
             m_state = RobotState::Chase;
@@ -177,7 +185,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
 
     case RobotState::Attack:
-        // ���� ����: �÷��̾� ������ ������ ���
+        // Dash toward the player during the attack
         m_velocity.x = m_directionX * ATTACK_DASH_SPEED;
 
         if (!m_hasPlayedAttackSound)
@@ -193,11 +201,13 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             m_hasPlayedAttackSound = true;
         }
 
+        // Damage processing logic
         if (!m_hasDealtDamage)
         {
             Math::Vec2 attackBoxSize = { 590.0f, 150.0f };
             Math::Vec2 attackBoxPos = { 0.0f, 0.0f };
 
+            // Adjust attack box height based on attack type
             if (m_currentAttack == AttackType::LowSweep)
             {
                 attackBoxPos = { m_position.x, m_position.y - m_size.y / 2.0f + 75.0f };
@@ -240,8 +250,10 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
     }
 
+    // Apply gravity
     m_velocity.y += GRAVITY * fDt;
 
+    // Map boundary constraints
     Math::Vec2 nextPos = m_position;
     nextPos.x += m_velocity.x * fDt;
 
@@ -257,6 +269,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
 
     m_position.x = nextPos.x;
 
+    // Ground collision
     m_isOnGround = false;
     nextPos = m_position;
     nextPos.y += m_velocity.y * fDt;
@@ -276,6 +289,7 @@ void Robot::DecideAttackPattern()
 {
     AttackType nextAttack = (robot_dist(robot_gen) > 0.5f) ? AttackType::LowSweep : AttackType::HighSweep;
 
+    // Prevent more than 3 consecutive identical attacks
     if (nextAttack == m_lastAttack)
     {
         m_consecutiveAttackCount++;
@@ -309,8 +323,8 @@ void Robot::Draw(const Shader& shader) const
 
     unsigned int textureToBind = m_textureID;
 
-    // [����] Windup(�غ�) ������ ���� �⺻ �̹����� �����ϰ�,
-    // ���� Attack(����) ������ ���� ���/�ϴ� ���� �̹����� ���ε��մϴ�.
+    // Use the base image for Windup state,
+    // and bind the specific High/Low texture during the Attack state.
     if (m_state == RobotState::Attack)
     {
         if (m_currentAttack == AttackType::HighSweep)
@@ -334,11 +348,17 @@ void Robot::Draw(const Shader& shader) const
 void Robot::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     if (m_state == RobotState::Dead) return;
+    
+    // HP Bar UI
     float barWidth = 150.0f;
     float barHeight = 15.0f;
     float yOffset = m_size.y / 2.0f + 30.0f;
     Math::Vec2 barPos = { m_position.x, m_position.y + yOffset };
+
+    // Draw background/border
     debugRenderer.DrawBox(colorShader, barPos, { barWidth + 4.0f, barHeight + 4.0f }, { 0.0f, 0.0f });
+    
+    // Calculate and draw HP fill
     float ratio = m_hp / m_maxHp;
     if (ratio < 0.0f) ratio = 0.0f;
     float fillWidth = barWidth * ratio;
@@ -351,6 +371,7 @@ void Robot::DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     if (m_state == RobotState::Dead) return;
 
+    // Render the attack hitboxes visually during Windup and Attack states
     if (m_state == RobotState::Windup || m_state == RobotState::Attack)
     {
         if (m_currentAttack == AttackType::LowSweep)
@@ -372,6 +393,7 @@ void Robot::TakeDamage(float amount)
 
     m_hp -= amount;
 
+    // Apply stagger if not on cooldown
     if (m_staggerCooldown <= 0.0f)
     {
         m_state = RobotState::Stagger;
@@ -390,11 +412,13 @@ void Robot::TakeDamage(float amount)
 
 void Robot::Shutdown()
 {
+    // Cleanup OpenGL resources
     GL::DeleteVertexArrays(1, &m_VAO);
     GL::DeleteBuffers(1, &m_VBO);
     GL::DeleteTextures(1, &m_textureID);
     GL::DeleteTextures(1, &m_textureHighID);
     GL::DeleteTextures(1, &m_textureLowID);
+    
     m_soundHigh.Stop();
     m_soundLow.Stop();
 }

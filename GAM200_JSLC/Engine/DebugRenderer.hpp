@@ -1,4 +1,5 @@
 // DebugRenderer.hpp
+
 #pragma once
 #include "Vec2.hpp"
 
@@ -16,10 +17,8 @@ public:
 
 private:
     unsigned int circleVAO = 0;
-    unsigned int circleVBO = 0;
     unsigned int boxVAO = 0;
     unsigned int lineVAO = 0;
-    unsigned int lineVBO = 0;
     unsigned int VBO = 0, EBO = 0;
     static constexpr int CIRCLE_SEGMENTS = 24;
 };

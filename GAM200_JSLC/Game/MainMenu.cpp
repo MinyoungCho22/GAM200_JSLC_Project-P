@@ -1,11 +1,16 @@
+//MainMenu.cpp
+
 #include "MainMenu.hpp"
+#include "GameplayState.hpp"
+#include "Font.hpp"
+
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Input.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Matrix.hpp" 
-#include "GameplayState.hpp" 
+
 #include <cmath>
 #include <string>
 #include <vector>
@@ -23,6 +28,7 @@ void MainMenu::Initialize()
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
     m_promptText = m_font->PrintToTexture(*m_fontShader, "Press ENTER to help the City!");
+    
     m_shapeShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
 
     float vertices[] = {
@@ -58,7 +64,7 @@ void MainMenu::Update(double dt)
 
 void MainMenu::Draw()
 {
-    // 배경 짙은 네이비
+    // Clear background
     GL::ClearColor(0.05f, 0.05f, 0.1f, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
@@ -69,13 +75,15 @@ void MainMenu::Draw()
 
     GL::BindVertexArray(m_shapeVAO);
 
+    // Lambda: DrawRect
     auto DrawRect = [&](float x, float y, float w, float h, float r, float g, float b) {
         Math::Matrix model = Math::Matrix::CreateTranslation({ x, y }) * Math::Matrix::CreateScale({ w, h });
         m_shapeShader->setMat4("model", model);
         m_shapeShader->setVec3("objectColor", r, g, b);
         GL::DrawArrays(GL_TRIANGLES, 0, 6);
-        };
+    };
 
+    // Lambda: DrawLetter
     auto DrawLetter = [&](char letter, float x, float y, float size, float r, float g, float b) {
         float t = size * 0.15f;
         float h = size; 
@@ -83,51 +91,47 @@ void MainMenu::Draw()
 
         switch (letter) {
         case 'N':
-            // 좌측 기둥
+            // Left leg
             DrawRect(x, y, t, h, r, g, b);
-            // 우측 기둥
+            // Right leg
             DrawRect(x + w - t, y, t, h, r, g, b);
-
-            // N의 대각선
-            // 상단 작은 블록
+            // Diagonal parts
             DrawRect(x + t, y + h * 0.6f, t, h * 0.2f, r, g, b);
-            // 중간 블록
             DrawRect(x + t * 1.5f, y + h * 0.4f, t, h * 0.2f, r, g, b);
-            // 하단 작은 블록 (우측 기둥과 연결)
             DrawRect(x + t * 2.5f, y + h * 0.2f, t * 0.5f, h * 0.2f, r, g, b);
             break;
         case 'o':
-   
-            DrawRect(x, y, w, t, r, g, b);          // 하단 (바닥에 붙임)
-            DrawRect(x, y + h - t, w, t, r, g, b);  // 상단
-            DrawRect(x, y, t, h, r, g, b);          // 좌측 기둥 (전체 높이)
-            DrawRect(x + w - t, y, t, h, r, g, b);  // 우측 기둥 (전체 높이)
+            DrawRect(x, y, w, t, r, g, b);          // Bottom
+            DrawRect(x, y + h - t, w, t, r, g, b);  // Top
+            DrawRect(x, y, t, h, r, g, b);          // Left
+            DrawRect(x + w - t, y, t, h, r, g, b);  // Right
             break;
         case '.':
-            DrawRect(x + t, y, t * 1.5f, t * 1.5f, r, g, b); // 바닥 점
+            DrawRect(x + t, y, t * 1.5f, t * 1.5f, r, g, b); // Dot
             break;
         case '9':
-            DrawRect(x, y + h - t, w, t, r, g, b);          // 상단
-            DrawRect(x, y + h / 2, t, h / 2, r, g, b);      // 좌측 상단
-            DrawRect(x + w - t, y, t, h, r, g, b);          // 우측 전체
-            DrawRect(x, y + h / 2, w, t, r, g, b);          // 중간
-            DrawRect(x, y, w, t, r, g, b);                  // 하단
+            DrawRect(x, y + h - t, w, t, r, g, b);      // Top
+            DrawRect(x, y + h / 2, t, h / 2, r, g, b);  // Left Top
+            DrawRect(x + w - t, y, t, h, r, g, b);      // Right
+            DrawRect(x, y + h / 2, w, t, r, g, b);      // Middle
+            DrawRect(x, y, w, t, r, g, b);              // Bottom
             break;
-        case ' ': // 공백
+        case ' ': 
+            // Space
             break;
         }
-        };
+    };
 
     std::string title = "No. 99";
 
-    // 중앙 정렬 계산
+    // Variables for Text Animation
     float fontSize = 150.0f;
     float spacing = fontSize * 0.8f;
     float startX = (GAME_WIDTH - (title.length() * spacing)) / 2.0f;
     float startY = GAME_HEIGHT / 2.0f + 100.0f;
 
-    // 글리치 효과 계산
-    bool isGlitch = (rand() % 100) < 5; // 5% 확률
+    // Glitch Effect
+    bool isGlitch = (rand() % 100) < 5; // 5% chance
     float glitchX = 0.0f;
     float glitchY = 0.0f;
 
@@ -137,7 +141,7 @@ void MainMenu::Draw()
         glitchY = (float)(rand() % 20 - 10);
     }
 
-    // 그림자 레이어 (네온 핑크)
+    // Shadow Layer (Dark Pink)
     for (size_t i = 0; i < title.length(); ++i)
     {
         float x = startX + i * spacing + glitchX;
@@ -145,7 +149,7 @@ void MainMenu::Draw()
         DrawLetter(title[i], x + 8.0f, y - 8.0f, fontSize, 1.0f, 0.0f, 1.0f);
     }
 
-    // 메인 레이어 (네온 민트)
+    // Main Text Layer (Cyan)
     for (size_t i = 0; i < title.length(); ++i)
     {
         float x = startX + i * spacing;
@@ -155,7 +159,7 @@ void MainMenu::Draw()
 
     GL::BindVertexArray(0);
 
-    // 안내 문구
+    // Blending for Font
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -167,12 +171,16 @@ void MainMenu::Draw()
     m_fontShader->setFloat("alpha", alpha);
 
     float promptHeight = 40.0f;
-    float promptWidth = m_promptText.width * (promptHeight / m_font->m_fontHeight);
-    Math::Vec2 promptPos = {
-        (GAME_WIDTH - promptWidth) / 2.0f,
-        (GAME_HEIGHT / 2.0f) - 300.0f
-    };
-    m_font->DrawBakedText(*m_fontShader, m_promptText, promptPos, promptHeight);
+    // Check if font is valid before accessing members
+    if(m_font) 
+    {
+        float promptWidth = m_promptText.width * (promptHeight / m_font->m_fontHeight);
+        Math::Vec2 promptPos = {
+            (GAME_WIDTH - promptWidth) / 2.0f,
+            (GAME_HEIGHT / 2.0f) - 300.0f
+        };
+        m_font->DrawBakedText(*m_fontShader, m_promptText, promptPos, promptHeight);
+    }
 
     GL::Disable(GL_BLEND);
 }

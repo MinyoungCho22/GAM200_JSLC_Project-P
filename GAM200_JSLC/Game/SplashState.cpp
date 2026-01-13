@@ -1,4 +1,6 @@
-﻿#include "SplashState.hpp"
+// SplashState.cpp
+
+#include "SplashState.hpp"
 #include "MainMenu.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
@@ -16,15 +18,21 @@ SplashState::SplashState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 void SplashState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "SplashState Initialize");
+    
+    // Initial GL state setup
     GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
+    
+    // Set sequence timer to total duration
     timer = fadeInDuration + holdDuration + fadeOutDuration;
     currentAlpha = 0.0f;
 
+    // Audio initialization
     logoSound.Load("Asset/DigiPen.mp3");
     logoSound.Play();
     logoSound.SetVolume(0.0f);
 
+    // Geometry data for a centered quad
     float vertices[] = {
         -0.5f,  0.5f,   0.0f, 1.0f,
          0.5f, -0.5f,   1.0f, 0.0f,
@@ -34,27 +42,33 @@ void SplashState::Initialize()
          0.5f, -0.5f,   1.0f, 0.0f
     };
 
+    // Buffer and Vertex Array setup
     GL::GenVertexArrays(1, &VAO);
     GL::GenBuffers(1, &VBO);
     GL::BindVertexArray(VAO);
     GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
     GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    
+    // Position attribute (layout 0)
     GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     GL::EnableVertexAttribArray(0);
+    // Texture Coordinate attribute (layout 1)
     GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     GL::EnableVertexAttribArray(1);
 
+    // Texture generation and parameter configuration
     GL::GenTextures(1, &textureID);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
-
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+    // Load logo image using stb_image
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
     unsigned char* data = stbi_load("Asset/DigiPen.png", &width, &height, &nrChannels, 0);
+    
     if (data)
     {
         imageWidth = width;
@@ -63,67 +77,81 @@ void SplashState::Initialize()
         GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         GL::GenerateMipmap(GL_TEXTURE_2D);
     }
-    else { Logger::Instance().Log(Logger::Severity::Error, "Failed to load texture: Asset/DigiPen.png"); }
+    else 
+    { 
+        Logger::Instance().Log(Logger::Severity::Error, "Failed to load texture: Asset/DigiPen.png"); 
+    }
     stbi_image_free(data);
 }
 
 void SplashState::Update(double dt)
 {
     SoundSystem::Instance().Update();
-    
     timer -= dt;
 
+    // Calculate alpha transparency based on the elapsed time of the sequence
     if (timer > (holdDuration + fadeOutDuration))
     {
+        // Phase: Fade In
         double timePassed = (fadeInDuration + holdDuration + fadeOutDuration) - timer;
         currentAlpha = static_cast<float>(timePassed / fadeInDuration);
     }
     else if (timer > fadeOutDuration)
     {
+        // Phase: Hold
         currentAlpha = 1.0f;
     }
     else
     {
+        // Phase: Fade Out
         currentAlpha = static_cast<float>(timer / fadeOutDuration);
     }
 
+    // Ensure alpha stays within valid normalized range [0.0, 1.0]
     if (currentAlpha < 0.0f) currentAlpha = 0.0f;
     if (currentAlpha > 1.0f) currentAlpha = 1.0f;
 
+    // Sync audio volume with visual transparency
     logoSound.SetVolume(currentAlpha);
 
+    // Transition to MainMenu once the sequence completes
     if (timer <= 0.0)
     {
         gsm.ChangeState(std::make_unique<MainMenu>(gsm));
     }
 }
 
+
+
 void SplashState::Draw()
 {
     GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
+    // Enable blending for transparency support
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     Engine& engine = gsm.GetEngine();
-
     Shader& textureShader = engine.GetTextureShader();
     textureShader.use();
 
+    // Create orthographic projection based on current window dimensions
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, static_cast<float>(engine.GetWidth()), 0.0f, static_cast<float>(engine.GetHeight()), -1.0f, 1.0f);
 
+    // Center the image on the screen and scale by its native size
     Math::Vec2 imageSize = { static_cast<float>(imageWidth), static_cast<float>(imageHeight) };
     Math::Vec2 screenCenter = { engine.GetWidth() / 2.0f, engine.GetHeight() / 2.0f };
     Math::Matrix model = Math::Matrix::CreateTranslation(screenCenter) * Math::Matrix::CreateScale(imageSize);
 
+    // Send transformation matrices and uniforms to the shader
     textureShader.setMat4("model", model);
     textureShader.setMat4("projection", projection);
-
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
     textureShader.setFloat("alpha", currentAlpha);
 
+    // Render the logo quad
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
     GL::BindVertexArray(VAO);
@@ -136,13 +164,15 @@ void SplashState::Draw()
 void SplashState::Shutdown()
 {
     logoSound.Stop();
+    
+    // Cleanup GPU resources
     GL::DeleteVertexArrays(1, &VAO);
     GL::DeleteBuffers(1, &VBO);
     GL::DeleteTextures(1, &textureID);
 
+    // Reset shared shader state to prevent unintended transparency in the next state
     Engine& engine = gsm.GetEngine();
     Shader& textureShader = engine.GetTextureShader();
-
     textureShader.use();
     textureShader.setFloat("alpha", 1.0f);
 

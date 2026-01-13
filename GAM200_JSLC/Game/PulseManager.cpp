@@ -1,4 +1,4 @@
-﻿//PulseManager.cpp
+//PulseManager.cpp
 
 #include "PulseManager.hpp"
 #include "Player.hpp"

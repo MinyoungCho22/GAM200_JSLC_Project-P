@@ -1,4 +1,6 @@
-﻿#pragma once
+//Drone.hpp
+
+#pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Engine/Sound.hpp"
 
@@ -81,7 +83,7 @@ private:
     float m_baseY = 0.0f;
     float m_bobTimer = 0.0f;
     float m_groundLevel = 180.0f;
-    unsigned int textureID = 0;
+    unsigned int VAO = 0, VBO = 0, textureID = 0;
 
     Sound m_moveSound;
 };

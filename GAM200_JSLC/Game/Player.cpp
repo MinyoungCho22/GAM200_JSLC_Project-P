@@ -1,8 +1,9 @@
-﻿#include "Player.hpp"
+//Player.cpp
+
+#include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include "../OpenGL/QuadMesh.hpp"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <vector>
@@ -80,6 +81,26 @@ void Player::Init(Math::Vec2 startPos)
     m_currentGroundLevel = GROUND_LEVEL;
     can_double_jump = false;
     is_double_jumping = false;
+
+    std::vector<float> vertices = {
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f,
+        -0.5f, -0.5f,   0.0f, 0.0f,
+
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f,  0.5f,   1.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f
+    };
+
+    GL::GenVertexArrays(1, &VAO);
+    GL::GenBuffers(1, &VBO);
+    GL::BindVertexArray(VAO);
+    GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
+    GL::BufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    GL::EnableVertexAttribArray(0);
+    GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    GL::EnableVertexAttribArray(1);
 
     LoadAnimation(AnimationState::Idle, "Asset/player_Idle.png", 10, 0.1f);
     LoadAnimation(AnimationState::Walking, "Asset/player_Walking.png", 7, 0.1f);
@@ -267,15 +288,18 @@ void Player::Draw(const Shader& shader) const
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, currentAnim.textureID);
-    OpenGL::QuadMesh::Bind();
-    OpenGL::QuadMesh::Draw();
-    OpenGL::QuadMesh::Unbind();
+    GL::BindVertexArray(VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
 
     shader.setFloat("alpha", 1.0f);
 }
 
 void Player::Shutdown()
 {
+    GL::DeleteVertexArrays(1, &VAO);
+    GL::DeleteBuffers(1, &VBO);
+
     for (int i = 0; i < 5; ++i)
     {
         if (m_animations[i].textureID != 0)

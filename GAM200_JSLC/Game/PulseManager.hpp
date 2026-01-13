@@ -1,4 +1,4 @@
-﻿//PulseManager.hpp
+//PulseManager.hpp
 
 #pragma once
 #include "../Engine/Vec2.hpp"

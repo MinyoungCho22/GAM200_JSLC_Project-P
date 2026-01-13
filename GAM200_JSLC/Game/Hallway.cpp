@@ -1,4 +1,6 @@
-﻿#include "Hallway.hpp"
+//Hallway.cpp
+
+#include "Hallway.hpp"
 #include "Background.hpp"
 #include "Player.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -70,8 +72,8 @@ void Hallway::Initialize()
 
 
     m_droneManager = std::make_unique<DroneManager>();
-    m_droneManager->SpawnDrone({ 2600.0f, 400.0f }, "Asset/Drone.png");
-    m_droneManager->SpawnDrone({ 5500.0f, 400.0f }, "Asset/Drone.png");
+    m_droneManager->SpawnDrone({ 2600.0f, 400.0f }, "Asset/drone.png");
+    m_droneManager->SpawnDrone({ 5500.0f, 400.0f }, "Asset/drone.png");
 }
 
 

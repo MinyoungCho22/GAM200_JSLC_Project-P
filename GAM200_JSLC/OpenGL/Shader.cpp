@@ -1,4 +1,6 @@
-﻿#include "Shader.hpp"
+//Shader.cpp
+
+#include "Shader.hpp"
 #include "../Engine/Logger.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
@@ -8,39 +10,54 @@
 
 Shader::Shader(const char* vertexPath, const char* fragmentPath)
 {
+    // 1. Retrieve the vertex/fragment source code from filePath
     std::string vertexCode;
     std::string fragmentCode;
     std::ifstream vShaderFile;
     std::ifstream fShaderFile;
 
+    // Ensure ifstream objects can throw exceptions
     vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    
     try
     {
+        // Open files
         vShaderFile.open(vertexPath);
         fShaderFile.open(fragmentPath);
         std::stringstream vShaderStream, fShaderStream;
+        
+        // Read file's buffer contents into streams
         vShaderStream << vShaderFile.rdbuf();
         fShaderStream << fShaderFile.rdbuf();
+        
+        // Close file handlers
         vShaderFile.close();
         fShaderFile.close();
+        
+        // Convert stream into string
         vertexCode = vShaderStream.str();
         fragmentCode = fShaderStream.str();
     }
     catch (std::ifstream::failure& e)
     {
-        Logger::Instance().Log(Logger::Severity::Error, "SHADER: FILE_NOT_SUCCESFULLY_READ: %s", e.what());
+        Logger::Instance().Log(Logger::Severity::Error, "SHADER: FILE_NOT_SUCCESSFULLY_READ: %s", e.what());
     }
+    
     const char* vShaderCode = vertexCode.c_str();
     const char* fShaderCode = fragmentCode.c_str();
 
+    // 2. Compile shaders
     unsigned int vertex, fragment;
     int success;
     char infoLog[512];
 
+    // Vertex Shader
     vertex = GL::CreateShader(GL_VERTEX_SHADER);
     GL::ShaderSource(vertex, 1, &vShaderCode, NULL);
     GL::CompileShader(vertex);
+    
+    // Check for compilation errors
     GL::GetShaderiv(vertex, GL_COMPILE_STATUS, &success);
     if (!success)
     {
@@ -48,9 +65,12 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath)
         Logger::Instance().Log(Logger::Severity::Error, "SHADER: VERTEX COMPILATION_FAILED\n%s", infoLog);
     };
 
+    // Fragment Shader
     fragment = GL::CreateShader(GL_FRAGMENT_SHADER);
     GL::ShaderSource(fragment, 1, &fShaderCode, NULL);
     GL::CompileShader(fragment);
+    
+    // Check for compilation errors
     GL::GetShaderiv(fragment, GL_COMPILE_STATUS, &success);
     if (!success)
     {
@@ -58,10 +78,13 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath)
         Logger::Instance().Log(Logger::Severity::Error, "SHADER: FRAGMENT COMPILATION_FAILED\n%s", infoLog);
     }
 
+    // 3. Shader Program linking
     ID = GL::CreateProgram();
     GL::AttachShader(ID, vertex);
     GL::AttachShader(ID, fragment);
     GL::LinkProgram(ID);
+    
+    // Check for linking errors
     GL::GetProgramiv(ID, GL_LINK_STATUS, &success);
     if (!success)
     {
@@ -69,19 +92,24 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath)
         Logger::Instance().Log(Logger::Severity::Error, "SHADER: PROGRAM LINKING_FAILED\n%s", infoLog);
     }
 
+    // Delete the shaders as they're linked into our program now and no longer necessary
     GL::DeleteShader(vertex);
     GL::DeleteShader(fragment);
 }
 
 Shader::~Shader()
 {
+    // Clean up the shader program from the GPU
     GL::DeleteProgram(ID);
 }
 
 void Shader::use() const
 {
+    // Tell OpenGL to use this specific shader program
     GL::UseProgram(ID);
 }
+
+// --- Uniform Utilities ---
 
 void Shader::setInt(const std::string& name, int value) const
 {
@@ -95,18 +123,18 @@ void Shader::setVec3(const std::string& name, float v1, float v2, float v3) cons
 
 void Shader::setMat4(const std::string& name, const Math::Matrix& mat) const
 {
+    // Upload the 4x4 matrix data to the GPU
     GL::UniformMatrix4fv(GL::GetUniformLocation(ID, name.c_str()), 1, GL_FALSE, mat.Ptr());
 }
-
 
 void Shader::setVec4(const std::string& name, float v1, float v2, float v3, float v4) const
 {
     GL::Uniform4f(GL::GetUniformLocation(ID, name.c_str()), v1, v2, v3, v4);
 }
 
-
 void Shader::setBool(const std::string& name, bool value) const
 {
+    // Booleans are passed to GLSL as integers (0 or 1)
     GL::Uniform1i(GL::GetUniformLocation(ID, name.c_str()), static_cast<int>(value));
 }
 

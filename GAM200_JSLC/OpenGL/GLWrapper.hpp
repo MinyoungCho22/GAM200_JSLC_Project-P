@@ -1,58 +1,14 @@
-﻿#pragma once
+//GLWrapper.hpp
 
-#ifdef __INTELLISENSE__
-    #include <cstddef>
-    // IntelliSense용 타입 정의
-    typedef unsigned int GLuint;
-    typedef int GLint;
-    typedef int GLsizei;
-    typedef unsigned int GLenum;
-    typedef unsigned char GLboolean;
-    typedef float GLfloat;
-    typedef unsigned int GLbitfield;
-    typedef unsigned char GLubyte;
-    typedef const char GLchar;
-    typedef void GLvoid;
-    typedef ptrdiff_t GLsizeiptr;
-    
-    // IntelliSense용 상수 정의
-    #define GL_ARRAY_BUFFER 0x8892
-    #define GL_STATIC_DRAW 0x88E4
-    #define GL_FLOAT 0x1406
-    #define GL_FALSE 0
-    #define GL_TRIANGLES 0x0004
-    #define GL_COLOR_BUFFER_BIT 0x00004000
-    #define GL_BLEND 0x0BE2
-    #define GL_SRC_ALPHA 0x0302
-    #define GL_ONE_MINUS_SRC_ALPHA 0x0303
-    #define GL_TEXTURE_2D 0x0DE1
-    #define GL_RGBA 0x1908
-    #define GL_RGB 0x1907
-    #define GL_UNSIGNED_BYTE 0x1401
-    #define GL_TEXTURE_WRAP_S 0x2802
-    #define GL_TEXTURE_WRAP_T 0x2803
-    #define GL_CLAMP_TO_EDGE 0x812F
-    #define GL_TEXTURE_MIN_FILTER 0x2801
-    #define GL_TEXTURE_MAG_FILTER 0x2800
-    #define GL_LINEAR 0x2601
-    #define GL_NEAREST 0x2600
-    #define GL_FRAMEBUFFER 0x8D40
-    #define GL_COLOR_ATTACHMENT0 0x8CE0
-    #define GL_FRAMEBUFFER_COMPLETE 0x8CD5
-    #define GL_VERTEX_SHADER 0x8B31
-    #define GL_FRAGMENT_SHADER 0x8B30
-    #define GL_COMPILE_STATUS 0x8B81
-    #define GL_LINK_STATUS 0x8B82
-    #define GL_INFO_LOG_LENGTH 0x8B84
-    #define GL_TEXTURE0 0x84C0
-    #define GL_VERSION 0x1F02
-#else
-    #include <GL/glew.h>
-#endif
+#pragma once
+
+#include <GL/glew.h>
 
 namespace GL
 {
-    // Buffer & Vertex Array
+    // -------------------------------------------------------------------------
+    // Buffer & Vertex Array Objects (VAO/VBO)
+    // -------------------------------------------------------------------------
     static inline void GenVertexArrays(GLsizei n, GLuint* arrays) { glGenVertexArrays(n, arrays); }
     static inline void GenBuffers(GLsizei n, GLuint* buffers) { glGenBuffers(n, buffers); }
     static inline void BindVertexArray(GLuint array) { glBindVertexArray(array); }
@@ -63,13 +19,16 @@ namespace GL
     static inline void DeleteVertexArrays(GLsizei n, const GLuint* arrays) { glDeleteVertexArrays(n, arrays); }
     static inline void DeleteBuffers(GLsizei n, const GLuint* buffers) { glDeleteBuffers(n, buffers); }
 
-    // Drawing
+    // -------------------------------------------------------------------------
+    // Drawing Commands
+    // -------------------------------------------------------------------------
     static inline void DrawArrays(GLenum mode, GLint first, GLsizei count) { glDrawArrays(mode, first, count); }
     static inline void DrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices) { glDrawElements(mode, count, type, indices); }
 
-    // State & Context
+    // -------------------------------------------------------------------------
+    // Global State & Context
+    // -------------------------------------------------------------------------
     static inline void Enable(GLenum cap) { glEnable(cap); }
-    // [추가됨] glDisable 래퍼 함수
     static inline void Disable(GLenum cap) { glDisable(cap); }
     static inline void BlendFunc(GLenum sfactor, GLenum dfactor) { glBlendFunc(sfactor, dfactor); }
     static inline void ClearColor(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) { glClearColor(red, green, blue, alpha); }
@@ -77,7 +36,9 @@ namespace GL
     static inline const GLubyte* GetString(GLenum name) { return glGetString(name); }
     static inline void Viewport(GLint x, GLint y, GLsizei width, GLsizei height) { glViewport(x, y, width, height); }
 
-    // Textures
+    // -------------------------------------------------------------------------
+    // Texture Management
+    // -------------------------------------------------------------------------
     static inline void GenTextures(GLsizei n, GLuint* textures) { glGenTextures(n, textures); }
     static inline void BindTexture(GLenum target, GLuint texture) { glBindTexture(target, texture); }
     static inline void TexParameteri(GLenum target, GLenum pname, GLint param) { glTexParameteri(target, pname, param); }
@@ -86,14 +47,18 @@ namespace GL
     static inline void ActiveTexture(GLenum texture) { glActiveTexture(texture); }
     static inline void DeleteTextures(GLsizei n, const GLuint* textures) { glDeleteTextures(n, textures); }
 
+    // -------------------------------------------------------------------------
     // Framebuffers (FBO)
+    // -------------------------------------------------------------------------
     static inline void GenFramebuffers(GLsizei n, GLuint* framebuffers) { glGenFramebuffers(n, framebuffers); }
     static inline void BindFramebuffer(GLenum target, GLuint framebuffer) { glBindFramebuffer(target, framebuffer); }
     static inline void FramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level) { glFramebufferTexture2D(target, attachment, textarget, texture, level); }
     static inline GLenum CheckFramebufferStatus(GLenum target) { return glCheckFramebufferStatus(target); }
     static inline void DeleteFramebuffers(GLsizei n, const GLuint* framebuffers) { glDeleteFramebuffers(n, framebuffers); }
 
-    // Shaders & Programs
+    // -------------------------------------------------------------------------
+    // Shaders & Shader Programs
+    // -------------------------------------------------------------------------
     static inline GLuint CreateShader(GLenum type) { return glCreateShader(type); }
     static inline void ShaderSource(GLuint shader, GLsizei count, const GLchar* const* string, const GLint* length) { glShaderSource(shader, count, string, length); }
     static inline void CompileShader(GLuint shader) { glCompileShader(shader); }

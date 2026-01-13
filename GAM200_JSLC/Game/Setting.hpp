@@ -1,4 +1,6 @@
-﻿#pragma once
+// Setting.hpp
+
+#pragma once
 #include "../Engine/GameState.hpp"
 #include <memory>
 #include "Font.hpp" 
@@ -7,6 +9,10 @@
 class GameStateManager;
 class Shader;
 
+/**
+ * @class SettingState
+ * @brief Manages the in-game settings menu, including display resolutions and application exit.
+ */
 class SettingState : public GameState
 {
 public:
@@ -17,6 +23,7 @@ public:
     void Shutdown() override;
 
 private:
+    // Menu navigation states
     enum class MenuPage { Main, Display };
     enum class MainOption { Resume, Exit };
 
@@ -29,15 +36,16 @@ private:
     MainOption m_mainSelection = MainOption::Resume;
     int m_displaySelection = 0;
 
+    // OpenGL objects for the background dimming overlay
     unsigned int m_overlayVAO;
     unsigned int m_overlayVBO;
 
-    // 메인 메뉴
+    // Pre-baked UI text textures for performance
     CachedTextureInfo m_resumeText;
     CachedTextureInfo m_resumeSelectedText;
     CachedTextureInfo m_exitText;
     CachedTextureInfo m_exitSelectedText;
 
-    CachedTextureInfo m_resRecommendedText;     // "2560 x 1600 (Recommended)"
-    CachedTextureInfo m_res1600Text;            // "1600 x 900"
+    CachedTextureInfo m_resRecommendedText; // e.g., "2560 x 1600 (Recommended)"
+    CachedTextureInfo m_res1600Text;        // e.g., "1600 x 900"
 };

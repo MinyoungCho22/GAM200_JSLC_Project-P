@@ -1,4 +1,6 @@
-﻿#pragma once
+//Font.hpp
+
+#pragma once
 
 #include "../Engine/Vec2.hpp"
 #include "../Engine/Rect.hpp"

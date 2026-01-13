@@ -1,3 +1,5 @@
+//Door.hpp
+
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include <memory>
@@ -15,7 +17,7 @@ class Door
 {
 public:
     void Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost, DoorType type);
-    void Update(Player& player, bool isInteractKeyPressed, bool canProceed = true);
+    void Update(Player& player, bool isInteractKeyPressed);
     void DrawDebug(Shader& shader) const;
     void Shutdown();
 
@@ -33,4 +35,5 @@ private:
     bool m_isPlayerNearby = false;
     bool m_shouldLoadNextMap = false;
     bool m_isOpened = false;
+    unsigned int VAO = 0, VBO = 0;
 };

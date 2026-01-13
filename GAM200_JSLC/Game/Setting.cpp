@@ -1,4 +1,4 @@
-﻿// Setting.cpp
+// Setting.cpp
 
 #include "Setting.hpp"
 #include "../Engine/GameStateManager.hpp"
@@ -12,6 +12,7 @@
 #include <string>
 #include <sstream>
 
+// Fixed logical resolution for the UI system
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
 
@@ -25,31 +26,33 @@ void SettingState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "SettingState Initialize");
 
+    // Initialize font and shaders
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
     m_colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
-
     m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
+    
     m_fontShader->use();
     m_fontShader->setInt("ourTexture", 0);
 
-    // --- 텍스트 미리 베이킹 ---
+    // --- Pre-bake text textures ---
+    // This converts strings to OpenGL textures once to avoid per-frame text rendering overhead.
 
-    // 1. 메인 메뉴 텍스트
+    // 1. Main menu options
     m_resumeText = m_font->PrintToTexture(*m_fontShader, "Setting");
     m_resumeSelectedText = m_font->PrintToTexture(*m_fontShader, "> Setting <");
     m_exitText = m_font->PrintToTexture(*m_fontShader, "Exit");
     m_exitSelectedText = m_font->PrintToTexture(*m_fontShader, "> Exit <");
 
-    // 2. 디스플레이 메뉴 텍스트
+    // 2. Display menu options (dynamic based on system/monitor)
     Math::ivec2 recRes = gsm.GetEngine().GetRecommendedResolution();
     std::stringstream ss;
     ss << recRes.x << " x " << recRes.y << " (Recommended)";
-
     m_resRecommendedText = m_font->PrintToTexture(*m_fontShader, ss.str());
 
-    // --- 오버레이 VAO/VBO 생성 ---
+    // --- Initialize Overlay Geometry ---
+    // A simple full-screen quad used to dim the background.
     float vertices[] = {
         0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f
@@ -71,20 +74,15 @@ void SettingState::Update(double dt)
 
     if (m_currentPage == MenuPage::Main)
     {
-        // --- 메인 메뉴 (Setting / Exit) ---
+        // --- Navigation for Main Settings Page ---
         if (input.IsKeyTriggered(Input::Key::Escape))
         {
-            gsm.PopState();
+            gsm.PopState(); // Return to previous state (Game or MainMenu)
             return;
         }
-        if (input.IsKeyTriggered(Input::Key::W))
-        {
-            m_mainSelection = MainOption::Resume;
-        }
-        else if (input.IsKeyTriggered(Input::Key::S))
-        {
-            m_mainSelection = MainOption::Exit;
-        }
+
+        if (input.IsKeyTriggered(Input::Key::W)) { m_mainSelection = MainOption::Resume; }
+        else if (input.IsKeyTriggered(Input::Key::S)) { m_mainSelection = MainOption::Exit; }
 
         if (input.IsKeyTriggered(Input::Key::Enter) || input.IsKeyTriggered(Input::Key::Space))
         {
@@ -101,10 +99,10 @@ void SettingState::Update(double dt)
     }
     else if (m_currentPage == MenuPage::Display)
     {
-        // --- 디스플레이 설정 메뉴 (해상도 선택) ---
+        // --- Navigation for Display Settings Page ---
         if (input.IsKeyTriggered(Input::Key::Escape))
         {
-            m_currentPage = MenuPage::Main; // 메인 메뉴로 돌아가기
+            m_currentPage = MenuPage::Main;
             return;
         }
 
@@ -112,6 +110,7 @@ void SettingState::Update(double dt)
         {
             if (m_displaySelection == 0)
             {
+                // Apply the recommended resolution to the window
                 Math::ivec2 res = gsm.GetEngine().GetRecommendedResolution();
                 Logger::Instance().Log(Logger::Severity::Event, "Apply Resolution: %d x %d", res.x, res.y);
                 gsm.GetEngine().SetResolution(res.x, res.y);
@@ -124,46 +123,40 @@ void SettingState::Draw()
 {
     Engine& engine = gsm.GetEngine();
 
-    // 현재 프레임버퍼 크기 가져오기
+    // --- Viewport & Aspect Ratio Calculation ---
+    // Calculates Letterbox (horizontal bars) or Pillarbox (vertical bars)
     int windowWidth, windowHeight;
     glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
 
-    // 화면 비율 계산
     float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     float gameAspect = GAME_WIDTH / GAME_HEIGHT;
 
-    int viewportX = 0;
-    int viewportY = 0;
-    int viewportWidth = windowWidth;
-    int viewportHeight = windowHeight;
+    int viewportX = 0, viewportY = 0;
+    int viewportWidth = windowWidth, viewportHeight = windowHeight;
 
-    // 레터박스/필러박스 계산
-    if (windowAspect > gameAspect)
+    if (windowAspect > gameAspect) // Pillarbox
     {
-        // 화면이 더 넓음 -> 좌우에 필러박스
         viewportWidth = static_cast<int>(windowHeight * gameAspect);
         viewportX = (windowWidth - viewportWidth) / 2;
     }
-    else if (windowAspect < gameAspect)
+    else if (windowAspect < gameAspect) // Letterbox
     {
-        // 화면이 더 높음 -> 상하에 레터박스
         viewportHeight = static_cast<int>(windowWidth / gameAspect);
         viewportY = (windowHeight - viewportHeight) / 2;
     }
 
-    // 게임 렌더링 영역 설정
     GL::Viewport(viewportX, viewportY, viewportWidth, viewportHeight);
 
-    // 게임 고정 해상도로 projection 생성
+    // Create orthographic projection based on fixed 1920x1080 UI resolution
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT, -1.0f, 1.0f);
 
-    // 1. 반투명 검은색 오버레이 그리기 (공통)
+    // 1. Render Semi-transparent Dimming Overlay
     m_colorShader->use();
     m_colorShader->setMat4("projection", projection);
     Math::Matrix overlayModel = Math::Matrix::CreateTranslation({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }) *
-        Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
+                                Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
     m_colorShader->setMat4("model", overlayModel);
-    m_colorShader->setVec4("objectColor", 0.0f, 0.0f, 0.0f, 0.7f);
+    m_colorShader->setVec4("objectColor", 0.0f, 0.0f, 0.0f, 0.7f); // 70% opacity black
 
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -172,47 +165,47 @@ void SettingState::Draw()
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
     GL::BindVertexArray(0);
 
-    // 2. 텍스트 그리기 (페이지에 따라 분기)
+    // 2. Render Menu Text based on current page
     m_fontShader->use();
     m_fontShader->setMat4("projection", projection);
 
-    float size = 64.0f;
+    float fontSize = 64.0f;
 
     if (m_currentPage == MenuPage::Main)
     {
-        // --- 메인 메뉴 그리기 ---
         Math::Vec2 settingPos = { GAME_WIDTH / 2.0f - 150.f, GAME_HEIGHT / 2.0f + 50.f };
         Math::Vec2 exitPos = { GAME_WIDTH / 2.0f - 150.f, GAME_HEIGHT / 2.0f - 50.f };
 
-        if (m_mainSelection == MainOption::Resume) // 'Setting'
+        if (m_mainSelection == MainOption::Resume)
         {
-            m_font->DrawBakedText(*m_fontShader, m_resumeSelectedText, settingPos, size);
-            m_font->DrawBakedText(*m_fontShader, m_exitText, exitPos, size);
+            m_font->DrawBakedText(*m_fontShader, m_resumeSelectedText, settingPos, fontSize);
+            m_font->DrawBakedText(*m_fontShader, m_exitText, exitPos, fontSize);
         }
-        else // m_mainSelection == MainOption::Exit
+        else
         {
-            m_font->DrawBakedText(*m_fontShader, m_resumeText, settingPos, size);
-            m_font->DrawBakedText(*m_fontShader, m_exitSelectedText, exitPos, size);
+            m_font->DrawBakedText(*m_fontShader, m_resumeText, settingPos, fontSize);
+            m_font->DrawBakedText(*m_fontShader, m_exitSelectedText, exitPos, fontSize);
         }
     }
     else if (m_currentPage == MenuPage::Display)
     {
-        // --- 디스플레이 메뉴 그리기 ---
         Math::Vec2 resRecPos = { GAME_WIDTH / 2.0f - 400.f, GAME_HEIGHT / 2.0f + 50.f };
 
         if (m_displaySelection == 0)
         {
-            // 항상 Recommended만 선택된 상태로 표시
+            // For the demo, always show the Recommended option as selected
             std::string selectedStr = "> " + m_resRecommendedText.text + " <";
             CachedTextureInfo selectedTex = m_font->PrintToTexture(*m_fontShader, selectedStr);
-
-            m_font->DrawBakedText(*m_fontShader, selectedTex, resRecPos, size);
+            m_font->DrawBakedText(*m_fontShader, selectedTex, resRecPos, fontSize);
         }
     }
 }
 
+
+
 void SettingState::Shutdown()
 {
+    // Release OpenGL resources
     GL::DeleteVertexArrays(1, &m_overlayVAO);
     GL::DeleteBuffers(1, &m_overlayVBO);
     Logger::Instance().Log(Logger::Severity::Info, "SettingState Shutdown");

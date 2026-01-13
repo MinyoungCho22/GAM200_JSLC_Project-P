@@ -1,9 +1,12 @@
-﻿#include "Font.hpp"
+//Font.cpp
+
+#include "Font.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include <vector>
 #include <iostream>
 
+// Suppress warnings for stb_image
 #pragma warning(push, 0)
 #include <stb_image.h>
 #pragma warning(pop)
@@ -11,7 +14,7 @@
 
 unsigned int Font::GetPixel(const unsigned char* data, int x, int y, int width, int channels) const
 {
-    // stbi_load(false) 기준. (0,0)은 Top-Left
+    // Based on stbi_load(false). (0,0) is Top-Left
     const unsigned char* p = data + (y * width + x) * channels;
     unsigned int r = p[0];
     unsigned int g = p[1];
@@ -42,14 +45,14 @@ void Font::Initialize(const char* fontAtlasPath)
         return;
     }
 
-    m_fontHeight = height - 1; // y=0은 파싱용, y=1 ~ (height)가 폰트 높이
+    m_fontHeight = height - 1; // y=0 is for parsing info, font height is from y=1 to height
     size_t current_char_index = 0;
     int last_boundary_x = 0;
-    unsigned int last_color = GetPixel(data, 0, 0, width, nrChannels); // y=0 라인 스캔
+    unsigned int last_color = GetPixel(data, 0, 0, width, nrChannels); // Scan y=0 line
 
     for (int x = 1; x < width; ++x)
     {
-        unsigned int current_color = GetPixel(data, x, 0, width, nrChannels); // y=0 라인
+        unsigned int current_color = GetPixel(data, x, 0, width, nrChannels); // Scan y=0 line
         if (current_color != last_color)
         {
             if (current_char_index >= m_charSequence.length())
@@ -60,9 +63,9 @@ void Font::Initialize(const char* fontAtlasPath)
 
             char c = m_charSequence[current_char_index];
             Math::IRect rect;
-            // 픽셀 좌표 (y=0 Top, y=height Bottom) 기준
-            rect.bottom_left = { last_boundary_x, 1 };                 // (min_x, min_y) (min_y = 1)
-            rect.top_right = { x, 1 + m_fontHeight };                // (max_x, max_y) (max_y = height)
+            // Coordinate system: y=0 Top, y=height Bottom
+            rect.bottom_left = { last_boundary_x, 1 };                 // (min_x, min_y)
+            rect.top_right = { x, 1 + m_fontHeight };                // (max_x, max_y)
             m_charToRectMap[c] = rect;
 
             current_char_index++;
@@ -71,7 +74,7 @@ void Font::Initialize(const char* fontAtlasPath)
         }
     }
 
-    // --- OpenGL 텍스처/VAO/FBO 생성 ---
+    // --- Create OpenGL Texture/VAO/FBO ---
 
     GL::GenTextures(1, &m_atlasTextureID);
     GL::BindTexture(GL_TEXTURE_2D, m_atlasTextureID);
@@ -113,21 +116,21 @@ void Font::Initialize(const char* fontAtlasPath)
 
 void Font::Shutdown()
 {
-    // 캐시된 모든 텍스처 삭제
+    // Delete all cached textures
     for (auto const& [key, val] : m_textCache)
     {
         GL::DeleteTextures(1, &val.textureID);
     }
     m_textCache.clear();
 
-    // FBO 삭제
+    // Delete FBO
     if (m_fboID != 0) GL::DeleteFramebuffers(1, &m_fboID);
 
-    // 쿼드 VAO/VBO 삭제
+    // Delete Quad VAO/VBO
     if (m_quadVAO != 0) GL::DeleteVertexArrays(1, &m_quadVAO);
     if (m_quadVBO != 0) GL::DeleteBuffers(1, &m_quadVBO);
 
-    // 원본 아틀라스 텍스처 삭제
+    // Delete original atlas texture
     if (m_atlasTextureID != 0) GL::DeleteTextures(1, &m_atlasTextureID);
 }
 
@@ -138,18 +141,18 @@ CachedTextureInfo Font::PrintToTexture(Shader& atlasShader, const std::string& t
         return { 0, 0, 0 };
     }
 
-    // 캐시 확인
+    // Check cache
     auto it = m_textCache.find(text);
     if (it != m_textCache.end())
     {
-        return it->second; // 캐시 히트
+        return it->second; // Cache hit
     }
 
-    // 캐시 미스: 새 텍스처 베이킹
+    // Cache miss: Bake new texture
     CachedTextureInfo newTextureInfo = BakeTextToTexture(atlasShader, text);
-    newTextureInfo.text = text; // 캐시 정보에 원본 텍스트 저장
+    newTextureInfo.text = text; // Store original text in cache info
 
-    // 캐시에 저장
+    // Save to cache
     m_textCache[text] = newTextureInfo;
     return newTextureInfo;
 }
@@ -167,8 +170,7 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
     GL::BindTexture(GL_TEXTURE_2D, newTexID);
     GL::TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textSize.x, textSize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
-    // FBO 텍스처를 확대할 때 부드럽게 보이도록 GL_LINEAR 사용
-    // GL_NEAREST -> GL_LINEAR로 변경
+    // Use GL_LINEAR for smooth look when scaling FBO texture
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -228,16 +230,12 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
         float uv_h = static_cast<float>(char_size.y) / m_atlasHeight;
         float uv_y = 1.0f - (static_cast<float>(char_rect.top_right.y) / m_atlasHeight);
 
-
-
-
+        // Adjust UV to avoid bleeding artifacts
         const float pixel_epsilon_x = 0.5f / m_atlasWidth;
         uv_x += pixel_epsilon_x;
         uv_w -= 2.0f * pixel_epsilon_x;
 
-
         const float one_pixel_y = 1.0f / m_atlasHeight;
-
         uv_y += one_pixel_y;
         uv_h -= 2.0f * one_pixel_y;
 
@@ -271,7 +269,7 @@ void Font::DrawBakedText(Shader& textureShader, const CachedTextureInfo& texture
         position.y + renderHeight / 2.0f
     };
 
-
+    // Note: Negative height usually implies flipping Y axis
     Math::Matrix model = Math::Matrix::CreateTranslation(center) *
         Math::Matrix::CreateScale({ renderWidth, -renderHeight });
     textureShader.setMat4("model", model);

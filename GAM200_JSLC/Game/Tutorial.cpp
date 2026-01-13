@@ -1,10 +1,12 @@
+//Tutorial.cpp
+
 #include "Tutorial.hpp"
 #include "Player.hpp"
 #include "Hallway.hpp"
 #include "Rooftop.hpp"
 #include "Room.hpp"
 #include "Door.hpp"
-#include "../Engine/Input.hpp"        
+#include "../Engine/Input.hpp"         
 #include "../Engine/Collision.hpp"      
 #include "../OpenGL/Shader.hpp" 
 
@@ -17,6 +19,7 @@ Tutorial::Tutorial()
 
 void Tutorial::Init(Font& font, Shader& atlasShader, Math::Vec2 pursePosition, Math::Vec2 purseSize)
 {
+    // Initialize the basic item absorption tutorial
     TutorialMessage msg;
     msg.text = "Press I To Absorb the Purse";
     msg.texture = font.PrintToTexture(atlasShader, msg.text);
@@ -32,12 +35,13 @@ void Tutorial::Init(Font& font, Shader& atlasShader, Math::Vec2 pursePosition, M
 
 void Tutorial::AddHidingSpotMessage(Font& font, Shader& atlasShader, Math::Vec2 hidingSpotPos, Math::Vec2 hidingSpotSize)
 {
+    // Initialize hiding mechanic tutorial (electromagnetic shield)
     TutorialMessage msg;
     msg.id = "hiding_spot";
     msg.text = "Press the S key to hide inside the electromagnetic shield";
     msg.texture = font.PrintToTexture(atlasShader, msg.text);
     msg.targetPosition = hidingSpotPos;
-    msg.targetSize = hidingSpotSize * 2.0f;
+    msg.targetSize = hidingSpotSize * 2.0f; // Increase detection area for better UX
     msg.textPosition = { GAME_WIDTH / 2.0f - 450.0f, 100.0f };
     msg.textHeight = 50.0f;
     msg.isActive = false;
@@ -100,6 +104,7 @@ void Tutorial::AddRooftopDoorMessage(Font& font, Shader& atlasShader)
 
 void Tutorial::AddDroneCrashMessage(Font& font, Shader& atlasShader)
 {
+    // Special hint displayed after successful hiding tutorial
     TutorialMessage msg;
     msg.id = "drone_crash_hint";
     msg.text = "Hold down the J key for over 1 second to crash the drone!";
@@ -108,7 +113,7 @@ void Tutorial::AddDroneCrashMessage(Font& font, Shader& atlasShader)
     msg.textHeight = 50.0f;
     msg.isActive = false;
     msg.type = TutorialMessage::Type::DroneCrashHint;
-    msg.duration = 4.0f;
+    msg.duration = 4.0f; // Display for 4 seconds
     msg.timer = 0.0f;
 
     m_messages.push_back(msg);
@@ -130,6 +135,7 @@ void Tutorial::AddLiftMessage(Font& font, Shader& atlasShader)
 
 void Tutorial::DisableAll()
 {
+    // Forces all tutorial sequences to end immediately
     m_crouchTutorialCompleted = true;
 
     for (auto& msg : m_messages)
@@ -141,6 +147,7 @@ void Tutorial::DisableAll()
 
 void Tutorial::Update(float dt, Player& player, const Input::Input& input, Room* room, Hallway* hallway, Rooftop* rooftop, Door* roomDoor, Door* rooftopDoor)
 {
+    // Manage state for the "Hold S to Hide" tutorial
     if (!m_crouchTutorialCompleted && input.IsKeyPressed(Input::Key::S))
     {
         m_crouchTimer += dt;
@@ -150,6 +157,7 @@ void Tutorial::Update(float dt, Player& player, const Input::Input& input, Room*
         m_crouchTimer = 0.0f;
     }
 
+    // If held for 2 seconds, trigger the drone crash hint
     if (!m_crouchTutorialCompleted && m_crouchTimer >= 2.0f)
     {
         m_crouchTutorialCompleted = true;
@@ -177,6 +185,7 @@ void Tutorial::Update(float dt, Player& player, const Input::Input& input, Room*
     Math::Vec2 playerPos = player.GetPosition();
     Math::Vec2 playerSize = player.GetHitboxSize();
 
+    // Trigger/Deactivate messages based on contextual conditions
     for (auto& msg : m_messages)
     {
         if (msg.isPermanentlyDisabled)
@@ -185,6 +194,7 @@ void Tutorial::Update(float dt, Player& player, const Input::Input& input, Room*
             continue;
         }
 
+        // Handle timed messages (e.g., Drone Crash Hint)
         if (msg.type == TutorialMessage::Type::DroneCrashHint)
         {
             if (msg.isActive)
@@ -197,12 +207,13 @@ void Tutorial::Update(float dt, Player& player, const Input::Input& input, Room*
                 }
             }
         }
-        else
+        else // Handle proximity-based or conditional messages
         {
             switch (msg.type)
             {
             case TutorialMessage::Type::Collision:
             {
+                // Toggle based on AABB overlap between player and target area
                 bool isColliding = Collision::CheckAABB(playerPos, playerSize, msg.targetPosition, msg.targetSize);
                 msg.isActive = isColliding;
                 break;
@@ -241,6 +252,7 @@ void Tutorial::Update(float dt, Player& player, const Input::Input& input, Room*
 
 void Tutorial::Draw(Font& font, Shader& textureShader)
 {
+    // Render only active tutorial text to the screen
     for (const auto& msg : m_messages)
     {
         if (msg.isActive)

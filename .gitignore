@@ -1,18 +1,46 @@
-.vs/
+# ===========================
+# 1. 빌드 출력 폴더 (User Request)
+# ===========================
+x64/
+x86/
 Debug/
 Release/
-x64/
-/GameLog.txt
-GAM200_JSLC/GameLog.txt
-
-# CMake build files
 build/
+out/
+bin/
+obj/
+
+# ===========================
+# 2. Visual Studio 임시/설정 파일 (User Request)
+# ===========================
+.vs/
+*.user
+*.suo
+*.ipch
+*.sdf
+*.opensdf
+*.aps
+*.ncb
+
+# ===========================
+# 3. 런타임 생성 파일 (로그 등)
+# ===========================
+# 경로 상관없이 GameLog.txt는 모두 무시
+GameLog.txt
+*.log
+
+# ===========================
+# 4. CMake 생성 파일 (혹시 소스 트리에 생겼을 경우)
+# ===========================
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
-*.cmake
-!CMakeLists.txt
+CMakeScripts/
+Makefile
 
-# CMake cache JSON files
-buildW.cmakeWa*.json
-*.cmakeWa*.json
+# ===========================
+# 5. OS 생성 파일 (맥/윈도우 찌꺼기)
+# ===========================
+.DS_Store
+Thumbs.db
+desktop.ini
