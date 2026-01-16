@@ -1,3 +1,5 @@
+//Logger.hpp
+
 #pragma once
 #include <string>
 #include <fstream>
@@ -6,39 +8,38 @@
 class Logger
 {
 public:
-    // Logger의 유일한 인스턴스를 가져오는 함수
+    // Get singleton instance
     static Logger& Instance();
 
-    // 로그의 심각도 수준을 정의
+    // Log severity levels
     enum class Severity
     {
-        Verbose, // 아주 사소한 메시지
-        Debug,   // 디버깅 중에만 사용하는 메시지
-        Info,    // 일반적인 정보 메시지
-        Event,   // 키 입력, 상태 변경 등 일반 이벤트
-        Error    // 파일 로드 실패 등 오류 메시지
+        Verbose,
+        Debug,
+        Info,
+        Event,
+        Error
     };
 
-    // 로거 초기 설정 함수
+    // Initialize logger (Must be called first)
     void Initialize(Severity min_severity, bool use_console);
 
-    // printf 스타일의 서식 있는 로깅을 위한 함수
+    // Log message
     void Log(Severity severity, const char* format, ...);
 
-    // 복사 및 대입을 방지하여 싱글턴 패턴을 유지
+    // Delete copy constructor and assignment operator
     Logger(const Logger&) = delete;
     void operator=(const Logger&) = delete;
 
 private:
-    // 생성자를 private으로 만들어 외부 생성을 막자
     Logger();
+    ~Logger();
 
-    // 멤버 변수
     Severity min_severity;
     bool use_console_output;
     std::chrono::steady_clock::time_point start_time_point;
     std::ofstream log_file;
 
-    // Helper 함수: 실제 로그 메시지를 포맷팅함
+    // Helper function to format message
     std::string FormatMessage(const std::string& severity_text, const std::string& message);
 };

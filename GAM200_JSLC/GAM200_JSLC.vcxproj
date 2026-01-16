@@ -82,7 +82,12 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -98,7 +103,12 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -112,7 +122,12 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -128,28 +143,89 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CS200\RenderingAPI.cpp" />
+    <ClCompile Include="Engine\Camera.cpp" />
+    <ClCompile Include="Engine\Collision.cpp" />
+    <ClCompile Include="Engine\DebugRenderer.cpp" />
     <ClCompile Include="Engine\Engine.cpp" />
+    <ClCompile Include="Engine\GameStateManager.cpp" />
+    <ClCompile Include="Engine\Input.cpp" />
     <ClCompile Include="Engine\Logger.cpp" />
     <ClCompile Include="Engine\Matrix.cpp" />
+    <ClCompile Include="Engine\Sound.cpp" />
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Engine\Window.cpp" />
+    <ClCompile Include="Game\Background.cpp" />
+    <ClCompile Include="Game\Door.cpp" />
+    <ClCompile Include="Game\Drone.cpp" />
+    <ClCompile Include="Game\DroneManager.cpp" />
+    <ClCompile Include="Game\Font.cpp" />
+    <ClCompile Include="Game\GameOver.cpp" />
+    <ClCompile Include="Game\GameplayState.cpp" />
+    <ClCompile Include="Game\Hallway.cpp" />
+    <ClCompile Include="Game\MainMenu.cpp" />
     <ClCompile Include="Game\Player.cpp" />
+    <ClCompile Include="Game\PulseGauge.cpp" />
+    <ClCompile Include="Game\PulseManager.cpp" />
+    <ClCompile Include="Game\PulseSource.cpp" />
+    <ClCompile Include="Game\Robot.cpp" />
+    <ClCompile Include="Game\Rooftop.cpp" />
+    <ClCompile Include="Game\Room.cpp" />
+    <ClCompile Include="Game\Setting.cpp" />
+    <ClCompile Include="Game\SplashState.cpp" />
+    <ClCompile Include="Game\TraceSystem.cpp" />
+    <ClCompile Include="Game\Tutorial.cpp" />
+    <ClCompile Include="Game\Underground.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="OpenGL\Shader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CS200\RenderingAPI.hpp" />
     <ClInclude Include="CS200\RGBA.hpp" />
+    <ClInclude Include="Engine\Camera.hpp" />
+    <ClInclude Include="Engine\Collision.hpp" />
+    <ClInclude Include="Engine\DebugRenderer.hpp" />
     <ClInclude Include="Engine\Engine.hpp" />
+    <ClInclude Include="Engine\GameState.hpp" />
+    <ClInclude Include="Engine\GameStateManager.hpp" />
+    <ClInclude Include="Engine\Input.hpp" />
     <ClInclude Include="Engine\Logger.hpp" />
     <ClInclude Include="Engine\Matrix.hpp" />
+    <ClInclude Include="Engine\Rect.hpp" />
+    <ClInclude Include="Engine\Sound.hpp" />
     <ClInclude Include="Engine\Vec2.hpp" />
     <ClInclude Include="Engine\Window.hpp" />
+    <ClInclude Include="Game\Background.hpp" />
+    <ClInclude Include="Game\Door.hpp" />
+    <ClInclude Include="Game\Drone.hpp" />
+    <ClInclude Include="Game\DroneManager.hpp" />
+    <ClInclude Include="Game\Font.hpp" />
+    <ClInclude Include="Game\GameOver.hpp" />
+    <ClInclude Include="Game\GameplayState.hpp" />
+    <ClInclude Include="Game\Hallway.hpp" />
+    <ClInclude Include="Game\MainMenu.hpp" />
     <ClInclude Include="Game\Player.hpp" />
+    <ClInclude Include="Game\PulseGauge.hpp" />
+    <ClInclude Include="Game\PulseManager.hpp" />
+    <ClInclude Include="Game\PulseSource.hpp" />
+    <ClInclude Include="Game\PulseCore.hpp" />
+    <ClInclude Include="Game\Robot.hpp" />
+    <ClInclude Include="Game\Rooftop.hpp" />
+    <ClInclude Include="Game\Room.hpp" />
+    <ClInclude Include="Game\Setting.hpp" />
+    <ClInclude Include="Game\SplashState.hpp" />
+    <ClInclude Include="Game\TraceSystem.hpp" />
+    <ClInclude Include="Game\Tutorial.hpp" />
+    <ClInclude Include="Game\Underground.hpp" />
+    <ClInclude Include="OpenGL\GLWrapper.hpp" />
     <ClInclude Include="OpenGL\Shader.hpp" />
   </ItemGroup>
   <ItemGroup>

@@ -1,16 +1,18 @@
+//main.cpp
+
 #include "Engine/Engine.hpp"
 #include "Engine/Logger.hpp" 
 
 int main(void)
 {
-    // 로거를 가장 먼저 초기화
-    // Debug 레벨 이상의 로그를 콘솔에 출력하도록 설정
+    // Initialize the logger before anything else
+    // Set to output logs of Debug severity or higher to the console
     Logger::Instance().Initialize(Logger::Severity::Debug, true);
 
     Engine engine;
     if (!engine.Initialize("Project P"))
     {
-        // 엔진 초기화 실패 시 에러 로그를 남기고 종료
+        // Log an error message and terminate if engine initialization fails
         Logger::Instance().Log(Logger::Severity::Error, "Engine initialization failed!");
         return -1;
     }

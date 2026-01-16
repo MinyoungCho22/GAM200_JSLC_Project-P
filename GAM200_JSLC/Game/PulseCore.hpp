@@ -1,31 +1,17 @@
-#pragma once
-#include <algorithm>   
-#include <functional>  
+//PulseCore.hpp
 
-//  Pulse: 값만 관리 (최대/현재)
+#pragma once
+#include <algorithm>
+#include <functional>
+
 class Pulse {
 public:
-    explicit Pulse(float max = 100.0f)
-        : pulse_max(max), pulse_value(max) {
+    explicit Pulse(float max = 100.0f, float start = 20.0f)
+        : pulse_max(max), pulse_value(start) {
     }
 
     float Value() const { return pulse_value; }
     float Max()   const { return pulse_max; }
-
-    void setValue(float v) {
-        if (v < 0.f)
-            pulse_value = 0.f;
-        else if (v > pulse_max)
-            pulse_value = pulse_max;
-        else
-            pulse_value = v;
-    }
-
-    void setMax(float m) {
-        pulse_max = (m < 0.f ? 0.f : m);
-        if (pulse_value > pulse_max) pulse_value = pulse_max;
-        if (pulse_value < 0.f)       pulse_value = 0.f;
-    }
 
     void add(float amount) {
         if (amount <= 0.f) return;
@@ -34,8 +20,12 @@ public:
 
     void spend(float amount) {
         if (amount <= 0.f) return;
-        if (pulse_value >= amount)
-            pulse_value -= amount;
+
+        pulse_value -= amount;
+        if (pulse_value < 0.0f)
+        {
+            pulse_value = 0.0f;
+        }
     }
 
 private:
@@ -44,8 +34,9 @@ private:
 };
 
 struct PulseConfig {
-    float chargeAmount = 30.f; 
-    float attackCost = 20.f; 
+    float chargeRatePerSecond = 50.f;
+    float attackCost = 20.f;
+    float dashCost = 3.f;
 };
 
 struct PulseTickResult {
@@ -57,11 +48,10 @@ struct PulseTickResult {
     bool  spendFailed = false;
 };
 
-//기본적인 펄스 시스템 토대 
 class PulseCore {
 public:
-    explicit PulseCore(float maxPulse = 100.f, PulseConfig cfg = {})
-        : pulse(maxPulse), config(cfg) {
+    explicit PulseCore(float maxPulse = 100.f, float startPulse = 20.f, PulseConfig cfg = {})
+        : pulse(maxPulse, startPulse), config(cfg) {
     }
 
     Pulse& getPulse() { return pulse; }
@@ -69,27 +59,22 @@ public:
     PulseConfig& getConfig() { return config; }
     const PulseConfig& getConfig() const { return config; }
 
-    PulseTickResult tick(bool pressE, bool pressQ,
-        bool inCharger,
-        bool inAttack)
+    PulseTickResult tick(bool wantsToCharge, bool canCharge, bool isDashing, double dt)
     {
         PulseTickResult r{};
         r.before = pulse.Value();
 
-        if (pressE && inCharger) {
+        if (wantsToCharge && canCharge) {
             float before = pulse.Value();
-            pulse.add(config.chargeAmount);
+            float amount_to_add = config.chargeRatePerSecond * static_cast<float>(dt);
+            pulse.add(amount_to_add);
             r.delta += pulse.Value() - before;
             r.charged = true;
         }
 
-        if (pressQ && inAttack) {
-            float before = pulse.Value();
-            float cost = config.attackCost;
-            if (pulse.Value() >= cost) {
-                pulse.spend(cost);
-                r.delta -= cost;
-                r.spent = true;
+        if (isDashing) {
+            if (pulse.Value() >= config.dashCost) {
+
             }
             else {
                 r.spendFailed = true;
