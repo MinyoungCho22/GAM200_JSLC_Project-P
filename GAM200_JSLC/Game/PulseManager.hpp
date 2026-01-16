@@ -28,6 +28,8 @@ public:
 
 private:
     AnimationData m_pulseAnim;
+    unsigned int m_circuitTexID = 0;
+    unsigned int m_fluidTexID = 0;
     unsigned int m_pulseVAO = 0;
     unsigned int m_pulseVBO = 0;
 
@@ -40,4 +42,23 @@ private:
 
     Math::Vec2 m_chargeStartPos;
     Math::Vec2 m_chargeEndPos;
+
+    bool m_attackPathValid = false;
+    float m_attackPathUpdateTimer = 0.0f;
+
+    Math::Vec2 m_attackStartFrozen{};
+    Math::Vec2 m_attackC1{};
+    Math::Vec2 m_attackC2{};
+    Math::Vec2 m_attackC3{};
+
+    Math::Vec2 m_attackEndLive{};
+
+    float m_lastDt = 0.016f;
+
+    // Attack VFX timing (flow sync)
+    float m_attackElapsed = 0.0f;
+    float m_attackTravelTime = 0.12f;
+    float m_attackTotalLen = 0.0f;
+    Math::Vec2 m_attackPrevEnd = { 0.f, 0.f };
+    bool  m_attackPacketActive = false;
 };
