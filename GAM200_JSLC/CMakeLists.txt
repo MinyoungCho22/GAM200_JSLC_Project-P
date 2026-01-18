@@ -46,25 +46,25 @@ if(MSVC)
 endif()
 
 # ==========================================================
-# [Include & Link Settings] (완전 독립형 설정)
+# [Include & Link Settings]
 # ==========================================================
 
 # 1. Include Paths
-# vcpkg 경로를 제거하고, 프로젝트 내 'include' 폴더를 추가했습니다.
+
 target_include_directories(${PROJECT_NAME} PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}
     "${CMAKE_CURRENT_SOURCE_DIR}/Engine"
     "${CMAKE_CURRENT_SOURCE_DIR}/Game"
     "${CMAKE_CURRENT_SOURCE_DIR}/OpenGL"
     "${CMAKE_CURRENT_SOURCE_DIR}/CS200"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include" # [중요] 여기에 헤더 파일들을 넣어주세요!
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
 # 2. Library Search Paths
-# 프로젝트 내 'lib' 폴더를 라이브러리 검색 경로로 지정합니다.
+
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib)
 
-# 3. fmod_vc.lib 복사 (Engine 폴더에 있는 경우)
+# 3. fmod_vc.lib
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Engine/fmod_vc.lib" 
      DESTINATION "${CMAKE_BINARY_DIR}")
 
