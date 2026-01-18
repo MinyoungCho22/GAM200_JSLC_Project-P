@@ -6,9 +6,6 @@ x86/
 Debug/
 Release/
 build/
-out/
-bin/
-obj/
 
 # ===========================
 # 2. Visual Studio 임시/설정 파일 (User Request)
