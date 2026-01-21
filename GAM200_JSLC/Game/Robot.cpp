@@ -1,5 +1,3 @@
-//Robot.cpp
-
 #include "Robot.hpp"
 #include "Player.hpp" 
 #include "../OpenGL/Shader.hpp"
@@ -247,6 +245,11 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         {
             m_state = RobotState::Chase;
         }
+        break;
+
+    case RobotState::Dead:
+        // Already handled by early return at the start of Update,
+        // but required to silence compiler warnings about unhandled enum value.
         break;
     }
 
