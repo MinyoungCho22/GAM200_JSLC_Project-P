@@ -3,7 +3,17 @@
 #pragma once
 #include <string>
 #include <map>
+
+#ifdef DISABLE_FMOD
+namespace FMOD
+{
+    class System;
+    class Sound;
+    class Channel;
+}
+#else
 #include "fmod.hpp"
+#endif
 
 class SoundSystem
 {
@@ -28,6 +38,12 @@ class Sound
 public:
     Sound();
     ~Sound();
+
+    Sound(const Sound&) = delete;
+    Sound& operator=(const Sound&) = delete;
+
+    Sound(Sound&& other) noexcept;
+    Sound& operator=(Sound&& other) noexcept;
 
     bool Load(const std::string& filepath, bool loop = false);
 

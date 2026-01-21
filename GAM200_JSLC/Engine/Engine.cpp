@@ -22,6 +22,19 @@ bool Engine::Initialize(const std::string& windowTitle)
         return false;
     }
 
+    // Request a modern OpenGL context (needed for GLSL #version 330 core shaders).
+    // macOS typically supports up to OpenGL 4.1 core profile.
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#else
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#endif
+
     m_window = glfwCreateWindow(m_width, m_height, windowTitle.c_str(), nullptr, nullptr);
 
     if (!m_window) {
@@ -40,14 +53,17 @@ bool Engine::Initialize(const std::string& windowTitle)
     m_input = std::make_unique<Input::Input>();
     m_input->Initialize(m_window);
 
+#ifdef USE_GLEW
     glewExperimental = GL_TRUE;
     if (glewInit() != GLEW_OK) {
         Logger::Instance().Log(Logger::Severity::Error, "Failed to initialize GLEW");
         return false;
     }
+#endif
     Logger::Instance().Log(Logger::Severity::Debug, "OpenGL Version: %s", reinterpret_cast<const char*>(GL::GetString(GL_VERSION)));
 
-    m_textureShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
+    // NOTE: Folder is `OpenGL/Shaders` (case-sensitive on macOS)
+    m_textureShader = std::make_unique<Shader>("OpenGL/Shaders/simple.vert", "OpenGL/Shaders/simple.frag");
     m_textureShader->use();
     m_textureShader->setInt("ourTexture", 0);
 

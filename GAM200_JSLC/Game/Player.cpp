@@ -102,9 +102,9 @@ void Player::Init(Math::Vec2 startPos)
     GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     GL::EnableVertexAttribArray(1);
 
-    LoadAnimation(AnimationState::Idle, "Asset/player_Idle.png", 10, 0.1f);
-    LoadAnimation(AnimationState::Walking, "Asset/player_Walking.png", 7, 0.1f);
-    LoadAnimation(AnimationState::Crouching, "Asset/player_Crouch.png", 2, 0.1f);
+    LoadAnimation(AnimationState::Idle, "Asset/Player_Idle.png", 10, 0.1f);
+    LoadAnimation(AnimationState::Walking, "Asset/Player_Walking.png", 7, 0.1f);
+    LoadAnimation(AnimationState::Crouching, "Asset/Player_Crouch.png", 2, 0.1f);
 
     AnimationData& walkAnim = m_animations[static_cast<int>(AnimationState::Walking)];
     float desiredWidth = 240.0f;
