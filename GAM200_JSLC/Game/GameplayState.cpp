@@ -383,6 +383,14 @@ void GameplayState::Update(double dt)
         m_room->Update(player, dt, input);
     }
 
+    auto& pp = engine.GetPostProcess();
+
+    if (m_doorOpened && !m_rooftopAccessed)   
+        pp.Settings().exposure = 0.35f;
+    else
+        pp.Settings().exposure = 1.0f;
+
+
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
     m_rooftop->Update(dt, player, playerHitboxSize, input);
 

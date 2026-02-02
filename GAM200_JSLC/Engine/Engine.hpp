@@ -5,6 +5,7 @@
 #include <memory>
 #include "Input.hpp"
 #include "Vec2.hpp" 
+#include "OpenGL/PostProcessManager.h" 
 
 struct GLFWwindow;
 class GameStateManager;
@@ -39,6 +40,8 @@ public:
 
     void SetResolution(int width, int height); 
 
+    PostProcessManager& GetPostProcess() { return *m_postProcess; }
+
 private:
     void Update();
 
@@ -64,4 +67,6 @@ private:
 
     int m_windowedWidth = VIRTUAL_WIDTH;
     int m_windowedHeight = VIRTUAL_HEIGHT;
+
+    std::unique_ptr<PostProcessManager> m_postProcess;
 };

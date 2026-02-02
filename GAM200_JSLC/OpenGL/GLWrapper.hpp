@@ -55,6 +55,14 @@ namespace GL
     static inline void FramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level) { glFramebufferTexture2D(target, attachment, textarget, texture, level); }
     static inline GLenum CheckFramebufferStatus(GLenum target) { return glCheckFramebufferStatus(target); }
     static inline void DeleteFramebuffers(GLsizei n, const GLuint* framebuffers) { glDeleteFramebuffers(n, framebuffers); }
+    static inline void GenRenderbuffers(GLsizei n, GLuint* renderbuffers) { glGenRenderbuffers(n, renderbuffers); }
+    static inline void BindRenderbuffer(GLenum target, GLuint renderbuffer) { glBindRenderbuffer(target, renderbuffer); }
+    static inline void RenderbufferStorage(GLenum target, GLenum internalformat, GLsizei width, GLsizei height) { glRenderbufferStorage(target, internalformat, width, height); }
+    static inline void FramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer) { glFramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer); }
+    static inline void DeleteRenderbuffers(GLsizei n, const GLuint* renderbuffers)
+    {
+        glDeleteRenderbuffers(n, renderbuffers);
+    }
 
     // -------------------------------------------------------------------------
     // Shaders & Shader Programs
