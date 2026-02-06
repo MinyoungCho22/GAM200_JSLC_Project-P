@@ -7,6 +7,7 @@
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Input.hpp"
 #include "../Engine/Engine.hpp"
+#include "../Engine/Logger.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Matrix.hpp" 
@@ -56,8 +57,11 @@ void MainMenu::Update(double dt)
 {
     m_glitchTimer += dt;
 
-    if (gsm.GetEngine().GetInput().IsKeyTriggered(Input::Key::Enter))
+    // Check for Enter key to start game (immediate response)
+    if (!m_enterPressed && gsm.GetEngine().GetInput().IsKeyPressed(Input::Key::Enter))
     {
+        m_enterPressed = true;
+        Logger::Instance().Log(Logger::Severity::Event, "MainMenu: Enter key pressed - starting game!");
         gsm.ChangeState(std::make_unique<GameplayState>(gsm));
     }
 }

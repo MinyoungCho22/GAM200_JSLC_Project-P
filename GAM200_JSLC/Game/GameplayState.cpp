@@ -8,6 +8,7 @@
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Collision.hpp"
+#include "../Engine/ImguiManager.hpp"
 #include "Setting.hpp"
 #include "Background.hpp"
 #include <GLFW/glfw3.h>
@@ -83,7 +84,6 @@ void GameplayState::Initialize()
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
     m_debugToggleText = m_font->PrintToTexture(*m_fontShader, "Debug (TAB)");
-    m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ...");
 
     m_tutorial = std::make_unique<Tutorial>();
 
@@ -107,8 +107,6 @@ void GameplayState::Initialize()
     m_tutorial->AddDroneCrashMessage(*m_font, *m_fontShader);
     m_tutorial->AddLiftMessage(*m_font, *m_fontShader);
 
-    m_fpsTimer = 0.0;
-    m_frameCount = 0;
     m_isGameOver = false;
     m_doorOpened = false;
 
@@ -118,12 +116,56 @@ void GameplayState::Initialize()
         m_bgm.SetVolume(0.4f);
         Logger::Instance().Log(Logger::Severity::Info, "Gameplay BGM Started");
     }
+
+    // Set up debug window with drone managers and config manager
+    auto* imguiManager = gsm.GetEngine().GetImguiManager();
+    if (imguiManager)
+    {
+        // Add map drone managers
+        imguiManager->AddMapDroneManager("Hallway", m_hallway->GetDroneManager());
+        imguiManager->AddMapDroneManager("Rooftop", m_rooftop->GetDroneManager());
+        if (m_undergroundAccessed)
+        {
+            imguiManager->AddMapDroneManager("Underground", m_underground->GetDroneManager());
+        }
+
+        // Set main drone manager (for backwards compatibility)
+        if (droneManager)
+        {
+            imguiManager->SetDroneManager(droneManager.get());
+            // Also add main drone manager to the map list for Live Drones tab
+            imguiManager->AddMapDroneManager("Main", droneManager.get());
+        }
+
+        // Set config manager
+        auto configManager = gsm.GetEngine().GetDroneConfigManager();
+        if (configManager)
+        {
+            imguiManager->SetDroneConfigManager(configManager);
+
+            // Load saved live drone states
+            configManager->LoadLiveStatesFromFile();
+
+            // Apply saved states to drones
+            for (size_t i = 0; i < droneManager->GetDrones().size(); ++i)
+            {
+                configManager->ApplyLiveStateToDrone("Hallway", static_cast<int>(i), droneManager->GetDrones()[i]);
+            }
+        }
+    }
 }
 
 void GameplayState::Update(double dt)
 {
     Engine& engine = gsm.GetEngine();
     auto& input = engine.GetInput();
+
+    // Update player god mode from ImGui settings
+    auto* imguiManager = engine.GetImguiManager();
+    if (imguiManager)
+    {
+        player.SetGodMode(imguiManager->IsPlayerGodMode());
+    }
 
     if (m_isGameOver)
     {
@@ -201,7 +243,12 @@ void GameplayState::Update(double dt)
 
     if (isPressingAttack)
     {
-        if (player.GetPulseCore().getPulse().Value() > PULSE_COST_PER_SECOND * dt)
+        // Check for god mode (infinite pulse)
+        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+        bool isGodMode = imguiManager && imguiManager->IsPlayerGodMode();
+
+        // In god mode, always have enough pulse; otherwise check normally
+        if (isGodMode || player.GetPulseCore().getPulse().Value() > PULSE_COST_PER_SECOND * dt)
         {
             float closestDistSq = ATTACK_RANGE_SQ;
 
@@ -257,7 +304,15 @@ void GameplayState::Update(double dt)
 
     if (isPressingAttack && (targetDrone != nullptr || targetRobot != nullptr))
     {
-        player.GetPulseCore().getPulse().spend(PULSE_COST_PER_SECOND * static_cast<float>(dt));
+        // Check for god mode (infinite pulse)
+        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+        bool isGodMode = imguiManager && imguiManager->IsPlayerGodMode();
+
+        // Only spend pulse if not in god mode
+        if (!isGodMode)
+        {
+            player.GetPulseCore().getPulse().spend(PULSE_COST_PER_SECOND * static_cast<float>(dt));
+        }
 
         Math::Vec2 targetPos;
 
@@ -369,7 +424,12 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            player.TakeDamage(10.0f);
+            // Check for god mode (infinite pulse) - don't take damage in god mode
+            auto* imguiManager = gsm.GetEngine().GetImguiManager();
+            if (!imguiManager || !imguiManager->IsPlayerGodMode())
+            {
+                player.TakeDamage(10.0f);
+            }
             drone.ResetDamageFlag();
             break;
         }
@@ -396,7 +456,12 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            player.TakeDamage(10.0f);
+            // Check for god mode (infinite pulse) - don't take damage in god mode
+            auto* imguiManager = gsm.GetEngine().GetImguiManager();
+            if (!imguiManager || !imguiManager->IsPlayerGodMode())
+            {
+                player.TakeDamage(10.0f);
+            }
             drone.ResetDamageFlag();
             break;
         }
@@ -407,7 +472,12 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            player.TakeDamage(10.0f);
+            // Check for god mode (infinite pulse) - don't take damage in god mode
+            auto* imguiManager = gsm.GetEngine().GetImguiManager();
+            if (!imguiManager || !imguiManager->IsPlayerGodMode())
+            {
+                player.TakeDamage(10.0f);
+            }
             drone.ResetDamageFlag();
             break;
         }
@@ -418,14 +488,21 @@ void GameplayState::Update(double dt)
         auto& undergroundDrones = m_underground->GetDrones();
         for (auto& drone : undergroundDrones)
         {
-            if (!drone.IsDead() && drone.ShouldDealDamage())
+        if (!drone.IsDead() && drone.ShouldDealDamage())
+        {
+            // Check for god mode (infinite pulse) - don't take damage in god mode
+            auto* imguiManager = gsm.GetEngine().GetImguiManager();
+            if (!imguiManager || !imguiManager->IsPlayerGodMode())
             {
                 player.TakeDamage(20.0f);
-                drone.ResetDamageFlag();
-                break;
             }
+            drone.ResetDamageFlag();
+            break;
+        }
         }
     }
+
+    // Map drone managers are registered in Initialize(), no need to sync here
 
     m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
 
@@ -440,27 +517,15 @@ void GameplayState::Update(double dt)
         cameraLogTimer = 0.0f;
     }
 
-    m_fpsTimer += dt;
-    m_frameCount++;
-
-    if (m_fpsTimer >= 1.0)
-    {
-        int average_fps = static_cast<int>(m_frameCount / m_fpsTimer);
-        std::stringstream ss_fps;
-        ss_fps << "FPS: " << average_fps;
-        m_fpsText = m_font->PrintToTexture(*m_fontShader, ss_fps.str());
-        m_fpsTimer -= 1.0;
-        m_frameCount = 0;
-    }
-
     std::stringstream ss_pulse;
     ss_pulse.precision(1);
     ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
 
-    std::stringstream ss_warning;
-    ss_warning << "Warning Level: " << m_traceSystem->GetWarningLevel();
-    m_warningLevelText = m_font->PrintToTexture(*m_fontShader, ss_warning.str());
+    if (engine.GetImguiManager())
+    {
+        engine.GetImguiManager()->SetWarningLevel(m_traceSystem->GetWarningLevel());
+    }
 
     if (player.IsDead())
     {
@@ -662,10 +727,8 @@ void GameplayState::Draw()
     m_fontShader->use();
     m_fontShader->setMat4("projection", baseProjection);
 
-    m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, GAME_HEIGHT - 120.f }, 32.0f);
-    m_font->DrawBakedText(*m_fontShader, m_warningLevelText, { 20.f, GAME_HEIGHT - 160.f }, 32.0f);
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())
     {

@@ -46,6 +46,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     m_searchMaxAngle = drone_angle_distribution(drone_generator);
     m_searchRotation = 0.0f;
     m_searchDir = 1;
+    m_debugExitTimer = 0.0f;
 
     if (m_moveSound.Load("Asset/drone_3.mp3", true))
     {
@@ -115,6 +116,35 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     {
         m_moveSound.Stop();
         return;
+    }
+
+    // Debug mode: COMPLETE FREEZE - No AI, no movement, no updates
+    if (m_debugMode)
+    {
+        // Minimal updates only - no position/velocity changes
+        m_moveSound.SetVolume(0.0f); // Mute sound in debug mode
+
+        // Even radar animation is frozen in debug mode
+        // Position and velocity are ONLY changed manually via ImGui
+
+        return;
+    }
+
+    // Delay AI restart after exiting debug mode
+    if (m_debugExitTimer > 0.0f)
+    {
+        m_debugExitTimer -= static_cast<float>(dt);
+        m_velocity = { 0.0f, 0.0f }; // Stay stationary during delay
+        m_moveSound.SetVolume(0.0f);
+
+        // Update radar even during delay
+        if (!m_isHit)
+        {
+            m_radarAngle += m_radarRotationSpeed * static_cast<float>(dt);
+            if (m_radarAngle >= 360.0f) m_radarAngle -= 360.0f;
+        }
+
+        return; // Skip AI logic during delay
     }
 
     if (m_velocity.LengthSq() > 10.0f || m_isChasing)
@@ -515,4 +545,28 @@ void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
 void Drone::ResetDamageTimer()
 {
     m_damageTimer = 0.0f;
+}
+
+void Drone::SetDebugMode(bool debug)
+{
+    bool wasDebugMode = m_debugMode;
+    m_debugMode = debug;
+
+    // When exiting debug mode, delay AI restart to prevent unwanted movement
+    if (wasDebugMode && !debug)
+    {
+        // Stop all movement immediately
+        m_velocity = { 0.0f, 0.0f };
+
+        // Set delay timer to prevent AI from starting immediately
+        m_debugExitTimer = 2.0f; // 2 second delay before AI restarts
+
+        // Reset AI states but keep current position
+        m_moveTimer = 0.0f;
+        m_direction = { 1.0f, 0.0f };
+        m_isChasing = false;
+        m_lostTimer = 0.0f;
+
+        Logger::Instance().Log(Logger::Severity::Debug, "Drone debug mode disabled - AI delayed for 2 seconds");
+    }
 }

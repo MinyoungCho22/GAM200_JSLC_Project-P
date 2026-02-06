@@ -41,6 +41,7 @@ public:
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
+    DroneManager* GetDroneManager() { return m_droneManager.get(); }
     void ClearAllDrones();
 
     // Interaction state queries

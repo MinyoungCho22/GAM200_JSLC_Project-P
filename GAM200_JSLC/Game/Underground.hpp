@@ -45,6 +45,7 @@ public:
 
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
+    DroneManager* GetDroneManager() { return m_droneManager.get(); }
     void ClearAllDrones();
 
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }

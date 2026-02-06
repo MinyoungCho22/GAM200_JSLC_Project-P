@@ -34,6 +34,31 @@ public:
     static constexpr float DETECTION_RANGE_SQ = DETECTION_RANGE * DETECTION_RANGE;
     static constexpr float TIME_TO_DESTROY = 1.0f;
 
+    // Debug access methods
+    Math::Vec2 GetVelocity() const { return m_velocity; }
+    void SetVelocity(const Math::Vec2& velocity) { m_velocity = velocity; }
+    void SetPosition(const Math::Vec2& position) { m_position = position; }
+    void SetSize(const Math::Vec2& size) { m_size = size; }
+    float GetBaseSpeed() const { return m_baseSpeed; }
+    void SetBaseSpeedDebug(float speed) { m_baseSpeed = speed; }
+    void SetDead(bool dead) { m_isDead = dead; }
+    void SetHit(bool hit) { m_isHit = hit; if (hit) m_hitTimer = 0.0f; }
+    void SetAttacking(bool attacking) { m_isAttacking = attacking; }
+    float GetDamageTimer() const { return m_damageTimer; }
+    void SetDamageTimer(float timer) { m_damageTimer = timer; }
+    float GetAttackRadius() const { return m_attackRadius; }
+    void SetAttackRadius(float radius) { const_cast<float&>(m_attackRadius) = radius; }
+    float GetAttackAngle() const { return m_attackAngle; }
+    void SetAttackAngle(float angle) { m_attackAngle = angle; }
+    int GetAttackDirection() const { return m_attackDirection; }
+    void SetAttackDirection(int direction) { m_attackDirection = direction; }
+    void ResetHitTimer() { m_hitTimer = 0.0f; }
+    void ResetDamageTimerDebug() { m_damageTimer = 0.0f; }
+
+    // Debug mode control
+    void SetDebugMode(bool debug);
+    bool IsDebugMode() const { return m_debugMode; }
+
 private:
     void StartDeathSequence();
 
@@ -84,6 +109,9 @@ private:
     float m_bobTimer = 0.0f;
     float m_groundLevel = 180.0f;
     unsigned int VAO = 0, VBO = 0, textureID = 0;
+
+    bool m_debugMode = false; // When true, AI is disabled for manual positioning
+    float m_debugExitTimer = 0.0f; // Timer to delay AI restart after exiting debug mode
 
     Sound m_moveSound;
 };

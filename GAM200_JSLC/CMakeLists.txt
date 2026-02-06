@@ -19,6 +19,8 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     "Game/*.cpp"
     "OpenGL/*.cpp"
     "CS200/*.cpp"
+    "ThirdParty/imgui/*.cpp"
+    "ThirdParty/imgui/backends/*.cpp"
 )
 
 # Header files (.hpp, .h)
@@ -57,14 +59,21 @@ endif()
 # [Include & Link Settings]
 # ==========================================================
 
-target_include_directories(${PROJECT_NAME} PRIVATE 
+target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     "${CMAKE_CURRENT_SOURCE_DIR}/Engine"
     "${CMAKE_CURRENT_SOURCE_DIR}/Game"
     "${CMAKE_CURRENT_SOURCE_DIR}/OpenGL"
     "${CMAKE_CURRENT_SOURCE_DIR}/CS200"
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui/backends"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/json"
 )
+
+# Dear ImGui OpenGL backend needs to know which GL loader is used by the application.
+# This project uses GLEW on Windows (see USE_GLEW).
+target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLEW)
 
 find_package(OpenGL REQUIRED)
 find_package(PkgConfig QUIET)

@@ -51,6 +51,8 @@ public:
     void SetOnGround(bool onGround);
 
     void SetHiding(bool hiding) { m_isHiding = hiding; }
+    void SetGodMode(bool godMode) { m_godMode = godMode; }
+    bool IsGodMode() const { return m_godMode; }
 
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
@@ -93,4 +95,5 @@ private:
     bool can_double_jump = false;
     bool is_double_jumping = false;
     bool m_isHiding = false;
+    bool m_godMode = false;
 };

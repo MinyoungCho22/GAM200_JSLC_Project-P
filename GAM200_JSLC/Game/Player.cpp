@@ -311,7 +311,7 @@ void Player::Shutdown()
 
 void Player::TakeDamage(float amount)
 {
-    if (m_isInvincible) return;
+    if (m_isInvincible || m_godMode) return;
 
     m_pulseCore.getPulse().spend(amount);
     m_isInvincible = true;

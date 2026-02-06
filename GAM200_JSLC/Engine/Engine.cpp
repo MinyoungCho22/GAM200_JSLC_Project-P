@@ -3,6 +3,7 @@
 #include "Engine.hpp"
 #include "Logger.hpp"
 #include "GameStateManager.hpp"
+#include "ImguiManager.hpp"
 #include "../Game/SplashState.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp" 
@@ -73,6 +74,13 @@ bool Engine::Initialize(const std::string& windowTitle)
     m_gameStateManager = std::make_unique<GameStateManager>(*this);
     m_gameStateManager->PushState(std::make_unique<SplashState>(*m_gameStateManager));
 
+    m_imguiManager = std::make_unique<ImguiManager>();
+    (void)m_imguiManager->Initialize();
+
+    // Initialize drone config manager
+    m_droneConfigManager = std::make_shared<DroneConfigManager>();
+    m_imguiManager->SetDroneConfigManager(m_droneConfigManager);
+
     return true;
 }
 
@@ -96,6 +104,13 @@ void Engine::GameLoop()
         GL::Clear(GL_COLOR_BUFFER_BIT);
 
         m_gameStateManager->Draw();
+
+        if (m_imguiManager)
+        {
+            m_imguiManager->BeginFrame(m_deltaTime);
+            m_imguiManager->DrawDebugWindow();
+            m_imguiManager->EndFrame();
+        }
 
         glfwSwapBuffers(m_window);
     }
@@ -208,6 +223,13 @@ void Engine::RequestShutdown()
 void Engine::Shutdown()
 {
     m_gameStateManager->Clear();
+
+    if (m_imguiManager)
+    {
+        m_imguiManager->Shutdown();
+        m_imguiManager.reset();
+    }
+
     if (m_window) {
         glfwDestroyWindow(m_window);
         m_window = nullptr;

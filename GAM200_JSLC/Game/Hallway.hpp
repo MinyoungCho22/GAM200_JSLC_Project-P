@@ -46,6 +46,7 @@ public:
     std::vector<PulseSource>& GetPulseSources();
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
+    DroneManager* GetDroneManager() { return m_droneManager.get(); }
 
     const std::vector<HidingSpot>& GetHidingSpots() const;
     bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;

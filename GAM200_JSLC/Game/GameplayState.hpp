@@ -57,12 +57,8 @@ private:
     std::unique_ptr<Door> m_rooftopDoor;
     double m_logTimer = 0.0;
     std::unique_ptr<Font> m_font;
-    double m_fpsTimer = 0.0;
-    int m_frameCount = 0;
-    CachedTextureInfo m_fpsText;
     CachedTextureInfo m_pulseText;
     CachedTextureInfo m_debugToggleText;
-    CachedTextureInfo m_warningLevelText;
     Camera m_camera;
     std::unique_ptr<Hallway> m_hallway;
     std::unique_ptr<Rooftop> m_rooftop;

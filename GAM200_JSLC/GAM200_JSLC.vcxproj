@@ -74,9 +74,9 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;IMGUI_IMPL_OPENGL_LOADER_GLEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\imgui;$(ProjectDir)ThirdParty\imgui\backends;C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -95,9 +95,9 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;IMGUI_IMPL_OPENGL_LOADER_GLEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\imgui;$(ProjectDir)ThirdParty\imgui\backends;C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -114,9 +114,9 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;IMGUI_IMPL_OPENGL_LOADER_GLEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\imgui;$(ProjectDir)ThirdParty\imgui\backends;C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -135,9 +135,9 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;IMGUI_IMPL_OPENGL_LOADER_GLEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\imgui;$(ProjectDir)ThirdParty\imgui\backends;C:\vcpkg\installed\x64-windows\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -155,14 +155,22 @@
     <ClCompile Include="Engine\Camera.cpp" />
     <ClCompile Include="Engine\Collision.cpp" />
     <ClCompile Include="Engine\DebugRenderer.cpp" />
+    <ClCompile Include="Engine\DroneConfig.cpp" />
     <ClCompile Include="Engine\Engine.cpp" />
     <ClCompile Include="Engine\GameStateManager.cpp" />
+    <ClCompile Include="Engine\ImguiManager.cpp" />
     <ClCompile Include="Engine\Input.cpp" />
     <ClCompile Include="Engine\Logger.cpp" />
     <ClCompile Include="Engine\Matrix.cpp" />
     <ClCompile Include="Engine\Sound.cpp" />
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Engine\Window.cpp" />
+    <ClCompile Include="ThirdParty\imgui\imgui.cpp" />
+    <ClCompile Include="ThirdParty\imgui\imgui_draw.cpp" />
+    <ClCompile Include="ThirdParty\imgui\imgui_tables.cpp" />
+    <ClCompile Include="ThirdParty\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="ThirdParty\imgui\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="ThirdParty\imgui\backends\imgui_impl_opengl3.cpp" />
     <ClCompile Include="Game\Background.cpp" />
     <ClCompile Include="Game\Door.cpp" />
     <ClCompile Include="Game\Drone.cpp" />
@@ -193,9 +201,11 @@
     <ClInclude Include="Engine\Camera.hpp" />
     <ClInclude Include="Engine\Collision.hpp" />
     <ClInclude Include="Engine\DebugRenderer.hpp" />
+    <ClInclude Include="Engine\DroneConfig.hpp" />
     <ClInclude Include="Engine\Engine.hpp" />
     <ClInclude Include="Engine\GameState.hpp" />
     <ClInclude Include="Engine\GameStateManager.hpp" />
+    <ClInclude Include="Engine\ImguiManager.hpp" />
     <ClInclude Include="Engine\Input.hpp" />
     <ClInclude Include="Engine\Logger.hpp" />
     <ClInclude Include="Engine\Matrix.hpp" />
@@ -203,6 +213,15 @@
     <ClInclude Include="Engine\Sound.hpp" />
     <ClInclude Include="Engine\Vec2.hpp" />
     <ClInclude Include="Engine\Window.hpp" />
+    <ClInclude Include="ThirdParty\imgui\imgui.h" />
+    <ClInclude Include="ThirdParty\imgui\imconfig.h" />
+    <ClInclude Include="ThirdParty\imgui\imgui_internal.h" />
+    <ClInclude Include="ThirdParty\imgui\imstb_rectpack.h" />
+    <ClInclude Include="ThirdParty\imgui\imstb_textedit.h" />
+    <ClInclude Include="ThirdParty\imgui\imstb_truetype.h" />
+    <ClInclude Include="ThirdParty\imgui\backends\imgui_impl_glfw.h" />
+    <ClInclude Include="ThirdParty\imgui\backends\imgui_impl_opengl3.h" />
+    <ClInclude Include="ThirdParty\imgui\backends\imgui_impl_opengl3_loader.h" />
     <ClInclude Include="Game\Background.hpp" />
     <ClInclude Include="Game\Door.hpp" />
     <ClInclude Include="Game\Drone.hpp" />

@@ -9,6 +9,8 @@
 struct GLFWwindow;
 class GameStateManager;
 class Shader;
+class ImguiManager;
+class DroneConfigManager;
 
 
 constexpr int VIRTUAL_WIDTH = 1920;
@@ -25,6 +27,7 @@ public:
     void RequestShutdown();
     double GetDeltaTime() const { return m_deltaTime; }
     GLFWwindow* GetWindow() const { return m_window; }
+    ImguiManager* GetImguiManager() const { return m_imguiManager.get(); }
 
     int GetWidth() const { return VIRTUAL_WIDTH; }
     int GetHeight() const { return VIRTUAL_HEIGHT; }
@@ -32,6 +35,9 @@ public:
     Input::Input& GetInput() const { return *m_input; }
 
     Shader& GetTextureShader() const { return *m_textureShader; }
+
+    ImguiManager* GetImguiManager() { return m_imguiManager.get(); }
+    std::shared_ptr<DroneConfigManager> GetDroneConfigManager() { return m_droneConfigManager; }
 
     void ToggleFullscreen();
 
@@ -57,6 +63,9 @@ private:
     std::unique_ptr<Input::Input> m_input;
 
     std::unique_ptr<Shader> m_textureShader;
+
+    std::unique_ptr<ImguiManager> m_imguiManager;
+    std::shared_ptr<DroneConfigManager> m_droneConfigManager;
 
     bool m_isFullscreen = false;
     int m_windowedX = 100;
