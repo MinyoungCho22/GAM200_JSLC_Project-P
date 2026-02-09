@@ -3,7 +3,7 @@
 #include "../Engine/Vec2.hpp"
 #include "Logger.hpp"
 #include <fstream>
-#include <filesystem>
+#include <sys/stat.h>
 
 DroneConfigManager::DroneConfigManager()
 {
@@ -39,7 +39,9 @@ bool DroneConfigManager::LoadFromFile(const std::string& filename)
 
     try
     {
-        if (!std::filesystem::exists(filename))
+        // Check if file exists using traditional method
+        struct stat buffer;
+        if (stat(filename.c_str(), &buffer) != 0)
         {
             Logger::Instance().Log(Logger::Severity::Debug,
                 "DroneConfig: Config file '%s' does not exist, will create defaults", filename.c_str());

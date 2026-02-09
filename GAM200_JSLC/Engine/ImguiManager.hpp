@@ -7,6 +7,8 @@
 struct GLFWwindow;
 class DroneManager;
 class Drone;
+class Robot;
+class Underground;
 
 /**
  * @brief Dear ImGui debug window manager (GLFW + OpenGL3).
@@ -30,6 +32,7 @@ public:
     void SetDroneManager(DroneManager* manager) { m_droneManager = manager; }
     void SetDroneConfigManager(std::shared_ptr<DroneConfigManager> configManager) { m_configManager = configManager; }
     void AddMapDroneManager(const std::string& mapName, DroneManager* manager);
+    void SetUnderground(Underground* underground) { m_underground = underground; }
 
            void SetEnabled(bool enabled) { m_enabled = enabled; }
            bool IsEnabled() const { return m_enabled; }
@@ -47,6 +50,7 @@ private:
     void DrawLiveDronePanel();
     void DrawDroneList(DroneManager* manager);
     void DrawDroneProperties(Drone& drone, int index);
+    void DrawRobotProperties(Robot& robot, int index);
     void DrawDroneConfigPanel();
     void DrawDroneConfigProperties(int configIndex);
     void ApplyConfigToDrone(const DroneConfigData& config, Drone& drone);
@@ -75,6 +79,10 @@ private:
     std::string m_selectedMapName = "Hallway";
     void SaveDroneState(Drone& drone, int index, const std::string& mapName);
     void LoadDroneState(Drone& drone, int index, const std::string& mapName);
+
+    // Robot management
+    Underground* m_underground = nullptr;
+    int m_selectedRobotIndex = -1;
 
     // Player god mode (infinite pulse)
     bool m_playerGodMode = false;

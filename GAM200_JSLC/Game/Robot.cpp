@@ -270,6 +270,36 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         if (m_state == RobotState::Patrol || m_state == RobotState::Retreat) m_directionX = -1.0f;
     }
 
+    // Obstacle collision detection (horizontal)
+    // Only check if we're actually moving and not already colliding
+    bool canMove = true;
+    if (std::abs(m_velocity.x) > 0.1f)
+    {
+        for (const auto& obs : obstacles)
+        {
+            // Check if current position is NOT colliding
+            bool currentlyColliding = Collision::CheckAABB(m_position, m_size, obs.pos, obs.size);
+            
+            // Check if next position WOULD collide
+            Math::Vec2 testPos = { nextPos.x, m_position.y };
+            bool wouldCollide = Collision::CheckAABB(testPos, m_size, obs.pos, obs.size);
+            
+            // Only block movement if we're not currently colliding but would collide
+            if (!currentlyColliding && wouldCollide)
+            {
+                canMove = false;
+                nextPos.x = m_position.x;
+                
+                // Reverse direction if in Patrol or Retreat state
+                if (m_state == RobotState::Patrol || m_state == RobotState::Retreat)
+                {
+                    m_directionX = -m_directionX;
+                }
+                break;
+            }
+        }
+    }
+
     m_position.x = nextPos.x;
 
     // Ground collision
@@ -283,6 +313,35 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         nextPos.y = groundLimit + m_size.y / 2.0f;
         m_velocity.y = 0.0f;
         m_isOnGround = true;
+    }
+
+    // Obstacle collision detection (vertical)
+    for (const auto& obs : obstacles)
+    {
+        // Use a slightly smaller hitbox for vertical collision to prevent jittering
+        Math::Vec2 adjustedSize = { m_size.x * 0.9f, m_size.y };
+        
+        if (Collision::CheckAABB(nextPos, adjustedSize, obs.pos, obs.size))
+        {
+            // Check if robot is falling onto obstacle (landing on top)
+            if (m_velocity.y < 0.0f && m_position.y > obs.pos.y + obs.size.y / 2.0f)
+            {
+                // Land on top of obstacle with small buffer
+                float buffer = 1.0f;
+                nextPos.y = obs.pos.y + obs.size.y / 2.0f + m_size.y / 2.0f + buffer;
+                m_velocity.y = 0.0f;
+                m_isOnGround = true;
+            }
+            // Check if robot is jumping into obstacle from below
+            else if (m_velocity.y > 0.0f && m_position.y < obs.pos.y - obs.size.y / 2.0f)
+            {
+                // Hit obstacle from below with small buffer
+                float buffer = 1.0f;
+                nextPos.y = obs.pos.y - obs.size.y / 2.0f - m_size.y / 2.0f - buffer;
+                m_velocity.y = 0.0f;
+            }
+            break;
+        }
     }
 
     m_position.y = nextPos.y;

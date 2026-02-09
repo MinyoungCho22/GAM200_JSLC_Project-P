@@ -23,8 +23,11 @@ class Room
 public:
     void Initialize(Engine& engine, const char* texturePath);
     void Shutdown();
-    void Update(Player& player, double dt, Input::Input& input);
+    void Update(Player& player, double dt, Input::Input& input, Math::Vec2 mouseWorldPos);
     void Draw(Shader& textureShader) const;
+    
+    Math::Vec2 GetBlindPos() const { return m_blindPos; }
+    Math::Vec2 GetBlindSize() const { return m_blindSize; }
     
     // Renders visual representations of hitboxes and interactive zones
     void DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::Matrix& projection, const Player& player) const;

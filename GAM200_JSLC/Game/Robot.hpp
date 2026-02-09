@@ -45,6 +45,24 @@ public:
     Math::Vec2 GetSize() const { return m_size; }
     bool IsDead() const { return m_state == RobotState::Dead; }
     void TakeDamage(float amount);
+    
+    // Debug setters for ImGui
+    void SetPosition(const Math::Vec2& pos) { m_position = pos; }
+    void SetSize(const Math::Vec2& size) { m_size = size; }
+    void SetHP(float hp) { m_hp = hp; }
+    void SetMaxHP(float maxHp) { m_maxHp = maxHp; }
+    void SetDirectionX(float dir) { m_directionX = dir; }
+    void SetState(RobotState state) { m_state = state; }
+    
+    // Debug getters for ImGui
+    float GetHP() const { return m_hp; }
+    float GetMaxHP() const { return m_maxHp; }
+    float GetDirectionX() const { return m_directionX; }
+    RobotState GetState() const { return m_state; }
+    float GetPatrolSpeed() const { return PATROL_SPEED; }
+    float GetChaseSpeed() const { return CHASE_SPEED; }
+    float GetDetectionRange() const { return DETECTION_RANGE; }
+    float GetAttackRange() const { return ATTACK_RANGE; }
 
 private:
     void DecideAttackPattern();

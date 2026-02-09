@@ -24,4 +24,14 @@ namespace Collision
 
         return collisionX && collisionY;
     }
+
+    bool CheckPointInAABB(Math::Vec2 point, Math::Vec2 boxCenter, Math::Vec2 boxSize)
+    {
+        float minX = boxCenter.x - boxSize.x / 2.0f;
+        float maxX = boxCenter.x + boxSize.x / 2.0f;
+        float minY = boxCenter.y - boxSize.y / 2.0f;
+        float maxY = boxCenter.y + boxSize.y / 2.0f;
+
+        return (point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY);
+    }
 }

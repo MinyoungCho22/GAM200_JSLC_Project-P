@@ -1,4 +1,4 @@
-﻿// Input.hpp
+// Input.hpp
 
 #pragma once
 #include <array>
@@ -44,8 +44,18 @@ namespace Input
     };
 
     /**
+     * @enum MouseButton
+     * @brief Mouse button codes mapped to GLFW standards.
+     */
+    enum class MouseButton {
+        Left = 0,
+        Right = 1,
+        Middle = 2
+    };
+
+    /**
      * @class Input
-     * @brief Manages keyboard input states, allowing for polling of held and triggered keys.
+     * @brief Manages keyboard and mouse input states, allowing for polling of held and triggered keys/buttons.
      */
     class Input
     {
@@ -59,7 +69,7 @@ namespace Input
         void Initialize(GLFWwindow* window);
 
         /**
-         * @brief Updates current and previous key states. Should be called once per frame.
+         * @brief Updates current and previous key/mouse states. Should be called once per frame.
          */
         void Update();
 
@@ -77,6 +87,39 @@ namespace Input
          */
         bool IsKeyTriggered(Key key) const;
 
+        /**
+         * @brief Checks if a mouse button is currently being held down.
+         * @param button The mouse button to check.
+         * @return True if the button is currently pressed.
+         */
+        bool IsMouseButtonPressed(MouseButton button) const;
+
+        /**
+         * @brief Checks if a mouse button was pressed exactly during this frame.
+         * @param button The mouse button to check.
+         * @return True only on the frame the button was first pressed.
+         */
+        bool IsMouseButtonTriggered(MouseButton button) const;
+
+        /**
+         * @brief Gets the current mouse position in screen coordinates.
+         * @param x Reference to store the x coordinate.
+         * @param y Reference to store the y coordinate.
+         */
+        void GetMousePosition(double& x, double& y) const;
+
+        /**
+         * @brief Gets the current mouse x position in screen coordinates.
+         * @return The x coordinate.
+         */
+        double GetMouseX() const { return m_mouseX; }
+
+        /**
+         * @brief Gets the current mouse y position in screen coordinates.
+         * @return The y coordinate.
+         */
+        double GetMouseY() const { return m_mouseY; }
+
     private:
         GLFWwindow* m_window = nullptr;
 
@@ -84,5 +127,13 @@ namespace Input
         // Used to detect edge triggers (Transition from Released to Pressed).
         std::array<int, 349> m_keyState{};
         std::array<int, 349> m_keyStatePrevious{};
+
+        // Mouse button states (GLFW supports up to 8 buttons)
+        std::array<int, 8> m_mouseButtonState{};
+        std::array<int, 8> m_mouseButtonStatePrevious{};
+
+        // Mouse position
+        double m_mouseX = 0.0;
+        double m_mouseY = 0.0;
     };
 } // namespace Input

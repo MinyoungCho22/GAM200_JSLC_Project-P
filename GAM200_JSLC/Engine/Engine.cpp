@@ -51,6 +51,9 @@ bool Engine::Initialize(const std::string& windowTitle)
     glfwSetKeyCallback(m_window, Engine::KeyCallback);
     glfwSetFramebufferSizeCallback(m_window, Engine::FramebufferSizeCallback);
 
+    // Hide the default OS cursor so we can render our custom cursor
+    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+
     m_input = std::make_unique<Input::Input>();
     m_input->Initialize(m_window);
 

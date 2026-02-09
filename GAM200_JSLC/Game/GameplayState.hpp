@@ -40,6 +40,7 @@ public:
 private:
     void HandleRoomToHallwayTransition();
     void HandleHallwayToRooftopTransition();
+    Math::Vec2 ScreenToWorldCoordinates(double screenX, double screenY) const;
 
     GameStateManager& gsm;
     Player player;

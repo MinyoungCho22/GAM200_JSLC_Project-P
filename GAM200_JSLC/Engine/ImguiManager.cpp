@@ -6,6 +6,8 @@
 #include "../include/GLFW/glfw3.h"
 #include "../Game/DroneManager.hpp"
 #include "../Game/Drone.hpp"
+#include "../Game/Robot.hpp"
+#include "../Game/Underground.hpp"
 #include "../Engine/Vec2.hpp"
 
 #include "../ThirdParty/imgui/imgui.h"
@@ -198,7 +200,7 @@ void ImguiManager::DrawDebugWindow()
 
     ImGui::End();
 
-    // Drone debug panel
+    // Drone debug panel (includes robots for Underground map)
     DrawDroneDebugPanel();
 
     // Demo window removed for simplicity
@@ -283,12 +285,28 @@ void ImguiManager::DrawLiveDronePanel()
     }
 
     const auto& drones = currentManager->GetDrones();
-    ImGui::Text("Map: %s | Total Drones: %zu", currentMapName.c_str(), drones.size());
+    
+    // Check if current map is Underground to show robots
+    bool isUnderground = (currentMapName == "Underground");
+    size_t robotCount = 0;
+    if (isUnderground && m_underground)
+    {
+        robotCount = m_underground->GetRobots().size();
+    }
+    
+    if (isUnderground)
+    {
+        ImGui::Text("Map: %s | Drones: %zu | Robots: %zu", currentMapName.c_str(), drones.size(), robotCount);
+    }
+    else
+    {
+        ImGui::Text("Map: %s | Total Drones: %zu", currentMapName.c_str(), drones.size());
+    }
 
     if (ImGui::BeginTabBar("LiveDroneTabs"))
     {
-        // Overview tab
-        if (ImGui::BeginTabItem("Overview"))
+        // Drones Overview tab
+        if (ImGui::BeginTabItem("Drones"))
         {
             DrawDroneList(currentManager);
             ImGui::EndTabItem();
@@ -302,6 +320,56 @@ void ImguiManager::DrawLiveDronePanel()
             if (ImGui::BeginTabItem(tabName))
             {
                 DrawDroneProperties(const_cast<Drone&>(drones[m_selectedDroneIndex]), m_selectedDroneIndex);
+                ImGui::EndTabItem();
+            }
+        }
+
+        // Robots tab (only for Underground map)
+        if (isUnderground && m_underground)
+        {
+            if (ImGui::BeginTabItem("Robots"))
+            {
+                auto& robots = m_underground->GetRobots();
+                
+                if (robots.empty())
+                {
+                    ImGui::Text("No robots in this map");
+                }
+                else
+                {
+                    ImGui::Text("Total Robots: %zu", robots.size());
+                    ImGui::Separator();
+
+                    // List of robots
+                    for (size_t i = 0; i < robots.size(); ++i)
+                    {
+                        Robot& robot = robots[i];
+                        
+                        ImGui::PushID(static_cast<int>(i + 10000)); // Offset to avoid ID collision with drones
+                        
+                        std::string label = "Robot #" + std::to_string(i);
+                        if (robot.IsDead())
+                        {
+                            label += " [DEAD]";
+                        }
+                        
+                        if (ImGui::Selectable(label.c_str(), m_selectedRobotIndex == static_cast<int>(i)))
+                        {
+                            m_selectedRobotIndex = static_cast<int>(i);
+                        }
+                        
+                        ImGui::PopID();
+                    }
+
+                    ImGui::Separator();
+
+                    // Properties of selected robot
+                    if (m_selectedRobotIndex >= 0 && m_selectedRobotIndex < static_cast<int>(robots.size()))
+                    {
+                        DrawRobotProperties(robots[m_selectedRobotIndex], m_selectedRobotIndex);
+                    }
+                }
+                
                 ImGui::EndTabItem();
             }
         }
@@ -906,6 +974,77 @@ void ImguiManager::LoadDroneState(Drone& drone, int index, const std::string& ma
         return;
 
     m_configManager->ApplyLiveStateToDrone(mapName, index, drone);
+}
+
+void ImguiManager::DrawRobotProperties(Robot& robot, int index)
+{
+    ImGui::Text("Robot #%d Properties:", index);
+    ImGui::Separator();
+
+    // Position
+    Math::Vec2 pos = robot.GetPosition();
+    float posArray[2] = { pos.x, pos.y };
+    if (ImGui::DragFloat2("Position", posArray, 1.0f))
+    {
+        robot.SetPosition({ posArray[0], posArray[1] });
+    }
+
+    // Size
+    Math::Vec2 size = robot.GetSize();
+    float sizeArray[2] = { size.x, size.y };
+    if (ImGui::DragFloat2("Size", sizeArray, 1.0f, 10.0f, 1000.0f))
+    {
+        robot.SetSize({ sizeArray[0], sizeArray[1] });
+    }
+
+    // HP
+    float hp = robot.GetHP();
+    if (ImGui::DragFloat("HP", &hp, 1.0f, 0.0f, robot.GetMaxHP()))
+    {
+        robot.SetHP(hp);
+    }
+
+    // Max HP
+    float maxHP = robot.GetMaxHP();
+    if (ImGui::DragFloat("Max HP", &maxHP, 1.0f, 1.0f, 1000.0f))
+    {
+        robot.SetMaxHP(maxHP);
+    }
+
+    // Direction
+    float dirX = robot.GetDirectionX();
+    if (ImGui::DragFloat("Direction X", &dirX, 0.1f, -1.0f, 1.0f))
+    {
+        robot.SetDirectionX(dirX);
+    }
+
+    // State (read-only display)
+    ImGui::Separator();
+    ImGui::Text("Current State:");
+    RobotState state = robot.GetState();
+    const char* stateNames[] = { "Patrol", "Chase", "Retreat", "Windup", "Attack", "Recover", "Stagger", "Dead" };
+    ImGui::Text("%s", stateNames[static_cast<int>(state)]);
+
+    // Constants (read-only)
+    ImGui::Separator();
+    ImGui::Text("Constants (Read-Only):");
+    ImGui::Text("Patrol Speed: %.1f", robot.GetPatrolSpeed());
+    ImGui::Text("Chase Speed: %.1f", robot.GetChaseSpeed());
+    ImGui::Text("Detection Range: %.1f", robot.GetDetectionRange());
+    ImGui::Text("Attack Range: %.1f", robot.GetAttackRange());
+
+    // Actions
+    ImGui::Separator();
+    if (ImGui::Button("Kill Robot"))
+    {
+        robot.TakeDamage(robot.GetMaxHP());
+    }
+    
+    ImGui::SameLine();
+    if (ImGui::Button("Full Heal"))
+    {
+        robot.SetHP(robot.GetMaxHP());
+    }
 }
 
 void ImguiManager::EndFrame()

@@ -75,7 +75,7 @@ void Room::Shutdown()
     for (auto& source : m_pulseSources) source.Shutdown();
 }
 
-void Room::Update(Player& player, double dt, Input::Input& input)
+void Room::Update(Player& player, double dt, Input::Input& input, Math::Vec2 mouseWorldPos)
 {
     Math::Vec2 centerPos = player.GetPosition();
     Math::Vec2 halfSize = player.GetSize() * 0.5f;
@@ -99,7 +99,10 @@ void Room::Update(Player& player, double dt, Input::Input& input)
     // Check for interaction with Blinds
     m_playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
 
-    if (m_playerInBlindArea && input.IsKeyTriggered(Input::Key::J) && !m_isBright)
+    // Check if mouse clicked on blind hitbox (left click)
+    bool isMouseOnBlind = Collision::CheckPointInAABB(mouseWorldPos, m_blindPos, m_blindSize);
+    
+    if (m_playerInBlindArea && input.IsMouseButtonTriggered(Input::MouseButton::Left) && !m_isBright && isMouseOnBlind)
     {
         const float BLIND_TOGGLE_COST = 20.0f;
         Pulse& pulse = player.GetPulseCore().getPulse();

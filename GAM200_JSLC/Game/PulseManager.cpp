@@ -177,7 +177,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     std::vector<PulseSource>& hallwaySources,
     std::vector<PulseSource>& rooftopSources,
     std::vector<PulseSource>& undergroundSources,
-    bool is_interact_key_pressed, double dt)
+    bool is_interact_key_pressed, double dt, Math::Vec2 mouseWorldPos)
 {
     float fdt = static_cast<float>(dt);
 
@@ -200,6 +200,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
 
     PulseSource* closest_source = nullptr;
     float closest_dist_sq = -1.0f;
+    bool mouseOnSource = false;
 
     auto checkSource = [&](PulseSource& source) {
         if (!source.HasPulse()) return;
@@ -210,6 +211,8 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
             {
                 closest_source = &source;
                 closest_dist_sq = dist_sq;
+                // Check if mouse is clicking on this pulse source
+                mouseOnSource = Collision::CheckPointInAABB(mouseWorldPos, source.GetPosition(), source.GetSize());
             }
         }
         };
@@ -232,7 +235,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
         checkSource(source);
     }
 
-    bool is_near_charger = (closest_source != nullptr);
+    bool is_near_charger = (closest_source != nullptr && mouseOnSource);
     PulseTickResult result = player.GetPulseCore().tick(is_interact_key_pressed, is_near_charger, false, dt);
 
     if (result.charged && closest_source != nullptr)

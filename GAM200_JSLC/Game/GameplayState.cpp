@@ -124,10 +124,7 @@ void GameplayState::Initialize()
         // Add map drone managers
         imguiManager->AddMapDroneManager("Hallway", m_hallway->GetDroneManager());
         imguiManager->AddMapDroneManager("Rooftop", m_rooftop->GetDroneManager());
-        if (m_undergroundAccessed)
-        {
-            imguiManager->AddMapDroneManager("Underground", m_underground->GetDroneManager());
-        }
+        imguiManager->AddMapDroneManager("Underground", m_underground->GetDroneManager());
 
         // Set main drone manager (for backwards compatibility)
         if (droneManager)
@@ -136,6 +133,9 @@ void GameplayState::Initialize()
             // Also add main drone manager to the map list for Live Drones tab
             imguiManager->AddMapDroneManager("Main", droneManager.get());
         }
+
+        // Set underground for robot debugging
+        imguiManager->SetUnderground(m_underground.get());
 
         // Set config manager
         auto configManager = gsm.GetEngine().GetDroneConfigManager();
@@ -221,8 +221,13 @@ void GameplayState::Update(double dt)
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
 
-    bool isPressingInteract = input.IsKeyPressed(Input::Key::I);
-    bool isPressingAttack = input.IsKeyPressed(Input::Key::J);
+    bool isPressingInteract = input.IsMouseButtonPressed(Input::MouseButton::Right);
+    bool isPressingAttack = input.IsMouseButtonPressed(Input::MouseButton::Left);
+
+    // Get mouse world position
+    double mouseScreenX, mouseScreenY;
+    input.GetMousePosition(mouseScreenX, mouseScreenY);
+    Math::Vec2 mouseWorldPos = ScreenToWorldCoordinates(mouseScreenX, mouseScreenY);
 
     const float PULSE_COST_PER_SECOND = 1.0f;
 
@@ -236,7 +241,7 @@ void GameplayState::Update(double dt)
     }
 
     pulseManager->Update(playerCenter, playerHitboxSize, player, m_room->GetPulseSources(),
-        m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(), isPressingInteract, dt);
+        m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(), isPressingInteract, dt, mouseWorldPos);
 
     Drone* targetDrone = nullptr;
     Robot* targetRobot = nullptr;
@@ -261,7 +266,11 @@ void GameplayState::Update(double dt)
                     float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
                     float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
-                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
+                    
+                    // Check if drone is in range AND mouse is clicking on drone hitbox
+                    bool isMouseOnDrone = Collision::CheckPointInAABB(mouseWorldPos, drone.GetPosition(), droneHitboxSize);
+                    
+                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnDrone)
                     {
                         closestDistSq = distSq;
                         targetDrone = &drone;
@@ -291,7 +300,10 @@ void GameplayState::Update(double dt)
                     float effectiveAttackRange = ATTACK_RANGE + robotRadius;
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
 
-                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq)
+                    // Check if robot is in range AND mouse is clicking on robot hitbox
+                    bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize);
+
+                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnRobot)
                     {
                         closestDistSq = distSq;
                         targetRobot = &robot;
@@ -341,8 +353,8 @@ void GameplayState::Update(double dt)
         Math::Vec2 vfxStartPos = { playerCenter.x + (player.IsFacingRight() ? 1 : -1) * (playerHitboxSize.x / 2.0f), playerCenter.y };
         pulseManager->UpdateAttackVFX(true, vfxStartPos, targetPos);
 
-        m_door->Update(player, false);
-        m_rooftopDoor->Update(player, false);
+        m_door->Update(player, false, mouseWorldPos);
+        m_rooftopDoor->Update(player, false, mouseWorldPos);
     }
     else
     {
@@ -355,23 +367,23 @@ void GameplayState::Update(double dt)
             for (auto& drone : m_underground->GetDrones()) drone.ResetDamageTimer();
         }
 
-        if (input.IsKeyTriggered(Input::Key::J))
+        if (input.IsMouseButtonTriggered(Input::MouseButton::Left))
         {
             if (m_room->IsBlindOpen())
             {
-                m_door->Update(player, true);
+                m_door->Update(player, true, mouseWorldPos);
             }
             else
             {
-                m_door->Update(player, false);
+                m_door->Update(player, false, mouseWorldPos);
             }
 
-            m_rooftopDoor->Update(player, true);
+            m_rooftopDoor->Update(player, true, mouseWorldPos);
         }
         else
         {
-            m_door->Update(player, false);
-            m_rooftopDoor->Update(player, false);
+            m_door->Update(player, false, mouseWorldPos);
+            m_rooftopDoor->Update(player, false, mouseWorldPos);
         }
     }
 
@@ -440,7 +452,7 @@ void GameplayState::Update(double dt)
 
     if (!m_rooftopAccessed)
     {
-        m_room->Update(player, dt, input);
+        m_room->Update(player, dt, input, mouseWorldPos);
     }
 
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
@@ -621,6 +633,52 @@ void GameplayState::HandleRooftopToUndergroundTransition()
         "Transition to Underground! Player=(%.1f, %.1f)", playerStartX, playerStartY);
 }
 
+Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screenY) const
+{
+    Engine& engine = gsm.GetEngine();
+    int windowWidth, windowHeight;
+    glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
+
+    // Calculate viewport dimensions
+    float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
+    float gameAspect = GAME_WIDTH / GAME_HEIGHT;
+    int viewportX = 0;
+    int viewportY = 0;
+    int viewportWidth = windowWidth;
+    int viewportHeight = windowHeight;
+
+    if (windowAspect > gameAspect)
+    {
+        viewportWidth = static_cast<int>(windowHeight * gameAspect);
+        viewportX = (windowWidth - viewportWidth) / 2;
+    }
+    else if (windowAspect < gameAspect)
+    {
+        viewportHeight = static_cast<int>(windowWidth / gameAspect);
+        viewportY = (windowHeight - viewportHeight) / 2;
+    }
+
+    // Convert mouse position from window space to viewport space
+    float mouseViewportX = static_cast<float>(screenX - viewportX);
+    float mouseViewportY = static_cast<float>(screenY - viewportY);
+
+    // Convert viewport space to normalized device coordinates [0, 1]
+    float mouseNDCX = mouseViewportX / static_cast<float>(viewportWidth);
+    float mouseNDCY = mouseViewportY / static_cast<float>(viewportHeight);
+
+    // Convert NDC to game space coordinates
+    float mouseGameX = mouseNDCX * GAME_WIDTH;
+    float mouseGameY = (1.0f - mouseNDCY) * GAME_HEIGHT; // Flip Y axis
+
+    // Apply camera offset to get world coordinates
+    Math::Vec2 cameraPos = m_camera.GetPosition();
+    Math::Vec2 worldPos;
+    worldPos.x = mouseGameX - (GAME_WIDTH / 2.0f) + cameraPos.x;
+    worldPos.y = mouseGameY - (GAME_HEIGHT / 2.0f) + cameraPos.y;
+
+    return worldPos;
+}
+
 void GameplayState::Draw()
 {
     Engine& engine = gsm.GetEngine();
@@ -737,6 +795,62 @@ void GameplayState::Draw()
     }
 
     m_tutorial->Draw(*m_font, *m_fontShader);
+
+    // Draw mouse cursor
+    Engine& engineForCursor = gsm.GetEngine();
+    auto& inputForCursor = engineForCursor.GetInput();
+    double mouseScreenX, mouseScreenY;
+    inputForCursor.GetMousePosition(mouseScreenX, mouseScreenY);
+
+    // Convert screen coordinates to game coordinates
+    int windowWidthForCursor, windowHeightForCursor;
+    glfwGetFramebufferSize(engineForCursor.GetWindow(), &windowWidthForCursor, &windowHeightForCursor);
+
+    // Calculate viewport dimensions (same logic as viewport calculation above)
+    float windowAspectForCursor = static_cast<float>(windowWidthForCursor) / static_cast<float>(windowHeightForCursor);
+    float gameAspectForCursor = GAME_WIDTH / GAME_HEIGHT;
+    int viewportXForCursor = 0;
+    int viewportYForCursor = 0;
+    int viewportWidthForCursor = windowWidthForCursor;
+    int viewportHeightForCursor = windowHeightForCursor;
+
+    if (windowAspectForCursor > gameAspectForCursor)
+    {
+        viewportWidthForCursor = static_cast<int>(windowHeightForCursor * gameAspectForCursor);
+        viewportXForCursor = (windowWidthForCursor - viewportWidthForCursor) / 2;
+    }
+    else if (windowAspectForCursor < gameAspectForCursor)
+    {
+        viewportHeightForCursor = static_cast<int>(windowWidthForCursor / gameAspectForCursor);
+        viewportYForCursor = (windowHeightForCursor - viewportHeightForCursor) / 2;
+    }
+
+    // Convert mouse position from window space to viewport space
+    float mouseViewportX = static_cast<float>(mouseScreenX - viewportXForCursor);
+    float mouseViewportY = static_cast<float>(mouseScreenY - viewportYForCursor);
+
+    // Convert viewport space to normalized device coordinates [0, 1]
+    float mouseNDCX = mouseViewportX / static_cast<float>(viewportWidthForCursor);
+    float mouseNDCY = mouseViewportY / static_cast<float>(viewportHeightForCursor);
+
+    // Convert NDC to game space coordinates
+    float mouseGameX = mouseNDCX * GAME_WIDTH;
+    float mouseGameY = (1.0f - mouseNDCY) * GAME_HEIGHT; // Flip Y axis
+
+    // Draw crosshair cursor
+    colorShader->use();
+    colorShader->setMat4("projection", baseProjection);
+
+    const float cursorSize = 15.0f;
+    const float cursorThickness = 2.0f;
+    Math::Vec2 cursorPos = { mouseGameX, mouseGameY };
+
+    // Draw horizontal line of crosshair
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.0f, cursorThickness }, { 1.0f, 1.0f });
+    // Draw vertical line of crosshair
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThickness, cursorSize * 2.0f }, { 1.0f, 1.0f });
+    // Draw center dot
+    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 3.0f, { 1.0f, 1.0f });
 
     if (m_isDebugDraw)
     {
