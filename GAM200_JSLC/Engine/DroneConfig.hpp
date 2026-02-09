@@ -52,6 +52,7 @@ struct LiveDroneState
     float attackAngle = 0.0f;
     int attackDirection = 1;
     float damageTimer = 0.0f;
+    float maxHP = 100.0f;  // Only save maxHP, current HP resets to max on game start
     bool isDebugMode = false;
     bool isDead = false;
     bool isHit = false;
@@ -64,7 +65,7 @@ struct LiveDroneState
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(LiveDroneState,
         droneIndex, mapName, positionX, positionY, velocityX, velocityY,
         sizeX, sizeY, baseSpeed, attackRadius, attackAngle, attackDirection,
-        damageTimer, isDebugMode, isDead, isHit, isAttacking)
+        damageTimer, maxHP, isDebugMode, isDead, isHit, isAttacking)
 };
 
 /**

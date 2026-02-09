@@ -54,6 +54,23 @@ public:
     void SetAttackDirection(int direction) { m_attackDirection = direction; }
     void ResetHitTimer() { m_hitTimer = 0.0f; }
     void ResetDamageTimerDebug() { m_damageTimer = 0.0f; }
+    
+    // HP system
+    float GetHP() const { return m_hp; }
+    void SetHP(float hp) { 
+        m_hp = hp; 
+        if (m_hp <= 0.0f) { 
+            m_hp = 0.0f; 
+            m_isDead = true; 
+        } else if (m_isDead && m_hp > 0.0f) {
+            // Revive if HP is set above 0
+            m_isDead = false;
+            m_isHit = false;
+        }
+    }
+    float GetMaxHP() const { return m_maxHP; }
+    void SetMaxHP(float maxHP) { m_maxHP = maxHP; }
+    void TakeDamage(float damage) { SetHP(m_hp - damage); }
 
     // Debug mode control
     void SetDebugMode(bool debug);
@@ -75,6 +92,8 @@ private:
     bool m_isDead = false;
 
     float m_damageTimer = 0.0f;
+    float m_hp = 100.0f;
+    float m_maxHP = 100.0f;
     bool m_isTracer = false;
     bool m_isChasing = false;
     float m_lostTimer = 0.0f;

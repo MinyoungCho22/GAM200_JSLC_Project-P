@@ -233,13 +233,6 @@ void ImguiManager::DrawDroneDebugPanel()
             ImGui::EndTabItem();
         }
 
-        // Drone Configurations tab
-        if (ImGui::BeginTabItem("Configurations"))
-        {
-            DrawDroneConfigPanel();
-            ImGui::EndTabItem();
-        }
-
         ImGui::EndTabBar();
     }
 
@@ -259,7 +252,8 @@ void ImguiManager::DrawLiveDronePanel()
 
         if (ImGui::Combo("Map", &m_selectedMapIndex, mapNames.data(), static_cast<int>(mapNames.size())))
         {
-            m_selectedDroneIndex = -1; // Reset selection when changing maps
+            m_selectedDroneIndex = -1; // Reset drone selection when changing maps
+            m_selectedRobotIndex = -1; // Reset robot selection when changing maps
         }
     }
 
@@ -271,11 +265,13 @@ void ImguiManager::DrawLiveDronePanel()
     {
         currentManager = m_mapDroneManagers[m_selectedMapIndex].second;
         currentMapName = m_mapDroneManagers[m_selectedMapIndex].first;
+        m_selectedMapName = currentMapName; // Update selected map name for save/load
     }
     else if (m_droneManager)
     {
         currentManager = m_droneManager;
         currentMapName = "Main";
+        m_selectedMapName = currentMapName; // Update selected map name for save/load
     }
 
     if (!currentManager)
@@ -305,23 +301,53 @@ void ImguiManager::DrawLiveDronePanel()
 
     if (ImGui::BeginTabBar("LiveDroneTabs"))
     {
-        // Drones Overview tab
+        // Drones tab with list and properties (like robots)
         if (ImGui::BeginTabItem("Drones"))
         {
-            DrawDroneList(currentManager);
-            ImGui::EndTabItem();
-        }
-
-        // Individual drone properties
-        if (m_selectedDroneIndex >= 0 && m_selectedDroneIndex < static_cast<int>(drones.size()))
-        {
-            char tabName[32];
-            sprintf(tabName, "Drone %d", m_selectedDroneIndex);
-            if (ImGui::BeginTabItem(tabName))
+            if (drones.empty())
             {
-                DrawDroneProperties(const_cast<Drone&>(drones[m_selectedDroneIndex]), m_selectedDroneIndex);
-                ImGui::EndTabItem();
+                ImGui::Text("No drones in this map");
             }
+            else
+            {
+                ImGui::Text("Total Drones: %zu", drones.size());
+                ImGui::Separator();
+
+                // List of drones
+                for (size_t i = 0; i < drones.size(); ++i)
+                {
+                    const Drone& drone = drones[i];
+                    
+                    ImGui::PushID(static_cast<int>(i));
+                    
+                    std::string label = "Drone #" + std::to_string(i);
+                    if (drone.IsDead())
+                    {
+                        label += " [DEAD]";
+                    }
+                    else if (drone.IsDebugMode())
+                    {
+                        label += " [DEBUG]";
+                    }
+                    
+                    if (ImGui::Selectable(label.c_str(), m_selectedDroneIndex == static_cast<int>(i)))
+                    {
+                        m_selectedDroneIndex = static_cast<int>(i);
+                    }
+                    
+                    ImGui::PopID();
+                }
+
+                ImGui::Separator();
+
+                // Properties of selected drone
+                if (m_selectedDroneIndex >= 0 && m_selectedDroneIndex < static_cast<int>(drones.size()))
+                {
+                    DrawDroneProperties(const_cast<Drone&>(drones[m_selectedDroneIndex]), m_selectedDroneIndex);
+                }
+            }
+            
+            ImGui::EndTabItem();
         }
 
         // Robots tab (only for Underground map)
@@ -517,20 +543,23 @@ void ImguiManager::DrawDroneProperties(Drone& drone, int index)
     if (ImGui::Button("+10")) pos.y += 10.0f;
     ImGui::PopID();
 
-    // Apply position changes
+    // Apply position changes automatically
     Math::Vec2 currentPos = drone.GetPosition();
     bool positionChanged = (pos.x != currentPos.x) || (pos.y != currentPos.y);
-    if (ImGui::Button("Apply Position") || positionChanged)
+    if (positionChanged)
     {
         drone.SetPosition(pos);
-        // Auto-save position change
+        drone.SetVelocity({0.0f, 0.0f});  // Stop movement when position is changed
+        drone.SetDebugMode(true);  // Enable debug mode to freeze AI
         SaveDroneState(drone, m_selectedDroneIndex, m_selectedMapName);
     }
 
-    // Drag control as alternative
-    if (ImGui::DragFloat2("Drag Position", &pos.x, 1.0f, -2000.0f, 2000.0f))
+    // Drag control
+    if (ImGui::DragFloat2("Drag Position", &pos.x, 1.0f, -10000.0f, 30000.0f))
     {
         drone.SetPosition(pos);
+        drone.SetVelocity({0.0f, 0.0f});  // Stop movement when position is changed
+        drone.SetDebugMode(true);  // Enable debug mode to freeze AI
         SaveDroneState(drone, m_selectedDroneIndex, m_selectedMapName);
     }
 
@@ -616,6 +645,41 @@ void ImguiManager::DrawDroneProperties(Drone& drone, int index)
         drone.SetSize(size);
         SaveDroneState(drone, m_selectedDroneIndex, m_selectedMapName);
     }
+
+    ImGui::Separator();
+
+    // HP controls
+    float hp = drone.GetHP();
+    float maxHP = drone.GetMaxHP();
+    ImGui::Text("HP: %.1f / %.1f", hp, maxHP);
+
+    // HP modification
+    if (ImGui::DragFloat("HP", &hp, 1.0f, 0.0f, maxHP))
+    {
+        drone.SetHP(hp);
+        SaveDroneState(drone, m_selectedDroneIndex, m_selectedMapName);
+    }
+
+    if (ImGui::DragFloat("Max HP", &maxHP, 1.0f, 1.0f, 10000.0f))
+    {
+        drone.SetMaxHP(maxHP);
+        SaveDroneState(drone, m_selectedDroneIndex, m_selectedMapName);
+    }
+
+    // Quick HP buttons
+    ImGui::PushID("hp_buttons");
+    if (ImGui::Button("Kill Drone"))
+    {
+        drone.SetHP(0.0f);
+        SaveDroneState(drone, m_selectedDroneIndex, m_selectedMapName);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Full Heal"))
+    {
+        drone.SetHP(maxHP);
+        SaveDroneState(drone, m_selectedDroneIndex, m_selectedMapName);
+    }
+    ImGui::PopID();
 
     ImGui::Separator();
 
@@ -798,149 +862,6 @@ void ImguiManager::AddMapDroneManager(const std::string& mapName, DroneManager* 
     m_mapDroneManagers.emplace_back(mapName, manager);
 }
 
-void ImguiManager::DrawDroneConfigPanel()
-{
-    if (!m_configManager)
-    {
-        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "Configuration manager not available");
-        return;
-    }
-
-    // File operations
-    if (ImGui::Button("Save Config"))
-    {
-        m_configManager->SaveToFile();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Load Config"))
-    {
-        m_configManager->LoadFromFile();
-    }
-
-    ImGui::Separator();
-    ImGui::Text("Drone Configurations (%zu)", m_configManager->GetConfigCount());
-
-    // Add new config button
-    if (ImGui::Button("Add New Config"))
-    {
-        DroneConfigData newConfig;
-        newConfig.name = "New Config " + std::to_string(m_configManager->GetConfigCount() + 1);
-        m_configManager->AddConfig(newConfig);
-    }
-
-    ImGui::Separator();
-
-    // List all configurations
-    const auto& configs = m_configManager->GetAllConfigs();
-    for (size_t i = 0; i < configs.size(); ++i)
-    {
-        char configName[256];
-        strcpy(configName, configs[i].name.c_str());
-
-        ImGui::PushID(static_cast<int>(i));
-
-        bool isSelected = (m_selectedConfigIndex == static_cast<int>(i));
-        if (ImGui::Selectable(configName, isSelected))
-        {
-            m_selectedConfigIndex = static_cast<int>(i);
-        }
-
-        ImGui::PopID();
-    }
-
-    // Show selected config properties
-    if (m_selectedConfigIndex >= 0 && m_selectedConfigIndex < static_cast<int>(configs.size()))
-    {
-        ImGui::Separator();
-        DrawDroneConfigProperties(m_selectedConfigIndex);
-    }
-}
-
-void ImguiManager::DrawDroneConfigProperties(int configIndex)
-{
-    if (!m_configManager) return;
-
-    DroneConfigData* config = m_configManager->GetConfig(configIndex);
-    if (!config) return;
-
-    ImGui::Text("Configuration: %s", config->name.c_str());
-
-    // Name editing
-    char nameBuffer[256];
-    strcpy(nameBuffer, config->name.c_str());
-    if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer)))
-    {
-        config->name = nameBuffer;
-        m_configManager->MarkModified(configIndex);
-    }
-
-    // Basic properties
-    ImGui::Separator();
-    ImGui::Text("Basic Properties");
-
-    bool modified = false;
-
-    modified |= ImGui::DragFloat("Base Speed", &config->baseSpeed, 1.0f, 0.0f, 1000.0f);
-    modified |= ImGui::DragFloat("Detection Range", &config->detectionRange, 1.0f, 10.0f, 500.0f);
-    modified |= ImGui::DragFloat("Time to Destroy", &config->timeToDestroy, 0.01f, 0.1f, 5.0f);
-    modified |= ImGui::DragFloat("Acceleration", &config->acceleration, 10.0f, 0.0f, 2000.0f);
-
-    // Attack properties
-    ImGui::Separator();
-    ImGui::Text("Attack Properties");
-
-    modified |= ImGui::DragFloat("Attack Radius", &config->attackRadius, 1.0f, 10.0f, 500.0f);
-    modified |= ImGui::DragFloat("Attack Angle", &config->attackAngle, 1.0f, 0.0f, 360.0f);
-    modified |= ImGui::SliderInt("Attack Direction", &config->attackDirection, -1, 1);
-
-    // Radar properties
-    ImGui::Separator();
-    ImGui::Text("Radar Properties");
-
-    modified |= ImGui::DragFloat("Radar Rotation Speed", &config->radarRotationSpeed, 1.0f, 10.0f, 500.0f);
-    modified |= ImGui::DragFloat("Radar Length", &config->radarLength, 1.0f, 10.0f, 300.0f);
-
-    // Special flags
-    ImGui::Separator();
-    modified |= ImGui::Checkbox("Is Tracer", &config->isTracer);
-
-    // Apply changes
-    if (modified)
-    {
-        m_configManager->MarkModified(configIndex);
-    }
-
-    // Actions
-    ImGui::Separator();
-    if (ImGui::Button("Apply to All Drones"))
-    {
-        // Apply this configuration to all live drones
-        if (m_droneManager)
-        {
-            const auto& drones = m_droneManager->GetDrones();
-            for (size_t i = 0; i < drones.size(); ++i)
-            {
-                Drone& drone = const_cast<Drone&>(drones[i]);
-                ApplyConfigToDrone(*config, drone);
-            }
-        }
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Delete Config"))
-    {
-        m_configManager->RemoveConfig(configIndex);
-        m_selectedConfigIndex = -1;
-    }
-}
-
-void ImguiManager::ApplyConfigToDrone(const DroneConfigData& config, Drone& drone)
-{
-    drone.SetBaseSpeedDebug(config.baseSpeed);
-    // Note: Other properties like detection range, attack radius, etc. would need
-    // to be made configurable in the Drone class itself for full application
-}
-
 void ImguiManager::SaveDroneState(Drone& drone, int index, const std::string& mapName)
 {
     if (!m_configManager)
@@ -960,6 +881,7 @@ void ImguiManager::SaveDroneState(Drone& drone, int index, const std::string& ma
     state.attackAngle = drone.GetAttackAngle();
     state.attackDirection = drone.GetAttackDirection();
     state.damageTimer = drone.GetDamageTimer();
+    state.maxHP = drone.GetMaxHP();  // Only save maxHP
     state.isDebugMode = drone.IsDebugMode();
     state.isDead = drone.IsDead();
     state.isHit = drone.IsHit();
@@ -981,12 +903,15 @@ void ImguiManager::DrawRobotProperties(Robot& robot, int index)
     ImGui::Text("Robot #%d Properties:", index);
     ImGui::Separator();
 
+    bool modified = false;
+
     // Position
     Math::Vec2 pos = robot.GetPosition();
     float posArray[2] = { pos.x, pos.y };
     if (ImGui::DragFloat2("Position", posArray, 1.0f))
     {
         robot.SetPosition({ posArray[0], posArray[1] });
+        modified = true;
     }
 
     // Size
@@ -995,6 +920,7 @@ void ImguiManager::DrawRobotProperties(Robot& robot, int index)
     if (ImGui::DragFloat2("Size", sizeArray, 1.0f, 10.0f, 1000.0f))
     {
         robot.SetSize({ sizeArray[0], sizeArray[1] });
+        modified = true;
     }
 
     // HP
@@ -1002,6 +928,7 @@ void ImguiManager::DrawRobotProperties(Robot& robot, int index)
     if (ImGui::DragFloat("HP", &hp, 1.0f, 0.0f, robot.GetMaxHP()))
     {
         robot.SetHP(hp);
+        modified = true;
     }
 
     // Max HP
@@ -1009,6 +936,7 @@ void ImguiManager::DrawRobotProperties(Robot& robot, int index)
     if (ImGui::DragFloat("Max HP", &maxHP, 1.0f, 1.0f, 1000.0f))
     {
         robot.SetMaxHP(maxHP);
+        modified = true;
     }
 
     // Direction
@@ -1016,6 +944,13 @@ void ImguiManager::DrawRobotProperties(Robot& robot, int index)
     if (ImGui::DragFloat("Direction X", &dirX, 0.1f, -1.0f, 1.0f))
     {
         robot.SetDirectionX(dirX);
+        modified = true;
+    }
+
+    // Save state if modified
+    if (modified)
+    {
+        SaveRobotState(robot, index, m_selectedMapName);
     }
 
     // State (read-only display)
@@ -1038,13 +973,48 @@ void ImguiManager::DrawRobotProperties(Robot& robot, int index)
     if (ImGui::Button("Kill Robot"))
     {
         robot.TakeDamage(robot.GetMaxHP());
+        SaveRobotState(robot, index, m_selectedMapName);
     }
     
     ImGui::SameLine();
     if (ImGui::Button("Full Heal"))
     {
         robot.SetHP(robot.GetMaxHP());
+        SaveRobotState(robot, index, m_selectedMapName);
     }
+}
+
+void ImguiManager::SaveRobotState(Robot& robot, int index, const std::string& mapName)
+{
+    if (!m_robotConfigManager)
+        return;
+
+    LiveRobotState state;
+    state.robotIndex = index;
+    state.mapName = mapName;
+    
+    Math::Vec2 pos = robot.GetPosition();
+    state.positionX = pos.x;
+    state.positionY = pos.y;
+    
+    Math::Vec2 size = robot.GetSize();
+    state.sizeX = size.x;
+    state.sizeY = size.y;
+    
+    state.hp = robot.GetHP();
+    state.maxHP = robot.GetMaxHP();
+    state.directionX = robot.GetDirectionX();
+    state.state = static_cast<int>(robot.GetState());
+
+    m_robotConfigManager->UpdateLiveState(state);
+}
+
+void ImguiManager::LoadRobotState(Robot& robot, int index, const std::string& mapName)
+{
+    if (!m_robotConfigManager)
+        return;
+
+    m_robotConfigManager->ApplyLiveStateToRobot(mapName, index, robot);
 }
 
 void ImguiManager::EndFrame()

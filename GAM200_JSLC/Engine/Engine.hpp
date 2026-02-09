@@ -11,6 +11,7 @@ class GameStateManager;
 class Shader;
 class ImguiManager;
 class DroneConfigManager;
+class RobotConfigManager;
 
 
 constexpr int VIRTUAL_WIDTH = 1920;
@@ -38,6 +39,7 @@ public:
 
     ImguiManager* GetImguiManager() { return m_imguiManager.get(); }
     std::shared_ptr<DroneConfigManager> GetDroneConfigManager() { return m_droneConfigManager; }
+    std::shared_ptr<RobotConfigManager> GetRobotConfigManager() { return m_robotConfigManager; }
 
     void ToggleFullscreen();
 
@@ -66,6 +68,7 @@ private:
 
     std::unique_ptr<ImguiManager> m_imguiManager;
     std::shared_ptr<DroneConfigManager> m_droneConfigManager;
+    std::shared_ptr<RobotConfigManager> m_robotConfigManager;
 
     bool m_isFullscreen = false;
     int m_windowedX = 100;

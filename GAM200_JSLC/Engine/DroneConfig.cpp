@@ -280,6 +280,8 @@ bool DroneConfigManager::ApplyLiveStateToDrone(const std::string& mapName, int d
     drone.SetAttackAngle(state->attackAngle);
     drone.SetAttackDirection(state->attackDirection);
     drone.SetDamageTimer(state->damageTimer);
+    drone.SetMaxHP(state->maxHP);
+    drone.SetHP(state->maxHP);  // Reset HP to max on load
     drone.SetDebugMode(state->isDebugMode);
 
     if (state->isDead) drone.SetDead(true);

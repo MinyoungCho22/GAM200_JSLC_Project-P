@@ -4,6 +4,8 @@
 #include "Logger.hpp"
 #include "GameStateManager.hpp"
 #include "ImguiManager.hpp"
+#include "DroneConfig.hpp"
+#include "RobotConfig.hpp"
 #include "../Game/SplashState.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp" 
@@ -83,6 +85,10 @@ bool Engine::Initialize(const std::string& windowTitle)
     // Initialize drone config manager
     m_droneConfigManager = std::make_shared<DroneConfigManager>();
     m_imguiManager->SetDroneConfigManager(m_droneConfigManager);
+
+    // Initialize robot config manager
+    m_robotConfigManager = std::make_shared<RobotConfigManager>();
+    m_imguiManager->SetRobotConfigManager(m_robotConfigManager);
 
     return true;
 }

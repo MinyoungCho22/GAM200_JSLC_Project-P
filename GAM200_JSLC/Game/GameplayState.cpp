@@ -146,10 +146,48 @@ void GameplayState::Initialize()
             // Load saved live drone states
             configManager->LoadLiveStatesFromFile();
 
-            // Apply saved states to drones
+            // Apply saved states to drones in Main
             for (size_t i = 0; i < droneManager->GetDrones().size(); ++i)
             {
-                configManager->ApplyLiveStateToDrone("Hallway", static_cast<int>(i), droneManager->GetDrones()[i]);
+                configManager->ApplyLiveStateToDrone("Main", static_cast<int>(i), const_cast<Drone&>(droneManager->GetDrones()[i]));
+            }
+
+            // Apply saved states to Hallway drones
+            auto& hallwayDrones = m_hallway->GetDrones();
+            for (size_t i = 0; i < hallwayDrones.size(); ++i)
+            {
+                configManager->ApplyLiveStateToDrone("Hallway", static_cast<int>(i), hallwayDrones[i]);
+            }
+
+            // Apply saved states to Rooftop drones
+            auto& rooftopDrones = m_rooftop->GetDrones();
+            for (size_t i = 0; i < rooftopDrones.size(); ++i)
+            {
+                configManager->ApplyLiveStateToDrone("Rooftop", static_cast<int>(i), rooftopDrones[i]);
+            }
+
+            // Apply saved states to Underground drones
+            auto& undergroundDrones = m_underground->GetDrones();
+            for (size_t i = 0; i < undergroundDrones.size(); ++i)
+            {
+                configManager->ApplyLiveStateToDrone("Underground", static_cast<int>(i), undergroundDrones[i]);
+            }
+        }
+
+        // Set robot config manager
+        auto robotConfigManager = gsm.GetEngine().GetRobotConfigManager();
+        if (robotConfigManager)
+        {
+            imguiManager->SetRobotConfigManager(robotConfigManager);
+
+            // Load saved live robot states
+            robotConfigManager->LoadLiveStatesFromFile();
+
+            // Apply saved states to robots
+            auto& robots = m_underground->GetRobots();
+            for (size_t i = 0; i < robots.size(); ++i)
+            {
+                robotConfigManager->ApplyLiveStateToRobot("Underground", static_cast<int>(i), robots[i]);
             }
         }
     }
@@ -359,13 +397,8 @@ void GameplayState::Update(double dt)
     else
     {
         pulseManager->UpdateAttackVFX(false, {}, {});
-        for (auto& drone : droneManager->GetDrones()) drone.ResetDamageTimer();
-        for (auto& drone : m_hallway->GetDrones()) drone.ResetDamageTimer();
-        for (auto& drone : m_rooftop->GetDrones()) drone.ResetDamageTimer();
-        if (m_undergroundAccessed)
-        {
-            for (auto& drone : m_underground->GetDrones()) drone.ResetDamageTimer();
-        }
+        // HP system: Don't reset damage - let HP stay reduced
+        // Removed ResetDamageTimer() calls to keep cumulative damage
 
         if (input.IsMouseButtonTriggered(Input::MouseButton::Left))
         {

@@ -33,6 +33,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     m_isChasing = false;
     m_lostTimer = 0.0f;
     m_currentSpeed = m_baseSpeed;
+    m_hp = m_maxHP;  // Initialize HP to max
 
     if (startPos.y >= ROOFTOP_MIN_Y)
     {
@@ -494,9 +495,16 @@ bool Drone::ApplyDamage(float dt)
 {
     if (m_isHit || m_isDead) return false;
 
-    m_damageTimer += dt;
-    if (m_damageTimer >= TIME_TO_DESTROY)
+    // Calculate damage per second based on TIME_TO_DESTROY
+    // If TIME_TO_DESTROY = 1.0s, then damage = maxHP / 1.0 = maxHP per second
+    float damagePerSecond = m_maxHP / TIME_TO_DESTROY;
+    float damage = damagePerSecond * dt;
+    
+    m_hp -= damage;
+    
+    if (m_hp <= 0.0f)
     {
+        m_hp = 0.0f;
         StartDeathSequence();
         return true;
     }
@@ -505,7 +513,8 @@ bool Drone::ApplyDamage(float dt)
 
 void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
-    if (m_isDead || m_damageTimer <= 0.0f) return;
+    // Show HP bar only when HP is less than max
+    if (m_isDead || m_hp >= m_maxHP) return;
 
     float barWidth = 100.0f;
     float barHeight = 15.0f;
@@ -522,7 +531,9 @@ void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
     GL::BindVertexArray(VAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
 
-    float ratio = m_damageTimer / TIME_TO_DESTROY;
+    // Show remaining HP ratio (full bar = full HP)
+    float ratio = m_hp / m_maxHP;
+    if (ratio < 0.0f) ratio = 0.0f;
     if (ratio > 1.0f) ratio = 1.0f;
 
     float fillWidth = barWidth * ratio;
@@ -536,7 +547,23 @@ void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
     Math::Matrix fgModel = Math::Matrix::CreateTranslation(fgPos) * Math::Matrix::CreateScale(fgSize);
 
     colorShader.setMat4("model", fgModel);
-    colorShader.setVec3("objectColor", 1.0f, 0.0f, 0.0f);
+    
+    // Color based on HP ratio: Green -> Yellow -> Red
+    float r = 1.0f;
+    float g = 1.0f;
+    if (ratio > 0.5f)
+    {
+        // Green to Yellow (100% -> 50%)
+        r = 2.0f * (1.0f - ratio);
+        g = 1.0f;
+    }
+    else
+    {
+        // Yellow to Red (50% -> 0%)
+        r = 1.0f;
+        g = 2.0f * ratio;
+    }
+    colorShader.setVec3("objectColor", r, g, 0.0f);
 
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
     GL::BindVertexArray(0);

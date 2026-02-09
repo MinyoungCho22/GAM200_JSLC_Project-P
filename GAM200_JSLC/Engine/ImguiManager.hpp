@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DroneConfig.hpp"
+#include "RobotConfig.hpp"
 #include <vector>
 #include <memory>
 
@@ -31,6 +32,7 @@ public:
     void SetWarningLevel(int level);
     void SetDroneManager(DroneManager* manager) { m_droneManager = manager; }
     void SetDroneConfigManager(std::shared_ptr<DroneConfigManager> configManager) { m_configManager = configManager; }
+    void SetRobotConfigManager(std::shared_ptr<RobotConfigManager> configManager) { m_robotConfigManager = configManager; }
     void AddMapDroneManager(const std::string& mapName, DroneManager* manager);
     void SetUnderground(Underground* underground) { m_underground = underground; }
 
@@ -51,9 +53,6 @@ private:
     void DrawDroneList(DroneManager* manager);
     void DrawDroneProperties(Drone& drone, int index);
     void DrawRobotProperties(Robot& robot, int index);
-    void DrawDroneConfigPanel();
-    void DrawDroneConfigProperties(int configIndex);
-    void ApplyConfigToDrone(const DroneConfigData& config, Drone& drone);
 
     GLFWwindow* m_debugWindow = nullptr;
     GLFWwindow* m_mainWindow = nullptr; // Save main window context
@@ -69,6 +68,7 @@ private:
 
     DroneManager* m_droneManager = nullptr;
     std::shared_ptr<DroneConfigManager> m_configManager;
+    std::shared_ptr<RobotConfigManager> m_robotConfigManager;
     std::vector<std::pair<std::string, DroneManager*>> m_mapDroneManagers;
     int m_selectedDroneIndex = -1;
     int m_selectedConfigIndex = -1;
@@ -83,6 +83,8 @@ private:
     // Robot management
     Underground* m_underground = nullptr;
     int m_selectedRobotIndex = -1;
+    void SaveRobotState(Robot& robot, int index, const std::string& mapName);
+    void LoadRobotState(Robot& robot, int index, const std::string& mapName);
 
     // Player god mode (infinite pulse)
     bool m_playerGodMode = false;
