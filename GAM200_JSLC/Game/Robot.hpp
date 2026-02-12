@@ -99,7 +99,7 @@ private:
     float m_spawnX = 0.0f;
     const float PATROL_RANGE = 1000.0f;
 
-    const float GRAVITY = -1500.0f;
+    const float GRAVITY = -2200.0f;
     const float PATROL_SPEED = 100.0f;
     const float CHASE_SPEED = 250.0f;
     const float DETECTION_RANGE = 500.0f;

@@ -89,6 +89,12 @@ private:
     float jump_velocity = 900.0f;
     float dash_speed = 900.0f;
     float dash_duration = 0.15f;
+    
+    // Physics parameters for realistic movement
+    float m_acceleration = 1200.0f;        // Acceleration rate when moving
+    float m_friction = 1000.0f;            // Friction/deceleration rate
+    float m_maxSpeed = 300.0f;             // Maximum horizontal speed
+    float m_currentHorizontalSpeed = 0.0f; // Current horizontal velocity
     unsigned int VAO = 0;
     unsigned int VBO = 0;
     bool m_is_flipped = false;

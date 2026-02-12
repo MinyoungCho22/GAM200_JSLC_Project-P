@@ -15,7 +15,7 @@
 #include "../Engine/Logger.hpp"
 #pragma warning(pop)
 
-const float GRAVITY = -1500.0f;
+const float GRAVITY = -2200.0f;
 const float GROUND_LEVEL = 180.0f;
 
 void AnimationData::Update(float dt)
@@ -81,6 +81,7 @@ void Player::Init(Math::Vec2 startPos)
     m_currentGroundLevel = GROUND_LEVEL;
     can_double_jump = false;
     is_double_jumping = false;
+    m_currentHorizontalSpeed = 0.0f;
 
     std::vector<float> vertices = {
         -0.5f,  0.5f,   0.0f, 1.0f,
@@ -118,7 +119,8 @@ AnimationState Player::DetermineAnimationState() const
     if (is_dashing)
         return AnimationState::Walking;
 
-    if (velocity.x != 0.0f)
+    // Check if player is actually moving (not just tiny residual speed)
+    if (std::abs(m_currentHorizontalSpeed) > 10.0f)
         return AnimationState::Walking;
 
     return AnimationState::Idle;
@@ -137,8 +139,16 @@ void Player::Update(double dt, Input::Input& input)
         is_on_ground = false;
     }
 
-    if (input.IsKeyPressed(Input::Key::A)) MoveLeft();
-    if (input.IsKeyPressed(Input::Key::D)) MoveRight();
+    // Store input direction (will be used for acceleration)
+    float inputDirection = 0.0f;
+    if (input.IsKeyPressed(Input::Key::A)) {
+        MoveLeft();
+        inputDirection = -1.0f;
+    }
+    if (input.IsKeyPressed(Input::Key::D)) {
+        MoveRight();
+        inputDirection = 1.0f;
+    }
 
     if (input.IsKeyTriggered(Input::Key::Space)) Jump();
 
@@ -161,15 +171,84 @@ void Player::Update(double dt, Input::Input& input)
         if (dash_timer <= 0.0f)
         {
             is_dashing = false;
+            // Maintain momentum after dash ends
+            m_currentHorizontalSpeed = last_move_direction * dash_speed * 0.6f; // 60% of dash speed
         }
     }
 
     velocity.y += GRAVITY * static_cast<float>(dt);
 
+    // Apply physics-based horizontal movement
+    float fDt = static_cast<float>(dt);
+    
+    if (!is_dashing && !is_crouching)
+    {
+        // Air control is reduced (50% of ground control)
+        float controlMultiplier = is_on_ground ? 1.0f : 0.5f;
+        float currentAcceleration = m_acceleration * controlMultiplier;
+        float currentFriction = m_friction * controlMultiplier;
+        
+        // Apply acceleration or friction based on input
+        if (inputDirection != 0.0f)
+        {
+            // Player is trying to move - apply acceleration
+            m_currentHorizontalSpeed += inputDirection * currentAcceleration * fDt;
+            
+            // Clamp to max speed
+            if (m_currentHorizontalSpeed > m_maxSpeed)
+                m_currentHorizontalSpeed = m_maxSpeed;
+            else if (m_currentHorizontalSpeed < -m_maxSpeed)
+                m_currentHorizontalSpeed = -m_maxSpeed;
+        }
+        else
+        {
+            // No input - apply friction to decelerate
+            if (is_on_ground)
+            {
+                // On ground: apply full friction
+                if (m_currentHorizontalSpeed > 0.0f)
+                {
+                    m_currentHorizontalSpeed -= currentFriction * fDt;
+                    if (m_currentHorizontalSpeed < 0.0f)
+                        m_currentHorizontalSpeed = 0.0f;
+                }
+                else if (m_currentHorizontalSpeed < 0.0f)
+                {
+                    m_currentHorizontalSpeed += currentFriction * fDt;
+                    if (m_currentHorizontalSpeed > 0.0f)
+                        m_currentHorizontalSpeed = 0.0f;
+                }
+            }
+            // In air without input: maintain horizontal speed (no air resistance)
+        }
+    }
+    
+    // Calculate final velocity
     Math::Vec2 final_velocity = velocity;
     if (is_dashing)
     {
         final_velocity.x = last_move_direction * dash_speed;
+    }
+    else if (!is_crouching)
+    {
+        final_velocity.x = m_currentHorizontalSpeed;
+    }
+    else
+    {
+        // When crouching, apply friction to stop
+        if (m_currentHorizontalSpeed > 0.0f)
+        {
+            m_currentHorizontalSpeed -= m_friction * fDt;
+            if (m_currentHorizontalSpeed < 0.0f)
+                m_currentHorizontalSpeed = 0.0f;
+        }
+        else if (m_currentHorizontalSpeed < 0.0f)
+        {
+            m_currentHorizontalSpeed += m_friction * fDt;
+            if (m_currentHorizontalSpeed > 0.0f)
+                m_currentHorizontalSpeed = 0.0f;
+        }
+        final_velocity.x = 0.0f;
     }
 
     position += final_velocity * static_cast<float>(dt);
@@ -228,8 +307,6 @@ void Player::Update(double dt, Input::Input& input)
         }
         m_animations[static_cast<int>(m_currentAnimState)].Update(static_cast<float>(dt));
     }
-
-    velocity.x = 0;
 }
 
 void Player::Draw(const Shader& shader) const
@@ -345,7 +422,8 @@ Math::Vec2 Player::GetHitboxCenter() const
 void Player::MoveLeft()
 {
     if (is_crouching) return;
-    velocity.x -= move_speed;
+    // Apply acceleration in the left direction
+    velocity.x = -1.0f; // Store input direction
     last_move_direction = -1;
     m_is_flipped = true;
 }
@@ -353,7 +431,8 @@ void Player::MoveLeft()
 void Player::MoveRight()
 {
     if (is_crouching) return;
-    velocity.x += move_speed;
+    // Apply acceleration in the right direction
+    velocity.x = 1.0f; // Store input direction
     last_move_direction = 1;
     m_is_flipped = false;
 }
@@ -425,6 +504,8 @@ void Player::SetCurrentGroundLevel(float newGroundLevel)
 void Player::ResetVelocity()
 {
     velocity = Math::Vec2(0.0f, 0.0f);
+    // Note: Don't reset horizontal speed here to maintain momentum when landing
+    // m_currentHorizontalSpeed = 0.0f;
 }
 
 void Player::SetOnGround(bool onGround)
