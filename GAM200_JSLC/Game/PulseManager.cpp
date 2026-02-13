@@ -26,43 +26,43 @@ std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 
 void PulseManager::Initialize()
 {
-    const char* circuitPath = "Asset/PulseCircuit.png";
-    const char* fluidPath = "Asset/PulseFluid.png";
-
-    auto loadTexture = [&](const char* path, GLuint& outTexID)
+    auto LoadTexture = [&](const char* path) -> GLuint
         {
-            outTexID = 0;
+            GLuint tex = 0;
+            GL::GenTextures(1, &tex);
+            GL::BindTexture(GL_TEXTURE_2D, tex);
 
-            GL::GenTextures(1, &outTexID);
-            GL::BindTexture(GL_TEXTURE_2D, outTexID);
             GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-            int width = 0, height = 0, nrChannels = 0;
+            int w, h, ch;
             stbi_set_flip_vertically_on_load(true);
-            unsigned char* data = stbi_load(path, &width, &height, &nrChannels, 0);
+            unsigned char* data = stbi_load(path, &w, &h, &ch, 0);
 
-            if (data)
+            if (!data)
             {
-                GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-                GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-                GL::GenerateMipmap(GL_TEXTURE_2D);
-                stbi_image_free(data);
+                Logger::Instance().Log(Logger::Severity::Error, "Failed to load texture: %s", path);
+                return 0;
+            }
 
-                Logger::Instance().Log(Logger::Severity::Info, "%s loaded for VFX.", path);
-            }
-            else
-            {
-                Logger::Instance().Log(Logger::Severity::Error, "Failed to load %s!", path);
-                stbi_image_free(data);
-                outTexID = 0;
-            }
+            GLenum format = (ch == 4) ? GL_RGBA : GL_RGB;
+            GL::TexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
+            GL::GenerateMipmap(GL_TEXTURE_2D);
+
+            stbi_image_free(data);
+            return tex;
         };
 
-    loadTexture(circuitPath, m_circuitTexID);
-    loadTexture(fluidPath, m_fluidTexID);
+    m_texCornerNE = LoadTexture("Asset/pulse/pulse_corner_ne.png");
+    m_texCornerNW = LoadTexture("Asset/pulse/pulse_corner_nw.png");
+    m_texCornerSE = LoadTexture("Asset/pulse/pulse_corner_se.png");
+    m_texCornerSW = LoadTexture("Asset/pulse/pulse_corner_sw.png");
+    m_texLineH = LoadTexture("Asset/pulse/pulse_line_h.png");
+    m_texLineV = LoadTexture("Asset/pulse/pulse_line_v.png");
+
+    m_fluidTexID = LoadTexture("Asset/pulse/PulseFluid.png");
 
     float vertices[] = {
         -0.5f,  0.5f,   0.0f, 1.0f,
@@ -88,16 +88,26 @@ void PulseManager::Initialize()
 }
 
 
+
 void PulseManager::Shutdown()
 {
     if (m_circuitTexID != 0) GL::DeleteTextures(1, &m_circuitTexID);
     if (m_fluidTexID != 0) GL::DeleteTextures(1, &m_fluidTexID);
+
+    if (m_texCornerNE) GL::DeleteTextures(1, &m_texCornerNE);
+    if (m_texCornerNW) GL::DeleteTextures(1, &m_texCornerNW);
+    if (m_texCornerSE) GL::DeleteTextures(1, &m_texCornerSE);
+    if (m_texCornerSW) GL::DeleteTextures(1, &m_texCornerSW);
+    if (m_texLineH)    GL::DeleteTextures(1, &m_texLineH);
+    if (m_texLineV)    GL::DeleteTextures(1, &m_texLineV);
 
     GL::DeleteVertexArrays(1, &m_pulseVAO);
     GL::DeleteBuffers(1, &m_pulseVBO);
 
     m_circuitTexID = 0;
     m_fluidTexID = 0;
+    m_texCornerNE = m_texCornerNW = m_texCornerSE = m_texCornerSW = 0;
+    m_texLineH = m_texLineV = 0;
 }
 
 
@@ -129,7 +139,6 @@ void PulseManager::UpdateAttackVFX(bool isAttacking, Math::Vec2 startPos, Math::
 
     m_attackPrevEnd = endPos;
 
-    // Smoothly follow player's start (reduces jitter)
     const float UPDATE_INTERVAL = 0.15f;
 
     float moved = (startPos - m_attackStartFrozen).Length();
@@ -269,16 +278,18 @@ void PulseManager::DrawVFX(const Shader& shader) const
     shader.setBool("flipX", false);
     shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
 
-    const float circuitThickness = 6.0f;             
-    const float fluidThickness = circuitThickness; 
-    const float chargeThickness = circuitThickness; 
+    const float TILE = 16.0f;                
+    const float packetLen = 24.0f;
+    const float packetGap = 12.0f;
+    const float packetLen2Mul = 0.75f;
+    const float packetThick2Mul = 0.85f;
 
-    const float nodeRadius = circuitThickness * 0.33f; 
-
-    const float packetLen = 24.0f;         
-    const float packetGap = 12.0f;         
-    const float packetLen2Mul = 0.75f;       
-    const float packetThick2Mul = 0.85f;      
+    auto snapTile = [&](Math::Vec2 p) -> Math::Vec2
+        {
+            float gx = std::round(p.x / TILE) * TILE;
+            float gy = std::round(p.y / TILE) * TILE;
+            return { gx, gy };
+        };
 
     auto drawSprite = [&](Math::Vec2 p, Math::Vec2 size)
         {
@@ -289,27 +300,6 @@ void PulseManager::DrawVFX(const Shader& shader) const
             GL::DrawArrays(GL_TRIANGLES, 0, 6);
         };
 
-    auto drawNode = [&](Math::Vec2 p, float r)
-        {
-            drawSprite(p, { r, r });
-            drawSprite(p + Math::Vec2{ r, 0.f }, { r * 0.7f, r * 0.7f });
-            drawSprite(p + Math::Vec2{ -r, 0.f }, { r * 0.7f, r * 0.7f });
-            drawSprite(p + Math::Vec2{ 0.f,  r }, { r * 0.7f, r * 0.7f });
-            drawSprite(p + Math::Vec2{ 0.f, -r }, { r * 0.7f, r * 0.7f });
-        };
-
-    auto drawManhattanSegment = [&](Math::Vec2 a, Math::Vec2 b, float thickness)
-        {
-            Math::Vec2 d = b - a;
-            float ax = std::abs(d.x);
-            float ay = std::abs(d.y);
-            if (ax < 0.001f && ay < 0.001f) return;
-
-            Math::Vec2 center = (a + b) * 0.5f;
-            if (ax >= ay) drawSprite(center, { ax, thickness });
-            else          drawSprite(center, { thickness, ay });
-        };
-
     auto safeDir = [&](Math::Vec2 a, Math::Vec2 b) -> Math::Vec2
         {
             Math::Vec2 v = b - a;
@@ -318,95 +308,219 @@ void PulseManager::DrawVFX(const Shader& shader) const
             return v / l;
         };
 
+    auto axisDir = [&](Math::Vec2 d) -> Math::Vec2
+        {
+            if (std::abs(d.x) >= std::abs(d.y))
+                return Math::Vec2{ (d.x >= 0.f) ? 1.f : -1.f, 0.f };
+            else
+                return Math::Vec2{ 0.f, (d.y >= 0.f) ? 1.f : -1.f };
+        };
+
+    auto cornerTexFromDirs = [&](Math::Vec2 inDir, Math::Vec2 outDir) -> GLuint
+        {
+            auto axis = [&](Math::Vec2 d) -> Math::Vec2
+                {
+                    if (std::abs(d.x) >= std::abs(d.y))
+                        return { (d.x >= 0.f) ? 1.f : -1.f, 0.f };
+                    else
+                        return { 0.f, (d.y >= 0.f) ? 1.f : -1.f };
+                };
+
+            Math::Vec2 a = axis(inDir);
+            Math::Vec2 b = axis(outDir);
+
+            float hx = (a.x != 0.f) ? a.x : b.x; 
+            float vy = (a.y != 0.f) ? a.y : b.y; 
+
+            vy = -vy;
+
+            if (hx > 0.f && vy > 0.f) return m_texCornerNE;
+            if (hx < 0.f && vy > 0.f) return m_texCornerNW;
+            if (hx > 0.f && vy < 0.f) return m_texCornerSE;
+            if (hx < 0.f && vy < 0.f) return m_texCornerSW;
+
+            return m_texCornerNE;
+        };
+
+
+    auto drawLineH_Tiled = [&](Math::Vec2 a, Math::Vec2 b)
+        {
+            a = snapTile(a); b = snapTile(b);
+            if (b.x < a.x) std::swap(a, b);
+
+            float len = b.x - a.x;
+            if (len < 0.5f) return;
+
+            GL::BindTexture(GL_TEXTURE_2D, m_texLineH);
+
+            int full = (int)(len / TILE);
+            float rem = len - full * TILE;
+
+            shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+            for (int i = 0; i < full; ++i)
+            {
+                Math::Vec2 p = { a.x + (i + 0.5f) * TILE, a.y };
+                drawSprite(p, { TILE, TILE });
+            }
+
+            if (rem > 0.5f)
+            {
+                float u = rem / TILE;
+                shader.setVec4("spriteRect", 0.f, 0.f, u, 1.f);
+
+                Math::Vec2 p = { a.x + full * TILE + rem * 0.5f, a.y };
+                drawSprite(p, { rem, TILE });
+
+                shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+            }
+        };
+
+    auto drawLineV_Tiled = [&](Math::Vec2 a, Math::Vec2 b)
+        {
+            a = snapTile(a); b = snapTile(b);
+            if (b.y < a.y) std::swap(a, b);
+
+            float len = b.y - a.y;
+            if (len < 0.5f) return;
+
+            GL::BindTexture(GL_TEXTURE_2D, m_texLineV);
+
+            int full = (int)(len / TILE);
+            float rem = len - full * TILE;
+
+            shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+            for (int i = 0; i < full; ++i)
+            {
+                Math::Vec2 p = { a.x, a.y + (i + 0.5f) * TILE };
+                drawSprite(p, { TILE, TILE });
+            }
+
+            if (rem > 0.5f)
+            {
+                float v = rem / TILE;
+                shader.setVec4("spriteRect", 0.f, 0.f, 1.f, v);
+
+                Math::Vec2 p = { a.x, a.y + full * TILE + rem * 0.5f };
+                drawSprite(p, { TILE, rem });
+
+                shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+            }
+        };
+
+    auto drawSegment_Tiled = [&](Math::Vec2 a, Math::Vec2 b)
+        {
+            Math::Vec2 d = b - a;
+            if (std::abs(d.x) >= std::abs(d.y)) drawLineH_Tiled(a, b);
+            else                                drawLineV_Tiled(a, b);
+        };
+
+    auto drawCornerAuto = [&](Math::Vec2 prev, Math::Vec2 corner, Math::Vec2 next)
+        {
+            prev = snapTile(prev);
+            corner = snapTile(corner);
+            next = snapTile(next);
+
+            Math::Vec2 inDir = corner - prev;
+            Math::Vec2 outDir = next - corner;
+
+            GLuint tex = cornerTexFromDirs(inDir, outDir);
+            GL::BindTexture(GL_TEXTURE_2D, tex);
+
+            shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+            drawSprite(corner, { TILE, TILE });
+        };
+
     if (m_isAttacking && m_attackPathValid)
     {
-        Math::Vec2 start = m_attackStartFrozen;
-        Math::Vec2 c1 = m_attackC1;
-        Math::Vec2 c2 = m_attackC2;
-        Math::Vec2 c3 = m_attackC3;
-        Math::Vec2 end = m_attackEndLive;
+        Math::Vec2 p0 = snapTile(m_attackStartFrozen);
+        Math::Vec2 p1 = snapTile(m_attackC1);
+        Math::Vec2 p2 = snapTile(m_attackC2);
+        Math::Vec2 p3 = snapTile(m_attackC3);
+        Math::Vec2 p4 = snapTile(m_attackEndLive);
 
-        auto segLen = [&](Math::Vec2 a, Math::Vec2 b) { return (b - a).Length(); };
-        float L0 = segLen(start, c1);
-        float L1 = segLen(c1, c2);
-        float L2 = segLen(c2, c3);
-        float L3 = segLen(c3, end);
-        float totalLen = L0 + L1 + L2 + L3;
+        drawSegment_Tiled(p0, p1);
+        drawSegment_Tiled(p1, p2);
+        drawSegment_Tiled(p2, p3);
+        drawSegment_Tiled(p3, p4);
 
-        GL::BindTexture(GL_TEXTURE_2D, m_circuitTexID);
+        drawCornerAuto(p0, p1, p2);
+        drawCornerAuto(p1, p2, p3);
+        drawCornerAuto(p2, p3, p4);
 
-        drawManhattanSegment(start, c1, circuitThickness);
-        drawManhattanSegment(c1, c2, circuitThickness);
-        drawManhattanSegment(c2, c3, circuitThickness);
-        drawManhattanSegment(c3, end, circuitThickness);
-
-        drawNode(start, nodeRadius);
-        drawNode(c1, nodeRadius * 0.90f);
-        drawNode(c2, nodeRadius * 0.90f);
-        drawNode(c3, nodeRadius * 0.90f);
-        drawNode(end, nodeRadius * 1.05f);
-
-        if (m_attackPacketActive && totalLen >= 1.0f)
+        if (m_attackPacketActive)
         {
-            auto pointOnPath = [&](float s) -> Math::Vec2
-                {
-                    if (s <= L0) return start + safeDir(start, c1) * s; s -= L0;
-                    if (s <= L1) return c1 + safeDir(c1, c2) * s; s -= L1;
-                    if (s <= L2) return c2 + safeDir(c2, c3) * s; s -= L2;
-                    if (s <= L3) return c3 + safeDir(c3, end) * s;
-                    return end;
-                };
+            auto segLen = [&](Math::Vec2 a, Math::Vec2 b) { return (b - a).Length(); };
+            float L0 = segLen(p0, p1);
+            float L1 = segLen(p1, p2);
+            float L2 = segLen(p2, p3);
+            float L3 = segLen(p3, p4);
+            float totalLen = L0 + L1 + L2 + L3;
 
-            auto dirOnPath = [&](float s) -> Math::Vec2
-                {
-                    if (s <= L0) return safeDir(start, c1); s -= L0;
-                    if (s <= L1) return safeDir(c1, c2);    s -= L1;
-                    if (s <= L2) return safeDir(c2, c3);    s -= L2;
-                    return safeDir(c3, end);
-                };
-
-            float travelTime = std::max(m_attackTravelTime, 0.001f);
-            float phase = std::clamp(m_attackElapsed / travelTime, 0.0f, 1.0f);
-
-            if (phase < 1.0f)
+            if (totalLen >= 1.0f)
             {
-                float headS = phase * totalLen;
-
-                GL::BindTexture(GL_TEXTURE_2D, m_fluidTexID);
-
-                auto drawPacketRect = [&](float sHead, float len, float thickness)
+                auto pointOnPath = [&](float s) -> Math::Vec2
                     {
-                        if (sHead < 0.0f || sHead > totalLen) return;
-
-                        float sTail = sHead - len;
-                        if (sTail < 0.0f) sTail = 0.0f;
-
-                        Math::Vec2 headPos = pointOnPath(sHead);
-                        Math::Vec2 tailPos = pointOnPath(sTail);
-                        Math::Vec2 center = (headPos + tailPos) * 0.5f;
-
-                        Math::Vec2 dir = dirOnPath(sHead);
-                        float ax = std::abs(dir.x);
-                        float ay = std::abs(dir.y);
-
-                        float visualLen = (headPos - tailPos).Length();
-                        if (visualLen < 0.5f) return;
-
-                        if (ax >= ay) drawSprite(center, { visualLen, thickness });
-                        else          drawSprite(center, { thickness, visualLen });
+                        if (s <= L0) return p0 + safeDir(p0, p1) * s; s -= L0;
+                        if (s <= L1) return p1 + safeDir(p1, p2) * s; s -= L1;
+                        if (s <= L2) return p2 + safeDir(p2, p3) * s; s -= L2;
+                        if (s <= L3) return p3 + safeDir(p3, p4) * s;
+                        return p4;
                     };
 
-                drawPacketRect(headS, packetLen, fluidThickness);
+                auto dirOnPath = [&](float s) -> Math::Vec2
+                    {
+                        if (s <= L0) return safeDir(p0, p1); s -= L0;
+                        if (s <= L1) return safeDir(p1, p2); s -= L1;
+                        if (s <= L2) return safeDir(p2, p3); s -= L2;
+                        return safeDir(p3, p4);
+                    };
 
-                if (packetGap > 0.0f)
+                float travelTime = std::max(m_attackTravelTime, 0.001f);
+                float phase = std::clamp(m_attackElapsed / travelTime, 0.0f, 1.0f);
+
+                if (phase < 1.0f)
                 {
-                    drawPacketRect(headS - packetGap,
-                        packetLen * packetLen2Mul,
-                        fluidThickness * packetThick2Mul);
+                    float headS = phase * totalLen;
+
+                    GL::BindTexture(GL_TEXTURE_2D, m_fluidTexID);
+                    shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+
+                    auto drawPacketRect = [&](float sHead, float len, float thickness)
+                        {
+                            if (sHead < 0.0f || sHead > totalLen) return;
+
+                            float sTail = sHead - len;
+                            if (sTail < 0.0f) sTail = 0.0f;
+
+                            Math::Vec2 headPos = pointOnPath(sHead);
+                            Math::Vec2 tailPos = pointOnPath(sTail);
+                            Math::Vec2 center = (headPos + tailPos) * 0.5f;
+
+                            Math::Vec2 dir = dirOnPath(sHead);
+                            float ax = std::abs(dir.x);
+                            float ay = std::abs(dir.y);
+
+                            float visualLen = (headPos - tailPos).Length();
+                            if (visualLen < 0.5f) return;
+
+                            // IMPORTANT: packets are simple quads, ok to scale freely
+                            if (ax >= ay) drawSprite(center, { visualLen, thickness });
+                            else          drawSprite(center, { thickness, visualLen });
+                        };
+
+                    drawPacketRect(headS, packetLen, 6.0f);
+
+                    if (packetGap > 0.0f)
+                    {
+                        drawPacketRect(headS - packetGap,
+                            packetLen * packetLen2Mul,
+                            6.0f * packetThick2Mul);
+                    }
                 }
             }
         }
 
+        shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
         GL::BindVertexArray(0);
         GL::Disable(GL_BLEND);
         return;
@@ -414,12 +528,10 @@ void PulseManager::DrawVFX(const Shader& shader) const
 
     if (m_isCharging)
     {
-        GL::BindTexture(GL_TEXTURE_2D, m_circuitTexID);
-
-        Math::Vec2 start = m_chargeStartPos;
-        Math::Vec2 end = m_chargeEndPos;
-
+        Math::Vec2 start = snapTile(m_chargeStartPos);
+        Math::Vec2 end = snapTile(m_chargeEndPos);
         Math::Vec2 diff = end - start;
+
         if (diff.Length() >= 1.0f)
         {
             Math::Vec2 cornerA = { end.x, start.y };
@@ -427,16 +539,14 @@ void PulseManager::DrawVFX(const Shader& shader) const
 
             float lenA = (cornerA - start).Length() + (end - cornerA).Length();
             float lenB = (cornerB - start).Length() + (end - cornerB).Length();
-            Math::Vec2 corner = (lenA <= lenB) ? cornerA : cornerB;
+            Math::Vec2 corner = snapTile((lenA <= lenB) ? cornerA : cornerB);
 
-            drawManhattanSegment(start, corner, chargeThickness);
-            drawManhattanSegment(corner, end, chargeThickness);
-
-            drawNode(start, nodeRadius * 0.85f);
-            drawNode(corner, nodeRadius * 0.80f);
-            drawNode(end, nodeRadius * 0.95f);
+            drawSegment_Tiled(start, corner);
+            drawSegment_Tiled(corner, end);
+            drawCornerAuto(start, corner, end);
         }
 
+        shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
         GL::BindVertexArray(0);
         GL::Disable(GL_BLEND);
         return;

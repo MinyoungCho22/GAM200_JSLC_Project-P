@@ -28,10 +28,19 @@ public:
 
 private:
     AnimationData m_pulseAnim;
+    unsigned int m_texLineH = 0;
+    unsigned int m_texLineV = 0;
+    unsigned int m_texCornerNE = 0;
+    unsigned int m_texCornerNW = 0;
+    unsigned int m_texCornerSE = 0;
+    unsigned int m_texCornerSW = 0;
+
     unsigned int m_circuitTexID = 0;
     unsigned int m_fluidTexID = 0;
     unsigned int m_pulseVAO = 0;
     unsigned int m_pulseVBO = 0;
+
+
 
     bool m_isAttacking = false;
     bool m_isCharging = false;
