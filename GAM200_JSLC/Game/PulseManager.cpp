@@ -177,6 +177,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     std::vector<PulseSource>& hallwaySources,
     std::vector<PulseSource>& rooftopSources,
     std::vector<PulseSource>& undergroundSources,
+    std::vector<PulseSource>& subwaySources,
     bool is_interact_key_pressed, double dt, Math::Vec2 mouseWorldPos)
 {
     float fdt = static_cast<float>(dt);
@@ -231,6 +232,10 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
         checkSource(source);
     }
     for (auto& source : undergroundSources)
+    {
+        checkSource(source);
+    }
+    for (auto& source : subwaySources)
     {
         checkSource(source);
     }

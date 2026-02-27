@@ -76,6 +76,10 @@ void GameplayState::Initialize()
     m_underground->Initialize();
     m_undergroundAccessed = false;
 
+    m_subway = std::make_unique<Subway>();
+    m_subway->Initialize();
+    m_subwayAccessed = false;
+
     m_camera.Initialize({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }, GAME_WIDTH, GAME_HEIGHT);
     m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
     m_cameraSmoothSpeed = 0.1f;
@@ -117,14 +121,15 @@ void GameplayState::Initialize()
         Logger::Instance().Log(Logger::Severity::Info, "Gameplay BGM Started");
     }
 
-    // Set up debug window with drone managers and config manager
-    auto* imguiManager = gsm.GetEngine().GetImguiManager();
-    if (imguiManager)
-    {
-        // Add map drone managers
-        imguiManager->AddMapDroneManager("Hallway", m_hallway->GetDroneManager());
-        imguiManager->AddMapDroneManager("Rooftop", m_rooftop->GetDroneManager());
-        imguiManager->AddMapDroneManager("Underground", m_underground->GetDroneManager());
+        // Set up debug window with drone managers and config manager
+        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+        if (imguiManager)
+        {
+            // Add map drone managers
+            imguiManager->AddMapDroneManager("Hallway", m_hallway->GetDroneManager());
+            imguiManager->AddMapDroneManager("Rooftop", m_rooftop->GetDroneManager());
+            imguiManager->AddMapDroneManager("Underground", m_underground->GetDroneManager());
+            imguiManager->AddMapDroneManager("Subway", m_subway->GetDroneManager());
 
         // Set main drone manager (for backwards compatibility)
         if (droneManager)
@@ -171,6 +176,13 @@ void GameplayState::Initialize()
             for (size_t i = 0; i < undergroundDrones.size(); ++i)
             {
                 configManager->ApplyLiveStateToDrone("Underground", static_cast<int>(i), undergroundDrones[i]);
+            }
+
+            // Apply saved states to Subway drones
+            auto& subwayDrones = m_subway->GetDrones();
+            for (size_t i = 0; i < subwayDrones.size(); ++i)
+            {
+                configManager->ApplyLiveStateToDrone("Subway", static_cast<int>(i), subwayDrones[i]);
             }
         }
 
@@ -254,6 +266,15 @@ void GameplayState::Update(double dt)
         }
     }
 
+    if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num5))
+    {
+        if (!m_subwayAccessed)
+        {
+            m_tutorial->DisableAll();
+            HandleUndergroundToSubwayTransition();
+        }
+    }
+
     m_tutorial->Update(static_cast<float>(dt), player, input, m_room.get(), m_hallway.get(), m_rooftop.get(), m_door.get(), m_rooftopDoor.get());
 
     Math::Vec2 playerCenter = player.GetPosition();
@@ -279,7 +300,8 @@ void GameplayState::Update(double dt)
     }
 
     pulseManager->Update(playerCenter, playerHitboxSize, player, m_room->GetPulseSources(),
-        m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(), isPressingInteract, dt, mouseWorldPos);
+        m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(), 
+        m_subway->GetPulseSources(), isPressingInteract, dt, mouseWorldPos);
 
     Drone* targetDrone = nullptr;
     Robot* targetRobot = nullptr;
@@ -321,6 +343,7 @@ void GameplayState::Update(double dt)
             checkDrones(m_hallway->GetDrones());
             checkDrones(m_rooftop->GetDrones());
             if (m_undergroundAccessed) checkDrones(m_underground->GetDrones());
+            if (m_subwayAccessed) checkDrones(m_subway->GetDrones());
 
             if (m_undergroundAccessed)
             {
@@ -339,6 +362,33 @@ void GameplayState::Update(double dt)
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
 
                     // Check if robot is in range AND mouse is clicking on robot hitbox
+                    bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize);
+
+                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnRobot)
+                    {
+                        closestDistSq = distSq;
+                        targetRobot = &robot;
+                        targetDrone = nullptr;
+                    }
+                }
+            }
+
+            if (m_subwayAccessed)
+            {
+                auto& robots = m_subway->GetRobots();
+
+                for (auto& robot : robots)
+                {
+                    if (robot.IsDead()) continue;
+
+                    float distSq = (playerCenter - robot.GetPosition()).LengthSq();
+
+                    Math::Vec2 robotSize = robot.GetSize();
+                    float robotRadius = (robotSize.x + robotSize.y) * 0.25f;
+
+                    float effectiveAttackRange = ATTACK_RANGE + robotRadius;
+                    float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+
                     bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize);
 
                     if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnRobot)
@@ -439,6 +489,15 @@ void GameplayState::Update(double dt)
         }
     }
 
+    if (m_undergroundAccessed && !m_subwayAccessed)
+    {
+        float transitionX = Underground::MIN_X + Underground::WIDTH - 50.0f;
+        if (player.GetPosition().x > transitionX)
+        {
+            HandleUndergroundToSubwayTransition();
+        }
+    }
+
     bool isPlayerHidingInRoom = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     bool isPlayerHidingInHallway = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     bool isPlayerHiding = isPlayerHidingInRoom || isPlayerHidingInHallway;
@@ -496,6 +555,11 @@ void GameplayState::Update(double dt)
         m_underground->Update(dt, player, playerHitboxSize);
     }
 
+    if (m_subwayAccessed)
+    {
+        m_subway->Update(dt, player, playerHitboxSize);
+    }
+
     auto& hallwayDrones = m_hallway->GetDrones();
     for (auto& drone : hallwayDrones)
     {
@@ -547,9 +611,35 @@ void GameplayState::Update(double dt)
         }
     }
 
+    if (m_subwayAccessed)
+    {
+        auto& subwayDrones = m_subway->GetDrones();
+        for (auto& drone : subwayDrones)
+        {
+            if (!drone.IsDead() && drone.ShouldDealDamage())
+            {
+                auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                {
+                    player.TakeDamage(25.0f);
+                }
+                drone.ResetDamageFlag();
+                break;
+            }
+        }
+    }
+
     // Map drone managers are registered in Initialize(), no need to sync here
 
-    m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
+    // 카메라 애니메이션 업데이트
+    if (m_camera.IsAnimating())
+    {
+        m_camera.UpdateAnimation(static_cast<float>(dt));
+    }
+    else
+    {
+        m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
+    }
 
     static double cameraLogTimer = 0.0f;
     cameraLogTimer += dt;
@@ -666,6 +756,53 @@ void GameplayState::HandleRooftopToUndergroundTransition()
         "Transition to Underground! Player=(%.1f, %.1f)", playerStartX, playerStartY);
 }
 
+void GameplayState::HandleUndergroundToSubwayTransition()
+{
+    Logger::Instance().Log(Logger::Severity::Event, 
+        "Transition to Subway! Starting descent animation...");
+
+    m_undergroundAccessed = true;
+    m_subwayAccessed = true;
+
+    // Underground의 드론들 제거
+    m_underground->ClearAllDrones();
+
+    // 플레이어 최종 위치 (Subway 맵 시작점 - 왼쪽으로 이동)
+    float playerStartX = Subway::MIN_X + 300.0f;  // 더 왼쪽에 배치
+    float playerStartY = Subway::MIN_Y + 540.0f;  // 화면 중앙 높이
+    float newGroundLevel = Subway::MIN_Y + 90.0f;
+
+    // 플레이어 위치 설정
+    player.SetCurrentGroundLevel(newGroundLevel);
+    player.SetPosition({ playerStartX, playerStartY });
+    player.ResetVelocity();
+    player.SetOnGround(false);
+
+    // Subway 맵 카메라 경계 설정
+    float worldMinX = Subway::MIN_X;
+    float worldMaxX = Subway::MIN_X + Subway::WIDTH;
+    float worldMinY = Subway::MIN_Y;
+    float worldMaxY = Subway::MIN_Y + Subway::HEIGHT;
+
+    m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
+
+    // 카메라 애니메이션: 현재 위치에서 아래로 내려가는 느낌
+    Math::Vec2 cameraStartPos = m_camera.GetPosition();
+    
+    // 최종 카메라 위치 (Subway 맵 왼쪽 + 플레이어 중심)
+    Math::Vec2 cameraEndPos = { Subway::MIN_X + GAME_WIDTH / 2.0f, Subway::MIN_Y + GAME_HEIGHT / 2.0f };
+    
+    // 2.0초 동안 지하로 내려가는 애니메이션
+    m_camera.StartAnimation(cameraStartPos, cameraEndPos, 2.0f);
+    
+    m_cameraSmoothSpeed = 0.05f;
+
+    Logger::Instance().Log(Logger::Severity::Event,
+        "Subway Transition! Camera: (%.1f, %.1f) -> (%.1f, %.1f), Player: (%.1f, %.1f)", 
+        cameraStartPos.x, cameraStartPos.y, cameraEndPos.x, cameraEndPos.y,
+        playerStartX, playerStartY);
+}
+
 Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screenY) const
 {
     Engine& engine = gsm.GetEngine();
@@ -725,6 +862,11 @@ void GameplayState::Draw()
     if (playerPos.y >= Rooftop::MIN_Y)
     {
         r = 70.0f / 255.0f; g = 68.0f / 255.0f; b = 71.0f / 255.0f;
+    }
+    else if (playerPos.y <= Subway::MIN_Y + Subway::HEIGHT)
+    {
+        // Subway map - darkest background
+        r = 15.0f / 255.0f; g = 15.0f / 255.0f; b = 20.0f / 255.0f;
     }
     else if (playerPos.y <= Underground::MIN_Y + Underground::HEIGHT)
     {
@@ -786,6 +928,7 @@ void GameplayState::Draw()
     m_hallway->Draw(textureShader);
     m_rooftop->Draw(textureShader);
     m_underground->Draw(textureShader);
+    m_subway->Draw(textureShader);
 
     textureShader.use();
     textureShader.setMat4("projection", projection);
@@ -802,11 +945,13 @@ void GameplayState::Draw()
     m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
     m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
     m_underground->DrawRadars(*colorShader, *m_debugRenderer);
+    m_subway->DrawRadars(*colorShader, *m_debugRenderer);
 
     droneManager->DrawGauges(*colorShader, *m_debugRenderer);
     m_hallway->DrawGauges(*colorShader, *m_debugRenderer);
     m_rooftop->DrawGauges(*colorShader, *m_debugRenderer);
     m_underground->DrawGauges(*colorShader, *m_debugRenderer);
+    m_subway->DrawGauges(*colorShader, *m_debugRenderer);
 
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
@@ -932,6 +1077,15 @@ void GameplayState::Draw()
             }
         }
 
+        for (const auto& drone : m_subway->GetDrones())
+        {
+            if (!drone.IsDead())
+            {
+                m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+                m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+            }
+        }
+
         m_room->DrawDebug(*m_debugRenderer, *colorShader, projection, player);
 
         for (const auto& source : m_hallway->GetPulseSources())
@@ -942,6 +1096,7 @@ void GameplayState::Draw()
         m_hallway->DrawDebug(*colorShader, *m_debugRenderer);
         m_rooftop->DrawDebug(*colorShader, *m_debugRenderer);
         m_underground->DrawDebug(*colorShader, *m_debugRenderer);
+        m_subway->DrawDebug(*colorShader, *m_debugRenderer);
         m_door->DrawDebug(*colorShader);
         m_rooftopDoor->DrawDebug(*colorShader);
     }
@@ -953,6 +1108,7 @@ void GameplayState::Shutdown()
     m_hallway->Shutdown();
     m_rooftop->Shutdown();
     m_underground->Shutdown();
+    m_subway->Shutdown();
     player.Shutdown();
     droneManager->Shutdown();
     m_pulseGauge.Shutdown();

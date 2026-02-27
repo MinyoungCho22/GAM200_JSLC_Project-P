@@ -21,6 +21,7 @@
 #include "MainMenu.hpp"
 #include "Tutorial.hpp"
 #include "Underground.hpp"
+#include "Subway.hpp"
 #include <memory>
 #include <vector>
 #include <string>
@@ -40,6 +41,8 @@ public:
 private:
     void HandleRoomToHallwayTransition();
     void HandleHallwayToRooftopTransition();
+    void HandleRooftopToUndergroundTransition();
+    void HandleUndergroundToSubwayTransition();
     Math::Vec2 ScreenToWorldCoordinates(double screenX, double screenY) const;
 
     GameStateManager& gsm;
@@ -66,8 +69,9 @@ private:
     std::unique_ptr<TraceSystem> m_traceSystem;
     std::unique_ptr<Tutorial> m_tutorial;
     std::unique_ptr<Underground> m_underground;
+    std::unique_ptr<Subway> m_subway;
     bool m_undergroundAccessed = false;
-    void HandleRooftopToUndergroundTransition();
+    bool m_subwayAccessed = false;
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;
