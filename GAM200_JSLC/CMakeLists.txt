@@ -44,7 +44,7 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${SHADER_FILES})
 
 # 4. Compiler/Platform Options
 if(MSVC)
-    add_compile_options(/utf-8)
+    target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
     target_compile_definitions(${PROJECT_NAME} PRIVATE _CONSOLE)
 else()
     # Silence unused-result errors from system headers on Unix-likes if needed
@@ -73,7 +73,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 # Dear ImGui OpenGL backend needs to know which GL loader is used by the application.
 # This project uses GLEW on Windows (see USE_GLEW).
-target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLEW)
+target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLEW SDL_MAIN_HANDLED)
 
 find_package(OpenGL REQUIRED)
 find_package(PkgConfig QUIET)
@@ -127,12 +127,11 @@ endif()
 
 if(WIN32)
     # Additional Windows-only search paths and libraries
-    link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib)
+    target_link_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         opengl32
         glew32
         SDL2
-        SDL2main
         glfw3dll
     )
 endif()

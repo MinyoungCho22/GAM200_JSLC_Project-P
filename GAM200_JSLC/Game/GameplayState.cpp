@@ -14,9 +14,6 @@
 #include <GLFW/glfw3.h>
 #include <string>
 #include <sstream>
-#include <iomanip>
-#include <algorithm>
-#include <cmath>
 #include "../Engine/Sound.hpp"
 
 constexpr float GROUND_LEVEL = 180.0f;

@@ -25,5 +25,13 @@
     
     "cmake.configureOnOpen": true,
     "cmake.buildDirectory": "${workspaceFolder}/build",
-    "cmake.sourceDirectory": "${workspaceFolder}"
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.buildEnvironment": {
+        "VSLANG": "1033",
+        "DOTNET_CLI_UI_LANGUAGE": "en-US"
+    },
+    "cmake.environment": {
+        "VSLANG": "1033",
+        "DOTNET_CLI_UI_LANGUAGE": "en-US"
+    }
 }

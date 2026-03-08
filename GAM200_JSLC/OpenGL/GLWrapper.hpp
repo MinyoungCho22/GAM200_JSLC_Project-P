@@ -2,11 +2,15 @@
 
 #pragma once
 
-#ifdef USE_GLEW
+#if defined(USE_GLEW) || defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
 #include <GL/glew.h>
 #elif defined(__APPLE__)
 #include <OpenGL/gl3.h>
 #else
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
 #include <GL/gl.h>
 #endif
 
