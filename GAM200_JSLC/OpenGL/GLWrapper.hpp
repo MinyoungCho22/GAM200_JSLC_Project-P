@@ -2,10 +2,10 @@
 
 #pragma once
 
-#if defined(USE_GLEW) || defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-#include <GL/glew.h>
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
 #include <OpenGL/gl3.h>
+#elif defined(USE_GLEW) || defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
+#include <GL/glew.h>
 #else
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
