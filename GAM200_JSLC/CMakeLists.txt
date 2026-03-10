@@ -52,6 +52,12 @@ else()
     if(APPLE)
         # Silence macOS OpenGL deprecation warnings
         target_compile_definitions(${PROJECT_NAME} PRIVATE GL_SILENCE_DEPRECATION)
+        # Ensure C++ stdlib headers are found (SDK-based toolchain on macOS)
+        set(OSX_SYSROOT "$ENV{SDKROOT}")
+        if(NOT OSX_SYSROOT)
+            set(OSX_SYSROOT "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")
+        endif()
+        target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${OSX_SYSROOT}/usr/include/c++/v1")
     endif()
 endif()
 
