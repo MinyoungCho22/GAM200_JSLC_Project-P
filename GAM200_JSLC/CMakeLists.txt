@@ -86,49 +86,37 @@ find_package(PkgConfig QUIET)
 
 # SDL2
 find_package(SDL2 CONFIG QUIET)
-if(NOT SDL2_FOUND AND PKG_CONFIG_FOUND)
-    pkg_check_modules(SDL2 REQUIRED sdl2)
+if(NOT SDL2_FOUND AND PKG_CONFIG_FOUND AND NOT WIN32)
+    pkg_check_modules(SDL2 sdl2)
 endif()
 
 if(SDL2_FOUND)
     target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2)
-else()
+elseif(SDL2_LIBRARIES)
     target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} PRIVATE ${SDL2_LIBRARIES})
 endif()
 
 # GLEW (only required on Windows where bundled binaries exist)
 if(WIN32)
-    find_package(GLEW CONFIG QUIET)
-    if(NOT GLEW_FOUND AND PKG_CONFIG_FOUND)
-        pkg_check_modules(GLEW REQUIRED glew)
-    endif()
-
-    if(GLEW_FOUND)
-        target_link_libraries(${PROJECT_NAME} PRIVATE GLEW::GLEW)
-    else()
-        target_include_directories(${PROJECT_NAME} PRIVATE ${GLEW_INCLUDE_DIRS})
-        target_link_libraries(${PROJECT_NAME} PRIVATE ${GLEW_LIBRARIES})
-    endif()
-
     target_compile_definitions(${PROJECT_NAME} PRIVATE USE_GLEW)
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
 
 # GLFW
-find_package(glfw3 CONFIG QUIET)
-if(NOT glfw3_FOUND AND PKG_CONFIG_FOUND)
-    # Homebrew usually installs pkg-config file as glfw3.pc
-    pkg_check_modules(GLFW REQUIRED glfw3)
-endif()
+if(NOT WIN32)
+    find_package(glfw3 CONFIG QUIET)
+    if(NOT glfw3_FOUND AND PKG_CONFIG_FOUND)
+        pkg_check_modules(GLFW glfw3)
+    endif()
 
-if(glfw3_FOUND)
-    # CMake config for glfw3 typically provides a target named glfw
-    target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
-elseif(GLFW_FOUND)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${GLFW_INCLUDE_DIRS})
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARIES})
+    if(glfw3_FOUND)
+        target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
+    elseif(GLFW_FOUND)
+        target_include_directories(${PROJECT_NAME} PRIVATE ${GLFW_INCLUDE_DIRS})
+        target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARIES})
+    endif()
 endif()
 
 if(WIN32)
