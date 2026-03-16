@@ -42,8 +42,33 @@ namespace Input
             m_mouseButtonState[button] = glfwGetMouseButton(m_window, button);
         }
 
-        // Poll mouse position
-        glfwGetCursorPos(m_window, &m_mouseX, &m_mouseY);
+        // Poll mouse position (GLFW returns window coordinates in screen points).
+        // Convert to framebuffer pixel coordinates to match our viewport math.
+        double windowMouseX = 0.0;
+        double windowMouseY = 0.0;
+        glfwGetCursorPos(m_window, &windowMouseX, &windowMouseY);
+
+        int windowWidth = 0;
+        int windowHeight = 0;
+        glfwGetWindowSize(m_window, &windowWidth, &windowHeight);
+
+        int framebufferWidth = 0;
+        int framebufferHeight = 0;
+        glfwGetFramebufferSize(m_window, &framebufferWidth, &framebufferHeight);
+
+        if (windowWidth > 0 && windowHeight > 0)
+        {
+            const double scaleX = static_cast<double>(framebufferWidth) / static_cast<double>(windowWidth);
+            const double scaleY = static_cast<double>(framebufferHeight) / static_cast<double>(windowHeight);
+            m_mouseX = windowMouseX * scaleX;
+            m_mouseY = windowMouseY * scaleY;
+        }
+        else
+        {
+            // Fallback for minimized/invalid window size cases.
+            m_mouseX = windowMouseX;
+            m_mouseY = windowMouseY;
+        }
     }
 
     /**

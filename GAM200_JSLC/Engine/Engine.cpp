@@ -10,7 +10,6 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp" 
 #include <GLFW/glfw3.h>
-#include <algorithm> 
 
 Engine::Engine() = default;
 Engine::~Engine() = default;
@@ -49,6 +48,9 @@ bool Engine::Initialize(const std::string& windowTitle)
     glfwGetWindowPos(m_window, &m_windowedX, &m_windowedY);
     glfwMakeContextCurrent(m_window);
     glfwSetWindowUserPointer(m_window, this);
+
+    // disable VSync on the main game context.
+    glfwSwapInterval(0);
 
     glfwSetKeyCallback(m_window, Engine::KeyCallback);
     glfwSetFramebufferSizeCallback(m_window, Engine::FramebufferSizeCallback);

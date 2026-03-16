@@ -48,7 +48,8 @@ bool ImguiManager::Initialize()
     glfwSetWindowPos(m_debugWindow, mainX + mainW + 10, mainY);
 
     glfwMakeContextCurrent(m_debugWindow);
-    glfwSwapInterval(1); // Enable vsync for debug window
+   
+    glfwSwapInterval(0);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
