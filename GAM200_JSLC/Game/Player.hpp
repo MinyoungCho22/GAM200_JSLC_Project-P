@@ -3,8 +3,9 @@
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
-#include "../Engine/Input.hpp" 
-#include <string>
+#include "../Engine/Input.hpp"
+
+#include <vector>
 
 class Shader;
 
@@ -15,6 +16,14 @@ enum class AnimationState
     Jumping,
     Crouching,
     Dashing
+};
+
+struct AfterimageGhost
+{
+    Math::Vec2 position;
+    int animFrame = 0;
+    bool flipped = false;
+    float alpha = 0.65f;
 };
 
 struct AnimationData
@@ -102,4 +111,11 @@ private:
     bool is_double_jumping = false;
     bool m_isHiding = false;
     bool m_godMode = false;
+
+    // Sandevistan afterimage effect
+    std::vector<AfterimageGhost> m_afterimageGhosts;
+    float m_afterimageSpawnTimer = 0.0f;
+    static constexpr float AFTERIMAGE_INTERVAL   = 0.025f;
+    static constexpr float AFTERIMAGE_FADE_SPEED = 5.0f;
+    static constexpr float AFTERIMAGE_INIT_ALPHA = 0.65f;
 };

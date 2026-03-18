@@ -8,6 +8,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 #pragma warning(push, 0)
 #define STB_IMAGE_IMPLEMENTATION
@@ -162,7 +163,34 @@ void Player::Update(double dt, Input::Input& input)
         {
             is_dashing = false;
         }
+
+        // Spawn Sandevistan afterimage ghosts at fixed intervals
+        m_afterimageSpawnTimer -= static_cast<float>(dt);
+        if (m_afterimageSpawnTimer <= 0.0f)
+        {
+            m_afterimageSpawnTimer = AFTERIMAGE_INTERVAL;
+            AfterimageGhost ghost;
+            ghost.position = position;
+            ghost.animFrame = m_animations[static_cast<int>(AnimationState::Walking)].currentFrame;
+            ghost.flipped   = m_is_flipped;
+            ghost.alpha     = AFTERIMAGE_INIT_ALPHA;
+            m_afterimageGhosts.push_back(ghost);
+        }
     }
+    else
+    {
+        m_afterimageSpawnTimer = 0.0f;
+    }
+
+    // Fade out existing ghosts and remove expired ones
+    for (auto& ghost : m_afterimageGhosts)
+    {
+        ghost.alpha -= AFTERIMAGE_FADE_SPEED * static_cast<float>(dt);
+    }
+    m_afterimageGhosts.erase(
+        std::remove_if(m_afterimageGhosts.begin(), m_afterimageGhosts.end(),
+            [](const AfterimageGhost& g) { return g.alpha <= 0.0f; }),
+        m_afterimageGhosts.end());
 
     velocity.y += GRAVITY * static_cast<float>(dt);
 
@@ -242,6 +270,38 @@ void Player::Draw(const Shader& shader) const
         }
     }
 
+    // Draw Sandevistan afterimage ghosts before the player (they appear behind)
+    if (!m_afterimageGhosts.empty())
+    {
+        const AnimationData& walkAnim = m_animations[static_cast<int>(AnimationState::Walking)];
+        // Cyberpunk electric cyan tint
+        shader.setVec3("colorTint", 0.0f, 0.85f, 1.0f);
+
+        for (const auto& ghost : m_afterimageGhosts)
+        {
+            Math::Matrix ghostModel = Math::Matrix::CreateTranslation(ghost.position) *
+                                      Math::Matrix::CreateScale(size);
+            shader.setMat4("model", ghostModel);
+            shader.setBool("flipX", ghost.flipped);
+            shader.setFloat("alpha", ghost.alpha);
+            shader.setFloat("tintStrength", 0.75f);
+
+            float frame_x = static_cast<float>(ghost.animFrame * walkAnim.frameWidth);
+            float rect_x  = frame_x / static_cast<float>(walkAnim.texWidth);
+            float rect_w  = static_cast<float>(walkAnim.frameWidth) / static_cast<float>(walkAnim.texWidth);
+            shader.setVec4("spriteRect", rect_x, 0.0f, rect_w, 1.0f);
+
+            GL::ActiveTexture(GL_TEXTURE0);
+            GL::BindTexture(GL_TEXTURE_2D, walkAnim.textureID);
+            GL::BindVertexArray(VAO);
+            GL::DrawArrays(GL_TRIANGLES, 0, 6);
+            GL::BindVertexArray(0);
+        }
+
+        // Reset tint state before drawing the main player sprite
+        shader.setFloat("tintStrength", 0.0f);
+    }
+
     Math::Vec2 drawSize = size;
     Math::Vec2 drawPosition = position;
 
@@ -293,6 +353,7 @@ void Player::Draw(const Shader& shader) const
     GL::BindVertexArray(0);
 
     shader.setFloat("alpha", 1.0f);
+    shader.setFloat("tintStrength", 0.0f);
 }
 
 void Player::Shutdown()

@@ -6,7 +6,7 @@
 #include "../Game/PulseCore.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
-#include "../Engine/Collision.hpp"
+
 #include "../Engine/Logger.hpp"
 #include "../Engine/DebugRenderer.hpp"
 #include <algorithm>
@@ -211,8 +211,8 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
     // Lift State Machine
     if (m_liftState == LiftState::Idle)
     {
-        // Activate lift if player is near and presses the interact key
-        if (m_isPlayerNearLift && input.IsKeyTriggered(Input::Key::J))
+        // Activate lift if player is near and left-clicks
+        if (m_isPlayerNearLift && input.IsMouseButtonTriggered(Input::MouseButton::Left))
         {
             const float LIFT_COST = 8.0f;
             Pulse& pulse = player.GetPulseCore().getPulse();
