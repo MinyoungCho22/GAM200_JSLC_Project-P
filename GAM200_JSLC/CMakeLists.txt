@@ -45,7 +45,7 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${SHADER_FILES})
 # 4. Compiler/Platform Options
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE _CONSOLE)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE _CONSOLE USE_GLEW)
 else()
     # Silence unused-result errors from system headers on Unix-likes if needed
     add_compile_options(-Wall -Wextra -Wno-unused-parameter)
@@ -67,6 +67,7 @@ endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/Engine"
     "${CMAKE_CURRENT_SOURCE_DIR}/Game"
     "${CMAKE_CURRENT_SOURCE_DIR}/OpenGL"
@@ -186,17 +187,20 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 )
 
 if(WIN32)
-    # 3. Auto Copy DLL Files
+    # 3. Auto Copy DLL Files (always copy to ensure they are present)
     file(GLOB DLL_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/DLLs/*.dll")
 
-    foreach(DLL ${DLL_FILES})
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${DLL}
-            $<TARGET_FILE_DIR:${PROJECT_NAME}>
-            COMMENT "Copying DLL: ${DLL}"
-        )
-    endforeach()
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/DLLs"
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>
+        COMMENT "Copying all DLL files..."
+    )
+
+    # Set working directory for Visual Studio debugger so relative paths resolve correctly
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+    )
 endif()
 
 # ==========================================================

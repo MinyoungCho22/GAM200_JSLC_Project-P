@@ -80,6 +80,9 @@ bool ImguiManager::Initialize()
         return false;
     }
 
+    // Restore main window context so the game loop renders to the correct target.
+    glfwMakeContextCurrent(m_mainWindow);
+
     m_initialized = true;
     Logger::Instance().Log(Logger::Severity::Info, "ImguiManager: Debug window initialized.");
     return true;

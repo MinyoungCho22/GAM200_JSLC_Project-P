@@ -4,7 +4,8 @@
 #include <string>
 #include <memory>
 #include "Input.hpp"
-#include "Vec2.hpp" 
+#include "Vec2.hpp"
+#include "OpenGL/PostProcessManager.h"
 
 struct GLFWwindow;
 class GameStateManager;
@@ -28,7 +29,6 @@ public:
     void RequestShutdown();
     double GetDeltaTime() const { return m_deltaTime; }
     GLFWwindow* GetWindow() const { return m_window; }
-    ImguiManager* GetImguiManager() const { return m_imguiManager.get(); }
 
     int GetWidth() const { return VIRTUAL_WIDTH; }
     int GetHeight() const { return VIRTUAL_HEIGHT; }
@@ -37,6 +37,7 @@ public:
 
     Shader& GetTextureShader() const { return *m_textureShader; }
 
+    ImguiManager* GetImguiManager() const { return m_imguiManager.get(); }
     ImguiManager* GetImguiManager() { return m_imguiManager.get(); }
     std::shared_ptr<DroneConfigManager> GetDroneConfigManager() { return m_droneConfigManager; }
     std::shared_ptr<RobotConfigManager> GetRobotConfigManager() { return m_robotConfigManager; }
@@ -45,7 +46,9 @@ public:
 
     Math::ivec2 GetRecommendedResolution();
 
-    void SetResolution(int width, int height); 
+    void SetResolution(int width, int height);
+
+    PostProcessManager& GetPostProcess() { return *m_postProcess; }
 
 private:
     void Update();
@@ -76,4 +79,6 @@ private:
 
     int m_windowedWidth = VIRTUAL_WIDTH;
     int m_windowedHeight = VIRTUAL_HEIGHT;
+
+    std::unique_ptr<PostProcessManager> m_postProcess;
 };

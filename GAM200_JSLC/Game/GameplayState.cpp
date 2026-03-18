@@ -14,6 +14,7 @@
 #include <GLFW/glfw3.h>
 #include <string>
 #include <sstream>
+
 #include "../Engine/Sound.hpp"
 
 constexpr float GROUND_LEVEL = 180.0f;
@@ -30,6 +31,8 @@ void GameplayState::Initialize()
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Initialize");
 
     colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
+    colorShader->use();
+    colorShader->setFloat("uAlpha", 1.0f);
 
     m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
     m_fontShader->use();
@@ -85,6 +88,7 @@ void GameplayState::Initialize()
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
     m_debugToggleText = m_font->PrintToTexture(*m_fontShader, "Debug (TAB)");
+    m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ...");
 
     m_tutorial = std::make_unique<Tutorial>();
 
@@ -108,6 +112,8 @@ void GameplayState::Initialize()
     m_tutorial->AddDroneCrashMessage(*m_font, *m_fontShader);
     m_tutorial->AddLiftMessage(*m_font, *m_fontShader);
 
+    m_fpsTimer = 0.0;
+    m_frameCount = 0;
     m_isGameOver = false;
     m_doorOpened = false;
 
@@ -118,21 +124,20 @@ void GameplayState::Initialize()
         Logger::Instance().Log(Logger::Severity::Info, "Gameplay BGM Started");
     }
 
-        // Set up debug window with drone managers and config manager
-        auto* imguiManager = gsm.GetEngine().GetImguiManager();
-        if (imguiManager)
-        {
-            // Add map drone managers
-            imguiManager->AddMapDroneManager("Hallway", m_hallway->GetDroneManager());
-            imguiManager->AddMapDroneManager("Rooftop", m_rooftop->GetDroneManager());
-            imguiManager->AddMapDroneManager("Underground", m_underground->GetDroneManager());
-            imguiManager->AddMapDroneManager("Subway", m_subway->GetDroneManager());
+    // Set up debug window with drone managers and config manager
+    auto* imguiManager = gsm.GetEngine().GetImguiManager();
+    if (imguiManager)
+    {
+        // Add map drone managers
+        imguiManager->AddMapDroneManager("Hallway", m_hallway->GetDroneManager());
+        imguiManager->AddMapDroneManager("Rooftop", m_rooftop->GetDroneManager());
+        imguiManager->AddMapDroneManager("Underground", m_underground->GetDroneManager());
+        imguiManager->AddMapDroneManager("Subway", m_subway->GetDroneManager());
 
         // Set main drone manager (for backwards compatibility)
         if (droneManager)
         {
             imguiManager->SetDroneManager(droneManager.get());
-            // Also add main drone manager to the map list for Live Drones tab
             imguiManager->AddMapDroneManager("Main", droneManager.get());
         }
 
@@ -145,37 +150,31 @@ void GameplayState::Initialize()
         {
             imguiManager->SetDroneConfigManager(configManager);
 
-            // Load saved live drone states
             configManager->LoadLiveStatesFromFile();
 
-            // Apply saved states to drones in Main
             for (size_t i = 0; i < droneManager->GetDrones().size(); ++i)
             {
                 configManager->ApplyLiveStateToDrone("Main", static_cast<int>(i), const_cast<Drone&>(droneManager->GetDrones()[i]));
             }
 
-            // Apply saved states to Hallway drones
             auto& hallwayDrones = m_hallway->GetDrones();
             for (size_t i = 0; i < hallwayDrones.size(); ++i)
             {
                 configManager->ApplyLiveStateToDrone("Hallway", static_cast<int>(i), hallwayDrones[i]);
             }
 
-            // Apply saved states to Rooftop drones
             auto& rooftopDrones = m_rooftop->GetDrones();
             for (size_t i = 0; i < rooftopDrones.size(); ++i)
             {
                 configManager->ApplyLiveStateToDrone("Rooftop", static_cast<int>(i), rooftopDrones[i]);
             }
 
-            // Apply saved states to Underground drones
             auto& undergroundDrones = m_underground->GetDrones();
             for (size_t i = 0; i < undergroundDrones.size(); ++i)
             {
                 configManager->ApplyLiveStateToDrone("Underground", static_cast<int>(i), undergroundDrones[i]);
             }
 
-            // Apply saved states to Subway drones
             auto& subwayDrones = m_subway->GetDrones();
             for (size_t i = 0; i < subwayDrones.size(); ++i)
             {
@@ -189,10 +188,8 @@ void GameplayState::Initialize()
         {
             imguiManager->SetRobotConfigManager(robotConfigManager);
 
-            // Load saved live robot states
             robotConfigManager->LoadLiveStatesFromFile();
 
-            // Apply saved states to robots
             auto& robots = m_underground->GetRobots();
             for (size_t i = 0; i < robots.size(); ++i)
             {
@@ -297,7 +294,7 @@ void GameplayState::Update(double dt)
     }
 
     pulseManager->Update(playerCenter, playerHitboxSize, player, m_room->GetPulseSources(),
-        m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(), 
+        m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(),
         m_subway->GetPulseSources(), isPressingInteract, dt, mouseWorldPos);
 
     Drone* targetDrone = nullptr;
@@ -309,7 +306,6 @@ void GameplayState::Update(double dt)
         auto* imguiManager = gsm.GetEngine().GetImguiManager();
         bool isGodMode = imguiManager && imguiManager->IsPlayerGodMode();
 
-        // In god mode, always have enough pulse; otherwise check normally
         if (isGodMode || player.GetPulseCore().getPulse().Value() > PULSE_COST_PER_SECOND * dt)
         {
             float closestDistSq = ATTACK_RANGE_SQ;
@@ -323,10 +319,9 @@ void GameplayState::Update(double dt)
                     float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
                     float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
-                    
-                    // Check if drone is in range AND mouse is clicking on drone hitbox
+
                     bool isMouseOnDrone = Collision::CheckPointInAABB(mouseWorldPos, drone.GetPosition(), droneHitboxSize);
-                    
+
                     if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnDrone)
                     {
                         closestDistSq = distSq;
@@ -334,7 +329,7 @@ void GameplayState::Update(double dt)
                         targetRobot = nullptr;
                     }
                 }
-                };
+            };
 
             checkDrones(droneManager->GetDrones());
             checkDrones(m_hallway->GetDrones());
@@ -351,14 +346,11 @@ void GameplayState::Update(double dt)
                     if (robot.IsDead()) continue;
 
                     float distSq = (playerCenter - robot.GetPosition()).LengthSq();
-
                     Math::Vec2 robotSize = robot.GetSize();
                     float robotRadius = (robotSize.x + robotSize.y) * 0.25f;
-
                     float effectiveAttackRange = ATTACK_RANGE + robotRadius;
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
 
-                    // Check if robot is in range AND mouse is clicking on robot hitbox
                     bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize);
 
                     if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnRobot)
@@ -379,10 +371,8 @@ void GameplayState::Update(double dt)
                     if (robot.IsDead()) continue;
 
                     float distSq = (playerCenter - robot.GetPosition()).LengthSq();
-
                     Math::Vec2 robotSize = robot.GetSize();
                     float robotRadius = (robotSize.x + robotSize.y) * 0.25f;
-
                     float effectiveAttackRange = ATTACK_RANGE + robotRadius;
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
 
@@ -401,11 +391,9 @@ void GameplayState::Update(double dt)
 
     if (isPressingAttack && (targetDrone != nullptr || targetRobot != nullptr))
     {
-        // Check for god mode (infinite pulse)
         auto* imguiManager = gsm.GetEngine().GetImguiManager();
         bool isGodMode = imguiManager && imguiManager->IsPlayerGodMode();
 
-        // Only spend pulse if not in god mode
         if (!isGodMode)
         {
             player.GetPulseCore().getPulse().spend(PULSE_COST_PER_SECOND * static_cast<float>(dt));
@@ -444,8 +432,6 @@ void GameplayState::Update(double dt)
     else
     {
         pulseManager->UpdateAttackVFX(false, {}, {});
-        // HP system: Don't reset damage - let HP stay reduced
-        // Removed ResetDamageTimer() calls to keep cumulative damage
 
         if (input.IsMouseButtonTriggered(Input::MouseButton::Left))
         {
@@ -525,7 +511,6 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            // Check for god mode (infinite pulse) - don't take damage in god mode
             auto* imguiManager = gsm.GetEngine().GetImguiManager();
             if (!imguiManager || !imguiManager->IsPlayerGodMode())
             {
@@ -543,6 +528,13 @@ void GameplayState::Update(double dt)
     {
         m_room->Update(player, dt, input, mouseWorldPos);
     }
+
+    auto& pp = engine.GetPostProcess();
+
+    if (m_doorOpened && !m_rooftopAccessed)
+        pp.Settings().exposure = 0.35f;
+    else
+        pp.Settings().exposure = 1.0f;
 
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
     m_rooftop->Update(dt, player, playerHitboxSize, input);
@@ -562,7 +554,6 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            // Check for god mode (infinite pulse) - don't take damage in god mode
             auto* imguiManager = gsm.GetEngine().GetImguiManager();
             if (!imguiManager || !imguiManager->IsPlayerGodMode())
             {
@@ -578,7 +569,6 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            // Check for god mode (infinite pulse) - don't take damage in god mode
             auto* imguiManager = gsm.GetEngine().GetImguiManager();
             if (!imguiManager || !imguiManager->IsPlayerGodMode())
             {
@@ -594,17 +584,16 @@ void GameplayState::Update(double dt)
         auto& undergroundDrones = m_underground->GetDrones();
         for (auto& drone : undergroundDrones)
         {
-        if (!drone.IsDead() && drone.ShouldDealDamage())
-        {
-            // Check for god mode (infinite pulse) - don't take damage in god mode
-            auto* imguiManager = gsm.GetEngine().GetImguiManager();
-            if (!imguiManager || !imguiManager->IsPlayerGodMode())
+            if (!drone.IsDead() && drone.ShouldDealDamage())
             {
-                player.TakeDamage(20.0f);
+                auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                {
+                    player.TakeDamage(20.0f);
+                }
+                drone.ResetDamageFlag();
+                break;
             }
-            drone.ResetDamageFlag();
-            break;
-        }
         }
     }
 
@@ -625,8 +614,6 @@ void GameplayState::Update(double dt)
             }
         }
     }
-
-    // Map drone managers are registered in Initialize(), no need to sync here
 
     // 카메라 애니메이션 업데이트
     if (m_camera.IsAnimating())
@@ -649,10 +636,27 @@ void GameplayState::Update(double dt)
         cameraLogTimer = 0.0f;
     }
 
+    m_fpsTimer += dt;
+    m_frameCount++;
+
+    if (m_fpsTimer >= 1.0)
+    {
+        int average_fps = static_cast<int>(m_frameCount / m_fpsTimer);
+        std::stringstream ss_fps;
+        ss_fps << "FPS: " << average_fps;
+        m_fpsText = m_font->PrintToTexture(*m_fontShader, ss_fps.str());
+        m_fpsTimer -= 1.0;
+        m_frameCount = 0;
+    }
+
     std::stringstream ss_pulse;
     ss_pulse.precision(1);
     ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
+
+    std::stringstream ss_warning;
+    ss_warning << "Warning Level: " << m_traceSystem->GetWarningLevel();
+    m_warningLevelText = m_font->PrintToTexture(*m_fontShader, ss_warning.str());
 
     if (engine.GetImguiManager())
     {
@@ -704,19 +708,15 @@ void GameplayState::HandleHallwayToRooftopTransition()
     player.ResetVelocity();
     player.SetOnGround(false);
 
-    // Dynamic Camera Adjustment for Verticality (Rooftop Level)
     float worldMinX = Rooftop::MIN_X;
     float worldMaxX = Rooftop::MIN_X + Rooftop::WIDTH;
     float worldMinY = Rooftop::MIN_Y;
     float worldMaxY = Rooftop::MIN_Y + Rooftop::HEIGHT;
 
-    // Re-calculate camera bounds to fit the new vertical structure
     m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
 
-    // Adjust interpolation speed for tighter tracking on high-risk platforms
     m_cameraSmoothSpeed = 0.02f;
 
-    // Log transition for QA debugging
     Logger::Instance().Log(Logger::Severity::Event,
         "Rooftop: Player=(%.1f, %.1f), Ground=%.1f",
         playerStartX, playerStartY, newGroundLevel);
@@ -725,7 +725,6 @@ void GameplayState::HandleHallwayToRooftopTransition()
 void GameplayState::HandleRooftopToUndergroundTransition()
 {
     m_rooftopAccessed = true;
-
     m_undergroundAccessed = true;
 
     m_rooftop->ClearAllDrones();
@@ -755,27 +754,23 @@ void GameplayState::HandleRooftopToUndergroundTransition()
 
 void GameplayState::HandleUndergroundToSubwayTransition()
 {
-    Logger::Instance().Log(Logger::Severity::Event, 
+    Logger::Instance().Log(Logger::Severity::Event,
         "Transition to Subway! Starting descent animation...");
 
     m_undergroundAccessed = true;
     m_subwayAccessed = true;
 
-    // Underground의 드론들 제거
     m_underground->ClearAllDrones();
 
-    // 플레이어 최종 위치 (Subway 맵 시작점 - 왼쪽으로 이동)
-    float playerStartX = Subway::MIN_X + 300.0f;  // 더 왼쪽에 배치
-    float playerStartY = Subway::MIN_Y + 540.0f;  // 화면 중앙 높이
+    float playerStartX = Subway::MIN_X + 300.0f;
+    float playerStartY = Subway::MIN_Y + 540.0f;
     float newGroundLevel = Subway::MIN_Y + 90.0f;
 
-    // 플레이어 위치 설정
     player.SetCurrentGroundLevel(newGroundLevel);
     player.SetPosition({ playerStartX, playerStartY });
     player.ResetVelocity();
     player.SetOnGround(false);
 
-    // Subway 맵 카메라 경계 설정
     float worldMinX = Subway::MIN_X;
     float worldMaxX = Subway::MIN_X + Subway::WIDTH;
     float worldMinY = Subway::MIN_Y;
@@ -783,19 +778,15 @@ void GameplayState::HandleUndergroundToSubwayTransition()
 
     m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
 
-    // 카메라 애니메이션: 현재 위치에서 아래로 내려가는 느낌
     Math::Vec2 cameraStartPos = m_camera.GetPosition();
-    
-    // 최종 카메라 위치 (Subway 맵 왼쪽 + 플레이어 중심)
     Math::Vec2 cameraEndPos = { Subway::MIN_X + GAME_WIDTH / 2.0f, Subway::MIN_Y + GAME_HEIGHT / 2.0f };
-    
-    // 2.0초 동안 지하로 내려가는 애니메이션
+
     m_camera.StartAnimation(cameraStartPos, cameraEndPos, 2.0f);
-    
+
     m_cameraSmoothSpeed = 0.05f;
 
     Logger::Instance().Log(Logger::Severity::Event,
-        "Subway Transition! Camera: (%.1f, %.1f) -> (%.1f, %.1f), Player: (%.1f, %.1f)", 
+        "Subway Transition! Camera: (%.1f, %.1f) -> (%.1f, %.1f), Player: (%.1f, %.1f)",
         cameraStartPos.x, cameraStartPos.y, cameraEndPos.x, cameraEndPos.y,
         playerStartX, playerStartY);
 }
@@ -806,7 +797,6 @@ Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screen
     int windowWidth, windowHeight;
     glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
 
-    // Calculate viewport dimensions
     float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     float gameAspect = GAME_WIDTH / GAME_HEIGHT;
     int viewportX = 0;
@@ -825,19 +815,15 @@ Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screen
         viewportY = (windowHeight - viewportHeight) / 2;
     }
 
-    // Convert mouse position from window space to viewport space
     float mouseViewportX = static_cast<float>(screenX - viewportX);
     float mouseViewportY = static_cast<float>(screenY - viewportY);
 
-    // Convert viewport space to normalized device coordinates [0, 1]
     float mouseNDCX = mouseViewportX / static_cast<float>(viewportWidth);
     float mouseNDCY = mouseViewportY / static_cast<float>(viewportHeight);
 
-    // Convert NDC to game space coordinates
     float mouseGameX = mouseNDCX * GAME_WIDTH;
-    float mouseGameY = (1.0f - mouseNDCY) * GAME_HEIGHT; // Flip Y axis
+    float mouseGameY = (1.0f - mouseNDCY) * GAME_HEIGHT;
 
-    // Apply camera offset to get world coordinates
     Math::Vec2 cameraPos = m_camera.GetPosition();
     Math::Vec2 worldPos;
     worldPos.x = mouseGameX - (GAME_WIDTH / 2.0f) + cameraPos.x;
@@ -862,7 +848,6 @@ void GameplayState::Draw()
     }
     else if (playerPos.y <= Subway::MIN_Y + Subway::HEIGHT)
     {
-        // Subway map - darkest background
         r = 15.0f / 255.0f; g = 15.0f / 255.0f; b = 20.0f / 255.0f;
     }
     else if (playerPos.y <= Underground::MIN_Y + Underground::HEIGHT)
@@ -960,8 +945,11 @@ void GameplayState::Draw()
     m_fontShader->use();
     m_fontShader->setMat4("projection", baseProjection);
 
+    m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, GAME_HEIGHT - 120.f }, 32.0f);
+    m_font->DrawBakedText(*m_fontShader, m_warningLevelText, { 20.f, GAME_HEIGHT - 160.f }, 32.0f);
+
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())
     {
@@ -977,11 +965,9 @@ void GameplayState::Draw()
     double mouseScreenX, mouseScreenY;
     inputForCursor.GetMousePosition(mouseScreenX, mouseScreenY);
 
-    // Convert screen coordinates to game coordinates
     int windowWidthForCursor, windowHeightForCursor;
     glfwGetFramebufferSize(engineForCursor.GetWindow(), &windowWidthForCursor, &windowHeightForCursor);
 
-    // Calculate viewport dimensions (same logic as viewport calculation above)
     float windowAspectForCursor = static_cast<float>(windowWidthForCursor) / static_cast<float>(windowHeightForCursor);
     float gameAspectForCursor = GAME_WIDTH / GAME_HEIGHT;
     int viewportXForCursor = 0;
@@ -1000,32 +986,46 @@ void GameplayState::Draw()
         viewportYForCursor = (windowHeightForCursor - viewportHeightForCursor) / 2;
     }
 
-    // Convert mouse position from window space to viewport space
     float mouseViewportX = static_cast<float>(mouseScreenX - viewportXForCursor);
     float mouseViewportY = static_cast<float>(mouseScreenY - viewportYForCursor);
 
-    // Convert viewport space to normalized device coordinates [0, 1]
     float mouseNDCX = mouseViewportX / static_cast<float>(viewportWidthForCursor);
     float mouseNDCY = mouseViewportY / static_cast<float>(viewportHeightForCursor);
 
-    // Convert NDC to game space coordinates
     float mouseGameX = mouseNDCX * GAME_WIDTH;
-    float mouseGameY = (1.0f - mouseNDCY) * GAME_HEIGHT; // Flip Y axis
+    float mouseGameY = (1.0f - mouseNDCY) * GAME_HEIGHT;
 
-    // Draw crosshair cursor
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
 
-    const float cursorSize = 15.0f;
-    const float cursorThickness = 2.0f;
+    const float cursorSize = 16.0f;
+    const float cursorThick = 2.5f;
     Math::Vec2 cursorPos = { mouseGameX, mouseGameY };
 
-    // Draw horizontal line of crosshair
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.0f, cursorThickness }, { 1.0f, 1.0f });
-    // Draw vertical line of crosshair
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThickness, cursorSize * 2.0f }, { 1.0f, 1.0f });
-    // Draw center dot
-    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 3.0f, { 1.0f, 1.0f });
+    // Additive blending: cursor adds light to the scene, always visible in darkness
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+    // Outer glow (neon cyan: R=0, G=1, B=0.8 via DrawCircle / B=0.2 via DrawBox)
+    colorShader->setFloat("uAlpha", 0.07f);
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 3.2f, cursorThick * 6.0f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 6.0f, cursorSize * 3.2f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 24.0f, { 0.0f, 1.0f });
+
+    // Mid glow
+    colorShader->setFloat("uAlpha", 0.18f);
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.5f, cursorThick * 3.5f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 3.5f, cursorSize * 2.5f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 15.0f, { 0.0f, 1.0f });
+
+    // Sharp core (full brightness, neon cyan)
+    colorShader->setFloat("uAlpha", 1.0f);
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.0f, cursorThick }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick, cursorSize * 2.0f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 4.5f, { 0.5f, 1.0f });
+
+    // Restore normal blending and reset alpha
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    colorShader->setFloat("uAlpha", 1.0f);
 
     if (m_isDebugDraw)
     {
@@ -1115,6 +1115,6 @@ void GameplayState::Shutdown()
     pulseManager->Shutdown();
 
     m_bgm.Stop();
-    
+
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Shutdown");
 }

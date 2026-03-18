@@ -8,7 +8,7 @@
 #include "RobotConfig.hpp"
 #include "../Game/SplashState.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include "../OpenGL/Shader.hpp" 
+#include "../OpenGL/Shader.hpp"
 #include <GLFW/glfw3.h>
 
 Engine::Engine() = default;
@@ -49,7 +49,7 @@ bool Engine::Initialize(const std::string& windowTitle)
     glfwMakeContextCurrent(m_window);
     glfwSetWindowUserPointer(m_window, this);
 
-    // disable VSync on the main game context.
+    // Disable VSync on the main game context.
     glfwSwapInterval(0);
 
     glfwSetKeyCallback(m_window, Engine::KeyCallback);
@@ -81,6 +81,9 @@ bool Engine::Initialize(const std::string& windowTitle)
     m_gameStateManager = std::make_unique<GameStateManager>(*this);
     m_gameStateManager->PushState(std::make_unique<SplashState>(*m_gameStateManager));
 
+    m_postProcess = std::make_unique<PostProcessManager>();
+    m_postProcess->Initialize(m_width, m_height);
+
     m_imguiManager = std::make_unique<ImguiManager>();
     (void)m_imguiManager->Initialize();
 
@@ -98,6 +101,7 @@ bool Engine::Initialize(const std::string& windowTitle)
 void Engine::GameLoop()
 {
     m_lastFrameTime = glfwGetTime();
+
     while (!glfwWindowShouldClose(m_window) && m_gameStateManager->HasState())
     {
         double currentFrameTime = glfwGetTime();
@@ -108,13 +112,10 @@ void Engine::GameLoop()
         m_input->Update();
         Update();
 
-        int windowWidth, windowHeight;
-        glfwGetFramebufferSize(m_window, &windowWidth, &windowHeight);
-        GL::Viewport(0, 0, windowWidth, windowHeight);
-        GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        GL::Clear(GL_COLOR_BUFFER_BIT);
-
+        m_postProcess->BeginScene();
         m_gameStateManager->Draw();
+        m_postProcess->EndScene();
+        m_postProcess->ApplyAndPresent();
 
         if (m_imguiManager)
         {
@@ -245,6 +246,13 @@ void Engine::Shutdown()
         glfwDestroyWindow(m_window);
         m_window = nullptr;
     }
+
+    if (m_postProcess)
+    {
+        m_postProcess->Shutdown();
+        m_postProcess.reset();
+    }
+
     glfwTerminate();
     Logger::Instance().Log(Logger::Severity::Info, "Engine Stopped");
 }
