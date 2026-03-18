@@ -58,6 +58,18 @@ void SoundSystem::Shutdown()
     }
 }
 
+void SoundSystem::SetMasterVolume(float volume)
+{
+    m_masterVolume = volume;
+    if (!m_system) return;
+
+    FMOD::ChannelGroup* masterGroup = nullptr;
+    if (m_system->getMasterChannelGroup(&masterGroup) == FMOD_OK && masterGroup)
+    {
+        masterGroup->setVolume(volume);
+    }
+}
+
 Sound::Sound() : m_sound(nullptr), m_channel(nullptr), m_isLoaded(false)
 {
 }
@@ -241,6 +253,11 @@ void SoundSystem::Update()
 void SoundSystem::Shutdown()
 {
     // Audio disabled; nothing to shut down.
+}
+
+void SoundSystem::SetMasterVolume(float volume)
+{
+    m_masterVolume = volume;
 }
 
 Sound::Sound() : m_sound(nullptr), m_channel(nullptr), m_isLoaded(false)

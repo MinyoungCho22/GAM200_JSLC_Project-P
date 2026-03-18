@@ -2,16 +2,17 @@
 
 #pragma once
 #include "../Engine/GameState.hpp"
+#include "../Engine/Matrix.hpp"
 #include <memory>
-#include "Font.hpp" 
-#include <vector> 
+#include "Font.hpp"
+#include <vector>
 
 class GameStateManager;
 class Shader;
 
 /**
  * @class SettingState
- * @brief Manages the in-game settings menu, including display resolutions and application exit.
+ * @brief In-game settings screen (ESC). Controls FPS cap, VSync, and master volume.
  */
 class SettingState : public GameState
 {
@@ -23,29 +24,53 @@ public:
     void Shutdown() override;
 
 private:
-    // Menu navigation states
-    enum class MenuPage { Main, Display };
-    enum class MainOption { Resume, Exit };
+    enum class MenuItem { FPS, VSync, Volume, Exit };
+
+    static constexpr int FPS_COUNT = 5;
+    static constexpr int FPS_VALUES[FPS_COUNT] = { 30, 60, 144, 240, 0 };
+    static constexpr float VOLUME_STEP = 0.05f;
 
     GameStateManager& gsm;
     std::unique_ptr<Shader> m_colorShader;
-    std::unique_ptr<Font> m_font;
+    std::unique_ptr<Font>   m_font;
     std::unique_ptr<Shader> m_fontShader;
 
-    MenuPage m_currentPage = MenuPage::Main;
-    MainOption m_mainSelection = MainOption::Resume;
-    int m_displaySelection = 0;
+    // Current selections (synced with Engine/SoundSystem on Initialize)
+    MenuItem m_selectedItem = MenuItem::FPS;
+    int   m_fpsIndex     = 1;      // 0=30, 1=60, 2=144, 3=240, 4=No Limit
+    bool  m_vsyncEnabled = false;
+    float m_masterVolume = 0.8f;   // 0.0 to 1.0
 
-    // OpenGL objects for the background dimming overlay
-    unsigned int m_overlayVAO;
-    unsigned int m_overlayVBO;
+    // OpenGL objects
+    unsigned int m_overlayVAO = 0;
+    unsigned int m_overlayVBO = 0;
+    unsigned int m_barVAO    = 0;  // centered quad for bar drawing
+    unsigned int m_barVBO    = 0;
 
-    // Pre-baked UI text textures for performance
-    CachedTextureInfo m_resumeText;
-    CachedTextureInfo m_resumeSelectedText;
+    // Pre-baked static text
+    CachedTextureInfo m_titleText;
+    CachedTextureInfo m_fpsLabelText;
+    CachedTextureInfo m_vsyncLabelText;
+    CachedTextureInfo m_volumeLabelText;
     CachedTextureInfo m_exitText;
-    CachedTextureInfo m_exitSelectedText;
+    CachedTextureInfo m_escHintText;
 
-    CachedTextureInfo m_resRecommendedText; // e.g., "2560 x 1600 (Recommended)"
-    CachedTextureInfo m_res1600Text;        // e.g., "1600 x 900"
+    // Dynamic value text (rebuilt when value changes)
+    CachedTextureInfo m_fpsValueText;
+    CachedTextureInfo m_vsyncValueText;
+    CachedTextureInfo m_volumePctText;
+
+    // Rebuild dynamic text strings after a value changes
+    void RebuildValueTexts();
+
+    // Draw a filled rectangle using m_colorShader (centered at cx, cy)
+    void DrawRect(const Math::Matrix& proj, float cx, float cy,
+                  float w, float h, float r, float g, float b, float a);
+
+    // Apply current settings to Engine and SoundSystem
+    void ApplyFps();
+    void ApplyVSync();
+    void ApplyVolume();
+
+    const char* GetFpsLabel(int index) const;
 };

@@ -50,6 +50,11 @@ public:
 
     PostProcessManager& GetPostProcess() { return *m_postProcess; }
 
+    void SetVSync(bool enabled);
+    void SetFpsCap(int cap);
+    bool IsVSyncEnabled() const { return m_vsyncEnabled; }
+    int GetFpsCap() const { return m_fpsCap; }
+
 private:
     void Update();
 
@@ -72,6 +77,9 @@ private:
     std::unique_ptr<ImguiManager> m_imguiManager;
     std::shared_ptr<DroneConfigManager> m_droneConfigManager;
     std::shared_ptr<RobotConfigManager> m_robotConfigManager;
+
+    bool m_vsyncEnabled = false;
+    int  m_fpsCap = 0;
 
     bool m_isFullscreen = false;
     int m_windowedX = 100;

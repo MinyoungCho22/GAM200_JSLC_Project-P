@@ -1,6 +1,7 @@
 // ImguiManager.cpp
 
 #include "ImguiManager.hpp"
+#include "Engine.hpp"
 #include "Logger.hpp"
 
 #include "../include/GLFW/glfw3.h"
@@ -230,10 +231,15 @@ void ImguiManager::DrawDroneDebugPanel()
 
     if (ImGui::BeginTabBar("DebugTabs"))
     {
-        // Live Drones tab
         if (ImGui::BeginTabItem("Live Drones"))
         {
             DrawLiveDronePanel();
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Settings"))
+        {
+            DrawSettingsPanel();
             ImGui::EndTabItem();
         }
 
@@ -241,6 +247,61 @@ void ImguiManager::DrawDroneDebugPanel()
     }
 
     ImGui::End();
+}
+
+void ImguiManager::DrawSettingsPanel()
+{
+    static const char* fpsLabels[]  = { "30 FPS", "60 FPS", "144 FPS", "240 FPS", "No Limit" };
+    static const int   fpsValues[]  = { 30, 60, 144, 240, 0 };
+    constexpr int      fpsCount     = 5;
+
+    ImGui::SeparatorText("Display Settings");
+
+    // VSync
+    if (ImGui::Checkbox("VSync", &m_vsyncEnabled))
+    {
+        if (m_engine)
+            m_engine->SetVSync(m_vsyncEnabled);
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::Text("Synchronize frame rate with monitor refresh rate.");
+        ImGui::Text("When ON, FPS Cap is ignored.");
+        ImGui::EndTooltip();
+    }
+
+    // FPS Cap (disabled when VSync is on)
+    if (m_vsyncEnabled)
+        ImGui::BeginDisabled();
+
+    if (ImGui::Combo("FPS Cap", &m_fpsCapIndex, fpsLabels, fpsCount))
+    {
+        if (m_engine)
+            m_engine->SetFpsCap(fpsValues[m_fpsCapIndex]);
+    }
+
+    if (m_vsyncEnabled)
+    {
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("  FPS Cap is disabled while VSync is ON.");
+    }
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("Current Status");
+
+    int displayedFps = m_averageFps;
+    ImGui::Text("Measured FPS  : %d", displayedFps);
+    ImGui::Text("VSync         : %s", m_vsyncEnabled ? "ON" : "OFF");
+
+    if (m_vsyncEnabled)
+        ImGui::Text("FPS Cap       : Disabled (VSync)");
+    else if (fpsValues[m_fpsCapIndex] == 0)
+        ImGui::Text("FPS Cap       : No Limit");
+    else
+        ImGui::Text("FPS Cap       : %d FPS", fpsValues[m_fpsCapIndex]);
 }
 
 void ImguiManager::DrawLiveDronePanel()

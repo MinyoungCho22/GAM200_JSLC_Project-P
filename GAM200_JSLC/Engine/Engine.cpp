@@ -10,6 +10,8 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp"
 #include <GLFW/glfw3.h>
+#include <thread>
+#include <chrono>
 
 Engine::Engine() = default;
 Engine::~Engine() = default;
@@ -86,6 +88,7 @@ bool Engine::Initialize(const std::string& windowTitle)
 
     m_imguiManager = std::make_unique<ImguiManager>();
     (void)m_imguiManager->Initialize();
+    m_imguiManager->SetEngine(this);
 
     // Initialize drone config manager
     m_droneConfigManager = std::make_shared<DroneConfigManager>();
@@ -125,6 +128,21 @@ void Engine::GameLoop()
         }
 
         glfwSwapBuffers(m_window);
+
+        // FPS cap: sleep to maintain target frame rate when VSync is off
+        if (!m_vsyncEnabled && m_fpsCap > 0)
+        {
+            double targetFrameTime = 1.0 / static_cast<double>(m_fpsCap);
+            double elapsed = glfwGetTime() - currentFrameTime;
+            if (elapsed < targetFrameTime)
+            {
+                double sleepTime = targetFrameTime - elapsed - 0.0005;
+                if (sleepTime > 0.0)
+                    std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime));
+                // Spin-wait for sub-millisecond precision
+                while (glfwGetTime() - currentFrameTime < targetFrameTime) {}
+            }
+        }
     }
 }
 
@@ -222,6 +240,18 @@ void Engine::ToggleFullscreen()
         glfwSetWindowMonitor(m_window, nullptr, m_windowedX, m_windowedY, m_windowedWidth, m_windowedHeight, 0);
         Logger::Instance().Log(Logger::Severity::Event, "Switched to Windowed mode");
     }
+}
+
+void Engine::SetVSync(bool enabled)
+{
+    m_vsyncEnabled = enabled;
+    glfwMakeContextCurrent(m_window);
+    glfwSwapInterval(enabled ? 1 : 0);
+}
+
+void Engine::SetFpsCap(int cap)
+{
+    m_fpsCap = cap;
 }
 
 void Engine::RequestShutdown()

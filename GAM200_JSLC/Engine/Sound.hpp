@@ -25,12 +25,16 @@ public:
 
     FMOD::System* GetSystem() const { return m_system; }
 
+    void SetMasterVolume(float volume);
+    float GetMasterVolume() const { return m_masterVolume; }
+
 private:
     SoundSystem() = default;
     ~SoundSystem() = default;
 
     FMOD::System* m_system = nullptr;
     void* m_extraDriverData = nullptr;
+    float m_masterVolume = 0.8f;
 };
 
 class Sound

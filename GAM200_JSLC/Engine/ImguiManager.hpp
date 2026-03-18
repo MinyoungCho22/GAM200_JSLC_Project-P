@@ -10,6 +10,7 @@ class DroneManager;
 class Drone;
 class Robot;
 class Underground;
+class Engine;
 
 /**
  * @brief Dear ImGui debug window manager (GLFW + OpenGL3).
@@ -35,6 +36,7 @@ public:
     void SetRobotConfigManager(std::shared_ptr<RobotConfigManager> configManager) { m_robotConfigManager = configManager; }
     void AddMapDroneManager(const std::string& mapName, DroneManager* manager);
     void SetUnderground(Underground* underground) { m_underground = underground; }
+    void SetEngine(Engine* engine) { m_engine = engine; }
 
            void SetEnabled(bool enabled) { m_enabled = enabled; }
            bool IsEnabled() const { return m_enabled; }
@@ -88,5 +90,13 @@ private:
 
     // Player god mode (infinite pulse)
     bool m_playerGodMode = false;
+
+    // Engine reference for settings control
+    Engine* m_engine = nullptr;
+
+    // Settings tab state
+    bool m_vsyncEnabled = false;
+    int  m_fpsCapIndex  = 0; // index into s_fpsCapOptions
+    void DrawSettingsPanel();
 };
 
