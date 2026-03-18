@@ -1,14 +1,3 @@
-// splash.frag  —  DigiPen "runner shadow" splash effect
-//
-// The logo is always bright/white. A narrow dark shadow band
-// sweeps quickly from left to right, like a silhouette sprinting over it.
-//
-// C++ uniforms per frame:
-//   uTime        – elapsed seconds (drives shadow position)
-//   uAlpha       – global fade [0..1]
-//   uBrightFloor – base brightness: ~2.0 during shadow phases, ~4.0 during bright hold
-//   uShadowStr   – 1.0 = full dark shadow; 0.0 = no shadow (hold phase)
-
 #version 330 core
 
 in  vec2 TexCoord;
