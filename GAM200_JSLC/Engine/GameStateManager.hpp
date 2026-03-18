@@ -14,6 +14,7 @@ public:
     void Update(double dt);
     void Draw();
     void PushState(std::unique_ptr<GameState> state);
+    void InsertBelow(std::unique_ptr<GameState> state); // insert under current top
     void PopState();
     void ChangeState(std::unique_ptr<GameState> state);
     bool HasState() const { return !states.empty(); }

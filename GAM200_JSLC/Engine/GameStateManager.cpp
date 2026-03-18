@@ -15,16 +15,34 @@ void GameStateManager::Update(double dt)
 
 void GameStateManager::Draw()
 {
-    if (HasState())
-    {
-        states.back()->Draw();
-    }
+    if (states.empty()) return;
+
+    // If the top state is transparent (e.g. a fade-out overlay),
+    // first render the state below it so it shows through.
+    if (states.size() >= 2 && states.back()->IsTransparent())
+        states[states.size() - 2]->Draw();
+
+    states.back()->Draw();
 }
 
 void GameStateManager::PushState(std::unique_ptr<GameState> state)
 {
     states.push_back(std::move(state));
     states.back()->Initialize();
+}
+
+void GameStateManager::InsertBelow(std::unique_ptr<GameState> state)
+{
+    state->Initialize();
+    if (states.empty())
+    {
+        states.push_back(std::move(state));
+    }
+    else
+    {
+        // Insert one position before the current top state
+        states.insert(states.end() - 1, std::move(state));
+    }
 }
 
 void GameStateManager::PopState()

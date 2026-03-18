@@ -11,4 +11,8 @@ public:
     virtual void Update(double dt) = 0;
     virtual void Draw() = 0;
     virtual void Shutdown() = 0;
+
+    // Return true if this state is rendered on top of the state below it
+    // (e.g. fade-out transition revealing the next state underneath)
+    virtual bool IsTransparent() const { return false; }
 };
