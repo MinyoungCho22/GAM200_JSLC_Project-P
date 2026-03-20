@@ -1,4 +1,4 @@
-﻿// PostProcessManager.cpp
+// PostProcessManager.cpp
 
 #include "PostProcessManager.h"
 #include "../OpenGL/GLWrapper.hpp"
@@ -30,6 +30,8 @@ void PostProcessManager::Initialize(int width, int height)
 {
     m_width = width;
     m_height = height;
+    m_displayWidth = width;
+    m_displayHeight = height;
 
     CreateFullscreenQuad();
     CreateSceneFBO();
@@ -99,7 +101,8 @@ void PostProcessManager::ApplyAndPresent()
 {
     GL::Disable(GL_DEPTH_TEST);
 
-    GL::Viewport(0, 0, m_width, m_height);
+    // Use the actual screen framebuffer dimensions (may differ from virtual size on HiDPI/Retina)
+    GL::Viewport(0, 0, m_displayWidth, m_displayHeight);
     GL::ClearColor(0.f, 0.f, 0.f, 1.f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 

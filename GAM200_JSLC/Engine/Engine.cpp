@@ -96,6 +96,15 @@ bool Engine::Initialize(const std::string& windowTitle)
     m_postProcess = std::make_unique<PostProcessManager>();
     m_postProcess->Initialize(m_width, m_height);
 
+    // On HiDPI/Retina displays (e.g. macOS), the framebuffer can be larger than the window size.
+    // Fetch the real framebuffer dimensions and inform PostProcessManager.
+    {
+        int fbWidth = 0, fbHeight = 0;
+        glfwGetFramebufferSize(m_window, &fbWidth, &fbHeight);
+        if (fbWidth > 0 && fbHeight > 0)
+            m_postProcess->SetDisplaySize(fbWidth, fbHeight);
+    }
+
     m_imguiManager = std::make_unique<ImguiManager>();
     (void)m_imguiManager->Initialize();
     m_imguiManager->SetEngine(this);
@@ -230,6 +239,9 @@ void Engine::OnFramebufferResize(int newScreenWidth, int newScreenHeight)
 {
     Logger::Instance().Log(Logger::Severity::Event,
         "Framebuffer resized to %d x %d", newScreenWidth, newScreenHeight);
+
+    if (m_postProcess)
+        m_postProcess->SetDisplaySize(newScreenWidth, newScreenHeight);
 }
 
 void Engine::ToggleFullscreen()
