@@ -26,8 +26,6 @@ bool Engine::Initialize(const std::string& windowTitle)
         return false;
     }
 
-    // Request a modern OpenGL context (needed for GLSL #version 330 core shaders).
-    // macOS typically supports up to OpenGL 4.1 core profile.
 #ifdef __APPLE__
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
@@ -134,10 +132,30 @@ void Engine::GameLoop()
         m_input->Update();
         Update();
 
-        m_postProcess->BeginScene();
-        m_gameStateManager->Draw();
-        m_postProcess->EndScene();
-        m_postProcess->ApplyAndPresent();
+        if (m_gameStateManager->TopBypassesPostProcess())
+        {
+            // Render background states (e.g. gameplay) through post-processing.
+            m_postProcess->BeginScene();
+            m_gameStateManager->DrawBackground();
+            m_postProcess->EndScene();
+            m_postProcess->ApplyAndPresent();
+
+            // Draw the overlay state (e.g. settings screen) directly to the
+            // default framebuffer so post-processing does not affect its UI.
+            int fbW = 0, fbH = 0;
+            glfwGetFramebufferSize(m_window, &fbW, &fbH);
+            GL::Viewport(0, 0, fbW, fbH);
+            GL::Enable(GL_BLEND);
+            GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            m_gameStateManager->DrawTopState();
+        }
+        else
+        {
+            m_postProcess->BeginScene();
+            m_gameStateManager->Draw();
+            m_postProcess->EndScene();
+            m_postProcess->ApplyAndPresent();
+        }
 
         if (m_imguiManager)
         {

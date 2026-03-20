@@ -13,6 +13,14 @@ public:
     GameStateManager(Engine& engine);
     void Update(double dt);
     void Draw();
+
+    // Draw all states except the top (used when top state bypasses post-processing)
+    void DrawBackground();
+    // Draw only the top state (used when top state bypasses post-processing)
+    void DrawTopState();
+    // Returns true when the top state should skip the post-processing pass
+    bool TopBypassesPostProcess() const;
+
     void PushState(std::unique_ptr<GameState> state);
     void InsertBelow(std::unique_ptr<GameState> state); // insert under current top
     void PopState();

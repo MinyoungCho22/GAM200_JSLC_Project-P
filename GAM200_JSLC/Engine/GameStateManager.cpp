@@ -25,6 +25,29 @@ void GameStateManager::Draw()
     states.back()->Draw();
 }
 
+void GameStateManager::DrawBackground()
+{
+    size_t n = states.size();
+    if (n < 2) return;
+
+    // Draw the state just below the top, respecting its own transparency.
+    if (n >= 3 && states[n - 2]->IsTransparent())
+        states[n - 3]->Draw();
+
+    states[n - 2]->Draw();
+}
+
+void GameStateManager::DrawTopState()
+{
+    if (!states.empty())
+        states.back()->Draw();
+}
+
+bool GameStateManager::TopBypassesPostProcess() const
+{
+    return !states.empty() && states.back()->BypassPostProcess();
+}
+
 void GameStateManager::PushState(std::unique_ptr<GameState> state)
 {
     states.push_back(std::move(state));

@@ -267,24 +267,9 @@ void SettingState::Draw()
 {
     Engine& engine = gsm.GetEngine();
 
-    int windowWidth, windowHeight;
-    glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
-
-    float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
-    float gameAspect   = GAME_WIDTH / GAME_HEIGHT;
-
-    int vpX = 0, vpY = 0, vpW = windowWidth, vpH = windowHeight;
-    if (windowAspect > gameAspect)
-    {
-        vpW = static_cast<int>(windowHeight * gameAspect);
-        vpX = (windowWidth - vpW) / 2;
-    }
-    else if (windowAspect < gameAspect)
-    {
-        vpH = static_cast<int>(windowWidth / gameAspect);
-        vpY = (windowHeight - vpH) / 2;
-    }
-    GL::Viewport(vpX, vpY, vpW, vpH);
+    // Viewport is already set to FBO size (GAME_WIDTH x GAME_HEIGHT) by PostProcessManager::BeginScene().
+    // Do NOT call glfwGetFramebufferSize here — on Retina displays the physical framebuffer is larger
+    // than the FBO, which would cause only the bottom-left portion to be rendered.
 
     Math::Matrix proj = Math::Matrix::CreateOrtho(0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT, -1.0f, 1.0f);
 

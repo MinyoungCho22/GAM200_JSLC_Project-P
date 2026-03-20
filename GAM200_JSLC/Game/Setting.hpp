@@ -23,6 +23,9 @@ public:
     void Draw() override;
     void Shutdown() override;
 
+    // Skip post-processing: draw directly to the default framebuffer after the scene pass.
+    bool BypassPostProcess() const override { return true; }
+
 private:
     enum class MenuItem { FPS, VSync, Volume, Exit };
 
