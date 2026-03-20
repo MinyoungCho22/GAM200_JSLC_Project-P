@@ -47,6 +47,16 @@ bool Engine::Initialize(const std::string& windowTitle)
         return false;
     }
 
+    // Center window on primary monitor (needed for macOS which doesn't auto-center)
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* vidmode = glfwGetVideoMode(primaryMonitor);
+    if (vidmode)
+    {
+        int xpos = (vidmode->width  - m_width)  / 2;
+        int ypos = (vidmode->height - m_height) / 2;
+        glfwSetWindowPos(m_window, xpos, ypos);
+    }
+
     glfwGetWindowPos(m_window, &m_windowedX, &m_windowedY);
     glfwMakeContextCurrent(m_window);
     glfwSetWindowUserPointer(m_window, this);
