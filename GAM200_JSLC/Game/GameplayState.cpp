@@ -795,7 +795,7 @@ Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screen
 {
     Engine& engine = gsm.GetEngine();
     int windowWidth, windowHeight;
-    glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
+    glfwGetWindowSize(engine.GetWindow(), &windowWidth, &windowHeight);
 
     float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     float gameAspect = GAME_WIDTH / GAME_HEIGHT;
@@ -836,9 +836,6 @@ void GameplayState::Draw()
 {
     Engine& engine = gsm.GetEngine();
 
-    int windowWidth, windowHeight;
-    glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
-
     float r, g, b;
     Math::Vec2 playerPos = player.GetPosition();
 
@@ -866,30 +863,11 @@ void GameplayState::Draw()
         }
     }
 
-    GL::Viewport(0, 0, windowWidth, windowHeight);
+    // Viewport is already set to FBO size (GAME_WIDTH x GAME_HEIGHT) by PostProcessManager::BeginScene().
+    // Do NOT call glfwGetFramebufferSize here — on Retina displays the physical framebuffer is larger
+    // than the FBO, which would cause only the bottom-left portion to be rendered.
     GL::ClearColor(r, g, b, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
-
-    float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
-    float gameAspect = GAME_WIDTH / GAME_HEIGHT;
-
-    int viewportX = 0;
-    int viewportY = 0;
-    int viewportWidth = windowWidth;
-    int viewportHeight = windowHeight;
-
-    if (windowAspect > gameAspect)
-    {
-        viewportWidth = static_cast<int>(windowHeight * gameAspect);
-        viewportX = (windowWidth - viewportWidth) / 2;
-    }
-    else if (windowAspect < gameAspect)
-    {
-        viewportHeight = static_cast<int>(windowWidth / gameAspect);
-        viewportY = (windowHeight - viewportHeight) / 2;
-    }
-
-    GL::Viewport(viewportX, viewportY, viewportWidth, viewportHeight);
 
     Shader& textureShader = engine.GetTextureShader();
 
@@ -966,7 +944,7 @@ void GameplayState::Draw()
     inputForCursor.GetMousePosition(mouseScreenX, mouseScreenY);
 
     int windowWidthForCursor, windowHeightForCursor;
-    glfwGetFramebufferSize(engineForCursor.GetWindow(), &windowWidthForCursor, &windowHeightForCursor);
+    glfwGetWindowSize(engineForCursor.GetWindow(), &windowWidthForCursor, &windowHeightForCursor);
 
     float windowAspectForCursor = static_cast<float>(windowWidthForCursor) / static_cast<float>(windowHeightForCursor);
     float gameAspectForCursor = GAME_WIDTH / GAME_HEIGHT;
