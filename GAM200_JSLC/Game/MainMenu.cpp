@@ -14,8 +14,7 @@
 
 #include <cmath>
 #include <string>
-#include <vector>
-#include <random>
+
 
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
@@ -27,13 +26,13 @@ void MainMenu::Initialize()
     m_enterPressed = false;
     m_waitForEnterRelease = gsm.GetEngine().GetInput().IsKeyPressed(Input::Key::Enter);
 
-    m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
+    m_fontShader = std::make_unique<Shader>("OpenGL/Shaders/simple.vert", "OpenGL/Shaders/simple.frag");
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
     m_promptText = m_font->PrintToTexture(*m_fontShader, "Press ENTER to help the City!");
     
-    m_shapeShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
+    m_shapeShader = std::make_unique<Shader>("OpenGL/Shaders/solid_color.vert", "OpenGL/Shaders/solid_color.frag");
 
     float vertices[] = {
         0.0f, 0.0f, // Bottom-Left

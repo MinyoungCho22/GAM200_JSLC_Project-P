@@ -10,7 +10,7 @@
 #include <vector>
 #include <cmath>
 #include <string>
-#include <random>
+
 
 // Logical screen dimensions
 constexpr float GAME_WIDTH = 1920.0f;
@@ -24,8 +24,8 @@ GameOver::GameOver(GameStateManager& gsm_ref, bool& isGameOverFlag)
 void GameOver::Initialize()
 {
     // Initialize shaders and font system
-    m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
-    m_colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
+    m_fontShader = std::make_unique<Shader>("OpenGL/Shaders/simple.vert", "OpenGL/Shaders/simple.frag");
+    m_colorShader = std::make_unique<Shader>("OpenGL/Shaders/solid_color.vert", "OpenGL/Shaders/solid_color.frag");
 
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");

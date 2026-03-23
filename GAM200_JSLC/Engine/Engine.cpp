@@ -274,9 +274,35 @@ void Engine::ToggleFullscreen()
     }
     else
     {
-        glfwSetWindowMonitor(m_window, nullptr, m_windowedX, m_windowedY, m_windowedWidth, m_windowedHeight, 0);
+        GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+
+        int restoreW = m_windowedWidth;
+        int restoreH = m_windowedHeight;
+        bool shouldMaximizeWindowed = false;
+
+        // If saved windowed size is monitor-sized (e.g. 1920x1080 on 1920 monitor),
+        // restore as maximized windowed mode so it is visibly windowed (not true fullscreen).
+        if (mode && restoreW >= mode->width && restoreH >= mode->height)
+        {
+            shouldMaximizeWindowed = true;
+            restoreW = mode->width;
+            restoreH = mode->height;
+        }
+
+        glfwSetWindowMonitor(m_window, nullptr, m_windowedX, m_windowedY, restoreW, restoreH, 0);
+        if (shouldMaximizeWindowed)
+        {
+            glfwMaximizeWindow(m_window);
+        }
         Logger::Instance().Log(Logger::Severity::Event, "Switched to Windowed mode");
     }
+}
+
+void Engine::SetFullscreen(bool enabled)
+{
+    if (m_isFullscreen == enabled) return;
+    ToggleFullscreen();
 }
 
 void Engine::SetVSync(bool enabled)

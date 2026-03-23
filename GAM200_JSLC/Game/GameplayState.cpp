@@ -32,15 +32,15 @@ void GameplayState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "GameplayState Initialize");
 
-    colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
+    colorShader = std::make_unique<Shader>("OpenGL/Shaders/solid_color.vert", "OpenGL/Shaders/solid_color.frag");
     colorShader->use();
     colorShader->setFloat("uAlpha", 1.0f);
 
-    m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
+    m_fontShader = std::make_unique<Shader>("OpenGL/Shaders/simple.vert", "OpenGL/Shaders/simple.frag");
     m_fontShader->use();
     m_fontShader->setInt("ourTexture", 0);
 
-    m_outlineShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/outline.frag");
+    m_outlineShader = std::make_unique<Shader>("OpenGL/Shaders/simple.vert", "OpenGL/Shaders/outline.frag");
     m_outlineShader->use();
     m_outlineShader->setInt("ourTexture", 0);
 

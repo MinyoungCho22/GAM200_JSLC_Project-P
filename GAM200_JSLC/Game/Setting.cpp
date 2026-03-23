@@ -22,8 +22,9 @@ constexpr float COL_VALUE  = 980.0f;   // x: value column (left-edge)
 constexpr float ROW_TITLE  = 800.0f;
 constexpr float ROW_FPS    = 640.0f;
 constexpr float ROW_VSYNC  = 520.0f;
-constexpr float ROW_VOLUME = 400.0f;
-constexpr float ROW_EXIT   = 250.0f;
+constexpr float ROW_FULLSCREEN = 400.0f;
+constexpr float ROW_VOLUME = 300.0f;
+constexpr float ROW_EXIT   = 180.0f;
 constexpr float ROW_HINT   =  70.0f;
 
 constexpr float LABEL_SIZE = 52.0f;
@@ -71,6 +72,11 @@ void SettingState::ApplyVSync()
     gsm.GetEngine().SetVSync(m_vsyncEnabled);
 }
 
+void SettingState::ApplyFullscreen()
+{
+    gsm.GetEngine().SetFullscreen(m_fullscreenEnabled);
+}
+
 void SettingState::ApplyVolume()
 {
     SoundSystem::Instance().SetMasterVolume(m_masterVolume);
@@ -93,6 +99,12 @@ void SettingState::RebuildValueTexts()
         m_vsyncValueText = m_font->PrintToTexture(*m_fontShader, s);
     }
 
+    // Fullscreen value string
+    {
+        std::string s = std::string("< ") + (m_fullscreenEnabled ? "On" : "Off") + " >";
+        m_fullscreenValueText = m_font->PrintToTexture(*m_fontShader, s);
+    }
+
     // Volume percentage string
     {
         int pct = static_cast<int>(std::round(m_masterVolume * 100.0f));
@@ -110,16 +122,17 @@ void SettingState::Initialize()
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
-    m_colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert",
-                                             "OpenGL/shaders/solid_color.frag");
-    m_fontShader  = std::make_unique<Shader>("OpenGL/shaders/simple.vert",
-                                             "OpenGL/shaders/simple.frag");
+    m_colorShader = std::make_unique<Shader>("OpenGL/Shaders/solid_color.vert",
+                                             "OpenGL/Shaders/solid_color.frag");
+    m_fontShader  = std::make_unique<Shader>("OpenGL/Shaders/simple.vert",
+                                             "OpenGL/Shaders/simple.frag");
     m_fontShader->use();
     m_fontShader->setInt("ourTexture", 0);
 
     // Sync state from Engine / SoundSystem
     Engine& engine = gsm.GetEngine();
     m_vsyncEnabled = engine.IsVSyncEnabled();
+    m_fullscreenEnabled = engine.IsFullscreen();
     m_masterVolume = SoundSystem::Instance().GetMasterVolume();
 
     int currentCap = engine.GetFpsCap();
@@ -133,6 +146,7 @@ void SettingState::Initialize()
     m_titleText       = m_font->PrintToTexture(*m_fontShader, "SETTINGS");
     m_fpsLabelText    = m_font->PrintToTexture(*m_fontShader, "FPS");
     m_vsyncLabelText  = m_font->PrintToTexture(*m_fontShader, "VSync");
+    m_fullscreenLabelText = m_font->PrintToTexture(*m_fontShader, "Fullscreen");
     m_volumeLabelText = m_font->PrintToTexture(*m_fontShader, "Volume");
     m_exitText        = m_font->PrintToTexture(*m_fontShader, "Exit");
     m_wasdHintText    = m_font->PrintToTexture(*m_fontShader, "W: Up   S: Down   A: Left   D: Right");
@@ -197,13 +211,13 @@ void SettingState::Update(double /*dt*/)
     if (moveUp)
     {
         int idx = static_cast<int>(m_selectedItem);
-        idx = (idx + 3) % 4; // 4 items, wrap upward
+        idx = (idx + 4) % 5; // 5 items, wrap upward
         m_selectedItem = static_cast<MenuItem>(idx);
     }
     else if (moveDown)
     {
         int idx = static_cast<int>(m_selectedItem);
-        idx = (idx + 1) % 4;
+        idx = (idx + 1) % 5;
         m_selectedItem = static_cast<MenuItem>(idx);
     }
 
@@ -221,6 +235,12 @@ void SettingState::Update(double /*dt*/)
     {
         m_vsyncEnabled = !m_vsyncEnabled;
         ApplyVSync();
+        RebuildValueTexts();
+    }
+    else if (m_selectedItem == MenuItem::Fullscreen && (goLeft || goRight))
+    {
+        m_fullscreenEnabled = !m_fullscreenEnabled;
+        ApplyFullscreen();
         RebuildValueTexts();
     }
     else if (m_selectedItem == MenuItem::Volume)
@@ -297,15 +317,41 @@ void SettingState::Draw()
 
     // 3. Highlight bar behind selected item
     float selRowY = 0.0f;
+    float selRowLeft = 0.0f;
+    float selRowRight = 0.0f;
     switch (m_selectedItem)
     {
-    case MenuItem::FPS:    selRowY = ROW_FPS;    break;
-    case MenuItem::VSync:  selRowY = ROW_VSYNC;  break;
-    case MenuItem::Volume: selRowY = ROW_VOLUME; break;
-    case MenuItem::Exit:   selRowY = ROW_EXIT;   break;
+    case MenuItem::FPS:
+        selRowY = ROW_FPS;
+        selRowLeft = COL_LABEL - static_cast<float>(m_fpsLabelText.width) * (LABEL_SIZE / m_fpsLabelText.height);
+        selRowRight = COL_VALUE + static_cast<float>(m_fpsValueText.width) * (VALUE_SIZE / m_fpsValueText.height);
+        break;
+    case MenuItem::VSync:
+        selRowY = ROW_VSYNC;
+        selRowLeft = COL_LABEL - static_cast<float>(m_vsyncLabelText.width) * (LABEL_SIZE / m_vsyncLabelText.height);
+        selRowRight = COL_VALUE + static_cast<float>(m_vsyncValueText.width) * (VALUE_SIZE / m_vsyncValueText.height);
+        break;
+    case MenuItem::Fullscreen:
+        selRowY = ROW_FULLSCREEN;
+        selRowLeft = COL_LABEL - static_cast<float>(m_fullscreenLabelText.width) * (LABEL_SIZE / m_fullscreenLabelText.height);
+        selRowRight = COL_VALUE + static_cast<float>(m_fullscreenValueText.width) * (VALUE_SIZE / m_fullscreenValueText.height);
+        break;
+    case MenuItem::Volume:
+        selRowY = ROW_VOLUME;
+        selRowLeft = COL_LABEL - static_cast<float>(m_volumeLabelText.width) * (LABEL_SIZE / m_volumeLabelText.height);
+        selRowRight = BAR_CX + BAR_W * 0.5f + 24.0f + static_cast<float>(m_volumePctText.width) * (VALUE_SIZE / m_volumePctText.height);
+        break;
+    case MenuItem::Exit:
+        selRowY = ROW_EXIT;
+        selRowLeft = GAME_WIDTH * 0.5f - static_cast<float>(m_exitText.width) * (VALUE_SIZE / m_exitText.height) * 0.5f;
+        selRowRight = GAME_WIDTH * 0.5f + static_cast<float>(m_exitText.width) * (VALUE_SIZE / m_exitText.height) * 0.5f;
+        break;
     }
-    DrawRect(proj, GAME_WIDTH * 0.5f, selRowY + LABEL_SIZE * 0.3f,
-             1000.0f, LABEL_SIZE + 12.0f, 0.05f, 0.25f, 0.25f, 0.85f);
+    const float barPaddingX = 28.0f;
+    float highlightW = (selRowRight - selRowLeft) + barPaddingX * 2.0f;
+    float highlightCX = (selRowLeft + selRowRight) * 0.5f;
+    DrawRect(proj, highlightCX, selRowY + LABEL_SIZE * 0.3f,
+             highlightW, LABEL_SIZE + 12.0f, 0.05f, 0.25f, 0.25f, 0.85f);
 
     // 4. Volume bar (background + fill)
     {                              
@@ -351,6 +397,10 @@ void SettingState::Draw()
     // VSync row
     drawLabel(m_vsyncLabelText, ROW_VSYNC);
     drawValue(m_vsyncValueText, ROW_VSYNC);
+
+    // Fullscreen row
+    drawLabel(m_fullscreenLabelText, ROW_FULLSCREEN);
+    drawValue(m_fullscreenValueText, ROW_FULLSCREEN);
 
     // Volume row  (label + percentage; bar drawn above in color shader pass)
     drawLabel(m_volumeLabelText, ROW_VOLUME);

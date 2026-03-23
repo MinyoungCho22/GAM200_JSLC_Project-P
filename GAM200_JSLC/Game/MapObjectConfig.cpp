@@ -111,8 +111,13 @@ SpriteRectConfig ParseSpriteRect(const std::string& objText, const SpriteRectCon
 
 long long GetFileWriteTime(const std::string& path)
 {
+#ifdef _WIN32
     struct _stat st {};
     if (_stat(path.c_str(), &st) != 0) return 0;
+#else
+    struct stat st {};
+    if (stat(path.c_str(), &st) != 0) return 0;
+#endif
     // Combine modified time and file size to reduce same-second save misses.
     return (static_cast<long long>(st.st_mtime) << 32) ^ static_cast<long long>(st.st_size);
 }

@@ -27,6 +27,7 @@ public:
 private:
 	void CreateSceneFBO();
 	void CreateFullscreenQuad();
+	void ComputeLetterboxViewport(int& outX, int& outY, int& outW, int& outH) const;
 
 	PostProcessSettings m_settings{};
 

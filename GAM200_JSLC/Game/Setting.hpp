@@ -30,7 +30,7 @@ public:
     bool BypassPostProcess() const override { return true; }
 
 private:
-    enum class MenuItem { FPS, VSync, Volume, Exit };
+    enum class MenuItem { FPS, VSync, Fullscreen, Volume, Exit };
 
     static constexpr int FPS_COUNT = 5;
     static constexpr int FPS_VALUES[FPS_COUNT] = { 30, 60, 144, 240, 0 };
@@ -45,6 +45,7 @@ private:
     MenuItem m_selectedItem = MenuItem::FPS;
     int   m_fpsIndex     = 1;      // 0=30, 1=60, 2=144, 3=240, 4=No Limit
     bool  m_vsyncEnabled = false;
+    bool  m_fullscreenEnabled = false;
     float m_masterVolume = 0.8f;   // 0.0 to 1.0
 
     // OpenGL objects
@@ -57,6 +58,7 @@ private:
     CachedTextureInfo m_titleText;
     CachedTextureInfo m_fpsLabelText;
     CachedTextureInfo m_vsyncLabelText;
+    CachedTextureInfo m_fullscreenLabelText;
     CachedTextureInfo m_volumeLabelText;
     CachedTextureInfo m_exitText;
     CachedTextureInfo m_wasdHintText;
@@ -65,6 +67,7 @@ private:
     // Dynamic value text (rebuilt when value changes)
     CachedTextureInfo m_fpsValueText;
     CachedTextureInfo m_vsyncValueText;
+    CachedTextureInfo m_fullscreenValueText;
     CachedTextureInfo m_volumePctText;
 
     // Rebuild dynamic text strings after a value changes
@@ -77,6 +80,7 @@ private:
     // Apply current settings to Engine and SoundSystem
     void ApplyFps();
     void ApplyVSync();
+    void ApplyFullscreen();
     void ApplyVolume();
 
     const char* GetFpsLabel(int index) const;

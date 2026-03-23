@@ -43,6 +43,8 @@ public:
     std::shared_ptr<RobotConfigManager> GetRobotConfigManager() { return m_robotConfigManager; }
 
     void ToggleFullscreen();
+    void SetFullscreen(bool enabled);
+    bool IsFullscreen() const { return m_isFullscreen; }
 
     Math::ivec2 GetRecommendedResolution();
 
