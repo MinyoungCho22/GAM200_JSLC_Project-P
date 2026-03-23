@@ -11,6 +11,7 @@
 class Shader;
 class Player;
 class DebugRenderer;
+struct HallwayObjectConfig;
 
 class Hallway
 {
@@ -27,6 +28,7 @@ public:
     static constexpr float HEIGHT = 1080.0f;
 
     void Initialize();
+    void ApplyConfig(const HallwayObjectConfig& cfg);
     void Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPlayerHiding);
 
     void Draw(Shader& shader);

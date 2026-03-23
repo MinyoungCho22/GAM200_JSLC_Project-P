@@ -3,6 +3,7 @@
 #include "Hallway.hpp"
 #include "Background.hpp"
 #include "Player.hpp"
+#include "MapObjectTypes.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Collision.hpp"
@@ -23,61 +24,51 @@ void Hallway::Initialize()
     m_size = { WIDTH, HEIGHT };
     m_position = { ROOM_WIDTH + WIDTH / 2.0f, HEIGHT / 2.0f };
 
-    float width1 = 210.f;
-    float height1 = 312.f;
-    float topLeftX1 = 2454.f;
-    float topLeftY1 = 705.f;
-    float bottomY1 = HEIGHT - topLeftY1;
-    Math::Vec2 center1 = {
-        topLeftX1 + (width1 / 2.0f),
-        bottomY1 + (height1 / 2.0f)
-    };
-    m_pulseSources.emplace_back();
-    m_pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
-    m_pulseSources.back().InitializeSprite("Asset/Hallway_pulsesource.png");
-
-    float width2 = 381.f;
-    float height2 = 324.f;
-    float topLeftX2 = 2820.f;
-    float topLeftY2 = 923.f;
-    float bottomY2 = HEIGHT - topLeftY2;
-    Math::Vec2 center2 = {
-        topLeftX2 + (width2 / 2.0f),
-        bottomY2 + (height2 / 2.0f)
-    };
-    m_hidingSpots.emplace_back(HidingSpot{ center2, {width2, height2}, nullptr });
-    m_hidingSpots.back().sprite = std::make_unique<Background>();
-    m_hidingSpots.back().sprite->Initialize("Asset/HidingSpot.png");
-
-    float width_hs2 = 381.f;
-    float height_hs2 = 324.f;
-    float topLeftX_hs2 = 5620.f;
-    float topLeftY_hs2 = 923.f;
-    float bottomY_hs2 = HEIGHT - topLeftY_hs2;
-    Math::Vec2 center_hs2 = {
-        topLeftX_hs2 + (width_hs2 / 2.0f),
-        bottomY_hs2 + (height_hs2 / 2.0f)
-    };
-    m_hidingSpots.emplace_back(HidingSpot{ center_hs2, {width_hs2, height_hs2}, nullptr });
-    m_hidingSpots.back().sprite = std::make_unique<Background>();
-    m_hidingSpots.back().sprite->Initialize("Asset/HidingSpot.png");
-
-
-    float width3 = 369.f;
-    float height3 = 645.f;
-    float topLeftX3 = 7489.f;
-    float topLeftY3 = 973.f;
-    float bottomY3 = HEIGHT - topLeftY3;
-    m_obstaclePos = {
-        topLeftX3 + (width3 / 2.0f),
-        bottomY3 + (height3 / 2.0f)
-    };
-    m_obstacleSize = { width3, height3 };
-
-
     m_droneManager = std::make_unique<DroneManager>();
     m_droneManager->SpawnDrone({ 2600.0f, 400.0f }, "Asset/Drone.png");
     m_droneManager->SpawnDrone({ 5500.0f, 400.0f }, "Asset/Drone.png");
+}
+
+void Hallway::ApplyConfig(const HallwayObjectConfig& cfg)
+{
+    for (auto& source : m_pulseSources) source.Shutdown();
+    m_pulseSources.clear();
+
+    for (auto& spot : m_hidingSpots)
+    {
+        if (spot.sprite)
+        {
+            spot.sprite->Shutdown();
+            spot.sprite.reset();
+        }
+    }
+    m_hidingSpots.clear();
+
+    for (const auto& p : cfg.pulseSources)
+    {
+        float bottomY = HEIGHT - p.topLeft.y;
+        Math::Vec2 center = { p.topLeft.x + p.size.x * 0.5f, bottomY + p.size.y * 0.5f };
+        m_pulseSources.emplace_back();
+        m_pulseSources.back().Initialize(center, p.size, 100.0f);
+        if (!p.spritePath.empty()) m_pulseSources.back().InitializeSprite(p.spritePath.c_str());
+    }
+
+    for (const auto& h : cfg.hidingSpots)
+    {
+        float bottomY = HEIGHT - h.topLeft.y;
+        Math::Vec2 center = { h.topLeft.x + h.size.x * 0.5f, bottomY + h.size.y * 0.5f };
+        m_hidingSpots.emplace_back(HidingSpot{ center, h.size, nullptr });
+        if (!h.spritePath.empty())
+        {
+            m_hidingSpots.back().sprite = std::make_unique<Background>();
+            m_hidingSpots.back().sprite->Initialize(h.spritePath.c_str());
+        }
+    }
+
+    float obsBottomY = HEIGHT - cfg.obstacle.topLeft.y;
+    m_obstaclePos = { cfg.obstacle.topLeft.x + cfg.obstacle.size.x * 0.5f,
+                      obsBottomY + cfg.obstacle.size.y * 0.5f };
+    m_obstacleSize = cfg.obstacle.size;
 }
 
 

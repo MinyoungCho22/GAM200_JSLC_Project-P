@@ -8,6 +8,7 @@
 #include "../Engine/Matrix.hpp"
 #include "../Engine/DebugRenderer.hpp"
 #include "../Engine/Collision.hpp"
+#include "MapObjectConfig.hpp"
 #include <algorithm>
 
 
@@ -22,63 +23,51 @@ void Underground::Initialize()
 
     m_droneManager = std::make_unique<DroneManager>();
 
-    // Define spawn points for ground-based robots
-    std::vector<float> spawnXCoords = { 18239.0f, 21060.0f };
-    float robotY = (MIN_Y + 90.0f) + 225.0f; // Adjusted for robot height and ground offset
-
-    for (float x : spawnXCoords)
-    {
-        m_robots.emplace_back();
-        m_robots.back().Init({ x, robotY });
-    }
-
     // Spawn aerial drones with varying speeds
     float droneY = MIN_Y + 550.0f;
     m_droneManager->SpawnDrone({ 19423.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(180.0f);
     m_droneManager->SpawnDrone({ 22203.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(250.0f);
     m_droneManager->SpawnDrone({ 22787.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(400.0f);
 
-    // Lambda to convert Top-Left local coordinates to Center world coordinates for obstacles
-    auto AddObstacle = [&](float topLeftX, float topLeftY, float width, float height) {
-        float worldCenterX = MIN_X + topLeftX + (width / 2.0f);
-        float worldCenterY = MIN_Y + (HEIGHT - topLeftY) - (height / 2.0f);
-        m_obstacles.push_back({ {worldCenterX, worldCenterY}, {width, height} });
-    };
+    ApplyConfig(MapObjectConfig::Instance().GetData().underground);
+}
 
-    auto AddPulseSource = [&](float topLeftX, float topLeftY, float width, float height) {
-        float worldCenterX = MIN_X + topLeftX + (width / 2.0f);
-        float worldCenterY = MIN_Y + (HEIGHT - topLeftY) - (height / 2.0f);
+void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
+{
+    for (auto& source : m_pulseSources) source.Shutdown();
+    for (auto& robot : m_robots) robot.Shutdown();
+    m_pulseSources.clear();
+    m_obstacles.clear();
+    m_ramps.clear();
+    m_robots.clear();
+
+    for (const auto& spawn : cfg.robotSpawns)
+    {
+        m_robots.emplace_back();
+        m_robots.back().Init(spawn);
+    }
+
+    for (const auto& o : cfg.obstacles)
+    {
+        float cx = MIN_X + o.topLeft.x + o.size.x * 0.5f;
+        float cy = MIN_Y + (HEIGHT - o.topLeft.y) - o.size.y * 0.5f;
+        m_obstacles.push_back({ {cx, cy}, o.size });
+    }
+
+    for (const auto& p : cfg.pulseSources)
+    {
+        float cx = MIN_X + p.topLeft.x + p.size.x * 0.5f;
+        float cy = MIN_Y + (HEIGHT - p.topLeft.y) - p.size.y * 0.5f;
         m_pulseSources.emplace_back();
-        m_pulseSources.back().Initialize({ worldCenterX, worldCenterY }, { width, height }, 100.0f);
-    };
+        m_pulseSources.back().Initialize({ cx, cy }, p.size, 100.0f);
+    }
 
-    auto AddRamp = [&](float startX, float bottomY, float width, float height) {
-        float centerX = startX + width / 2.0f;
-        float centerY = bottomY + height / 2.0f;
-        m_ramps.push_back({ {centerX, centerY}, {width, height}, true });
-    };
-
-    // Level Layout Definition
-    AddPulseSource(243.f, 480.f, 408.f, 132.f);
-    AddObstacle(939.f, 834.f, 561.f, 162.f);
-    AddObstacle(1584.f, 627.f, 288.f, 369.f);
-    AddPulseSource(1949.f, 309.f, 69.f, 255.f);
-    AddObstacle(2466.f, 834.f, 561.f, 162.f);
-    AddObstacle(3471.f, 834.f, 561.f, 162.f);
-    AddObstacle(4116.f, 627.f, 288.f, 369.f);
-    AddPulseSource(4485.f, 309.f, 69.f, 255.f);
-    AddObstacle(5235.f, 834.f, 561.f, 162.f);
-    AddPulseSource(5847.f, 375.f, 1013.f, 477.f);
-    AddObstacle(6825.f, 627.f, 296.f, 369.f);
-
-    // Setup final exit ramp
-    float rampStartX = 23400.0f;
-    float rampBottomY = -2010.0f;
-    float mapEndX = MIN_X + WIDTH;
-    float rampWidth = mapEndX - rampStartX;
-    float rampHeight = 300.0f;
-
-    AddRamp(rampStartX, rampBottomY, rampWidth, rampHeight);
+    for (const auto& r : cfg.ramps)
+    {
+        float cx = MIN_X + r.topLeft.x + r.size.x * 0.5f;
+        float cy = MIN_Y + (HEIGHT - r.topLeft.y) - r.size.y * 0.5f;
+        m_ramps.push_back({ {cx, cy}, r.size, true });
+    }
 }
 
 void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)

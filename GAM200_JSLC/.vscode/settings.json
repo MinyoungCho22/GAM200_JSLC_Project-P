@@ -37,5 +37,8 @@
     "cmake.buildToolArgs": [
         "/p:PreferredUILang=en-US"
     ],
-    "cmake.outputLogEncoding": "cp949"
+    "cmake.outputLogEncoding": "utf-8",
+    "terminal.integrated.automationProfile.windows": {
+        "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+    }
 }

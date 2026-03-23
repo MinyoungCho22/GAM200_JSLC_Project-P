@@ -13,6 +13,7 @@
 class Shader;
 class Player;
 class DebugRenderer;
+struct RooftopObjectConfig;
 
 /**
  * @class Rooftop
@@ -29,6 +30,7 @@ public:
     static constexpr float MIN_Y = 1080.0f;
 
     void Initialize();
+    void ApplyConfig(const RooftopObjectConfig& cfg);
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input,
                 Math::Vec2 mouseWorldPos, bool isLeftClickTriggered);
     void Draw(Shader& shader) const;

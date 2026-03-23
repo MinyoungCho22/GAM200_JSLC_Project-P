@@ -3,6 +3,7 @@
 #include "Rooftop.hpp"
 #include "Background.hpp"
 #include "Player.hpp"
+#include "MapObjectConfig.hpp"
 #include "../Game/PulseCore.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
@@ -24,19 +25,7 @@ void Rooftop::Initialize()
     m_lift = std::make_unique<Background>();
     m_lift->Initialize("Asset/Lift.png");
     m_holeSprite = std::make_unique<Background>();
-    m_holeSprite->Initialize("Asset/Hole.png");
     m_liftButtonSprite = std::make_unique<Background>();
-    m_liftButtonSprite->Initialize("Asset/LiftBotton.png");
-    {
-        float topLeftX = 13598.0f;
-        float topLeftY = 1570.0f;
-        float w = static_cast<float>(m_liftButtonSprite->GetWidth());
-        float h = static_cast<float>(m_liftButtonSprite->GetHeight());
-        if (w <= 0.0f) w = 320.0f;
-        if (h <= 0.0f) h = 96.0f;
-        m_liftButtonSize = { w, h };
-        m_liftButtonPos = { topLeftX + (w * 0.5f), topLeftY - (h * 0.5f) };
-    }
 
     // Define lift dimensions and initial position
     float liftWidth = 351.f;
@@ -73,36 +62,45 @@ void Rooftop::Initialize()
     m_droneManager->SpawnDrone({ 15500.0f, 1700.0f }, "Asset/Drone.png", false);
     m_droneManager->SpawnDrone({ 17250.0f, 1800.0f }, "Asset/Drone.png", true);
 
-    // Define interaction box for closing the rooftop hole
-    float width = 785.f;
-    float height = 172.f;
-    float topLeftX = 9951.f;
-    float game_Y_top = 1506.f;
-
-    m_debugBoxPos = { topLeftX + (width / 2.0f), game_Y_top - (height / 2.0f) };
-    m_debugBoxSize = { width, height };
-
-    // Initialize Pulse Sources for the player to collect energy
-    float pulseWidth1 = 333.f;
-    float pulseHeight1 = 240.f;
-    float pulseTopLeftX1 = 12521.f;
-    float pulseTopLeftY1 = 1700.f;
-    Math::Vec2 pulseCenter1 = { pulseTopLeftX1 + (pulseWidth1 / 2.0f), pulseTopLeftY1 - (pulseHeight1 / 2.0f) };
-    m_pulseSources.emplace_back();
-    m_pulseSources.back().Initialize(pulseCenter1, { pulseWidth1, pulseHeight1 }, 100.f);
-    m_pulseSources.back().InitializeSprite("Asset/Hvac.png");
-
-    float pulseWidth2 = 333.f;
-    float pulseHeight2 = 240.f;
-    float pulseTopLeftX2 = 12900.f;
-    float pulseTopLeftY2 = 1700.f;
-    Math::Vec2 pulseCenter2 = { pulseTopLeftX2 + (pulseWidth2 / 2.0f), pulseTopLeftY2 - (pulseHeight2 / 2.0f) };
-    m_pulseSources.emplace_back();
-    m_pulseSources.back().Initialize(pulseCenter2, { pulseWidth2, pulseHeight2 }, 100.f);
-    m_pulseSources.back().InitializeSprite("Asset/Hvac.png");
+    ApplyConfig(MapObjectConfig::Instance().GetData().rooftop);
 
     m_isClose = false;
     m_isPlayerClose = false;
+}
+
+void Rooftop::ApplyConfig(const RooftopObjectConfig& cfg)
+{
+    for (auto& source : m_pulseSources) source.Shutdown();
+    m_pulseSources.clear();
+
+    m_debugBoxPos = { cfg.hole.topLeft.x + cfg.hole.size.x * 0.5f,
+                      cfg.hole.topLeft.y - cfg.hole.size.y * 0.5f };
+    m_debugBoxSize = cfg.hole.size;
+    if (m_holeSprite && !cfg.hole.spritePath.empty())
+    {
+        m_holeSprite->Shutdown();
+        m_holeSprite->Initialize(cfg.hole.spritePath.c_str());
+    }
+
+    for (const auto& p : cfg.pulseSources)
+    {
+        Math::Vec2 center = { p.topLeft.x + p.size.x * 0.5f, p.topLeft.y - p.size.y * 0.5f };
+        m_pulseSources.emplace_back();
+        m_pulseSources.back().Initialize(center, p.size, 100.0f);
+        if (!p.spritePath.empty()) m_pulseSources.back().InitializeSprite(p.spritePath.c_str());
+    }
+
+    if (m_liftButtonSprite && !cfg.liftButton.spritePath.empty())
+    {
+        m_liftButtonSprite->Shutdown();
+        m_liftButtonSprite->Initialize(cfg.liftButton.spritePath.c_str());
+    }
+    float w = static_cast<float>(m_liftButtonSprite ? m_liftButtonSprite->GetWidth() : 0);
+    float h = static_cast<float>(m_liftButtonSprite ? m_liftButtonSprite->GetHeight() : 0);
+    if (w <= 0.0f) w = (cfg.liftButton.fallbackSize.x > 0.0f ? cfg.liftButton.fallbackSize.x : 320.0f);
+    if (h <= 0.0f) h = (cfg.liftButton.fallbackSize.y > 0.0f ? cfg.liftButton.fallbackSize.y : 96.0f);
+    m_liftButtonSize = { w, h };
+    m_liftButtonPos = { cfg.liftButton.topLeft.x + w * 0.5f, cfg.liftButton.topLeft.y - h * 0.5f };
 }
 
 void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input,

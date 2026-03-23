@@ -9,8 +9,9 @@
 #include "../Engine/DebugRenderer.hpp"
 #include "../Engine/Collision.hpp"
 #include "../Engine/Logger.hpp"
+#include "MapObjectConfig.hpp"
 #include <algorithm>
-#include <cmath>
+
 
 void Subway::Initialize()
 {
@@ -29,29 +30,32 @@ void Subway::Initialize()
     // No robot spawns in subway map
     // (Currently no robots either)
 
-    // Lambda functions for adding obstacles and pulse sources
-    auto AddObstacle = [&](float topLeftX, float topLeftY, float width, float height) {
-        float worldCenterX = MIN_X + topLeftX + (width / 2.0f);
-        float worldCenterY = MIN_Y + (HEIGHT - topLeftY) - (height / 2.0f);
-        m_obstacles.push_back({ {worldCenterX, worldCenterY}, {width, height} });
-    };
-
-    auto AddPulseSource = [&](float topLeftX, float topLeftY, float width, float height) {
-        float worldCenterX = MIN_X + topLeftX + (width / 2.0f);
-        float worldCenterY = MIN_Y + (HEIGHT - topLeftY) - (height / 2.0f);
-        m_pulseSources.emplace_back();
-        m_pulseSources.back().Initialize({ worldCenterX, worldCenterY }, { width, height }, 100.0f);
-    };
-
-    // Subway map pulse charging stations (image-based coordinates)
-    // First charging station: 2211, 171 / 357x258
-    AddPulseSource(1400.f, 171.f, 270.f, 258.f);
-    
-    // Second charging station: 5889, 84 / 465x114
-    AddPulseSource(3759.f, 84.f, 350.f, 114.f);
+    ApplyConfig(MapObjectConfig::Instance().GetData().subway);
 
     Logger::Instance().Log(Logger::Severity::Info, "Subway Map initialized with %d robots and %d drones",
         m_robots.size(), m_droneManager->GetDrones().size());
+}
+
+void Subway::ApplyConfig(const SubwayObjectConfig& cfg)
+{
+    for (auto& source : m_pulseSources) source.Shutdown();
+    m_pulseSources.clear();
+    m_obstacles.clear();
+
+    for (const auto& p : cfg.pulseSources)
+    {
+        float cx = MIN_X + p.topLeft.x + p.size.x * 0.5f;
+        float cy = MIN_Y + (HEIGHT - p.topLeft.y) - p.size.y * 0.5f;
+        m_pulseSources.emplace_back();
+        m_pulseSources.back().Initialize({ cx, cy }, p.size, 100.0f);
+    }
+
+    for (const auto& o : cfg.obstacles)
+    {
+        float cx = MIN_X + o.topLeft.x + o.size.x * 0.5f;
+        float cy = MIN_Y + (HEIGHT - o.topLeft.y) - o.size.y * 0.5f;
+        m_obstacles.push_back({ {cx, cy}, o.size });
+    }
 }
 
 void Subway::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)

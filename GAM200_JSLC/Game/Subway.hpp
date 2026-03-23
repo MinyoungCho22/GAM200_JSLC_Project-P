@@ -6,13 +6,13 @@
 #include "DroneManager.hpp"
 #include "Robot.hpp"
 #include "../Engine/Vec2.hpp"
-#include "../Engine/Input.hpp"
 #include <memory>
 #include <vector>
 
 class Shader;
 class Player;
 class DebugRenderer;
+struct SubwayObjectConfig;
 
 /**
  * @class Subway
@@ -34,6 +34,7 @@ public:
     };
 
     void Initialize();
+    void ApplyConfig(const SubwayObjectConfig& cfg);
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
     void Draw(Shader& shader) const;
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;

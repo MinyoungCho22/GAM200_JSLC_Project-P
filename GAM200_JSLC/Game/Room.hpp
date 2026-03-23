@@ -12,6 +12,7 @@ class Engine;
 class Shader;
 class Player;
 class DebugRenderer;
+struct RoomObjectConfig;
 
 /**
  * @class Room
@@ -22,6 +23,7 @@ class Room
 {
 public:
     void Initialize(Engine& engine, const char* texturePath);
+    void ApplyConfig(const RoomObjectConfig& cfg);
     void Shutdown();
     void Update(Player& player, double dt, Input::Input& input, Math::Vec2 mouseWorldPos);
     void Draw(Shader& textureShader) const;

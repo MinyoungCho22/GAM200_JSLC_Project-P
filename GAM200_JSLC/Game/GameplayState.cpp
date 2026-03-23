@@ -11,6 +11,7 @@
 #include "../Engine/ImguiManager.hpp"
 #include "Setting.hpp"
 #include "GameOver.hpp"
+#include "MapObjectConfig.hpp"
 #include "Background.hpp"
 #include <GLFW/glfw3.h>
 #include <string>
@@ -62,6 +63,9 @@ void GameplayState::Initialize()
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
 
+    // Load map object config before map initialization.
+    MapObjectConfig::Instance().Load();
+
     m_room = std::make_unique<Room>();
     m_room->Initialize(engine, "Asset/Room.png");
 
@@ -84,6 +88,16 @@ void GameplayState::Initialize()
     m_subway = std::make_unique<Subway>();
     m_subway->Initialize();
     m_subwayAccessed = false;
+
+    // Apply JSON config once at startup (the same path used by hot-reload).
+    {
+        const auto& cfg = MapObjectConfig::Instance().GetData();
+        m_room->ApplyConfig(cfg.room);
+        m_hallway->ApplyConfig(cfg.hallway);
+        m_rooftop->ApplyConfig(cfg.rooftop);
+        m_underground->ApplyConfig(cfg.underground);
+        m_subway->ApplyConfig(cfg.subway);
+    }
 
     m_camera.Initialize({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }, GAME_WIDTH, GAME_HEIGHT);
     m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
@@ -286,6 +300,17 @@ void GameplayState::Update(double dt)
     double mouseScreenX, mouseScreenY;
     input.GetMousePosition(mouseScreenX, mouseScreenY);
     Math::Vec2 mouseWorldPos = ScreenToWorldCoordinates(mouseScreenX, mouseScreenY);
+
+    // Auto hot-reload on file save for map object coordinates/sizes/sprites.
+    if (MapObjectConfig::Instance().ReloadIfChanged())
+    {
+        const auto& cfg = MapObjectConfig::Instance().GetData();
+        m_room->ApplyConfig(cfg.room);
+        m_hallway->ApplyConfig(cfg.hallway);
+        m_rooftop->ApplyConfig(cfg.rooftop);
+        m_underground->ApplyConfig(cfg.underground);
+        m_subway->ApplyConfig(cfg.subway);
+    }
 
     const float PULSE_COST_PER_SECOND = 1.0f;
 
