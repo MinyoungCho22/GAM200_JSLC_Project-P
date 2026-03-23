@@ -77,6 +77,9 @@ void Room::Shutdown()
 
 void Room::Update(Player& player, double dt, Input::Input& input, Math::Vec2 mouseWorldPos)
 {
+    (void)dt;
+    (void)mouseWorldPos;
+
     Math::Vec2 centerPos = player.GetPosition();
     Math::Vec2 halfSize = player.GetSize() * 0.5f;
 
@@ -99,16 +102,16 @@ void Room::Update(Player& player, double dt, Input::Input& input, Math::Vec2 mou
     // Check for interaction with Blinds
     m_playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
 
-    // Check if mouse clicked on blind hitbox (left click)
-    bool isMouseOnBlind = Collision::CheckPointInAABB(mouseWorldPos, m_blindPos, m_blindSize);
-    
-    if (m_playerInBlindArea && input.IsMouseButtonTriggered(Input::MouseButton::Left) && !m_isBright && isMouseOnBlind)
+    // More forgiving interaction: if player is in blind area, left click works
+    // without requiring a precise cursor-over-blind point test.
+    if (m_playerInBlindArea && input.IsMouseButtonTriggered(Input::MouseButton::Left) && !m_isBright)
     {
         const float BLIND_TOGGLE_COST = 20.0f;
+        const float MIN_PULSE_TO_OPERATE_BLIND = 30.0f;
         Pulse& pulse = player.GetPulseCore().getPulse();
 
-        // Spending player energy to trigger environment change
-        if (pulse.Value() >= BLIND_TOGGLE_COST)
+        // Do not allow blind interaction when pulse is 30 or below.
+        if (pulse.Value() > MIN_PULSE_TO_OPERATE_BLIND && pulse.Value() >= BLIND_TOGGLE_COST)
         {
             pulse.spend(BLIND_TOGGLE_COST);
             m_isBright = true;

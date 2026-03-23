@@ -144,7 +144,7 @@ void SplashState::Update(double dt)
     }
     else
     {
-        // Linear fade over T_BLOOM_OUT (서서히)
+        // Linear fade over T_BLOOM_OUT.
         float t  = static_cast<float>((m_elapsed - P_BLOOM_START) / T_BLOOM_OUT);
         t        = std::min(t, 1.0f);
         m_alpha  = 1.0f - t;
@@ -245,8 +245,7 @@ void SplashState::Draw()
     GL::BindTexture(GL_TEXTURE_2D, 0);
 
     // ── Character silhouettes (shadow-run phases only) ────────────────────
-    float charAlpha = m_alpha * m_shadowStr;
-    if (charAlpha > 0.01f && m_playerTexID && m_robotTexID && m_droneTexID)
+    if (m_playerTexID && m_robotTexID && m_droneTexID)
     {
         float t = static_cast<float>(m_elapsed);
 
@@ -270,7 +269,8 @@ void SplashState::Draw()
         // ── Running position (left→right, looping) ────────────────────────
         constexpr float SPEED    = 420.0f;   // pixels / second
         float cycleDist = screenW + girlW * 2.0f + 320.0f;
-        float progress  = std::fmod(t * SPEED, cycleDist);
+        // Single pass only: do not loop back to the left during splash.
+        float progress  = std::min(t * SPEED, cycleDist);
 
         // Girl: leading the group
         float girlX  = progress - girlW;
@@ -278,6 +278,18 @@ void SplashState::Draw()
         float droneX = girlX - 100.0f;
         // Robot: 220px behind the girl (chasing at the rear)
         float robotX = std::fmod(progress - 220.0f + cycleDist, cycleDist) - girlW;
+
+        // Keep silhouettes fully visible until all characters have fully passed the screen.
+        bool allPassed =
+            (girlX  - girlW  * 0.5f > screenW) &&
+            (droneX - droneW * 0.5f > screenW) &&
+            (robotX - robotW * 0.5f > screenW);
+        float charAlpha = allPassed ? (m_alpha * m_shadowStr) : m_alpha;
+        if (charAlpha <= 0.01f)
+        {
+            GL::Disable(GL_BLEND);
+            return;
+        }
 
         // ── Y positions with running / hover bobs ────────────────────────
         float midY   = screenH * 0.5f;

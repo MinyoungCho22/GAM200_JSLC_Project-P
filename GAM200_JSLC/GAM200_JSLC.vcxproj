@@ -83,8 +83,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)Engine;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
@@ -105,8 +105,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)Engine;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
@@ -125,8 +125,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)Engine;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
@@ -147,8 +147,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)Engine;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
@@ -166,6 +166,7 @@
     <ClCompile Include="Engine\Input.cpp" />
     <ClCompile Include="Engine\Logger.cpp" />
     <ClCompile Include="Engine\Matrix.cpp" />
+    <ClCompile Include="Engine\RobotConfig.cpp" />
     <ClCompile Include="Engine\Sound.cpp" />
     <ClCompile Include="Engine\Vec2.cpp" />
     <ClCompile Include="Engine\Window.cpp" />
@@ -193,10 +194,12 @@
     <ClCompile Include="Game\Room.cpp" />
     <ClCompile Include="Game\Setting.cpp" />
     <ClCompile Include="Game\SplashState.cpp" />
+    <ClCompile Include="Game\Subway.cpp" />
     <ClCompile Include="Game\TraceSystem.cpp" />
     <ClCompile Include="Game\Tutorial.cpp" />
     <ClCompile Include="Game\Underground.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="OpenGL\PostProcessManager.cpp" />
     <ClCompile Include="OpenGL\Shader.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -214,6 +217,7 @@
     <ClInclude Include="Engine\Logger.hpp" />
     <ClInclude Include="Engine\Matrix.hpp" />
     <ClInclude Include="Engine\Rect.hpp" />
+    <ClInclude Include="Engine\RobotConfig.hpp" />
     <ClInclude Include="Engine\Sound.hpp" />
     <ClInclude Include="Engine\Vec2.hpp" />
     <ClInclude Include="Engine\Window.hpp" />
@@ -249,6 +253,7 @@
     <ClInclude Include="Game\Tutorial.hpp" />
     <ClInclude Include="Game\Underground.hpp" />
     <ClInclude Include="OpenGL\GLWrapper.hpp" />
+    <ClInclude Include="OpenGL\PostProcessManager.h" />
     <ClInclude Include="OpenGL\Shader.hpp" />
   </ItemGroup>
   <ItemGroup>

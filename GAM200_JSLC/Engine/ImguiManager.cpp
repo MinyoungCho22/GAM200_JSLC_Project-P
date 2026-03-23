@@ -1087,3 +1087,14 @@ void ImguiManager::EndFrame()
     // Note: Rendering is now handled in DrawDebugWindow()
 }
 
+void ImguiManager::ClearGameplayBindings()
+{
+    m_droneManager = nullptr;
+    m_underground = nullptr;
+    m_mapDroneManagers.clear();
+    m_selectedDroneIndex = -1;
+    m_selectedRobotIndex = -1;
+    m_selectedMapIndex = 0;
+    m_selectedMapName = "Hallway";
+}
+

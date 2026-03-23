@@ -132,30 +132,27 @@ void Engine::GameLoop()
         m_input->Update();
         Update();
 
-        if (m_gameStateManager->TopBypassesPostProcess())
+        // Sync display size every frame — covers Windows DPI scaling and macOS Retina
+        // cases where the physical framebuffer may differ from the logical window size.
         {
-            // Render background states (e.g. gameplay) through post-processing.
-            m_postProcess->BeginScene();
-            m_gameStateManager->DrawBackground();
-            m_postProcess->EndScene();
-            m_postProcess->ApplyAndPresent();
-
-            // Draw the overlay state (e.g. settings screen) directly to the
-            // default framebuffer so post-processing does not affect its UI.
             int fbW = 0, fbH = 0;
             glfwGetFramebufferSize(m_window, &fbW, &fbH);
-            GL::Viewport(0, 0, fbW, fbH);
-            GL::Enable(GL_BLEND);
-            GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            m_gameStateManager->DrawTopState();
+            if (fbW > 0 && fbH > 0)
+                m_postProcess->SetDisplaySize(fbW, fbH);
         }
-        else
-        {
-            m_postProcess->BeginScene();
-            m_gameStateManager->Draw();
-            m_postProcess->EndScene();
-            m_postProcess->ApplyAndPresent();
-        }
+
+        // When the top state bypasses post-processing (e.g. settings UI),
+        // render everything to the FBO normally but present with exposure=1.0
+        // so the UI is not affected by scene darkening effects.
+        const bool bypass = m_gameStateManager->TopBypassesPostProcess();
+        m_postProcess->SetPassthrough(bypass);
+
+        m_postProcess->BeginScene();
+        m_gameStateManager->Draw();
+        m_postProcess->EndScene();
+        m_postProcess->ApplyAndPresent();
+
+        m_postProcess->SetPassthrough(false);
 
         if (m_imguiManager)
         {

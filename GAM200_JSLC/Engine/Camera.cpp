@@ -23,7 +23,7 @@ void Camera::Initialize(Math::Vec2 position, float viewWidth, float viewHeight)
 
 void Camera::Update(Math::Vec2 targetPosition, float smoothSpeed)
 {
-    // 애니메이션 중이면 Update를 무시
+    // Skip regular update while camera animation is active.
     if (m_isAnimating)
     {
         return;
@@ -82,7 +82,7 @@ void Camera::UpdateAnimation(float dt)
         return;
     }
 
-    // Ease-in-out 보간 (부드러운 가속/감속)
+    // Ease-in-out interpolation (smooth acceleration/deceleration).
     float t = m_animElapsed / m_animDuration;
     float easedT = t < 0.5f 
         ? 2.0f * t * t 

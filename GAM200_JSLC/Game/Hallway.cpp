@@ -6,7 +6,6 @@
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Collision.hpp"
-#include "../Engine/Logger.hpp"
 #include "../Engine/DebugRenderer.hpp"
 #include <algorithm> 
 #include <cmath>
@@ -26,8 +25,8 @@ void Hallway::Initialize()
 
     float width1 = 210.f;
     float height1 = 312.f;
-    float topLeftX1 = 2456.f;
-    float topLeftY1 = 708.f;
+    float topLeftX1 = 2454.f;
+    float topLeftY1 = 705.f;
     float bottomY1 = HEIGHT - topLeftY1;
     Math::Vec2 center1 = {
         topLeftX1 + (width1 / 2.0f),
@@ -35,6 +34,7 @@ void Hallway::Initialize()
     };
     m_pulseSources.emplace_back();
     m_pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
+    m_pulseSources.back().InitializeSprite("Asset/Hallway_pulsesource.png");
 
     float width2 = 381.f;
     float height2 = 324.f;
@@ -45,7 +45,9 @@ void Hallway::Initialize()
         topLeftX2 + (width2 / 2.0f),
         bottomY2 + (height2 / 2.0f)
     };
-    m_hidingSpots.emplace_back(HidingSpot{ center2, {width2, height2} });
+    m_hidingSpots.emplace_back(HidingSpot{ center2, {width2, height2}, nullptr });
+    m_hidingSpots.back().sprite = std::make_unique<Background>();
+    m_hidingSpots.back().sprite->Initialize("Asset/HidingSpot.png");
 
     float width_hs2 = 381.f;
     float height_hs2 = 324.f;
@@ -56,7 +58,9 @@ void Hallway::Initialize()
         topLeftX_hs2 + (width_hs2 / 2.0f),
         bottomY_hs2 + (height_hs2 / 2.0f)
     };
-    m_hidingSpots.emplace_back(HidingSpot{ center_hs2, {width_hs2, height_hs2} });
+    m_hidingSpots.emplace_back(HidingSpot{ center_hs2, {width_hs2, height_hs2}, nullptr });
+    m_hidingSpots.back().sprite = std::make_unique<Background>();
+    m_hidingSpots.back().sprite->Initialize("Asset/HidingSpot.png");
 
 
     float width3 = 369.f;
@@ -125,6 +129,22 @@ void Hallway::Draw(Shader& shader)
     shader.setMat4("model", model);
     m_background->Draw(shader, model);
 
+    for (const auto& source : m_pulseSources)
+    {
+        source.DrawSprite(shader);
+    }
+
+    for (const auto& spot : m_hidingSpots)
+    {
+        if (spot.sprite)
+        {
+            shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+            shader.setBool("flipX", false);
+            Math::Matrix spotModel = Math::Matrix::CreateTranslation(spot.pos) * Math::Matrix::CreateScale(spot.size);
+            spot.sprite->Draw(shader, spotModel);
+        }
+    }
+
     m_droneManager->Draw(shader);
 }
 
@@ -178,6 +198,15 @@ void Hallway::Shutdown()
     for (auto& source : m_pulseSources)
     {
         source.Shutdown();
+    }
+
+    for (auto& spot : m_hidingSpots)
+    {
+        if (spot.sprite)
+        {
+            spot.sprite->Shutdown();
+            spot.sprite.reset();
+        }
     }
 
     if (m_droneManager)
@@ -254,4 +283,39 @@ void Hallway::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
         debugRenderer.DrawBox(colorShader, spot.pos, spot.size, { 0.3f, 1.0f });
     }
     debugRenderer.DrawBox(colorShader, m_obstaclePos, m_obstacleSize, { 1.0f, 0.0f });
+}
+
+void Hallway::DrawSpriteOutlines(Shader& outlineShader,
+                                  Math::Vec2 playerPos, float proximityDist) const
+{
+    const float proxDistSq = proximityDist * proximityDist;
+
+    for (const auto& source : m_pulseSources)
+    {
+        if (!source.HasSprite()) continue;
+        float distSq = (playerPos - source.GetPosition()).LengthSq();
+        if (distSq <= proxDistSq)
+        {
+            source.DrawOutline(outlineShader);
+        }
+    }
+
+    for (const auto& spot : m_hidingSpots)
+    {
+        if (!spot.sprite) continue;
+        float distSq = (playerPos - spot.pos).LengthSq();
+        if (distSq <= proxDistSq)
+        {
+            int w = spot.sprite->GetWidth();
+            int h = spot.sprite->GetHeight();
+            if (w <= 0 || h <= 0) continue;
+
+            outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+            outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
+            outlineShader.setFloat("outlineWidthTexels", 2.0f);
+
+            Math::Matrix model = Math::Matrix::CreateTranslation(spot.pos) * Math::Matrix::CreateScale(spot.size);
+            spot.sprite->Draw(outlineShader, model);
+        }
+    }
 }

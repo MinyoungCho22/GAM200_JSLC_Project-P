@@ -14,8 +14,13 @@ public:
     void Shutdown();
     void Draw(Shader& shader, const Math::Matrix& model);
 
+    int GetWidth()  const { return m_width; }
+    int GetHeight() const { return m_height; }
+
 private:
     unsigned int VAO = 0;
     unsigned int VBO = 0;
     unsigned int m_textureID = 0;
+    int m_width  = 0;
+    int m_height = 0;
 };

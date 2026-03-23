@@ -107,7 +107,7 @@ void PostProcessManager::ApplyAndPresent()
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
     m_postShader->use();
-    m_postShader->setFloat("uExposure", m_settings.exposure);
+    m_postShader->setFloat("uExposure", m_passthrough ? 1.0f : m_settings.exposure);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, m_sceneColorTex);

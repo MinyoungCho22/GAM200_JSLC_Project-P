@@ -69,6 +69,10 @@ void GameOver::Update(double dt)
 
 void GameOver::Draw()
 {
+    // Always clear to black so TERMINATED text is clearly visible.
+    GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    GL::Clear(GL_COLOR_BUFFER_BIT);
+
     // Use fixed orthographic projection for UI
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT, -1.0f, 1.0f);
 
@@ -77,6 +81,7 @@ void GameOver::Draw()
 
     m_colorShader->use();
     m_colorShader->setMat4("projection", projection);
+    m_colorShader->setFloat("uAlpha", 1.0f);
 
     GL::BindVertexArray(m_quadVAO);
 

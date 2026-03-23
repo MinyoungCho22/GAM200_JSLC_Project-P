@@ -37,6 +37,7 @@ public:
     void Init(Math::Vec2 startPos);
     void Update(double dt, Player& player, const std::vector<ObstacleInfo>& obstacles, float mapMinX, float mapMaxX);
     void Draw(const Shader& shader) const;
+    void DrawOutline(const Shader& outlineShader) const;
     void DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();

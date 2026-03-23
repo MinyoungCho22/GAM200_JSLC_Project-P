@@ -5,7 +5,7 @@
 #include <memory>
 #include "Input.hpp"
 #include "Vec2.hpp"
-#include "OpenGL/PostProcessManager.h"
+#include "../OpenGL/PostProcessManager.h"
 
 struct GLFWwindow;
 class GameStateManager;

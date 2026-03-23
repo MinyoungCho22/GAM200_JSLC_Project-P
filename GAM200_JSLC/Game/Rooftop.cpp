@@ -23,6 +23,20 @@ void Rooftop::Initialize()
     // Initialize the lift platform
     m_lift = std::make_unique<Background>();
     m_lift->Initialize("Asset/Lift.png");
+    m_holeSprite = std::make_unique<Background>();
+    m_holeSprite->Initialize("Asset/Hole.png");
+    m_liftButtonSprite = std::make_unique<Background>();
+    m_liftButtonSprite->Initialize("Asset/LiftBotton.png");
+    {
+        float topLeftX = 13598.0f;
+        float topLeftY = 1570.0f;
+        float w = static_cast<float>(m_liftButtonSprite->GetWidth());
+        float h = static_cast<float>(m_liftButtonSprite->GetHeight());
+        if (w <= 0.0f) w = 320.0f;
+        if (h <= 0.0f) h = 96.0f;
+        m_liftButtonSize = { w, h };
+        m_liftButtonPos = { topLeftX + (w * 0.5f), topLeftY - (h * 0.5f) };
+    }
 
     // Define lift dimensions and initial position
     float liftWidth = 351.f;
@@ -76,6 +90,7 @@ void Rooftop::Initialize()
     Math::Vec2 pulseCenter1 = { pulseTopLeftX1 + (pulseWidth1 / 2.0f), pulseTopLeftY1 - (pulseHeight1 / 2.0f) };
     m_pulseSources.emplace_back();
     m_pulseSources.back().Initialize(pulseCenter1, { pulseWidth1, pulseHeight1 }, 100.f);
+    m_pulseSources.back().InitializeSprite("Asset/Hvac.png");
 
     float pulseWidth2 = 333.f;
     float pulseHeight2 = 240.f;
@@ -84,15 +99,18 @@ void Rooftop::Initialize()
     Math::Vec2 pulseCenter2 = { pulseTopLeftX2 + (pulseWidth2 / 2.0f), pulseTopLeftY2 - (pulseHeight2 / 2.0f) };
     m_pulseSources.emplace_back();
     m_pulseSources.back().Initialize(pulseCenter2, { pulseWidth2, pulseHeight2 }, 100.f);
+    m_pulseSources.back().InitializeSprite("Asset/Hvac.png");
 
     m_isClose = false;
     m_isPlayerClose = false;
 }
 
-void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input)
+void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input,
+                     Math::Vec2 mouseWorldPos, bool isLeftClickTriggered)
 {
     float oldLiftX = m_liftPos.x;
     Math::Vec2 playerPos = player.GetPosition();
+    auto clampf = [](float v, float lo, float hi) { return std::max(lo, std::min(v, hi)); };
 
     // Check if the player is within the rooftop level boundaries
     bool isPlayerInRooftop = (playerPos.y >= MIN_Y - 1000.0f && playerPos.y <= MIN_Y + HEIGHT &&
@@ -157,12 +175,12 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         Math::Vec2 boxMax = m_debugBoxPos + boxHalfSize;
         
         Math::Vec2 closestPointOnBox;
-        closestPointOnBox.x = std::clamp(playerPos.x, boxMin.x, boxMax.x);
-        closestPointOnBox.y = std::clamp(playerPos.y, boxMin.y, boxMax.y);
+        closestPointOnBox.x = clampf(playerPos.x, boxMin.x, boxMax.x);
+        closestPointOnBox.y = clampf(playerPos.y, boxMin.y, boxMax.y);
 
         Math::Vec2 closestPointOnPlayer;
-        closestPointOnPlayer.x = std::clamp(closestPointOnBox.x, playerMin.x, playerMax.x);
-        closestPointOnPlayer.y = std::clamp(closestPointOnBox.y, playerMin.y, playerMax.y);
+        closestPointOnPlayer.x = clampf(closestPointOnBox.x, playerMin.x, playerMax.x);
+        closestPointOnPlayer.y = clampf(closestPointOnBox.y, playerMin.y, playerMax.y);
 
         float distanceSq = (closestPointOnPlayer - closestPointOnBox).LengthSq();
         const float PROXIMITY_RANGE_SQ = 100.0f * 100.0f;
@@ -183,36 +201,45 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         }
     }
 
-    // Lift Proximity Logic: Check if player is close enough to activate the lift
+    // Lift Button Proximity Logic: check if player is close enough to interact with LiftBotton sprite area
     {
         Math::Vec2 playerHalfSize = playerHitboxSize / 2.0f;
-        Math::Vec2 liftHalfSize = m_liftSize / 2.0f;
-
-        Math::Vec2 liftMin = m_liftPos - liftHalfSize;
-        Math::Vec2 liftMax = m_liftPos + liftHalfSize;
-
-        Math::Vec2 closestPointOnLift;
-        closestPointOnLift.x = std::clamp(playerPos.x, liftMin.x, liftMax.x);
-        closestPointOnLift.y = std::clamp(playerPos.y, liftMin.y, liftMax.y);
-
         Math::Vec2 playerMin = playerPos - playerHalfSize;
         Math::Vec2 playerMax = playerPos + playerHalfSize;
 
+        Math::Vec2 buttonHalfSize = m_liftButtonSize / 2.0f;
+        Math::Vec2 buttonMin = m_liftButtonPos - buttonHalfSize;
+        Math::Vec2 buttonMax = m_liftButtonPos + buttonHalfSize;
+
+        Math::Vec2 closestPointOnButton;
+        closestPointOnButton.x = clampf(playerPos.x, buttonMin.x, buttonMax.x);
+        closestPointOnButton.y = clampf(playerPos.y, buttonMin.y, buttonMax.y);
+
         Math::Vec2 closestPointOnPlayer;
-        closestPointOnPlayer.x = std::clamp(closestPointOnLift.x, playerMin.x, playerMax.x);
-        closestPointOnPlayer.y = std::clamp(closestPointOnLift.y, playerMin.y, playerMax.y);
+        closestPointOnPlayer.x = clampf(closestPointOnButton.x, playerMin.x, playerMax.x);
+        closestPointOnPlayer.y = clampf(closestPointOnButton.y, playerMin.y, playerMax.y);
 
-        float distanceSq = (closestPointOnPlayer - closestPointOnLift).LengthSq();
-        const float LIFT_PROXIMITY_RANGE_SQ = 150.0f * 150.0f;
+        float distanceSq = (closestPointOnPlayer - closestPointOnButton).LengthSq();
+        const float LIFT_BUTTON_PROXIMITY_RANGE_SQ = 150.0f * 150.0f;
 
-        m_isPlayerNearLift = (distanceSq <= LIFT_PROXIMITY_RANGE_SQ) && (m_liftState == LiftState::Idle);
+        m_isPlayerNearLift = (distanceSq <= LIFT_BUTTON_PROXIMITY_RANGE_SQ) && (m_liftState == LiftState::Idle);
     }
 
-    // Lift State Machine
+    bool clickedLiftButton = false;
+    if (isLeftClickTriggered)
+    {
+        Math::Vec2 buttonHalf = m_liftButtonSize * 0.5f;
+        Math::Vec2 buttonMin = m_liftButtonPos - buttonHalf;
+        Math::Vec2 buttonMax = m_liftButtonPos + buttonHalf;
+        clickedLiftButton = (mouseWorldPos.x >= buttonMin.x && mouseWorldPos.x <= buttonMax.x &&
+                             mouseWorldPos.y >= buttonMin.y && mouseWorldPos.y <= buttonMax.y);
+    }
+
+    // Lift state machine
     if (m_liftState == LiftState::Idle)
     {
-        // Activate lift if player is near and left-clicks
-        if (m_isPlayerNearLift && input.IsMouseButtonTriggered(Input::MouseButton::Left))
+        // Activate only when player is near and clicks on the button sprite area
+        if (m_isPlayerNearLift && clickedLiftButton)
         {
             const float LIFT_COST = 8.0f;
             Pulse& pulse = player.GetPulseCore().getPulse();
@@ -312,8 +339,41 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         player.SetPosition({ rightBoundary - playerHalfSize.x, currentPlayerPos.y });
     }
 
-    // AABB Collision with the rooftop hole (only if it is not yet closed)
+    currentPlayerPos = player.GetPosition();
+
+    // Force hole filling progression:
+    // while the rooftop hole is open, block crossing its X-range entirely
+    // (even by jumping over), so the player must close the hole first.
+    // Behave like a static boundary wall (no knockback): keep player touching
+    // the hole edge. Once hole is closed (m_isClose), this logic is skipped.
+    bool blockedByHoleWall = false;
     if (!m_isClose)
+    {
+        Math::Vec2 holeHalfSize = m_debugBoxSize * 0.5f;
+        float holeMinX = m_debugBoxPos.x - holeHalfSize.x;
+        float holeMaxX = m_debugBoxPos.x + holeHalfSize.x;
+
+        Math::Vec2 pos = currentPlayerPos;
+        if (pos.x >= holeMinX - playerHalfSize.x && pos.x < m_debugBoxPos.x)
+        {
+            pos.x = holeMinX - playerHalfSize.x;
+            blockedByHoleWall = true;
+        }
+        else if (pos.x <= holeMaxX + playerHalfSize.x && pos.x >= m_debugBoxPos.x)
+        {
+            pos.x = holeMaxX + playerHalfSize.x;
+            blockedByHoleWall = true;
+        }
+
+        if (blockedByHoleWall)
+        {
+            player.SetPosition(pos);
+            currentPlayerPos = pos;
+        }
+    }
+
+    // AABB Collision with the rooftop hole (only if it is not yet closed)
+    if (!m_isClose && !blockedByHoleWall)
     {
         Math::Vec2 holeHalfSize = m_debugBoxSize * 0.5f;
         Math::Vec2 holeMin = m_debugBoxPos - holeHalfSize;
@@ -441,6 +501,27 @@ void Rooftop::Draw(Shader& shader) const
         m_background->Draw(shader, model);
     }
 
+    // Hole sprite: m_isClose(true) once player fills pulse and closes hole.
+    // Collision/hitbox uses same center/size (m_debugBoxPos/m_debugBoxSize).
+    if (!m_isClose && m_holeSprite)
+    {
+        Math::Matrix holeModel = Math::Matrix::CreateTranslation(m_debugBoxPos) * Math::Matrix::CreateScale(m_debugBoxSize);
+        shader.setMat4("model", holeModel);
+        m_holeSprite->Draw(shader, holeModel);
+    }
+
+    if (m_liftButtonSprite)
+    {
+        Math::Matrix buttonModel = Math::Matrix::CreateTranslation(m_liftButtonPos) * Math::Matrix::CreateScale(m_liftButtonSize);
+        shader.setMat4("model", buttonModel);
+        m_liftButtonSprite->Draw(shader, buttonModel);
+    }
+
+    for (const auto& source : m_pulseSources)
+    {
+        source.DrawSprite(shader);
+    }
+
     // Render the lift platform
     Math::Matrix liftModel = Math::Matrix::CreateTranslation(m_liftPos) * Math::Matrix::CreateScale(m_liftSize);
     shader.setMat4("model", liftModel);
@@ -477,6 +558,14 @@ void Rooftop::Shutdown()
     {
         m_lift->Shutdown();
     }
+    if (m_holeSprite)
+    {
+        m_holeSprite->Shutdown();
+    }
+    if (m_liftButtonSprite)
+    {
+        m_liftButtonSprite->Shutdown();
+    }
 
     for (auto& source : m_pulseSources)
     {
@@ -491,30 +580,110 @@ void Rooftop::Shutdown()
 
 void Rooftop::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
-    // Render debug boxes for Pulse Sources
+    // No rectangle debug boxes in Rooftop on Tab debug mode.
+    (void)colorShader;
+    (void)debugRenderer;
+}
+
+void Rooftop::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist) const
+{
+    const float proxDistSq = proximityDist * proximityDist;
+
     for (const auto& source : m_pulseSources)
     {
-        debugRenderer.DrawBox(colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
+        if (!source.HasSprite()) continue;
+        float distSq = (playerPos - source.GetPosition()).LengthSq();
+        if (distSq <= proxDistSq)
+        {
+            source.DrawOutline(outlineShader);
+        }
     }
 
-    // Render debug box for rooftop hole interaction area
-    Math::Vec2 debugColor = m_isPlayerClose ? Math::Vec2(0.0f, 1.0f) : Math::Vec2(1.0f, 0.0f);
-    debugRenderer.DrawBox(colorShader, m_debugBoxPos, m_debugBoxSize, debugColor);
+    if (!m_isClose && m_holeSprite)
+    {
+        // Hole sprite is wide, so use AABB proximity instead of center-distance.
+        Math::Vec2 holeHalf = m_debugBoxSize * 0.5f;
+        Math::Vec2 holeMin = m_debugBoxPos - holeHalf;
+        Math::Vec2 holeMax = m_debugBoxPos + holeHalf;
 
-    // Render debug box for lift platform and interaction area
-    Math::Vec2 liftDebugColor = m_isPlayerNearLift ? Math::Vec2(0.0f, 1.0f) : Math::Vec2(1.0f, 0.0f);
-    debugRenderer.DrawBox(colorShader, m_liftPos, m_liftSize, liftDebugColor);
+        Math::Vec2 closestPointOnHole;
+        closestPointOnHole.x = std::max(holeMin.x, std::min(playerPos.x, holeMax.x));
+        closestPointOnHole.y = std::max(holeMin.y, std::min(playerPos.y, holeMax.y));
 
-    // Render level boundaries for visual reference
-    float leftBoundary = MIN_X;
-    float rightBoundary = MIN_X + WIDTH;
-    float boundaryHeight = HEIGHT;
-    Math::Vec2 leftBoundaryPos = { leftBoundary, MIN_Y + boundaryHeight / 2.0f };
-    Math::Vec2 rightBoundaryPos = { rightBoundary, MIN_Y + boundaryHeight / 2.0f };
-    Math::Vec2 boundarySize = { 10.0f, boundaryHeight };
+        float distSq = (playerPos - closestPointOnHole).LengthSq();
+        if (distSq <= proxDistSq)
+        {
+            int w = m_holeSprite->GetWidth();
+            int h = m_holeSprite->GetHeight();
+            if (w > 0 && h > 0)
+            {
+                outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+                outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
+                outlineShader.setFloat("outlineWidthTexels", 2.0f);
 
-    debugRenderer.DrawBox(colorShader, leftBoundaryPos, boundarySize, { 1.0f, 0.0f });
-    debugRenderer.DrawBox(colorShader, rightBoundaryPos, boundarySize, { 1.0f, 0.0f });
+                Math::Matrix holeModel = Math::Matrix::CreateTranslation(m_debugBoxPos) * Math::Matrix::CreateScale(m_debugBoxSize);
+                outlineShader.setMat4("model", holeModel);
+                m_holeSprite->Draw(outlineShader, holeModel);
+            }
+        }
+    }
+
+    if (m_liftButtonSprite)
+    {
+        Math::Vec2 buttonHalf = m_liftButtonSize * 0.5f;
+        Math::Vec2 buttonMin = m_liftButtonPos - buttonHalf;
+        Math::Vec2 buttonMax = m_liftButtonPos + buttonHalf;
+
+        Math::Vec2 closestPointOnButton;
+        closestPointOnButton.x = std::max(buttonMin.x, std::min(playerPos.x, buttonMax.x));
+        closestPointOnButton.y = std::max(buttonMin.y, std::min(playerPos.y, buttonMax.y));
+
+        float distSq = (playerPos - closestPointOnButton).LengthSq();
+        if (distSq <= proxDistSq)
+        {
+            int w = m_liftButtonSprite->GetWidth();
+            int h = m_liftButtonSprite->GetHeight();
+            if (w > 0 && h > 0)
+            {
+                outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+                outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
+                outlineShader.setFloat("outlineWidthTexels", 2.0f);
+
+                Math::Matrix buttonModel = Math::Matrix::CreateTranslation(m_liftButtonPos) * Math::Matrix::CreateScale(m_liftButtonSize);
+                outlineShader.setMat4("model", buttonModel);
+                m_liftButtonSprite->Draw(outlineShader, buttonModel);
+            }
+        }
+    }
+
+    // Lift platform sprite outline
+    if (m_lift)
+    {
+        Math::Vec2 liftHalf = m_liftSize * 0.5f;
+        Math::Vec2 liftMin = m_liftPos - liftHalf;
+        Math::Vec2 liftMax = m_liftPos + liftHalf;
+
+        Math::Vec2 closestPointOnLift;
+        closestPointOnLift.x = std::max(liftMin.x, std::min(playerPos.x, liftMax.x));
+        closestPointOnLift.y = std::max(liftMin.y, std::min(playerPos.y, liftMax.y));
+
+        float distSq = (playerPos - closestPointOnLift).LengthSq();
+        if (distSq <= proxDistSq)
+        {
+            int w = m_lift->GetWidth();
+            int h = m_lift->GetHeight();
+            if (w > 0 && h > 0)
+            {
+                outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+                outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
+                outlineShader.setFloat("outlineWidthTexels", 2.0f);
+
+                Math::Matrix liftModel = Math::Matrix::CreateTranslation(m_liftPos) * Math::Matrix::CreateScale(m_liftSize);
+                outlineShader.setMat4("model", liftModel);
+                m_lift->Draw(outlineShader, liftModel);
+            }
+        }
+    }
 }
 
 const std::vector<Drone>& Rooftop::GetDrones() const

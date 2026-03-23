@@ -10,6 +10,7 @@
 #include "../Engine/Collision.hpp"
 #include "../Engine/ImguiManager.hpp"
 #include "Setting.hpp"
+#include "GameOver.hpp"
 #include "Background.hpp"
 #include <GLFW/glfw3.h>
 #include <string>
@@ -37,6 +38,10 @@ void GameplayState::Initialize()
     m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
     m_fontShader->use();
     m_fontShader->setInt("ourTexture", 0);
+
+    m_outlineShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/outline.frag");
+    m_outlineShader->use();
+    m_outlineShader->setInt("ourTexture", 0);
 
     gsm.GetEngine().GetTextureShader().use();
     gsm.GetEngine().GetTextureShader().setInt("ourTexture", 0);
@@ -311,6 +316,7 @@ void GameplayState::Update(double dt)
             float closestDistSq = ATTACK_RANGE_SQ;
 
             auto checkDrones = [&](std::vector<Drone>& drones) {
+                const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
                 for (auto& drone : drones)
                 {
                     if (drone.IsDead() || drone.IsHit()) continue;
@@ -320,7 +326,8 @@ void GameplayState::Update(double dt)
                     float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
 
-                    bool isMouseOnDrone = Collision::CheckPointInAABB(mouseWorldPos, drone.GetPosition(), droneHitboxSize);
+                    bool isMouseOnDrone = Collision::CheckPointInAABB(mouseWorldPos, drone.GetPosition(), droneHitboxSize)
+                        || Collision::CheckAABB(mouseWorldPos, cursorHitbox, drone.GetPosition(), droneHitboxSize);
 
                     if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnDrone)
                     {
@@ -340,6 +347,7 @@ void GameplayState::Update(double dt)
             if (m_undergroundAccessed)
             {
                 auto& robots = m_underground->GetRobots();
+                const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
 
                 for (auto& robot : robots)
                 {
@@ -351,7 +359,8 @@ void GameplayState::Update(double dt)
                     float effectiveAttackRange = ATTACK_RANGE + robotRadius;
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
 
-                    bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize);
+                    bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize)
+                        || Collision::CheckAABB(mouseWorldPos, cursorHitbox, robot.GetPosition(), robotSize);
 
                     if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnRobot)
                     {
@@ -365,6 +374,7 @@ void GameplayState::Update(double dt)
             if (m_subwayAccessed)
             {
                 auto& robots = m_subway->GetRobots();
+                const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
 
                 for (auto& robot : robots)
                 {
@@ -376,7 +386,8 @@ void GameplayState::Update(double dt)
                     float effectiveAttackRange = ATTACK_RANGE + robotRadius;
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
 
-                    bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize);
+                    bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize)
+                        || Collision::CheckAABB(mouseWorldPos, cursorHitbox, robot.GetPosition(), robotSize);
 
                     if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnRobot)
                     {
@@ -403,12 +414,14 @@ void GameplayState::Update(double dt)
 
         if (targetDrone != nullptr)
         {
+            // Cache position before potential reinforcement spawn.
+            // OnDroneKilled may spawn drones and reallocate vectors, invalidating targetDrone pointer.
+            targetPos = targetDrone->GetPosition();
             bool didDroneDie = targetDrone->ApplyDamage(static_cast<float>(dt));
             if (didDroneDie)
             {
                 m_traceSystem->OnDroneKilled(*droneManager, player.GetPosition());
             }
-            targetPos = targetDrone->GetPosition();
         }
         else if (targetRobot != nullptr)
         {
@@ -465,8 +478,9 @@ void GameplayState::Update(double dt)
 
     if (m_rooftopAccessed && !m_undergroundAccessed)
     {
-        float transitionX = Rooftop::MIN_X + Rooftop::WIDTH - 50.0f;
-        if (player.GetPosition().x > transitionX)
+        float playerRight = player.GetPosition().x + player.GetHitboxSize().x * 0.5f;
+        float transitionX = Rooftop::MIN_X + Rooftop::WIDTH - 1.0f;
+        if (playerRight >= transitionX)
         {
             HandleRooftopToUndergroundTransition();
         }
@@ -537,7 +551,8 @@ void GameplayState::Update(double dt)
         pp.Settings().exposure = 1.0f;
 
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
-    m_rooftop->Update(dt, player, playerHitboxSize, input);
+    m_rooftop->Update(dt, player, playerHitboxSize, input, mouseWorldPos,
+                      input.IsMouseButtonTriggered(Input::MouseButton::Left));
 
     if (m_undergroundAccessed)
     {
@@ -615,7 +630,7 @@ void GameplayState::Update(double dt)
         }
     }
 
-    // 카메라 애니메이션 업데이트
+    // Update camera animation
     if (m_camera.IsAnimating())
     {
         m_camera.UpdateAnimation(static_cast<float>(dt));
@@ -665,7 +680,10 @@ void GameplayState::Update(double dt)
 
     if (player.IsDead())
     {
+        // Ensure hall exposure does not leak into GameOver rendering.
+        engine.GetPostProcess().Settings().exposure = 1.0f;
         gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver));
+        return;
     }
 
     SoundSystem::Instance().Update();
@@ -834,6 +852,14 @@ Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screen
 
 void GameplayState::Draw()
 {
+    // If GameOver has just popped, do not render the previous gameplay frame.
+    if (m_isGameOver)
+    {
+        GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        GL::Clear(GL_COLOR_BUFFER_BIT);
+        return;
+    }
+
     Engine& engine = gsm.GetEngine();
 
     float r, g, b;
@@ -898,6 +924,37 @@ void GameplayState::Draw()
     textureShader.use();
     textureShader.setMat4("projection", projection);
     pulseManager->DrawVFX(textureShader);
+
+    // Pixel-perfect outlines for nearby sprite objects (always rendered).
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    m_outlineShader->use();
+    m_outlineShader->setMat4("projection", projection);
+    {
+        Math::Vec2 playerPos = player.GetPosition();
+        m_hallway->DrawSpriteOutlines(*m_outlineShader, playerPos);
+        m_rooftop->DrawSpriteOutlines(*m_outlineShader, playerPos);
+    }
+    if (m_isDebugDraw)
+    {
+        player.DrawOutline(*m_outlineShader);
+
+        for (const auto& robot : m_underground->GetRobots())
+        {
+            if (!robot.IsDead())
+            {
+                robot.DrawOutline(*m_outlineShader);
+            }
+        }
+        for (const auto& robot : m_subway->GetRobots())
+        {
+            if (!robot.IsDead())
+            {
+                robot.DrawOutline(*m_outlineShader);
+            }
+        }
+    }
+    GL::Disable(GL_BLEND);
 
     colorShader->use();
     colorShader->setMat4("projection", projection);
@@ -1013,9 +1070,6 @@ void GameplayState::Draw()
         Math::Vec2 playerCenter = player.GetHitboxCenter();
         m_debugRenderer->DrawCircle(*colorShader, playerCenter, ATTACK_RANGE, { 1.0f, 0.0f });
 
-        Math::Vec2 playerHitboxSize = player.GetHitboxSize();
-        m_debugRenderer->DrawBox(*colorShader, playerCenter, playerHitboxSize, { 0.0f, 1.0f });
-
         const auto& drones = droneManager->GetDrones();
         for (const auto& drone : drones)
         {
@@ -1065,7 +1119,11 @@ void GameplayState::Draw()
 
         for (const auto& source : m_hallway->GetPulseSources())
         {
-            m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
+            // Show fallback debug box only when no sprite exists.
+            if (!source.HasSprite())
+            {
+                m_debugRenderer->DrawBox(*colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
+            }
         }
 
         m_hallway->DrawDebug(*colorShader, *m_debugRenderer);
@@ -1079,6 +1137,11 @@ void GameplayState::Draw()
 
 void GameplayState::Shutdown()
 {
+    if (auto* imguiManager = gsm.GetEngine().GetImguiManager())
+    {
+        imguiManager->ClearGameplayBindings();
+    }
+
     m_room->Shutdown();
     m_hallway->Shutdown();
     m_rooftop->Shutdown();

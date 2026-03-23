@@ -39,6 +39,8 @@ void Door::Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost, Doo
 
 void Door::Update(Player& player, bool isInteractKeyPressed, Math::Vec2 mouseWorldPos)
 {
+    (void)mouseWorldPos;
+
     if (m_isOpened) return;
 
     Math::Vec2 playerCenter = player.GetPosition();
@@ -61,10 +63,8 @@ void Door::Update(Player& player, bool isInteractKeyPressed, Math::Vec2 mouseWor
         m_isPlayerNearby = (distSq < interactRangeSq);
     }
 
-    // Check if mouse clicked on door hitbox
-    bool isMouseOnDoor = Collision::CheckPointInAABB(mouseWorldPos, m_position, m_size);
-
-    if (m_isPlayerNearby && isInteractKeyPressed && isMouseOnDoor)
+    // More forgiving interaction: if player is near, don't require precise cursor-over-door hit.
+    if (m_isPlayerNearby && isInteractKeyPressed)
     {
         // In god mode, always allow door opening without spending pulse
         if (player.IsGodMode() || player.GetPulseCore().getPulse().Value() >= m_pulseCost)

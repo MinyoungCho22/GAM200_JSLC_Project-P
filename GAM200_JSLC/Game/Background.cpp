@@ -21,6 +21,9 @@ void Background::Initialize(const char* texturePath)
         return;
     }
 
+    m_width  = width;
+    m_height = height;
+
     GL::GenTextures(1, &m_textureID);
     GL::BindTexture(GL_TEXTURE_2D, m_textureID);
 

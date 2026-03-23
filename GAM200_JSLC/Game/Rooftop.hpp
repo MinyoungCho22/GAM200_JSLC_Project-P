@@ -29,12 +29,14 @@ public:
     static constexpr float MIN_Y = 1080.0f;
 
     void Initialize();
-    void Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input);
+    void Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input,
+                Math::Vec2 mouseWorldPos, bool isLeftClickTriggered);
     void Draw(Shader& shader) const;
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
     void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
+    void DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist = 300.f) const;
 
     // Entity accessors
     const std::vector<PulseSource>& GetPulseSources() const { return m_pulseSources; }
@@ -61,6 +63,10 @@ private:
     std::unique_ptr<Background> m_background;
     std::unique_ptr<Background> m_closeBackground; // Visual state for when the rooftop hole is closed
     std::unique_ptr<Background> m_lift;
+    std::unique_ptr<Background> m_holeSprite;
+    std::unique_ptr<Background> m_liftButtonSprite;
+    Math::Vec2 m_liftButtonPos{};
+    Math::Vec2 m_liftButtonSize{};
 
     // Lift transformation and state variables
     Math::Vec2 m_liftPos;

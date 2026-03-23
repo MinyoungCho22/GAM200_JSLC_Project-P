@@ -135,6 +135,7 @@ void SettingState::Initialize()
     m_vsyncLabelText  = m_font->PrintToTexture(*m_fontShader, "VSync");
     m_volumeLabelText = m_font->PrintToTexture(*m_fontShader, "Volume");
     m_exitText        = m_font->PrintToTexture(*m_fontShader, "Exit");
+    m_wasdHintText    = m_font->PrintToTexture(*m_fontShader, "W: Up   S: Down   A: Left   D: Right");
     m_escHintText     = m_font->PrintToTexture(*m_fontShader, "[ESC] Back");
 
     RebuildValueTexts();
@@ -276,7 +277,7 @@ void SettingState::Draw()
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // 1. Semi-transparent dimming overlay
+    // 1. Opaque black background
     m_colorShader->use();
     m_colorShader->setMat4("projection", proj);
     {
@@ -284,7 +285,7 @@ void SettingState::Draw()
                              Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
         m_colorShader->setMat4("model", model);
         m_colorShader->setVec3("objectColor", 0.0f, 0.0f, 0.0f);
-        m_colorShader->setFloat("uAlpha", 0.72f);
+        m_colorShader->setFloat("uAlpha", 1.0f);
         GL::BindTexture(GL_TEXTURE_2D, 0);
         GL::BindVertexArray(m_overlayVAO);
         GL::DrawArrays(GL_TRIANGLES, 0, 6);
@@ -307,7 +308,7 @@ void SettingState::Draw()
              1000.0f, LABEL_SIZE + 12.0f, 0.05f, 0.25f, 0.25f, 0.85f);
 
     // 4. Volume bar (background + fill)
-    {
+    {                              
         // Background
         DrawRect(proj, BAR_CX, ROW_VOLUME + LABEL_SIZE * 0.3f,
                  BAR_W, BAR_H, 0.2f, 0.2f, 0.2f, 1.0f);
@@ -374,6 +375,12 @@ void SettingState::Draw()
                                 ROW_EXIT },
                               VALUE_SIZE);
     }
+
+    // ESC hint
+    m_font->DrawBakedText(*m_fontShader, m_wasdHintText,
+                          { GAME_WIDTH * 0.5f - m_wasdHintText.width * (HINT_SIZE / m_wasdHintText.height) * 0.5f,
+                            ROW_HINT + 38.0f },
+                          HINT_SIZE);
 
     // ESC hint
     m_font->DrawBakedText(*m_fontShader, m_escHintText,

@@ -6,7 +6,6 @@
 #include "../Engine/Collision.hpp"
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include <iostream>
 #include <random>
 #include <cmath>
 
@@ -407,26 +406,89 @@ void Robot::Draw(const Shader& shader) const
     GL::BindVertexArray(0);
 }
 
-void Robot::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
+void Robot::DrawOutline(const Shader& outlineShader) const
 {
     if (m_state == RobotState::Dead) return;
-    
-    // HP Bar UI
+
+    outlineShader.use();
+
+    bool flipX = (m_directionX > 0.0f);
+    Math::Matrix model = Math::Matrix::CreateTranslation(m_position) * Math::Matrix::CreateScale(m_size);
+    outlineShader.setMat4("model", model);
+    outlineShader.setBool("flipX", flipX);
+    outlineShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
+    outlineShader.setFloat("outlineWidthTexels", 2.0f);
+
+    unsigned int textureToBind = m_textureID;
+    if (m_state == RobotState::Attack)
+    {
+        if (m_currentAttack == AttackType::HighSweep) textureToBind = m_textureHighID;
+        else if (m_currentAttack == AttackType::LowSweep) textureToBind = m_textureLowID;
+    }
+
+    // Robot textures are single-frame sprites.
+    int texW = 396;
+    int texH = 450;
+    if (textureToBind == m_textureHighID || textureToBind == m_textureLowID)
+    {
+        texW = 590;
+        texH = 450;
+    }
+    outlineShader.setVec2("texelSize", 1.0f / static_cast<float>(texW), 1.0f / static_cast<float>(texH));
+
+    GL::ActiveTexture(GL_TEXTURE0);
+    GL::BindTexture(GL_TEXTURE_2D, textureToBind);
+    GL::BindVertexArray(m_VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
+}
+
+void Robot::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    (void)debugRenderer;
+    // Same style behavior as Drone::DrawGauge: only when damaged.
+    if (m_state == RobotState::Dead || m_hp >= m_maxHp) return;
+
     float barWidth = 150.0f;
     float barHeight = 15.0f;
     float yOffset = m_size.y / 2.0f + 30.0f;
-    Math::Vec2 barPos = { m_position.x, m_position.y + yOffset };
+    Math::Vec2 barCenterPos = { m_position.x, m_position.y + yOffset };
 
-    // Draw background/border
-    debugRenderer.DrawBox(colorShader, barPos, { barWidth + 4.0f, barHeight + 4.0f }, { 0.0f, 0.0f });
-    
-    // Calculate and draw HP fill
+    Math::Vec2 bgSize = { barWidth + 4.0f, barHeight + 4.0f };
+    Math::Matrix bgModel = Math::Matrix::CreateTranslation(barCenterPos) * Math::Matrix::CreateScale(bgSize);
+    colorShader.setMat4("model", bgModel);
+    colorShader.setVec3("objectColor", 0.0f, 0.0f, 0.0f);
+    GL::BindVertexArray(m_VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+
     float ratio = m_hp / m_maxHp;
     if (ratio < 0.0f) ratio = 0.0f;
+    if (ratio > 1.0f) ratio = 1.0f;
+
     float fillWidth = barWidth * ratio;
-    float leftEdge = barPos.x - (barWidth / 2.0f);
-    float fillCenterX = leftEdge + (fillWidth / 2.0f);
-    debugRenderer.DrawBox(colorShader, { fillCenterX, barPos.y }, { fillWidth, barHeight }, { 1.0f, 0.0f });
+    float leftEdgeX = barCenterPos.x - (barWidth / 2.0f);
+    float fillCenterX = leftEdgeX + (fillWidth / 2.0f);
+    Math::Vec2 fgPos = { fillCenterX, barCenterPos.y };
+    Math::Vec2 fgSize = { fillWidth, barHeight };
+    Math::Matrix fgModel = Math::Matrix::CreateTranslation(fgPos) * Math::Matrix::CreateScale(fgSize);
+    colorShader.setMat4("model", fgModel);
+
+    float r = 1.0f;
+    float g = 1.0f;
+    if (ratio > 0.5f)
+    {
+        r = 2.0f * (1.0f - ratio); // green -> yellow
+        g = 1.0f;
+    }
+    else
+    {
+        r = 1.0f;                  // yellow -> red
+        g = 2.0f * ratio;
+    }
+    colorShader.setVec3("objectColor", r, g, 0.0f);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
 }
 
 void Robot::DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const

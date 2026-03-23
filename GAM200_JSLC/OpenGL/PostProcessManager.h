@@ -17,6 +17,9 @@ public:
 	// Set the actual screen framebuffer size (differs from virtual size on HiDPI/Retina displays)
 	void SetDisplaySize(int w, int h) { m_displayWidth = w; m_displayHeight = h; }
 
+	// When enabled, ApplyAndPresent uses exposure=1.0 (no darkening) - used for UI overlays
+	void SetPassthrough(bool enabled) { m_passthrough = enabled; }
+
 	PostProcessSettings& Settings() { return m_settings; }
 	const PostProcessSettings& Settings() const { return m_settings; }
 
@@ -37,6 +40,7 @@ private:
 	int m_height = 0;
 	int m_displayWidth = 0;
 	int m_displayHeight = 0;
+	bool m_passthrough = false;
 
 	std::unique_ptr<Shader> m_postShader;
 };

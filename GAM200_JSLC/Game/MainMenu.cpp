@@ -24,6 +24,9 @@ MainMenu::MainMenu(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
 void MainMenu::Initialize()
 {
+    m_enterPressed = false;
+    m_waitForEnterRelease = gsm.GetEngine().GetInput().IsKeyPressed(Input::Key::Enter);
+
     m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
@@ -57,8 +60,16 @@ void MainMenu::Update(double dt)
 {
     m_glitchTimer += dt;
 
-    // Check for Enter key to start game (immediate response)
-    if (!m_enterPressed && gsm.GetEngine().GetInput().IsKeyPressed(Input::Key::Enter))
+    // If Enter is still held from the previous state (e.g. GameOver),
+    // force a release first so starting the game always needs one fresh press on No.99.
+    if (m_waitForEnterRelease)
+    {
+        if (!gsm.GetEngine().GetInput().IsKeyPressed(Input::Key::Enter))
+            m_waitForEnterRelease = false;
+        return;
+    }
+
+    if (!m_enterPressed && gsm.GetEngine().GetInput().IsKeyTriggered(Input::Key::Enter))
     {
         m_enterPressed = true;
         Logger::Instance().Log(Logger::Severity::Event, "MainMenu: Enter key pressed - starting game!");
@@ -69,7 +80,7 @@ void MainMenu::Update(double dt)
 void MainMenu::Draw()
 {
     // Clear background
-    GL::ClearColor(0.05f, 0.05f, 0.1f, 1.0f);
+    GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT, -1.0f, 1.0f);

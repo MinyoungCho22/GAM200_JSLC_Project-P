@@ -17,7 +17,6 @@
 #include "Hallway.hpp"
 #include "Rooftop.hpp"
 #include "TraceSystem.hpp" 
-#include "GameOver.hpp" 
 #include "MainMenu.hpp"
 #include "Tutorial.hpp"
 #include "Underground.hpp"
@@ -50,6 +49,7 @@ private:
     std::unique_ptr<Shader> textureShader;
     std::unique_ptr<Shader> colorShader;
     std::unique_ptr<Shader> m_fontShader;
+    std::unique_ptr<Shader> m_outlineShader;
     std::vector<PulseSource> pulseSources;
     std::unique_ptr<PulseManager> pulseManager;
     std::unique_ptr<DroneManager> droneManager;

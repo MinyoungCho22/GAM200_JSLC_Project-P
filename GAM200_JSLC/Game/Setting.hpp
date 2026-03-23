@@ -5,7 +5,7 @@
 #include "../Engine/Matrix.hpp"
 #include <memory>
 #include "Font.hpp"
-#include <vector>
+
 
 class GameStateManager;
 class Shader;
@@ -23,7 +23,10 @@ public:
     void Draw() override;
     void Shutdown() override;
 
-    // Skip post-processing: draw directly to the default framebuffer after the scene pass.
+    // Render settings as an opaque full-screen state.
+    bool IsTransparent() const override { return false; }
+
+    // Disable post-processing effects (exposure darkening) while settings UI is visible.
     bool BypassPostProcess() const override { return true; }
 
 private:
@@ -56,6 +59,7 @@ private:
     CachedTextureInfo m_vsyncLabelText;
     CachedTextureInfo m_volumeLabelText;
     CachedTextureInfo m_exitText;
+    CachedTextureInfo m_wasdHintText;
     CachedTextureInfo m_escHintText;
 
     // Dynamic value text (rebuilt when value changes)

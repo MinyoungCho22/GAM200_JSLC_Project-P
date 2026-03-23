@@ -187,6 +187,8 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     std::vector<PulseSource>& subwaySources,
     bool is_interact_key_pressed, double dt, Math::Vec2 mouseWorldPos)
 {
+    (void)mouseWorldPos;
+
     float fdt = static_cast<float>(dt);
 
     if (m_isAttacking && m_attackPathValid)
@@ -209,7 +211,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     PulseSource* closest_source = nullptr;
     float closest_dist_sq = -1.0f;
 
-    bool mouseOnSource = false;
+    bool overlapWithSource = false;
 
     auto checkSource = [&](PulseSource& source) {
         if (!source.HasPulse()) return;
@@ -220,7 +222,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
             {
                 closest_source = &source;
                 closest_dist_sq = dist_sq;
-                mouseOnSource = Collision::CheckPointInAABB(mouseWorldPos, source.GetPosition(), source.GetSize());
+                overlapWithSource = true;
             }
         }
         };
@@ -231,7 +233,8 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     for (auto& source : undergroundSources) checkSource(source);
     for (auto& source : subwaySources)     checkSource(source);
 
-    bool is_near_charger = (closest_source != nullptr && mouseOnSource);
+    // More forgiving interaction: right-click charging activates when player overlaps the source.
+    bool is_near_charger = (closest_source != nullptr && overlapWithSource);
     PulseTickResult result = player.GetPulseCore().tick(is_interact_key_pressed, is_near_charger, false, dt);
 
     if (result.charged && closest_source != nullptr)

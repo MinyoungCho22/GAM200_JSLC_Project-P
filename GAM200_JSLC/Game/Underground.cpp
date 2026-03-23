@@ -9,7 +9,7 @@
 #include "../Engine/DebugRenderer.hpp"
 #include "../Engine/Collision.hpp"
 #include <algorithm>
-#include <cmath> 
+
 
 void Underground::Initialize()
 {
@@ -239,13 +239,6 @@ void Underground::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) c
         debugRenderer.DrawBox(colorShader, ramp.pos, ramp.size, { 1.0f, 1.0f });
     }
 
-    for (const auto& robot : m_robots)
-    {
-        if (!robot.IsDead())
-        {
-            debugRenderer.DrawBox(colorShader, robot.GetPosition(), robot.GetSize(), { 0.0f, 1.0f });
-        }
-    }
 }
 
 void Underground::Shutdown()

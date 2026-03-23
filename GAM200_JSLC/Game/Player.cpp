@@ -163,19 +163,6 @@ void Player::Update(double dt, Input::Input& input)
         {
             is_dashing = false;
         }
-
-        // Spawn Sandevistan afterimage ghosts at fixed intervals
-        m_afterimageSpawnTimer -= static_cast<float>(dt);
-        if (m_afterimageSpawnTimer <= 0.0f)
-        {
-            m_afterimageSpawnTimer = AFTERIMAGE_INTERVAL;
-            AfterimageGhost ghost;
-            ghost.position = position;
-            ghost.animFrame = m_animations[static_cast<int>(AnimationState::Walking)].currentFrame;
-            ghost.flipped   = m_is_flipped;
-            ghost.alpha     = AFTERIMAGE_INIT_ALPHA;
-            m_afterimageGhosts.push_back(ghost);
-        }
     }
     else
     {
@@ -257,6 +244,24 @@ void Player::Update(double dt, Input::Input& input)
         m_animations[static_cast<int>(m_currentAnimState)].Update(static_cast<float>(dt));
     }
 
+    // Spawn Sandevistan afterimage ghosts at fixed intervals.
+    // Spawn after animation-state update so crouch-dash leaves crouching ghosts.
+    if (is_dashing)
+    {
+        m_afterimageSpawnTimer -= static_cast<float>(dt);
+        if (m_afterimageSpawnTimer <= 0.0f)
+        {
+            m_afterimageSpawnTimer = AFTERIMAGE_INTERVAL;
+            AfterimageGhost ghost;
+            ghost.position = position;
+            ghost.animState = m_currentAnimState;
+            ghost.animFrame = m_animations[static_cast<int>(m_currentAnimState)].currentFrame;
+            ghost.flipped = m_is_flipped;
+            ghost.alpha = AFTERIMAGE_INIT_ALPHA;
+            m_afterimageGhosts.push_back(ghost);
+        }
+    }
+
     velocity.x = 0;
 }
 
@@ -273,26 +278,51 @@ void Player::Draw(const Shader& shader) const
     // Draw Sandevistan afterimage ghosts before the player (they appear behind)
     if (!m_afterimageGhosts.empty())
     {
-        const AnimationData& walkAnim = m_animations[static_cast<int>(AnimationState::Walking)];
         // Cyberpunk electric cyan tint
         shader.setVec3("colorTint", 0.0f, 0.85f, 1.0f);
 
         for (const auto& ghost : m_afterimageGhosts)
         {
-            Math::Matrix ghostModel = Math::Matrix::CreateTranslation(ghost.position) *
-                                      Math::Matrix::CreateScale(size);
+            AnimationState ghostState = ghost.animState;
+            const AnimationData* ghostAnim = &m_animations[static_cast<int>(ghostState)];
+            if (ghostAnim->textureID == 0 || ghostAnim->totalFrames <= 0)
+            {
+                ghostState = AnimationState::Walking;
+                ghostAnim = &m_animations[static_cast<int>(AnimationState::Walking)];
+            }
+
+            Math::Vec2 ghostSize = size;
+            Math::Vec2 ghostPos = ghost.position;
+            if (ghostState == AnimationState::Crouching)
+            {
+                float oldHeight = ghostSize.y;
+                ghostSize.x *= 0.7f;
+                ghostSize.y *= 0.7f;
+                ghostPos.y -= (oldHeight - ghostSize.y) * 0.5f;
+            }
+            else if (ghostState == AnimationState::Idle)
+            {
+                ghostSize.x *= 0.7f;
+            }
+
+            Math::Matrix ghostModel = Math::Matrix::CreateTranslation(ghostPos) *
+                                      Math::Matrix::CreateScale(ghostSize);
             shader.setMat4("model", ghostModel);
             shader.setBool("flipX", ghost.flipped);
             shader.setFloat("alpha", ghost.alpha);
             shader.setFloat("tintStrength", 0.75f);
 
-            float frame_x = static_cast<float>(ghost.animFrame * walkAnim.frameWidth);
-            float rect_x  = frame_x / static_cast<float>(walkAnim.texWidth);
-            float rect_w  = static_cast<float>(walkAnim.frameWidth) / static_cast<float>(walkAnim.texWidth);
+            int safeFrame = ghost.animFrame;
+            if (safeFrame < 0) safeFrame = 0;
+            if (safeFrame >= ghostAnim->totalFrames) safeFrame = ghostAnim->totalFrames - 1;
+
+            float frame_x = static_cast<float>(safeFrame * ghostAnim->frameWidth);
+            float rect_x  = frame_x / static_cast<float>(ghostAnim->texWidth);
+            float rect_w  = static_cast<float>(ghostAnim->frameWidth) / static_cast<float>(ghostAnim->texWidth);
             shader.setVec4("spriteRect", rect_x, 0.0f, rect_w, 1.0f);
 
             GL::ActiveTexture(GL_TEXTURE0);
-            GL::BindTexture(GL_TEXTURE_2D, walkAnim.textureID);
+            GL::BindTexture(GL_TEXTURE_2D, ghostAnim->textureID);
             GL::BindVertexArray(VAO);
             GL::DrawArrays(GL_TRIANGLES, 0, 6);
             GL::BindVertexArray(0);
@@ -302,22 +332,9 @@ void Player::Draw(const Shader& shader) const
         shader.setFloat("tintStrength", 0.0f);
     }
 
-    Math::Vec2 drawSize = size;
-    Math::Vec2 drawPosition = position;
-
-    if (m_currentAnimState == AnimationState::Crouching)
-    {
-        float oldHeight = drawSize.y;
-        drawSize.x *= 0.7f;
-        drawSize.y *= 0.7f;
-
-        float heightDiff = oldHeight - drawSize.y;
-        drawPosition.y -= heightDiff / 2.0f;
-    }
-    else if (m_currentAnimState == AnimationState::Idle)
-    {
-        drawSize.x *= 0.7f;
-    }
+    Math::Vec2 drawSize{};
+    Math::Vec2 drawPosition{};
+    GetCurrentDrawTransform(drawPosition, drawSize);
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(drawSize);
     Math::Matrix transMatrix = Math::Matrix::CreateTranslation(drawPosition);
@@ -356,6 +373,43 @@ void Player::Draw(const Shader& shader) const
     shader.setFloat("tintStrength", 0.0f);
 }
 
+void Player::DrawOutline(const Shader& outlineShader) const
+{
+    if (IsDead()) return;
+
+    const AnimationData& currentAnim = m_animations[static_cast<int>(m_currentAnimState)];
+    if (currentAnim.textureID == 0 || currentAnim.texWidth <= 0 || currentAnim.texHeight <= 0)
+    {
+        return;
+    }
+
+    Math::Vec2 drawSize{};
+    Math::Vec2 drawPosition{};
+    GetCurrentDrawTransform(drawPosition, drawSize);
+
+    Math::Matrix model = Math::Matrix::CreateTranslation(drawPosition) * Math::Matrix::CreateScale(drawSize);
+
+    outlineShader.use();
+    outlineShader.setMat4("model", model);
+    outlineShader.setBool("flipX", m_is_flipped);
+    outlineShader.setFloat("alpha", m_isHiding ? 0.5f : 1.0f);
+    outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
+    outlineShader.setFloat("outlineWidthTexels", 2.0f);
+    outlineShader.setVec2("texelSize", 1.0f / static_cast<float>(currentAnim.frameWidth),
+                          1.0f / static_cast<float>(currentAnim.texHeight));
+
+    float frame_x_offset = static_cast<float>(currentAnim.currentFrame * currentAnim.frameWidth);
+    float rect_x = frame_x_offset / static_cast<float>(currentAnim.texWidth);
+    float rect_w = static_cast<float>(currentAnim.frameWidth) / static_cast<float>(currentAnim.texWidth);
+    outlineShader.setVec4("spriteRect", rect_x, 0.0f, rect_w, 1.0f);
+
+    GL::ActiveTexture(GL_TEXTURE0);
+    GL::BindTexture(GL_TEXTURE_2D, currentAnim.textureID);
+    GL::BindVertexArray(VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
+}
+
 void Player::Shutdown()
 {
     GL::DeleteVertexArrays(1, &VAO);
@@ -384,23 +438,46 @@ void Player::TakeDamage(float amount)
 
 Math::Vec2 Player::GetHitboxSize() const
 {
+    Math::Vec2 drawSize{};
+    Math::Vec2 drawPosition{};
+    GetCurrentDrawTransform(drawPosition, drawSize);
+
     if (is_crouching)
     {
-        return { size.x * 0.4f, size.y * 0.5f };
+        return { drawSize.x * 0.75f, drawSize.y * 0.9f };
     }
-    else
-    {
-        return { size.x * 0.4f, size.y * 0.8f + 50.0f };
-    }
+    return { drawSize.x * 0.7f, drawSize.y * 0.92f };
 }
 
 Math::Vec2 Player::GetHitboxCenter() const
 {
+    Math::Vec2 drawSize{};
+    Math::Vec2 drawPosition{};
+    GetCurrentDrawTransform(drawPosition, drawSize);
+
     Math::Vec2 currentHitboxSize = GetHitboxSize();
-    float spriteFootY = position.y - (size.y / 2.0f);
+    float spriteFootY = drawPosition.y - (drawSize.y / 2.0f);
     float hitboxCenterY = spriteFootY + (currentHitboxSize.y / 2.0f);
 
-    return { position.x, hitboxCenterY };
+    return { drawPosition.x, hitboxCenterY };
+}
+
+void Player::GetCurrentDrawTransform(Math::Vec2& drawPosition, Math::Vec2& drawSize) const
+{
+    drawSize = size;
+    drawPosition = position;
+
+    if (m_currentAnimState == AnimationState::Crouching)
+    {
+        float oldHeight = drawSize.y;
+        drawSize.x *= 0.7f;
+        drawSize.y *= 0.7f;
+        drawPosition.y -= (oldHeight - drawSize.y) * 0.5f;
+    }
+    else if (m_currentAnimState == AnimationState::Idle)
+    {
+        drawSize.x *= 0.7f;
+    }
 }
 
 void Player::MoveLeft()

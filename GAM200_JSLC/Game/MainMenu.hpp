@@ -31,4 +31,5 @@ private:
 
     double m_glitchTimer = 0.0;
     bool m_enterPressed = false; // Prevent multiple triggers
+    bool m_waitForEnterRelease = false;
 };

@@ -22,6 +22,7 @@ struct AfterimageGhost
 {
     Math::Vec2 position;
     int animFrame = 0;
+    AnimationState animState = AnimationState::Walking;
     bool flipped = false;
     float alpha = 0.65f;
 };
@@ -46,6 +47,7 @@ public:
     void Init(Math::Vec2 startPos);
     void Update(double dt, Input::Input& input);
     void Draw(const Shader& shader) const;
+    void DrawOutline(const Shader& outlineShader) const;
     void Shutdown();
     void MoveLeft();
     void MoveRight();
@@ -75,6 +77,7 @@ public:
     bool IsDead() const;
 
 private:
+    void GetCurrentDrawTransform(Math::Vec2& drawPosition, Math::Vec2& drawSize) const;
     bool LoadAnimation(AnimationState state, const char* texturePath, int totalFrames, float frameDuration);
     AnimationState DetermineAnimationState() const;
     AnimationData m_animations[5];

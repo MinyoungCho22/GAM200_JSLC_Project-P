@@ -48,6 +48,9 @@ public:
     int GetAverageFps() const { return m_averageFps; }
     int GetWarningLevel() const { return m_warningLevel; }
 
+    // Clear pointers owned by GameplayState before the state is destroyed.
+    void ClearGameplayBindings();
+
 private:
     void UpdateFps(double dt);
     void DrawDroneDebugPanel();
