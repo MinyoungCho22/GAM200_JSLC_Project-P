@@ -284,7 +284,7 @@ void SettingState::DrawRect(const Math::Matrix& proj, float cx, float cy,
 // -----------------------------------------------------------------------------
 // Draw
 // -----------------------------------------------------------------------------
-void SettingState::Draw()
+void SettingState::DrawMainLayer()
 {
     Engine& engine = gsm.GetEngine();
 
@@ -437,6 +437,11 @@ void SettingState::Draw()
                           { GAME_WIDTH * 0.5f - m_escHintText.width * (HINT_SIZE / m_escHintText.height) * 0.5f,
                             ROW_HINT },
                           HINT_SIZE);
+}
+
+void SettingState::DrawForegroundLayer()
+{
+    // nothing
 }
 
 void SettingState::Shutdown()

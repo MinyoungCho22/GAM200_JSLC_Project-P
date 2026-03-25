@@ -14,7 +14,8 @@ public:
     MainMenu(GameStateManager& gsm);
     void Initialize() override;
     void Update(double dt) override;
-    void Draw() override;
+    void DrawMainLayer() override;
+    void DrawForegroundLayer() override;
     void Shutdown() override;
 
 private:
