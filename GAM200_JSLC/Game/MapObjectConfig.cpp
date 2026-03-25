@@ -178,7 +178,7 @@ MapObjectConfigData MapObjectConfig::DefaultData()
         { {6825.0f, 627.0f}, {296.0f, 369.0f}, "", {} }
     };
     data.underground.ramps = {
-        { {7140.0f, 1090.0f}, {780.0f, 300.0f}, "", {} }
+        { {7140.0f, 790.0f}, {780.0f, 300.0f}, "", {} }
     };
 
     data.subway.pulseSources = {
