@@ -23,6 +23,9 @@ public:
     // Set an integer value (often used for texture units/samplers)
     void setInt(const std::string& name, int value) const;
     
+    // Set a 2-component vector
+    void setVec2(const std::string& name, float v1, float v2) const;
+
     // Set a 3-component vector (often used for RGB colors or 3D positions)
     void setVec3(const std::string& name, float v1, float v2, float v3) const;
     

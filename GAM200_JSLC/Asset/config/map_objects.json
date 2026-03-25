@@ -1,0 +1,90 @@
+{
+  "room": {
+    "pulse_sources": [
+      { "top_left": [424.0, 360.0], "size": [51.0, 63.0] },
+      { "top_left": [692.0, 550.0], "size": [215.0, 180.0] },
+      { "top_left": [1414.0, 212.0], "size": [75.0, 33.0] }
+    ],
+    "blind": { "top_left": [1105.0, 352.0], "size": [310.0, 300.0] }
+  },
+  "hallway": {
+    "pulse_sources": [
+      {
+        "top_left": [2454.0, 705.0],
+        "size": [210.0, 312.0],
+        "sprite": "Asset/Hallway_pulsesource.png"
+      }
+    ],
+    "hiding_spots": [
+      {
+        "top_left": [2820.0, 923.0],
+        "size": [381.0, 324.0],
+        "sprite": "Asset/HidingSpot.png"
+      },
+      {
+        "top_left": [5620.0, 923.0],
+        "size": [381.0, 324.0],
+        "sprite": "Asset/HidingSpot.png"
+      }
+    ],
+    "obstacle": {
+      "top_left": [7489.0, 973.0],
+      "size": [369.0, 645.0]
+    }
+  },
+  "rooftop": {
+    "hole": {
+      "top_left": [9951.0, 1506.0],
+      "size": [785.0, 172.0],
+      "sprite": "Asset/Hole.png"
+    },
+    "pulse_sources": [
+      {
+        "top_left": [12521.0, 1700.0],
+        "size": [333.0, 240.0],
+        "sprite": "Asset/Hvac.png"
+      },
+      {
+        "top_left": [12900.0, 1700.0],
+        "size": [333.0, 240.0],
+        "sprite": "Asset/Hvac.png"
+      }
+    ],
+    "lift_button": {
+      "top_left": [13598.0, 1570.0],
+      "sprite": "Asset/LiftBotton.png",
+      "fallback_size": [320.0, 96.0]
+    }
+  },
+  "underground": {
+    "robot_spawns": [
+      [18239.0, -1685.0],
+      [21060.0, -1685.0]
+    ],
+    "pulse_sources": [
+      { "top_left": [243.0, 480.0], "size": [408.0, 132.0] },
+      { "top_left": [1949.0, 309.0], "size": [69.0, 255.0] },
+      { "top_left": [4485.0, 309.0], "size": [69.0, 255.0] },
+      { "top_left": [5847.0, 375.0], "size": [1013.0, 477.0] }
+    ],
+    "obstacles": [
+      { "top_left": [939.0, 834.0], "size": [561.0, 162.0] },
+      { "top_left": [1584.0, 627.0], "size": [288.0, 369.0] },
+      { "top_left": [2466.0, 834.0], "size": [561.0, 162.0] },
+      { "top_left": [3471.0, 834.0], "size": [561.0, 162.0] },
+      { "top_left": [4116.0, 627.0], "size": [288.0, 369.0] },
+      { "top_left": [5235.0, 834.0], "size": [561.0, 162.0] },
+      { "top_left": [6825.0, 627.0], "size": [296.0, 369.0] }
+    ],
+    "ramps": [
+      { "top_left": [7140.0, 1090.0], "size": [780.0, 300.0] }
+    ]
+  },
+  "subway": {
+    "pulse_sources": [
+      { "top_left": [1400.0, 171.0], "size": [270.0, 258.0] },
+      { "top_left": [3759.0, 84.0], "size": [350.0, 114.0] }
+    ],
+    "obstacles": []
+  }
+}

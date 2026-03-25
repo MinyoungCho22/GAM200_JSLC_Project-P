@@ -4,12 +4,15 @@
 #include <string>
 #include <memory>
 #include "Input.hpp"
-#include "Vec2.hpp" 
-#include "OpenGL/PostProcessManager.h" 
+#include "Vec2.hpp"
+#include "../OpenGL/PostProcessManager.h"
 
 struct GLFWwindow;
 class GameStateManager;
 class Shader;
+class ImguiManager;
+class DroneConfigManager;
+class RobotConfigManager;
 
 
 constexpr int VIRTUAL_WIDTH = 1920;
@@ -34,13 +37,25 @@ public:
 
     Shader& GetTextureShader() const { return *m_textureShader; }
 
+    ImguiManager* GetImguiManager() const { return m_imguiManager.get(); }
+    ImguiManager* GetImguiManager() { return m_imguiManager.get(); }
+    std::shared_ptr<DroneConfigManager> GetDroneConfigManager() { return m_droneConfigManager; }
+    std::shared_ptr<RobotConfigManager> GetRobotConfigManager() { return m_robotConfigManager; }
+
     void ToggleFullscreen();
+    void SetFullscreen(bool enabled);
+    bool IsFullscreen() const { return m_isFullscreen; }
 
     Math::ivec2 GetRecommendedResolution();
 
-    void SetResolution(int width, int height); 
+    void SetResolution(int width, int height);
 
     PostProcessManager& GetPostProcess() { return *m_postProcess; }
+
+    void SetVSync(bool enabled);
+    void SetFpsCap(int cap);
+    bool IsVSyncEnabled() const { return m_vsyncEnabled; }
+    int GetFpsCap() const { return m_fpsCap; }
 
 private:
     void Update();
@@ -60,6 +75,13 @@ private:
     std::unique_ptr<Input::Input> m_input;
 
     std::unique_ptr<Shader> m_textureShader;
+
+    std::unique_ptr<ImguiManager> m_imguiManager;
+    std::shared_ptr<DroneConfigManager> m_droneConfigManager;
+    std::shared_ptr<RobotConfigManager> m_robotConfigManager;
+
+    bool m_vsyncEnabled = false;
+    int  m_fpsCap = 0;
 
     bool m_isFullscreen = false;
     int m_windowedX = 100;

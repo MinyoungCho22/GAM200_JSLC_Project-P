@@ -1,0 +1,96 @@
+# Map Object Hitbox Coordinates
+
+Top-Left 기준
+
+## Room
+
+<!-- 실내 맵: 블라인드, 펄스 소스, 방 경계 -->
+
+| 오브젝트 | Raw Position (x, y) | Size (w, h) | 비고 |
+|---|---:|---:|---|
+| Room Bounds | (150.0, 930.0) | (1620.0, 780.0) | 플레이어 이동 경계 |
+| Pulse Source 1 | (424.0, 360.0) | (51.0, 63.0) | `Room.cpp` top-left 입력값 |
+| Pulse Source 2 | (692.0, 550.0) | (215.0, 180.0) | `Room.cpp` top-left 입력값 |
+| Pulse Source 3 | (1414.0, 212.0) | (75.0, 33.0) | `Room.cpp` top-left 입력값 |
+| Blind Interaction | (1105.0, 352.0) | (310.0, 300.0) | `Room.cpp` top-left 입력값 |
+
+## Gameplay Doors (Room/Hallway transition)
+
+<!-- GameplayState에서 생성되는 문 히트박스 -->
+
+| 오브젝트 | Raw Position (x, y) | Size (w, h) | 비고 |
+|---|---:|---:|---|
+| Room -> Hallway Door | (1710.0, 440.0) | (50.0, 300.0) | `GameplayState.cpp` Door 초기화 값 |
+| Hallway -> Rooftop Door | (7195.0, 400.0) | (300.0, 300.0) | `GameplayState.cpp` Door 초기화 값 |
+
+## Hallway
+
+<!-- 복도 맵: 은신처, 장애물, 펄스 소스 -->
+
+| 오브젝트 | Raw Position (x, y) | Size (w, h) | 비고 |
+|---|---:|---:|---|
+| Hallway Map Bounds | (1920.0, 1080.0) | (5940.0, 1080.0) | 배경/영역 |
+| Pulse Source 1 | (2454.0, 705.0) | (210.0, 312.0) | `Hallway.cpp` top-left 입력값 |
+| Hiding Spot 1 | (2820.0, 923.0) | (381.0, 324.0) | `Hallway.cpp` top-left 입력값 |
+| Hiding Spot 2 | (5620.0, 923.0) | (381.0, 324.0) | `Hallway.cpp` top-left 입력값 |
+| Obstacle | (7489.0, 973.0) | (369.0, 645.0) | `Hallway.cpp` top-left 입력값 |
+
+## Rooftop
+
+<!-- 옥상 맵: 구멍 상호작용, 리프트, 펄스 소스 -->
+
+| 오브젝트 | Raw Position (x, y) | Size (w, h) | 비고 |
+|---|---:|---:|---|
+| Rooftop Map Bounds | (8130.0, 1080.0) | (8400.0, 1080.0) | `Rooftop::MIN_X`, `Rooftop::MIN_Y` |
+| Hole Interaction Box | (9951.0, 1506.0) | (785.0, 172.0) | `Rooftop.cpp` top-left 입력값 |
+| Lift Platform (initial) | (13745.0, 1799.0) | (351.0, 345.0) | `Rooftop.cpp` top-left 입력값 |
+| Pulse Source 1 | (12521.0, 1700.0) | (333.0, 240.0) | `Rooftop.cpp` top-left 입력값 |
+| Pulse Source 2 | (12900.0, 1700.0) | (333.0, 240.0) | `Rooftop.cpp` top-left 입력값 |
+
+## Underground
+
+<!-- 지하 맵: 장애물, 램프, 펄스 소스, 적 스폰 -->
+
+| 오브젝트 | Raw Position (x, y) | Size (w, h) | 비고 |
+|---|---:|---:|---|
+| Underground Map Bounds | (16260.0, -2000.0) | (7920.0, 1080.0) | `Underground::MIN_X`, `Underground::MIN_Y` |
+| Obstacle 1 | (939.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
+| Obstacle 2 | (1584.0, 627.0) | (288.0, 369.0) | `AddObstacle` 입력값 |
+| Obstacle 3 | (2466.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
+| Obstacle 4 | (3471.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
+| Obstacle 5 | (4116.0, 627.0) | (288.0, 369.0) | `AddObstacle` 입력값 |
+| Obstacle 6 | (5235.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
+| Obstacle 7 | (6825.0, 627.0) | (296.0, 369.0) | `AddObstacle` 입력값 |
+| Pulse Source 1 | (243.0, 480.0) | (408.0, 132.0) | `AddPulseSource` 입력값 |
+| Pulse Source 2 | (1949.0, 309.0) | (69.0, 255.0) | `AddPulseSource` 입력값 |
+| Pulse Source 3 | (4485.0, 309.0) | (69.0, 255.0) | `AddPulseSource` 입력값 |
+| Pulse Source 4 | (5847.0, 375.0) | (1013.0, 477.0) | `AddPulseSource` 입력값 |
+| Ramp 1 | (23400.0, -2010.0) | (780.0, 300.0) | `AddRamp(startX, bottomY, ...)` 입력값 |
+
+### Underground Enemy Spawn Reference
+
+<!-- 히트박스가 아닌 스폰 위치 참고 -->
+
+| 오브젝트 | Position (x, y) | 비고 |
+|---|---:|---|
+| Robot Spawn 1 | (18239.0, -1685.0) | 로봇 스폰 |
+| Robot Spawn 2 | (21060.0, -1685.0) | 로봇 스폰 |
+| Drone Spawn 1 | (19423.0, -1450.0) | 드론 스폰 |
+| Drone Spawn 2 | (22203.0, -1450.0) | 드론 스폰 |
+| Drone Spawn 3 | (22787.0, -1450.0) | 드론 스폰 |
+
+## Subway
+
+<!-- 지하철 맵: 현재 펄스 소스만 배치, 장애물은 코드상 미배치 -->
+
+| 오브젝트 | Raw Position (x, y) | Size (w, h) | 비고 |
+|---|---:|---:|---|
+| Subway Map Bounds | (24180.0, -3500.0) | (7920.0, 1080.0) | `Subway::MIN_X`, `Subway::MIN_Y` |
+| Pulse Source 1 | (1400.0, 171.0) | (270.0, 258.0) | `AddPulseSource` 입력값 |
+| Pulse Source 2 | (3759.0, 84.0) | (350.0, 114.0) | `AddPulseSource` 입력값 |
+
+### Subway Enemy Spawn Reference
+
+<!-- 현재 코드 기준 로봇/드론 스폰 없음 -->
+
+- 현재 `Subway::Initialize()`에서 로봇/드론 스폰 코드는 없음.

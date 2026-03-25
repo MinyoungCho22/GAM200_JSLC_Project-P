@@ -6,19 +6,21 @@ project(GAM200JSLC VERSION 1.0 LANGUAGES CXX)
 # 2. C++ Standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-add_compile_options(/utf-8)
+
+option(ENABLE_FMOD "Enable FMOD audio if platform libraries are available" ON)
 
 # ==========================================================
 # [Collect Source/Header/Shader Files]
 # ==========================================================
 # Source files (.cpp)
-# [FIX] Added CONFIGURE_DEPENDS: Automatically re-configure if files change
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     "main.cpp"
     "Engine/*.cpp"
     "Game/*.cpp"
     "OpenGL/*.cpp"
     "CS200/*.cpp"
+    "ThirdParty/imgui/*.cpp"
+    "ThirdParty/imgui/backends/*.cpp"
 )
 
 # Header files (.hpp, .h)
@@ -31,51 +33,144 @@ file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
     "CS200/*.h"
 )
 
-# [Added] Shader files (.vert, .frag) - Collected to display in VS
+# Shader files (.vert, .frag)
 file(GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS
     "OpenGL/Shaders/*.vert"
     "OpenGL/Shaders/*.frag"
 )
 
-# 3. Create Executable (Include shader files here to show them in IDE)
+# 3. Create Executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${SHADER_FILES})
 
-# 4. MSVC Options
+# 4. Compiler/Platform Options
 if(MSVC)
-    add_compile_options(/utf-8)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE _CONSOLE)
+    target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE _CONSOLE USE_GLEW)
+else()
+    # Silence unused-result errors from system headers on Unix-likes if needed
+    add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+    if(APPLE)
+        # Silence macOS OpenGL deprecation warnings
+        target_compile_definitions(${PROJECT_NAME} PRIVATE GL_SILENCE_DEPRECATION)
+        # Ensure C++ stdlib headers are found (SDK-based toolchain on macOS)
+        set(OSX_SYSROOT "$ENV{SDKROOT}")
+        if(NOT OSX_SYSROOT)
+            set(OSX_SYSROOT "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")
+        endif()
+        target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${OSX_SYSROOT}/usr/include/c++/v1")
+    endif()
 endif()
 
-# 5. Include Paths
-target_include_directories(${PROJECT_NAME} PRIVATE 
+# ==========================================================
+# [Include & Link Settings]
+# ==========================================================
+
+target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/Engine"
     "${CMAKE_CURRENT_SOURCE_DIR}/Game"
     "${CMAKE_CURRENT_SOURCE_DIR}/OpenGL"
     "${CMAKE_CURRENT_SOURCE_DIR}/CS200"
-    "C:/vcpkg/installed/x64-windows/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui/backends"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/json"
 )
 
-# ==========================================================
-# [Library Settings]
-# ==========================================================
-# 1. Force copy 'fmod_vc.lib' to build directory (Kept existing logic)
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Engine/fmod_vc.lib" 
-     DESTINATION "${CMAKE_BINARY_DIR}")
+# Dear ImGui OpenGL backend needs to know which GL loader is used by the application.
+# This project uses GLEW on Windows (see USE_GLEW).
+target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLEW SDL_MAIN_HANDLED)
 
-# 2. Link Libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE 
-    "${CMAKE_BINARY_DIR}/fmod_vc.lib"  # Use the copied lib
-    opengl32 
-    glew32 
-    SDL2
-)
+find_package(OpenGL REQUIRED)
+find_package(PkgConfig QUIET)
+
+# SDL2
+find_package(SDL2 CONFIG QUIET)
+if(NOT SDL2_FOUND AND PKG_CONFIG_FOUND AND NOT WIN32)
+    pkg_check_modules(SDL2 sdl2)
+endif()
+
+if(SDL2_FOUND)
+    target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2)
+elseif(SDL2_LIBRARIES)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${SDL2_LIBRARIES})
+endif()
+
+# GLEW (only required on Windows where bundled binaries exist)
+if(WIN32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_GLEW)
+endif()
+
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
+
+# GLFW
+if(NOT WIN32)
+    find_package(glfw3 CONFIG QUIET)
+    if(NOT glfw3_FOUND AND PKG_CONFIG_FOUND)
+        pkg_check_modules(GLFW glfw3)
+    endif()
+
+    if(glfw3_FOUND)
+        target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
+    elseif(GLFW_FOUND)
+        target_include_directories(${PROJECT_NAME} PRIVATE ${GLFW_INCLUDE_DIRS})
+        target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARIES})
+    endif()
+endif()
+
+if(WIN32)
+    # Additional Windows-only search paths and libraries
+    target_link_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        opengl32
+        glew32
+        SDL2
+        glfw3dll
+    )
+endif()
+
+if(ENABLE_FMOD)
+    if(WIN32)
+        file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Engine/fmod_vc.lib"
+             DESTINATION "${CMAKE_BINARY_DIR}")
+        target_link_libraries(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/fmod_vc.lib")
+    elseif(APPLE)
+        set(FMOD_DYLIB "${CMAKE_CURRENT_SOURCE_DIR}/Engine/libfmod.dylib")
+        if(EXISTS "${FMOD_DYLIB}")
+            target_link_libraries(${PROJECT_NAME} PRIVATE "${FMOD_DYLIB}")
+
+            # Ensure the dylib is next to the executable at runtime
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${FMOD_DYLIB}"
+                $<TARGET_FILE_DIR:${PROJECT_NAME}>
+                COMMENT "Copying FMOD dylib..."
+            )
+
+            # Make the executable search for dylibs next to it
+            set_target_properties(${PROJECT_NAME} PROPERTIES
+                BUILD_RPATH "@executable_path"
+            )
+        else()
+            target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_FMOD)
+            message(WARNING "FMOD enabled but ${FMOD_DYLIB} not found; building with DISABLE_FMOD")
+        endif()
+    else()
+        # Other non-Windows platforms not configured for FMOD in this repo
+        target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_FMOD)
+        message(WARNING "FMOD enabled but not configured for this platform; building with DISABLE_FMOD")
+    endif()
+else()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_FMOD)
+endif()
 
 # ==========================================================
 # [Post-Build Events (Auto Copy)]
 # ==========================================================
 
-# 1. Copy 'Asset' folder
+# 1. Copy Asset
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_CURRENT_SOURCE_DIR}/Asset
@@ -83,7 +178,7 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMENT "Copying Asset folder..."
 )
 
-# 2. Copy 'OpenGL' folder entirely (Solves shader path issues)
+# 2. Copy OpenGL
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_CURRENT_SOURCE_DIR}/OpenGL
@@ -91,26 +186,25 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMENT "Copying OpenGL folder..."
 )
 
-# [Added] 3. Auto Copy DLL Files (DLLs folder -> Next to Executable)
-# Find all .dll files in the 'DLLs' folder of the project root.
-# [FIX] Added CONFIGURE_DEPENDS ensures CMake sees new DLLs immediately.
-file(GLOB DLL_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/DLLs/*.dll")
+if(WIN32)
+    # 3. Auto Copy DLL Files (always copy to ensure they are present)
+    file(GLOB DLL_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/DLLs/*.dll")
 
-# Copy found DLLs iteratively
-foreach(DLL ${DLL_FILES})
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${DLL}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/DLLs"
         $<TARGET_FILE_DIR:${PROJECT_NAME}>
-        COMMENT "Copying DLL: ${DLL}"
+        COMMENT "Copying all DLL files..."
     )
-endforeach()
+
+    # Set working directory for Visual Studio debugger so relative paths resolve correctly
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+    )
+endif()
 
 # ==========================================================
 # [Visual Studio Filter Settings]
 # ==========================================================
-# Organize standard source codes by folder structure
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SOURCES} ${HEADERS})
-
-# [Added] Organize shader files neatly under 'OpenGL/Shaders' filter
 source_group("OpenGL\\Shaders" FILES ${SHADER_FILES})

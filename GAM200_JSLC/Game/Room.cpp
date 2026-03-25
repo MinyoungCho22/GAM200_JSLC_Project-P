@@ -7,6 +7,7 @@
 #include "../Engine/DebugRenderer.hpp"
 #include "../Engine/Collision.hpp"
 #include "../Game/PulseCore.hpp"
+#include "MapObjectConfig.hpp"
 
 // Level design constants
 constexpr float ROOM_WIDTH = 1620.0f;
@@ -36,36 +37,28 @@ void Room::Initialize(Engine& engine, const char* texturePath)
     m_roomSize = { ROOM_WIDTH, ROOM_HEIGHT };
     m_roomCenter = { minX + ROOM_WIDTH / 2.0f, minY + ROOM_HEIGHT / 2.0f };
 
-    // Initialize PulseSource entities at hardcoded level-design positions
-    // Coordinates are converted from Top-Left origin to Center-based world origin
-    float width1 = 51.f, height1 = 63.f;
-    float topLeftX1 = 424.f, topLeftY1 = 360.f;
-    Math::Vec2 center1 = { topLeftX1 + (width1 / 2.0f), topLeftY1 - (height1 / 2.0f) };
-    m_pulseSources.emplace_back();
-    m_pulseSources.back().Initialize(center1, { width1, height1 }, 100.f);
-
-    float width2 = 215.f, height2 = 180.f;
-    float topLeftX2 = 692.f, topLeftY2 = 550.f;
-    Math::Vec2 center2 = { topLeftX2 + (width2 / 2.0f), topLeftY2 - (height2 / 2.0f) };
-    m_pulseSources.emplace_back();
-    m_pulseSources.back().Initialize(center2, { width2, height2 }, 100.f);
-
-    float width3 = 75.f, height3 = 33.f;
-    float topLeftX3 = 1414.f, topLeftY3 = 212.f;
-    Math::Vec2 center3 = { topLeftX3 + (width3 / 2.0f), topLeftY3 - (height3 / 2.0f) };
-    m_pulseSources.emplace_back();
-    m_pulseSources.back().Initialize(center3, { width3, height3 }, 100.f);
-
-    // Setup Blind interaction zone
-    float blindWidth = 310.f, blindHeight = 300.f;
-    float blindTopLeftX = 1105.f, blindTopLeftY = 352.f;
-    float blindBottomY = GAME_HEIGHT - blindTopLeftY;
-
-    m_blindPos = { blindTopLeftX + (blindWidth / 2.0f), blindBottomY - (blindHeight / 2.0f) };
-    m_blindSize = { blindWidth, blindHeight };
+    ApplyConfig(MapObjectConfig::Instance().GetData().room);
     
     m_isBright = false;
     m_playerInBlindArea = false;
+}
+
+void Room::ApplyConfig(const RoomObjectConfig& cfg)
+{
+    for (auto& source : m_pulseSources) source.Shutdown();
+    m_pulseSources.clear();
+
+    for (const auto& p : cfg.pulseSources)
+    {
+        Math::Vec2 center = { p.topLeft.x + p.size.x * 0.5f, p.topLeft.y - p.size.y * 0.5f };
+        m_pulseSources.emplace_back();
+        m_pulseSources.back().Initialize(center, p.size, 100.0f);
+    }
+
+    float blindBottomY = GAME_HEIGHT - cfg.blind.topLeft.y;
+    m_blindPos = { cfg.blind.topLeft.x + cfg.blind.size.x * 0.5f,
+                   blindBottomY - cfg.blind.size.y * 0.5f };
+    m_blindSize = cfg.blind.size;
 }
 
 void Room::Shutdown()
@@ -75,8 +68,11 @@ void Room::Shutdown()
     for (auto& source : m_pulseSources) source.Shutdown();
 }
 
-void Room::Update(Player& player, double dt, Input::Input& input)
+void Room::Update(Player& player, double dt, Input::Input& input, Math::Vec2 mouseWorldPos)
 {
+    (void)dt;
+    (void)mouseWorldPos;
+
     Math::Vec2 centerPos = player.GetPosition();
     Math::Vec2 halfSize = player.GetSize() * 0.5f;
 
@@ -99,13 +95,16 @@ void Room::Update(Player& player, double dt, Input::Input& input)
     // Check for interaction with Blinds
     m_playerInBlindArea = Collision::CheckAABB(player.GetPosition(), player.GetHitboxSize(), m_blindPos, m_blindSize);
 
-    if (m_playerInBlindArea && input.IsKeyTriggered(Input::Key::J) && !m_isBright)
+    // More forgiving interaction: if player is in blind area, left click works
+    // without requiring a precise cursor-over-blind point test.
+    if (m_playerInBlindArea && input.IsMouseButtonTriggered(Input::MouseButton::Left) && !m_isBright)
     {
         const float BLIND_TOGGLE_COST = 20.0f;
+        const float MIN_PULSE_TO_OPERATE_BLIND = 30.0f;
         Pulse& pulse = player.GetPulseCore().getPulse();
 
-        // Spending player energy to trigger environment change
-        if (pulse.Value() >= BLIND_TOGGLE_COST)
+        // Do not allow blind interaction when pulse is 30 or below.
+        if (pulse.Value() > MIN_PULSE_TO_OPERATE_BLIND && pulse.Value() >= BLIND_TOGGLE_COST)
         {
             pulse.spend(BLIND_TOGGLE_COST);
             m_isBright = true;

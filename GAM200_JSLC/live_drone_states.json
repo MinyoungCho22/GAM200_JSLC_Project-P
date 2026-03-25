@@ -1,0 +1,21 @@
+[
+    {
+        "attackAngle": -520.525634765625,
+        "attackDirection": -1,
+        "attackRadius": 100.0,
+        "baseSpeed": 200.0,
+        "damageTimer": 0.0,
+        "droneIndex": 0,
+        "isAttacking": false,
+        "isDead": false,
+        "isDebugMode": false,
+        "isHit": false,
+        "mapName": "Hallway",
+        "positionX": 3188.035888671875,
+        "positionY": 415.09716796875,
+        "sizeX": 120.0,
+        "sizeY": 120.0,
+        "velocityX": 200.0,
+        "velocityY": 0.0
+    }
+]

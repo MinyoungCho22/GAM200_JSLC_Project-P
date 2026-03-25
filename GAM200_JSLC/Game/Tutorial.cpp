@@ -21,7 +21,7 @@ void Tutorial::Init(Font& font, Shader& atlasShader, Math::Vec2 pursePosition, M
 {
     // Initialize the basic item absorption tutorial
     TutorialMessage msg;
-    msg.text = "Press I To Absorb the Purse";
+    msg.text = "Right-Click To Absorb the Purse";
     msg.texture = font.PrintToTexture(atlasShader, msg.text);
     msg.targetPosition = pursePosition;
     msg.targetSize = purseSize;
@@ -53,7 +53,7 @@ void Tutorial::AddHidingSpotMessage(Font& font, Shader& atlasShader, Math::Vec2 
 void Tutorial::AddHoleMessage(Font& font, Shader& atlasShader)
 {
     TutorialMessage msg;
-    msg.text = "Press the J key to fill the hole with pulses";
+    msg.text = "Left-Click to fill the hole with pulses";
     msg.texture = font.PrintToTexture(atlasShader, msg.text);
     msg.textPosition = { GAME_WIDTH / 2.0f - 400.0f, 100.0f };
     msg.textHeight = 50.0f;
@@ -66,7 +66,7 @@ void Tutorial::AddHoleMessage(Font& font, Shader& atlasShader)
 void Tutorial::AddBlindMessage(Font& font, Shader& atlasShader)
 {
     TutorialMessage msg;
-    msg.text = "Press the J key to open the blinds";
+    msg.text = "Left-Click to open the blinds";
     msg.texture = font.PrintToTexture(atlasShader, msg.text);
     msg.textPosition = { GAME_WIDTH / 2.0f - 350.0f, 150.0f };
     msg.textHeight = 50.0f;
@@ -79,7 +79,7 @@ void Tutorial::AddBlindMessage(Font& font, Shader& atlasShader)
 void Tutorial::AddRoomDoorMessage(Font& font, Shader& atlasShader)
 {
     TutorialMessage msg;
-    msg.text = "Press the J key to open the door.";
+    msg.text = "Left-Click to open the door.";
     msg.texture = font.PrintToTexture(atlasShader, msg.text);
     msg.textPosition = { GAME_WIDTH / 2.0f - 300.0f, 200.0f };
     msg.textHeight = 50.0f;
@@ -92,7 +92,7 @@ void Tutorial::AddRoomDoorMessage(Font& font, Shader& atlasShader)
 void Tutorial::AddRooftopDoorMessage(Font& font, Shader& atlasShader)
 {
     TutorialMessage msg;
-    msg.text = "Press the J key to go up the stairs.";
+    msg.text = "Left-Click to go up the stairs.";
     msg.texture = font.PrintToTexture(atlasShader, msg.text);
     msg.textPosition = { GAME_WIDTH / 2.0f - 300.0f, 200.0f };
     msg.textHeight = 50.0f;
@@ -107,7 +107,7 @@ void Tutorial::AddDroneCrashMessage(Font& font, Shader& atlasShader)
     // Special hint displayed after successful hiding tutorial
     TutorialMessage msg;
     msg.id = "drone_crash_hint";
-    msg.text = "Hold down the J key for over 1 second to crash the drone!";
+    msg.text = "Hold Left-Click for over 1 second to crash the drone!";
     msg.texture = font.PrintToTexture(atlasShader, msg.text);
     msg.textPosition = { GAME_WIDTH / 2.0f - 450.0f, 100.0f };
     msg.textHeight = 50.0f;
@@ -122,7 +122,7 @@ void Tutorial::AddDroneCrashMessage(Font& font, Shader& atlasShader)
 void Tutorial::AddLiftMessage(Font& font, Shader& atlasShader)
 {
     TutorialMessage msg;
-    msg.text = "Press the J key to take the Lift and move to another building";
+    msg.text = "Left-Click to take the Lift and move to another building";
     msg.texture = font.PrintToTexture(atlasShader, msg.text);
     msg.textPosition = { GAME_WIDTH / 2.0f - 500.0f, 100.0f };
     msg.textHeight = 50.0f;

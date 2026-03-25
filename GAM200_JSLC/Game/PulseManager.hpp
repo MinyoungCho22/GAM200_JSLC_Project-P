@@ -20,7 +20,8 @@ public:
         std::vector<PulseSource>& hallwaySources,
         std::vector<PulseSource>& rooftopSources,
         std::vector<PulseSource>& undergroundSources,
-        bool is_interact_key_pressed, double dt);
+        std::vector<PulseSource>& subwaySources,
+        bool is_interact_key_pressed, double dt, Math::Vec2 mouseWorldPos);
 
     void UpdateAttackVFX(bool isAttacking, Math::Vec2 startPos, Math::Vec2 endPos);
 
@@ -35,7 +36,6 @@ private:
     unsigned int m_texCornerSE = 0;
     unsigned int m_texCornerSW = 0;
 
-    unsigned int m_circuitTexID = 0;
     unsigned int m_fluidTexID = 0;
     unsigned int m_pulseVAO = 0;
     unsigned int m_pulseVBO = 0;
@@ -46,8 +46,6 @@ private:
     bool m_isCharging = false;
     float m_vfxTimer = 0.0f;
     double m_logTimer = 0.0;
-    Math::Vec2 m_attackStartPos;
-    Math::Vec2 m_attackEndPos;
 
     Math::Vec2 m_chargeStartPos;
     Math::Vec2 m_chargeEndPos;

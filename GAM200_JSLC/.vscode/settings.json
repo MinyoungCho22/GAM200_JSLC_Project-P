@@ -1,0 +1,44 @@
+{
+    "files.associations": {
+        "*.hpp": "cpp",
+        "*.cpp": "cpp",
+        "*.h": "c"
+    },
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/Engine",
+        "${workspaceFolder}/Game",
+        "${workspaceFolder}/OpenGL",
+        "${workspaceFolder}/CS200"
+    ],
+    "C_Cpp.default.defines": [
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE"
+    ],
+    
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.cStandard": "c17",
+    "C_Cpp.default.cppStandard": "c++20",
+
+    
+    "cmake.configureOnOpen": true,
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.buildEnvironment": {
+        "VSLANG": "1033",
+        "DOTNET_CLI_UI_LANGUAGE": "en-US"
+    },
+    "cmake.environment": {
+        "VSLANG": "1033",
+        "DOTNET_CLI_UI_LANGUAGE": "en-US"
+    },
+    "cmake.buildToolArgs": [
+        "/p:PreferredUILang=en-US"
+    ],
+    "cmake.outputLogEncoding": "utf-8",
+    "terminal.integrated.automationProfile.windows": {
+        "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+    }
+}

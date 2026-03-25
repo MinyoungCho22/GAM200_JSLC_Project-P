@@ -10,7 +10,7 @@
 #include <vector>
 #include <cmath>
 #include <string>
-#include <random>
+
 
 // Logical screen dimensions
 constexpr float GAME_WIDTH = 1920.0f;
@@ -24,8 +24,8 @@ GameOver::GameOver(GameStateManager& gsm_ref, bool& isGameOverFlag)
 void GameOver::Initialize()
 {
     // Initialize shaders and font system
-    m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
-    m_colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
+    m_fontShader = std::make_unique<Shader>("OpenGL/Shaders/simple.vert", "OpenGL/Shaders/simple.frag");
+    m_colorShader = std::make_unique<Shader>("OpenGL/Shaders/solid_color.vert", "OpenGL/Shaders/solid_color.frag");
 
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
@@ -69,6 +69,10 @@ void GameOver::Update(double dt)
 
 void GameOver::Draw()
 {
+    // Always clear to black so TERMINATED text is clearly visible.
+    GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    GL::Clear(GL_COLOR_BUFFER_BIT);
+
     // Use fixed orthographic projection for UI
     Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT, -1.0f, 1.0f);
 
@@ -77,6 +81,7 @@ void GameOver::Draw()
 
     m_colorShader->use();
     m_colorShader->setMat4("projection", projection);
+    m_colorShader->setFloat("uAlpha", 1.0f);
 
     GL::BindVertexArray(m_quadVAO);
 

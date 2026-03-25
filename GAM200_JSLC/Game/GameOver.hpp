@@ -16,6 +16,7 @@ public:
     void Update(double dt) override;
     void Draw() override;
     void Shutdown() override;
+    bool BypassPostProcess() const override { return true; }
 
 private:
     GameStateManager& gsm;

@@ -14,6 +14,12 @@ public:
     void SetPosition(Math::Vec2 position);
     void SetBounds(Math::Vec2 minBounds, Math::Vec2 maxBounds);
 
+    // Camera animation for transitions
+    void StartAnimation(Math::Vec2 startPos, Math::Vec2 endPos, float duration);
+    void UpdateAnimation(float dt);
+    bool IsAnimating() const { return m_isAnimating; }
+    void StopAnimation();
+
     Math::Matrix GetViewMatrix() const;
     Math::Vec2 GetPosition() const { return m_position; }
 
@@ -24,4 +30,11 @@ private:
     Math::Vec2 m_minBounds;
     Math::Vec2 m_maxBounds;
     bool m_hasBounds;
+
+    // Animation state
+    bool m_isAnimating = false;
+    Math::Vec2 m_animStartPos;
+    Math::Vec2 m_animEndPos;
+    float m_animDuration = 0.0f;
+    float m_animElapsed = 0.0f;
 };

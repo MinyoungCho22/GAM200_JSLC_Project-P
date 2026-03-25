@@ -3,8 +3,9 @@
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
-#include "../Engine/Input.hpp" 
-#include <string>
+#include "../Engine/Input.hpp"
+
+#include <vector>
 
 class Shader;
 
@@ -15,6 +16,15 @@ enum class AnimationState
     Jumping,
     Crouching,
     Dashing
+};
+
+struct AfterimageGhost
+{
+    Math::Vec2 position;
+    int animFrame = 0;
+    AnimationState animState = AnimationState::Walking;
+    bool flipped = false;
+    float alpha = 0.65f;
 };
 
 struct AnimationData
@@ -37,6 +47,7 @@ public:
     void Init(Math::Vec2 startPos);
     void Update(double dt, Input::Input& input);
     void Draw(const Shader& shader) const;
+    void DrawOutline(const Shader& outlineShader) const;
     void Shutdown();
     void MoveLeft();
     void MoveRight();
@@ -51,6 +62,8 @@ public:
     void SetOnGround(bool onGround);
 
     void SetHiding(bool hiding) { m_isHiding = hiding; }
+    void SetGodMode(bool godMode) { m_godMode = godMode; }
+    bool IsGodMode() const { return m_godMode; }
 
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
@@ -64,6 +77,7 @@ public:
     bool IsDead() const;
 
 private:
+    void GetCurrentDrawTransform(Math::Vec2& drawPosition, Math::Vec2& drawSize) const;
     bool LoadAnimation(AnimationState state, const char* texturePath, int totalFrames, float frameDuration);
     AnimationState DetermineAnimationState() const;
     AnimationData m_animations[5];
@@ -87,10 +101,24 @@ private:
     float jump_velocity = 900.0f;
     float dash_speed = 900.0f;
     float dash_duration = 0.15f;
+    
+    // Physics parameters for realistic movement
+    float m_acceleration = 1200.0f;        // Acceleration rate when moving
+    float m_friction = 1000.0f;            // Friction/deceleration rate
+    float m_maxSpeed = 300.0f;             // Maximum horizontal speed
+    float m_currentHorizontalSpeed = 0.0f; // Current horizontal velocity
     unsigned int VAO = 0;
     unsigned int VBO = 0;
     bool m_is_flipped = false;
     bool can_double_jump = false;
     bool is_double_jumping = false;
     bool m_isHiding = false;
+    bool m_godMode = false;
+
+    // Sandevistan afterimage effect
+    std::vector<AfterimageGhost> m_afterimageGhosts;
+    float m_afterimageSpawnTimer = 0.0f;
+    static constexpr float AFTERIMAGE_INTERVAL   = 0.025f;
+    static constexpr float AFTERIMAGE_FADE_SPEED = 5.0f;
+    static constexpr float AFTERIMAGE_INIT_ALPHA = 0.65f;
 };

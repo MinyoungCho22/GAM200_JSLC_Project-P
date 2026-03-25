@@ -17,7 +17,7 @@ class Door
 {
 public:
     void Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost, DoorType type);
-    void Update(Player& player, bool isInteractKeyPressed);
+    void Update(Player& player, bool isInteractKeyPressed, Math::Vec2 mouseWorldPos);
     void DrawDebug(Shader& shader) const;
     void Shutdown();
 
@@ -26,6 +26,9 @@ public:
 
     bool IsPlayerNearby() const { return m_isPlayerNearby; }
     bool IsOpened() const { return m_isOpened; }
+    
+    Math::Vec2 GetPosition() const { return m_position; }
+    Math::Vec2 GetSize() const { return m_size; }
 
 private:
     Math::Vec2 m_position{};

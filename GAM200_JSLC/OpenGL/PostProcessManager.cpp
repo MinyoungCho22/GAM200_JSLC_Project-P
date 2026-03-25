@@ -1,4 +1,4 @@
-﻿// PostProcessManager.cpp
+// PostProcessManager.cpp
 
 #include "PostProcessManager.h"
 #include "../OpenGL/GLWrapper.hpp"
@@ -30,6 +30,8 @@ void PostProcessManager::Initialize(int width, int height)
 {
     m_width = width;
     m_height = height;
+    m_displayWidth = width;
+    m_displayHeight = height;
 
     CreateFullscreenQuad();
     CreateSceneFBO();
@@ -99,12 +101,17 @@ void PostProcessManager::ApplyAndPresent()
 {
     GL::Disable(GL_DEPTH_TEST);
 
-    GL::Viewport(0, 0, m_width, m_height);
+    // Preserve virtual aspect ratio on all displays (including HiDPI/Retina).
+    // This prevents stretching and keeps UI/gameplay consistent cross-platform.
+    int vpX = 0, vpY = 0, vpW = m_displayWidth, vpH = m_displayHeight;
+    ComputeLetterboxViewport(vpX, vpY, vpW, vpH);
+
+    GL::Viewport(vpX, vpY, vpW, vpH);
     GL::ClearColor(0.f, 0.f, 0.f, 1.f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
     m_postShader->use();
-    m_postShader->setFloat("uExposure", m_settings.exposure);
+    m_postShader->setFloat("uExposure", m_passthrough ? 1.0f : m_settings.exposure);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, m_sceneColorTex);
@@ -114,6 +121,34 @@ void PostProcessManager::ApplyAndPresent()
     GL::BindVertexArray(0);
 
     GL::BindTexture(GL_TEXTURE_2D, 0);
+}
+
+void PostProcessManager::ComputeLetterboxViewport(int& outX, int& outY, int& outW, int& outH) const
+{
+    outX = 0;
+    outY = 0;
+    outW = m_displayWidth;
+    outH = m_displayHeight;
+
+    if (m_displayWidth <= 0 || m_displayHeight <= 0 || m_width <= 0 || m_height <= 0) return;
+
+    const float virtualAspect = static_cast<float>(m_width) / static_cast<float>(m_height);
+    const float displayAspect = static_cast<float>(m_displayWidth) / static_cast<float>(m_displayHeight);
+
+    if (displayAspect > virtualAspect)
+    {
+        outH = m_displayHeight;
+        outW = static_cast<int>(static_cast<float>(outH) * virtualAspect);
+        outX = (m_displayWidth - outW) / 2;
+        outY = 0;
+    }
+    else if (displayAspect < virtualAspect)
+    {
+        outW = m_displayWidth;
+        outH = static_cast<int>(static_cast<float>(outW) / virtualAspect);
+        outX = 0;
+        outY = (m_displayHeight - outH) / 2;
+    }
 }
 
 void PostProcessManager::CreateSceneFBO()

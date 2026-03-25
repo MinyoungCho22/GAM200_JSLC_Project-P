@@ -17,13 +17,13 @@
 #include "Hallway.hpp"
 #include "Rooftop.hpp"
 #include "TraceSystem.hpp" 
-#include "GameOver.hpp" 
 #include "MainMenu.hpp"
 #include "Tutorial.hpp"
 #include "Underground.hpp"
+#include "Subway.hpp"
 #include <memory>
 #include <vector>
-#include <string>
+
 
 class Shader;
 class GameStateManager;
@@ -40,12 +40,16 @@ public:
 private:
     void HandleRoomToHallwayTransition();
     void HandleHallwayToRooftopTransition();
+    void HandleRooftopToUndergroundTransition();
+    void HandleUndergroundToSubwayTransition();
+    Math::Vec2 ScreenToWorldCoordinates(double screenX, double screenY) const;
 
     GameStateManager& gsm;
     Player player;
     std::unique_ptr<Shader> textureShader;
     std::unique_ptr<Shader> colorShader;
     std::unique_ptr<Shader> m_fontShader;
+    std::unique_ptr<Shader> m_outlineShader;
     std::vector<PulseSource> pulseSources;
     std::unique_ptr<PulseManager> pulseManager;
     std::unique_ptr<DroneManager> droneManager;
@@ -56,12 +60,12 @@ private:
     std::unique_ptr<Door> m_door;
     std::unique_ptr<Door> m_rooftopDoor;
     double m_logTimer = 0.0;
-    std::unique_ptr<Font> m_font;
     double m_fpsTimer = 0.0;
     int m_frameCount = 0;
-    CachedTextureInfo m_fpsText;
+    std::unique_ptr<Font> m_font;
     CachedTextureInfo m_pulseText;
     CachedTextureInfo m_debugToggleText;
+    CachedTextureInfo m_fpsText;
     CachedTextureInfo m_warningLevelText;
     Camera m_camera;
     std::unique_ptr<Hallway> m_hallway;
@@ -69,8 +73,9 @@ private:
     std::unique_ptr<TraceSystem> m_traceSystem;
     std::unique_ptr<Tutorial> m_tutorial;
     std::unique_ptr<Underground> m_underground;
+    std::unique_ptr<Subway> m_subway;
     bool m_undergroundAccessed = false;
-    void HandleRooftopToUndergroundTransition();
+    bool m_subwayAccessed = false;
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;

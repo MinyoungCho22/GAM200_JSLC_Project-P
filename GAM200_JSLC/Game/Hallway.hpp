@@ -4,13 +4,14 @@
 #include "../Engine/Vec2.hpp"
 #include "PulseSource.hpp"
 #include "DroneManager.hpp"
+#include "Background.hpp"
 #include <memory>
 #include <vector>
 
-class Background;
 class Shader;
 class Player;
 class DebugRenderer;
+struct HallwayObjectConfig;
 
 class Hallway
 {
@@ -20,12 +21,14 @@ public:
     {
         Math::Vec2 pos;
         Math::Vec2 size;
+        std::unique_ptr<Background> sprite; // PNG sprite (nullptr when absent)
     };
 
     static constexpr float WIDTH = 5940.0f;
     static constexpr float HEIGHT = 1080.0f;
 
     void Initialize();
+    void ApplyConfig(const HallwayObjectConfig& cfg);
     void Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPlayerHiding);
 
     void Draw(Shader& shader);
@@ -37,6 +40,12 @@ public:
     void Shutdown();
     void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
 
+    // Draw pixel-perfect outlines when the player is near sprite-backed objects.
+    // outlineShader: shader built from simple.vert + outline.frag.
+    // proximityDist: reaction distance in world pixels (default: 300).
+    void DrawSpriteOutlines(Shader& outlineShader,
+                            Math::Vec2 playerPos, float proximityDist = 300.f) const;
+
     void ClearAllDrones();
 
     Math::Vec2 GetPosition() const;
@@ -46,6 +55,7 @@ public:
     std::vector<PulseSource>& GetPulseSources();
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
+    DroneManager* GetDroneManager() { return m_droneManager.get(); }
 
     const std::vector<HidingSpot>& GetHidingSpots() const;
     bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;

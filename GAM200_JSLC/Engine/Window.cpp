@@ -13,7 +13,14 @@
 // If the file is not found, try changing it to <SDL.h>.
 #include <SDL2/SDL.h> 
 #include <stdexcept>
+
+#ifdef USE_GLEW
 #include <GL/glew.h> // Required for glewInit()
+#elif defined(__APPLE__)
+#include <OpenGL/gl3.h>
+#else
+#include <GL/gl.h>
+#endif
 
 namespace
 {
@@ -157,12 +164,14 @@ void Window::setupOpenGL()
 
     SDL_GL_MakeCurrent(sdlWindow, glContext);
 
-    // Initialize GLEW (requires glew.h)
+    // Initialize GLEW on platforms that require it
+#ifdef USE_GLEW
     glewExperimental = GL_TRUE; 
     if (glewInit() != GLEW_OK)
     {
         throw std::runtime_error("Unable to initialize GLEW");
     }
+#endif
 
     if (SDL_GL_SetSwapInterval(-1) < 0)
     {

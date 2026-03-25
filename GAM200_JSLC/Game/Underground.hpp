@@ -13,6 +13,7 @@ class Player;
 class DroneManager;
 class Drone;
 class DebugRenderer;
+struct UndergroundObjectConfig;
 
 class Underground
 {
@@ -36,6 +37,7 @@ public:
     };
 
     void Initialize();
+    void ApplyConfig(const UndergroundObjectConfig& cfg);
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
     void Draw(Shader& shader) const;
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
@@ -45,6 +47,7 @@ public:
 
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
+    DroneManager* GetDroneManager() { return m_droneManager.get(); }
     void ClearAllDrones();
 
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }

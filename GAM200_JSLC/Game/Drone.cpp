@@ -33,6 +33,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     m_isChasing = false;
     m_lostTimer = 0.0f;
     m_currentSpeed = m_baseSpeed;
+    m_hp = m_maxHP;  // Initialize HP to max
 
     if (startPos.y >= ROOFTOP_MIN_Y)
     {
@@ -46,6 +47,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     m_searchMaxAngle = drone_angle_distribution(drone_generator);
     m_searchRotation = 0.0f;
     m_searchDir = 1;
+    m_debugExitTimer = 0.0f;
 
     if (m_moveSound.Load("Asset/drone_3.mp3", true))
     {
@@ -115,6 +117,35 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     {
         m_moveSound.Stop();
         return;
+    }
+
+    // Debug mode: COMPLETE FREEZE - No AI, no movement, no updates
+    if (m_debugMode)
+    {
+        // Minimal updates only - no position/velocity changes
+        m_moveSound.SetVolume(0.0f); // Mute sound in debug mode
+
+        // Even radar animation is frozen in debug mode
+        // Position and velocity are ONLY changed manually via ImGui
+
+        return;
+    }
+
+    // Delay AI restart after exiting debug mode
+    if (m_debugExitTimer > 0.0f)
+    {
+        m_debugExitTimer -= static_cast<float>(dt);
+        m_velocity = { 0.0f, 0.0f }; // Stay stationary during delay
+        m_moveSound.SetVolume(0.0f);
+
+        // Update radar even during delay
+        if (!m_isHit)
+        {
+            m_radarAngle += m_radarRotationSpeed * static_cast<float>(dt);
+            if (m_radarAngle >= 360.0f) m_radarAngle -= 360.0f;
+        }
+
+        return; // Skip AI logic during delay
     }
 
     if (m_velocity.LengthSq() > 10.0f || m_isChasing)
@@ -464,9 +495,16 @@ bool Drone::ApplyDamage(float dt)
 {
     if (m_isHit || m_isDead) return false;
 
-    m_damageTimer += dt;
-    if (m_damageTimer >= TIME_TO_DESTROY)
+    // Calculate damage per second based on TIME_TO_DESTROY
+    // If TIME_TO_DESTROY = 1.0s, then damage = maxHP / 1.0 = maxHP per second
+    float damagePerSecond = m_maxHP / TIME_TO_DESTROY;
+    float damage = damagePerSecond * dt;
+    
+    m_hp -= damage;
+    
+    if (m_hp <= 0.0f)
     {
+        m_hp = 0.0f;
         StartDeathSequence();
         return true;
     }
@@ -475,7 +513,8 @@ bool Drone::ApplyDamage(float dt)
 
 void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
-    if (m_isDead || m_damageTimer <= 0.0f) return;
+    // Show HP bar only when HP is less than max
+    if (m_isDead || m_hp >= m_maxHP) return;
 
     float barWidth = 100.0f;
     float barHeight = 15.0f;
@@ -492,7 +531,9 @@ void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
     GL::BindVertexArray(VAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
 
-    float ratio = m_damageTimer / TIME_TO_DESTROY;
+    // Show remaining HP ratio (full bar = full HP)
+    float ratio = m_hp / m_maxHP;
+    if (ratio < 0.0f) ratio = 0.0f;
     if (ratio > 1.0f) ratio = 1.0f;
 
     float fillWidth = barWidth * ratio;
@@ -506,7 +547,23 @@ void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
     Math::Matrix fgModel = Math::Matrix::CreateTranslation(fgPos) * Math::Matrix::CreateScale(fgSize);
 
     colorShader.setMat4("model", fgModel);
-    colorShader.setVec3("objectColor", 1.0f, 0.0f, 0.0f);
+    
+    // Color based on HP ratio: Green -> Yellow -> Red
+    float r = 1.0f;
+    float g = 1.0f;
+    if (ratio > 0.5f)
+    {
+        // Green to Yellow (100% -> 50%)
+        r = 2.0f * (1.0f - ratio);
+        g = 1.0f;
+    }
+    else
+    {
+        // Yellow to Red (50% -> 0%)
+        r = 1.0f;
+        g = 2.0f * ratio;
+    }
+    colorShader.setVec3("objectColor", r, g, 0.0f);
 
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
     GL::BindVertexArray(0);
@@ -515,4 +572,28 @@ void Drone::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
 void Drone::ResetDamageTimer()
 {
     m_damageTimer = 0.0f;
+}
+
+void Drone::SetDebugMode(bool debug)
+{
+    bool wasDebugMode = m_debugMode;
+    m_debugMode = debug;
+
+    // When exiting debug mode, delay AI restart to prevent unwanted movement
+    if (wasDebugMode && !debug)
+    {
+        // Stop all movement immediately
+        m_velocity = { 0.0f, 0.0f };
+
+        // Set delay timer to prevent AI from starting immediately
+        m_debugExitTimer = 2.0f; // 2 second delay before AI restarts
+
+        // Reset AI states but keep current position
+        m_moveTimer = 0.0f;
+        m_direction = { 1.0f, 0.0f };
+        m_isChasing = false;
+        m_lostTimer = 0.0f;
+
+        Logger::Instance().Log(Logger::Severity::Debug, "Drone debug mode disabled - AI delayed for 2 seconds");
+    }
 }

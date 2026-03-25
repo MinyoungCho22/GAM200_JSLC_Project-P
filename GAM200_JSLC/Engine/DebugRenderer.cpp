@@ -92,6 +92,17 @@ void DebugRenderer::DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, Mat
     GL::BindVertexArray(0);
 }
 
+void DebugRenderer::DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, float r, float g, float b) const
+{
+    Math::Matrix model = Math::Matrix::CreateTranslation(pos) * Math::Matrix::CreateScale(size);
+    shader.setMat4("model", model);
+    shader.setVec3("objectColor", r, g, b);
+
+    GL::BindVertexArray(boxVAO);
+    GL::DrawElements(GL_LINES, 8, GL_UNSIGNED_INT, 0);
+    GL::BindVertexArray(0);
+}
+
 void DebugRenderer::DrawLine(const Shader& shader, Math::Vec2 start, Math::Vec2 end, float r, float g, float b) const
 {
     Math::Vec2 direction = end - start;

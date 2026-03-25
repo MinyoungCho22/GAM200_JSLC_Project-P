@@ -1,5 +1,3 @@
-//Robot.cpp
-
 #include "Robot.hpp"
 #include "Player.hpp" 
 #include "../OpenGL/Shader.hpp"
@@ -8,7 +6,6 @@
 #include "../Engine/Collision.hpp"
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include <iostream>
 #include <random>
 #include <cmath>
 
@@ -248,6 +245,11 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             m_state = RobotState::Chase;
         }
         break;
+
+    case RobotState::Dead:
+        // Already handled by early return at the start of Update,
+        // but required to silence compiler warnings about unhandled enum value.
+        break;
     }
 
     // Apply gravity
@@ -267,6 +269,36 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         if (m_state == RobotState::Patrol || m_state == RobotState::Retreat) m_directionX = -1.0f;
     }
 
+    // Obstacle collision detection (horizontal)
+    // Only check if we're actually moving and not already colliding
+    bool canMove = true;
+    if (std::abs(m_velocity.x) > 0.1f)
+    {
+        for (const auto& obs : obstacles)
+        {
+            // Check if current position is NOT colliding
+            bool currentlyColliding = Collision::CheckAABB(m_position, m_size, obs.pos, obs.size);
+            
+            // Check if next position WOULD collide
+            Math::Vec2 testPos = { nextPos.x, m_position.y };
+            bool wouldCollide = Collision::CheckAABB(testPos, m_size, obs.pos, obs.size);
+            
+            // Only block movement if we're not currently colliding but would collide
+            if (!currentlyColliding && wouldCollide)
+            {
+                canMove = false;
+                nextPos.x = m_position.x;
+                
+                // Reverse direction if in Patrol or Retreat state
+                if (m_state == RobotState::Patrol || m_state == RobotState::Retreat)
+                {
+                    m_directionX = -m_directionX;
+                }
+                break;
+            }
+        }
+    }
+
     m_position.x = nextPos.x;
 
     // Ground collision
@@ -280,6 +312,35 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         nextPos.y = groundLimit + m_size.y / 2.0f;
         m_velocity.y = 0.0f;
         m_isOnGround = true;
+    }
+
+    // Obstacle collision detection (vertical)
+    for (const auto& obs : obstacles)
+    {
+        // Use a slightly smaller hitbox for vertical collision to prevent jittering
+        Math::Vec2 adjustedSize = { m_size.x * 0.9f, m_size.y };
+        
+        if (Collision::CheckAABB(nextPos, adjustedSize, obs.pos, obs.size))
+        {
+            // Check if robot is falling onto obstacle (landing on top)
+            if (m_velocity.y < 0.0f && m_position.y > obs.pos.y + obs.size.y / 2.0f)
+            {
+                // Land on top of obstacle with small buffer
+                float buffer = 1.0f;
+                nextPos.y = obs.pos.y + obs.size.y / 2.0f + m_size.y / 2.0f + buffer;
+                m_velocity.y = 0.0f;
+                m_isOnGround = true;
+            }
+            // Check if robot is jumping into obstacle from below
+            else if (m_velocity.y > 0.0f && m_position.y < obs.pos.y - obs.size.y / 2.0f)
+            {
+                // Hit obstacle from below with small buffer
+                float buffer = 1.0f;
+                nextPos.y = obs.pos.y - obs.size.y / 2.0f - m_size.y / 2.0f - buffer;
+                m_velocity.y = 0.0f;
+            }
+            break;
+        }
     }
 
     m_position.y = nextPos.y;
@@ -345,26 +406,89 @@ void Robot::Draw(const Shader& shader) const
     GL::BindVertexArray(0);
 }
 
-void Robot::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
+void Robot::DrawOutline(const Shader& outlineShader) const
 {
     if (m_state == RobotState::Dead) return;
-    
-    // HP Bar UI
+
+    outlineShader.use();
+
+    bool flipX = (m_directionX > 0.0f);
+    Math::Matrix model = Math::Matrix::CreateTranslation(m_position) * Math::Matrix::CreateScale(m_size);
+    outlineShader.setMat4("model", model);
+    outlineShader.setBool("flipX", flipX);
+    outlineShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
+    outlineShader.setFloat("outlineWidthTexels", 2.0f);
+
+    unsigned int textureToBind = m_textureID;
+    if (m_state == RobotState::Attack)
+    {
+        if (m_currentAttack == AttackType::HighSweep) textureToBind = m_textureHighID;
+        else if (m_currentAttack == AttackType::LowSweep) textureToBind = m_textureLowID;
+    }
+
+    // Robot textures are single-frame sprites.
+    int texW = 396;
+    int texH = 450;
+    if (textureToBind == m_textureHighID || textureToBind == m_textureLowID)
+    {
+        texW = 590;
+        texH = 450;
+    }
+    outlineShader.setVec2("texelSize", 1.0f / static_cast<float>(texW), 1.0f / static_cast<float>(texH));
+
+    GL::ActiveTexture(GL_TEXTURE0);
+    GL::BindTexture(GL_TEXTURE_2D, textureToBind);
+    GL::BindVertexArray(m_VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
+}
+
+void Robot::DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    (void)debugRenderer;
+    // Same style behavior as Drone::DrawGauge: only when damaged.
+    if (m_state == RobotState::Dead || m_hp >= m_maxHp) return;
+
     float barWidth = 150.0f;
     float barHeight = 15.0f;
     float yOffset = m_size.y / 2.0f + 30.0f;
-    Math::Vec2 barPos = { m_position.x, m_position.y + yOffset };
+    Math::Vec2 barCenterPos = { m_position.x, m_position.y + yOffset };
 
-    // Draw background/border
-    debugRenderer.DrawBox(colorShader, barPos, { barWidth + 4.0f, barHeight + 4.0f }, { 0.0f, 0.0f });
-    
-    // Calculate and draw HP fill
+    Math::Vec2 bgSize = { barWidth + 4.0f, barHeight + 4.0f };
+    Math::Matrix bgModel = Math::Matrix::CreateTranslation(barCenterPos) * Math::Matrix::CreateScale(bgSize);
+    colorShader.setMat4("model", bgModel);
+    colorShader.setVec3("objectColor", 0.0f, 0.0f, 0.0f);
+    GL::BindVertexArray(m_VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+
     float ratio = m_hp / m_maxHp;
     if (ratio < 0.0f) ratio = 0.0f;
+    if (ratio > 1.0f) ratio = 1.0f;
+
     float fillWidth = barWidth * ratio;
-    float leftEdge = barPos.x - (barWidth / 2.0f);
-    float fillCenterX = leftEdge + (fillWidth / 2.0f);
-    debugRenderer.DrawBox(colorShader, { fillCenterX, barPos.y }, { fillWidth, barHeight }, { 1.0f, 0.0f });
+    float leftEdgeX = barCenterPos.x - (barWidth / 2.0f);
+    float fillCenterX = leftEdgeX + (fillWidth / 2.0f);
+    Math::Vec2 fgPos = { fillCenterX, barCenterPos.y };
+    Math::Vec2 fgSize = { fillWidth, barHeight };
+    Math::Matrix fgModel = Math::Matrix::CreateTranslation(fgPos) * Math::Matrix::CreateScale(fgSize);
+    colorShader.setMat4("model", fgModel);
+
+    float r = 1.0f;
+    float g = 1.0f;
+    if (ratio > 0.5f)
+    {
+        r = 2.0f * (1.0f - ratio); // green -> yellow
+        g = 1.0f;
+    }
+    else
+    {
+        r = 1.0f;                  // yellow -> red
+        g = 2.0f * ratio;
+    }
+    colorShader.setVec3("objectColor", r, g, 0.0f);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
 }
 
 void Robot::DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const

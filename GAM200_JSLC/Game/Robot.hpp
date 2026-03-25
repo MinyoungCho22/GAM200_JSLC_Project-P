@@ -37,6 +37,7 @@ public:
     void Init(Math::Vec2 startPos);
     void Update(double dt, Player& player, const std::vector<ObstacleInfo>& obstacles, float mapMinX, float mapMaxX);
     void Draw(const Shader& shader) const;
+    void DrawOutline(const Shader& outlineShader) const;
     void DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
@@ -45,6 +46,24 @@ public:
     Math::Vec2 GetSize() const { return m_size; }
     bool IsDead() const { return m_state == RobotState::Dead; }
     void TakeDamage(float amount);
+    
+    // Debug setters for ImGui
+    void SetPosition(const Math::Vec2& pos) { m_position = pos; }
+    void SetSize(const Math::Vec2& size) { m_size = size; }
+    void SetHP(float hp) { m_hp = hp; }
+    void SetMaxHP(float maxHp) { m_maxHp = maxHp; }
+    void SetDirectionX(float dir) { m_directionX = dir; }
+    void SetState(RobotState state) { m_state = state; }
+    
+    // Debug getters for ImGui
+    float GetHP() const { return m_hp; }
+    float GetMaxHP() const { return m_maxHp; }
+    float GetDirectionX() const { return m_directionX; }
+    RobotState GetState() const { return m_state; }
+    float GetPatrolSpeed() const { return PATROL_SPEED; }
+    float GetChaseSpeed() const { return CHASE_SPEED; }
+    float GetDetectionRange() const { return DETECTION_RANGE; }
+    float GetAttackRange() const { return ATTACK_RANGE; }
 
 private:
     void DecideAttackPattern();
@@ -81,7 +100,7 @@ private:
     float m_spawnX = 0.0f;
     const float PATROL_RANGE = 1000.0f;
 
-    const float GRAVITY = -1500.0f;
+    const float GRAVITY = -2200.0f;
     const float PATROL_SPEED = 100.0f;
     const float CHASE_SPEED = 250.0f;
     const float DETECTION_RANGE = 500.0f;

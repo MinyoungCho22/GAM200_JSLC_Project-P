@@ -37,8 +37,10 @@ void Door::Initialize(Math::Vec2 position, Math::Vec2 size, float pulseCost, Doo
     GL::BindVertexArray(0);
 }
 
-void Door::Update(Player& player, bool isInteractKeyPressed)
+void Door::Update(Player& player, bool isInteractKeyPressed, Math::Vec2 mouseWorldPos)
 {
+    (void)mouseWorldPos;
+
     if (m_isOpened) return;
 
     Math::Vec2 playerCenter = player.GetPosition();
@@ -61,12 +63,17 @@ void Door::Update(Player& player, bool isInteractKeyPressed)
         m_isPlayerNearby = (distSq < interactRangeSq);
     }
 
+    // More forgiving interaction: if player is near, don't require precise cursor-over-door hit.
     if (m_isPlayerNearby && isInteractKeyPressed)
     {
-        float currentPulse = player.GetPulseCore().getPulse().Value();
-        if (currentPulse >= m_pulseCost)
+        // In god mode, always allow door opening without spending pulse
+        if (player.IsGodMode() || player.GetPulseCore().getPulse().Value() >= m_pulseCost)
         {
-            player.GetPulseCore().getPulse().spend(m_pulseCost);
+            // Only spend pulse if not in god mode
+            if (!player.IsGodMode())
+            {
+                player.GetPulseCore().getPulse().spend(m_pulseCost);
+            }
             m_shouldLoadNextMap = true;
             m_isOpened = true;
 
@@ -85,7 +92,7 @@ void Door::Update(Player& player, bool isInteractKeyPressed)
         {
             Logger::Instance().Log(Logger::Severity::Error,
                 "Not enough pulse! Required: %.1f, Current: %.1f",
-                m_pulseCost, currentPulse);
+                m_pulseCost, player.GetPulseCore().getPulse().Value());
         }
     }
 }

@@ -2,7 +2,17 @@
 
 #pragma once
 
+#if defined(__APPLE__)
+#include <OpenGL/gl3.h>
+#elif defined(USE_GLEW) || defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
 #include <GL/glew.h>
+#else
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <GL/gl.h>
+#endif
 
 namespace GL
 {
@@ -82,6 +92,7 @@ namespace GL
     static inline void UseProgram(GLuint program) { glUseProgram(program); }
     static inline GLint GetUniformLocation(GLuint program, const GLchar* name) { return glGetUniformLocation(program, name); }
     static inline void Uniform1i(GLint location, GLint v0) { glUniform1i(location, v0); }
+    static inline void Uniform2f(GLint location, GLfloat v0, GLfloat v1) { glUniform2f(location, v0, v1); }
     static inline void Uniform3f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2) { glUniform3f(location, v0, v1, v2); }
     static inline void UniformMatrix4fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value) { glUniformMatrix4fv(location, count, transpose, value); }
     static inline void Uniform4f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3) { glUniform4f(location, v0, v1, v2, v3); }

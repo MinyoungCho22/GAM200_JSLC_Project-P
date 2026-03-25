@@ -6,11 +6,13 @@ in vec2 TexCoord;
 
 uniform sampler2D ourTexture;
 
-uniform float alpha; 
+uniform float alpha;
+uniform vec3 colorTint;
+uniform float tintStrength;
 
 void main()
 {
     vec4 texColor = texture(ourTexture, TexCoord);
-    
-    FragColor = vec4(texColor.rgb, texColor.a * alpha);
+    vec3 tinted = mix(texColor.rgb, colorTint, tintStrength);
+    FragColor = vec4(tinted, texColor.a * alpha);
 }

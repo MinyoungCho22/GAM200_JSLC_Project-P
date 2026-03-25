@@ -3,210 +3,447 @@
 #include "Setting.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
+#include "../Engine/Sound.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include <GLFW/glfw3.h>
-
 #include <string>
-#include <sstream>
+#include <cmath>
 
 // Fixed logical resolution for the UI system
-constexpr float GAME_WIDTH = 1920.0f;
+constexpr float GAME_WIDTH  = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
 
+// ---- Layout constants -------------------------------------------------------
+constexpr float COL_LABEL  = 560.0f;   // x: label column (right-edge aligned)
+constexpr float COL_VALUE  = 980.0f;   // x: value column (left-edge)
+constexpr float ROW_TITLE  = 800.0f;
+constexpr float ROW_FPS    = 640.0f;
+constexpr float ROW_VSYNC  = 520.0f;
+constexpr float ROW_FULLSCREEN = 400.0f;
+constexpr float ROW_VOLUME = 300.0f;
+constexpr float ROW_EXIT   = 180.0f;
+constexpr float ROW_HINT   =  70.0f;
+
+constexpr float LABEL_SIZE = 52.0f;
+constexpr float VALUE_SIZE = 52.0f;
+constexpr float TITLE_SIZE = 76.0f;
+constexpr float HINT_SIZE  = 34.0f;
+
+constexpr float BAR_W = 480.0f;
+constexpr float BAR_H =  28.0f;
+constexpr float BAR_CX = COL_VALUE + BAR_W * 0.5f;  // bar center x
+
+// ---- FPS option table -------------------------------------------------------
+constexpr int SettingState::FPS_VALUES[SettingState::FPS_COUNT];
+
+// -----------------------------------------------------------------------------
+
 SettingState::SettingState(GameStateManager& gsm_ref)
-    : gsm(gsm_ref), m_mainSelection(MainOption::Resume), m_overlayVAO(0), m_overlayVBO(0) {
-    m_currentPage = MenuPage::Main;
-    m_displaySelection = 0;
+    : gsm(gsm_ref)
+{
 }
 
+const char* SettingState::GetFpsLabel(int index) const
+{
+    switch (index)
+    {
+    case 0: return "30 FPS";
+    case 1: return "60 FPS";
+    case 2: return "144 FPS";
+    case 3: return "240 FPS";
+    case 4: return "No Limit";
+    default: return "?";
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Apply helpers
+// -----------------------------------------------------------------------------
+void SettingState::ApplyFps()
+{
+    gsm.GetEngine().SetFpsCap(FPS_VALUES[m_fpsIndex]);
+}
+
+void SettingState::ApplyVSync()
+{
+    gsm.GetEngine().SetVSync(m_vsyncEnabled);
+}
+
+void SettingState::ApplyFullscreen()
+{
+    gsm.GetEngine().SetFullscreen(m_fullscreenEnabled);
+}
+
+void SettingState::ApplyVolume()
+{
+    SoundSystem::Instance().SetMasterVolume(m_masterVolume);
+}
+
+// -----------------------------------------------------------------------------
+// Dynamic text rebuild
+// -----------------------------------------------------------------------------
+void SettingState::RebuildValueTexts()
+{
+    // FPS value string
+    {
+        std::string s = std::string("< ") + GetFpsLabel(m_fpsIndex) + " >";
+        m_fpsValueText = m_font->PrintToTexture(*m_fontShader, s);
+    }
+
+    // VSync value string
+    {
+        std::string s = std::string("< ") + (m_vsyncEnabled ? "On" : "Off") + " >";
+        m_vsyncValueText = m_font->PrintToTexture(*m_fontShader, s);
+    }
+
+    // Fullscreen value string
+    {
+        std::string s = std::string("< ") + (m_fullscreenEnabled ? "On" : "Off") + " >";
+        m_fullscreenValueText = m_font->PrintToTexture(*m_fontShader, s);
+    }
+
+    // Volume percentage string
+    {
+        int pct = static_cast<int>(std::round(m_masterVolume * 100.0f));
+        m_volumePctText = m_font->PrintToTexture(*m_fontShader, std::to_string(pct) + "%");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Initialize
+// -----------------------------------------------------------------------------
 void SettingState::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "SettingState Initialize");
 
-    // Initialize font and shaders
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
-    m_colorShader = std::make_unique<Shader>("OpenGL/shaders/solid_color.vert", "OpenGL/shaders/solid_color.frag");
-    m_fontShader = std::make_unique<Shader>("OpenGL/shaders/simple.vert", "OpenGL/shaders/simple.frag");
-    
+    m_colorShader = std::make_unique<Shader>("OpenGL/Shaders/solid_color.vert",
+                                             "OpenGL/Shaders/solid_color.frag");
+    m_fontShader  = std::make_unique<Shader>("OpenGL/Shaders/simple.vert",
+                                             "OpenGL/Shaders/simple.frag");
     m_fontShader->use();
     m_fontShader->setInt("ourTexture", 0);
 
-    // --- Pre-bake text textures ---
-    // This converts strings to OpenGL textures once to avoid per-frame text rendering overhead.
+    // Sync state from Engine / SoundSystem
+    Engine& engine = gsm.GetEngine();
+    m_vsyncEnabled = engine.IsVSyncEnabled();
+    m_fullscreenEnabled = engine.IsFullscreen();
+    m_masterVolume = SoundSystem::Instance().GetMasterVolume();
 
-    // 1. Main menu options
-    m_resumeText = m_font->PrintToTexture(*m_fontShader, "Setting");
-    m_resumeSelectedText = m_font->PrintToTexture(*m_fontShader, "> Setting <");
-    m_exitText = m_font->PrintToTexture(*m_fontShader, "Exit");
-    m_exitSelectedText = m_font->PrintToTexture(*m_fontShader, "> Exit <");
+    int currentCap = engine.GetFpsCap();
+    m_fpsIndex = FPS_COUNT - 1; // default: No Limit
+    for (int i = 0; i < FPS_COUNT; ++i)
+    {
+        if (FPS_VALUES[i] == currentCap) { m_fpsIndex = i; break; }
+    }
 
-    // 2. Display menu options (dynamic based on system/monitor)
-    Math::ivec2 recRes = gsm.GetEngine().GetRecommendedResolution();
-    std::stringstream ss;
-    ss << recRes.x << " x " << recRes.y << " (Recommended)";
-    m_resRecommendedText = m_font->PrintToTexture(*m_fontShader, ss.str());
+    // Static text
+    m_titleText       = m_font->PrintToTexture(*m_fontShader, "SETTINGS");
+    m_fpsLabelText    = m_font->PrintToTexture(*m_fontShader, "FPS");
+    m_vsyncLabelText  = m_font->PrintToTexture(*m_fontShader, "VSync");
+    m_fullscreenLabelText = m_font->PrintToTexture(*m_fontShader, "Fullscreen");
+    m_volumeLabelText = m_font->PrintToTexture(*m_fontShader, "Volume");
+    m_exitText        = m_font->PrintToTexture(*m_fontShader, "Exit");
+    m_wasdHintText    = m_font->PrintToTexture(*m_fontShader, "W: Up   S: Down   A: Left   D: Right");
+    m_escHintText     = m_font->PrintToTexture(*m_fontShader, "[ESC] Back");
 
-    // --- Initialize Overlay Geometry ---
-    // A simple full-screen quad used to dim the background.
-    float vertices[] = {
-        0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f
+    RebuildValueTexts();
+
+    // ---- Fullscreen overlay quad (0..1 range) --------------------------------
+    float overlayVerts[] = {
+        0.0f, 1.0f,  1.0f, 0.0f,  0.0f, 0.0f,
+        0.0f, 1.0f,  1.0f, 1.0f,  1.0f, 0.0f
     };
     GL::GenVertexArrays(1, &m_overlayVAO);
     GL::GenBuffers(1, &m_overlayVBO);
     GL::BindVertexArray(m_overlayVAO);
     GL::BindBuffer(GL_ARRAY_BUFFER, m_overlayVBO);
-    GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    GL::BufferData(GL_ARRAY_BUFFER, sizeof(overlayVerts), overlayVerts, GL_STATIC_DRAW);
     GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     GL::EnableVertexAttribArray(0);
     GL::BindVertexArray(0);
+
+    // ---- Centered unit quad (-0.5..0.5) for bar drawing ---------------------
+    float barVerts[] = {
+        -0.5f,  0.5f,
+         0.5f,  0.5f,
+        -0.5f, -0.5f,
+         0.5f,  0.5f,
+         0.5f, -0.5f,
+        -0.5f, -0.5f
+    };
+    GL::GenVertexArrays(1, &m_barVAO);
+    GL::GenBuffers(1, &m_barVBO);
+    GL::BindVertexArray(m_barVAO);
+    GL::BindBuffer(GL_ARRAY_BUFFER, m_barVBO);
+    GL::BufferData(GL_ARRAY_BUFFER, sizeof(barVerts), barVerts, GL_STATIC_DRAW);
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    GL::EnableVertexAttribArray(0);
+    GL::BindVertexArray(0);
+
+    m_colorShader->use();
+    m_colorShader->setFloat("uAlpha", 1.0f);
 }
 
-void SettingState::Update(double dt)
+// -----------------------------------------------------------------------------
+// Update
+// -----------------------------------------------------------------------------
+void SettingState::Update(double /*dt*/)
 {
     Engine& engine = gsm.GetEngine();
     auto& input = engine.GetInput();
 
-    if (m_currentPage == MenuPage::Main)
+    if (input.IsKeyTriggered(Input::Key::Escape))
     {
-        // --- Navigation for Main Settings Page ---
-        if (input.IsKeyTriggered(Input::Key::Escape))
-        {
-            gsm.PopState(); // Return to previous state (Game or MainMenu)
-            return;
-        }
+        gsm.PopState();
+        return;
+    }
 
-        if (input.IsKeyTriggered(Input::Key::W)) { m_mainSelection = MainOption::Resume; }
-        else if (input.IsKeyTriggered(Input::Key::S)) { m_mainSelection = MainOption::Exit; }
+    // --- Navigate up / down ---
+    bool moveUp   = input.IsKeyTriggered(Input::Key::W);
+    bool moveDown = input.IsKeyTriggered(Input::Key::S);
 
-        if (input.IsKeyTriggered(Input::Key::Enter) || input.IsKeyTriggered(Input::Key::Space))
+    if (moveUp)
+    {
+        int idx = static_cast<int>(m_selectedItem);
+        idx = (idx + 4) % 5; // 5 items, wrap upward
+        m_selectedItem = static_cast<MenuItem>(idx);
+    }
+    else if (moveDown)
+    {
+        int idx = static_cast<int>(m_selectedItem);
+        idx = (idx + 1) % 5;
+        m_selectedItem = static_cast<MenuItem>(idx);
+    }
+
+    // --- Change value left / right ---
+    bool goLeft  = input.IsKeyTriggered(Input::Key::A);
+    bool goRight = input.IsKeyTriggered(Input::Key::D);
+
+    if (m_selectedItem == MenuItem::FPS && (goLeft || goRight))
+    {
+        m_fpsIndex = (m_fpsIndex + (goRight ? 1 : FPS_COUNT - 1)) % FPS_COUNT;
+        ApplyFps();
+        RebuildValueTexts();
+    }
+    else if (m_selectedItem == MenuItem::VSync && (goLeft || goRight))
+    {
+        m_vsyncEnabled = !m_vsyncEnabled;
+        ApplyVSync();
+        RebuildValueTexts();
+    }
+    else if (m_selectedItem == MenuItem::Fullscreen && (goLeft || goRight))
+    {
+        m_fullscreenEnabled = !m_fullscreenEnabled;
+        ApplyFullscreen();
+        RebuildValueTexts();
+    }
+    else if (m_selectedItem == MenuItem::Volume)
+    {
+        bool changed = false;
+        if (goRight) { m_masterVolume = std::min(1.0f, m_masterVolume + VOLUME_STEP); changed = true; }
+        if (goLeft)  { m_masterVolume = std::max(0.0f, m_masterVolume - VOLUME_STEP); changed = true; }
+        if (changed)
         {
-            if (m_mainSelection == MainOption::Resume)
-            {
-                m_currentPage = MenuPage::Display;
-                m_displaySelection = 0;
-            }
-            else if (m_mainSelection == MainOption::Exit)
-            {
-                engine.RequestShutdown();
-            }
+            ApplyVolume();
+            RebuildValueTexts();
         }
     }
-    else if (m_currentPage == MenuPage::Display)
+    else if (m_selectedItem == MenuItem::Exit)
     {
-        // --- Navigation for Display Settings Page ---
-        if (input.IsKeyTriggered(Input::Key::Escape))
-        {
-            m_currentPage = MenuPage::Main;
-            return;
-        }
-
         if (input.IsKeyTriggered(Input::Key::Enter) || input.IsKeyTriggered(Input::Key::Space))
         {
-            if (m_displaySelection == 0)
-            {
-                // Apply the recommended resolution to the window
-                Math::ivec2 res = gsm.GetEngine().GetRecommendedResolution();
-                Logger::Instance().Log(Logger::Severity::Event, "Apply Resolution: %d x %d", res.x, res.y);
-                gsm.GetEngine().SetResolution(res.x, res.y);
-            }
+            engine.RequestShutdown();
         }
     }
 }
 
+// -----------------------------------------------------------------------------
+// DrawRect helper (centered at cx, cy)
+// -----------------------------------------------------------------------------
+void SettingState::DrawRect(const Math::Matrix& proj, float cx, float cy,
+                            float w, float h,
+                            float r, float g, float b, float a)
+{
+    Math::Matrix model = Math::Matrix::CreateTranslation({ cx, cy }) *
+                         Math::Matrix::CreateScale({ w, h });
+    m_colorShader->setMat4("model", model);
+    m_colorShader->setMat4("projection", proj);
+    m_colorShader->setVec3("objectColor", r, g, b);
+    m_colorShader->setFloat("uAlpha", a);
+    GL::BindVertexArray(m_barVAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
+}
+
+// -----------------------------------------------------------------------------
+// Draw
+// -----------------------------------------------------------------------------
 void SettingState::Draw()
 {
     Engine& engine = gsm.GetEngine();
 
-    // --- Viewport & Aspect Ratio Calculation ---
-    // Calculates Letterbox (horizontal bars) or Pillarbox (vertical bars)
-    int windowWidth, windowHeight;
-    glfwGetFramebufferSize(engine.GetWindow(), &windowWidth, &windowHeight);
+    // Viewport is already set to FBO size (GAME_WIDTH x GAME_HEIGHT) by PostProcessManager::BeginScene().
+    // Do NOT call glfwGetFramebufferSize here — on Retina displays the physical framebuffer is larger
+    // than the FBO, which would cause only the bottom-left portion to be rendered.
 
-    float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
-    float gameAspect = GAME_WIDTH / GAME_HEIGHT;
-
-    int viewportX = 0, viewportY = 0;
-    int viewportWidth = windowWidth, viewportHeight = windowHeight;
-
-    if (windowAspect > gameAspect) // Pillarbox
-    {
-        viewportWidth = static_cast<int>(windowHeight * gameAspect);
-        viewportX = (windowWidth - viewportWidth) / 2;
-    }
-    else if (windowAspect < gameAspect) // Letterbox
-    {
-        viewportHeight = static_cast<int>(windowWidth / gameAspect);
-        viewportY = (windowHeight - viewportHeight) / 2;
-    }
-
-    GL::Viewport(viewportX, viewportY, viewportWidth, viewportHeight);
-
-    // Create orthographic projection based on fixed 1920x1080 UI resolution
-    Math::Matrix projection = Math::Matrix::CreateOrtho(0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT, -1.0f, 1.0f);
-
-    // 1. Render Semi-transparent Dimming Overlay
-    m_colorShader->use();
-    m_colorShader->setMat4("projection", projection);
-    Math::Matrix overlayModel = Math::Matrix::CreateTranslation({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }) *
-                                Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
-    m_colorShader->setMat4("model", overlayModel);
-    m_colorShader->setVec4("objectColor", 0.0f, 0.0f, 0.0f, 0.7f); // 70% opacity black
+    Math::Matrix proj = Math::Matrix::CreateOrtho(0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT, -1.0f, 1.0f);
 
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    GL::BindTexture(GL_TEXTURE_2D, 0);
-    GL::BindVertexArray(m_overlayVAO);
-    GL::DrawArrays(GL_TRIANGLES, 0, 6);
-    GL::BindVertexArray(0);
 
-    // 2. Render Menu Text based on current page
+    // 1. Opaque black background
+    m_colorShader->use();
+    m_colorShader->setMat4("projection", proj);
+    {
+        Math::Matrix model = Math::Matrix::CreateTranslation({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }) *
+                             Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
+        m_colorShader->setMat4("model", model);
+        m_colorShader->setVec3("objectColor", 0.0f, 0.0f, 0.0f);
+        m_colorShader->setFloat("uAlpha", 1.0f);
+        GL::BindTexture(GL_TEXTURE_2D, 0);
+        GL::BindVertexArray(m_overlayVAO);
+        GL::DrawArrays(GL_TRIANGLES, 0, 6);
+        GL::BindVertexArray(0);
+    }
+
+    // 2. Separator line below title
+    DrawRect(proj, GAME_WIDTH * 0.5f, ROW_TITLE - 60.0f, 900.0f, 3.0f, 0.3f, 0.3f, 0.3f, 1.0f);
+
+    // 3. Highlight bar behind selected item
+    float selRowY = 0.0f;
+    float selRowLeft = 0.0f;
+    float selRowRight = 0.0f;
+    switch (m_selectedItem)
+    {
+    case MenuItem::FPS:
+        selRowY = ROW_FPS;
+        selRowLeft = COL_LABEL - static_cast<float>(m_fpsLabelText.width) * (LABEL_SIZE / m_fpsLabelText.height);
+        selRowRight = COL_VALUE + static_cast<float>(m_fpsValueText.width) * (VALUE_SIZE / m_fpsValueText.height);
+        break;
+    case MenuItem::VSync:
+        selRowY = ROW_VSYNC;
+        selRowLeft = COL_LABEL - static_cast<float>(m_vsyncLabelText.width) * (LABEL_SIZE / m_vsyncLabelText.height);
+        selRowRight = COL_VALUE + static_cast<float>(m_vsyncValueText.width) * (VALUE_SIZE / m_vsyncValueText.height);
+        break;
+    case MenuItem::Fullscreen:
+        selRowY = ROW_FULLSCREEN;
+        selRowLeft = COL_LABEL - static_cast<float>(m_fullscreenLabelText.width) * (LABEL_SIZE / m_fullscreenLabelText.height);
+        selRowRight = COL_VALUE + static_cast<float>(m_fullscreenValueText.width) * (VALUE_SIZE / m_fullscreenValueText.height);
+        break;
+    case MenuItem::Volume:
+        selRowY = ROW_VOLUME;
+        selRowLeft = COL_LABEL - static_cast<float>(m_volumeLabelText.width) * (LABEL_SIZE / m_volumeLabelText.height);
+        selRowRight = BAR_CX + BAR_W * 0.5f + 24.0f + static_cast<float>(m_volumePctText.width) * (VALUE_SIZE / m_volumePctText.height);
+        break;
+    case MenuItem::Exit:
+        selRowY = ROW_EXIT;
+        selRowLeft = GAME_WIDTH * 0.5f - static_cast<float>(m_exitText.width) * (VALUE_SIZE / m_exitText.height) * 0.5f;
+        selRowRight = GAME_WIDTH * 0.5f + static_cast<float>(m_exitText.width) * (VALUE_SIZE / m_exitText.height) * 0.5f;
+        break;
+    }
+    const float barPaddingX = 28.0f;
+    float highlightW = (selRowRight - selRowLeft) + barPaddingX * 2.0f;
+    float highlightCX = (selRowLeft + selRowRight) * 0.5f;
+    DrawRect(proj, highlightCX, selRowY + LABEL_SIZE * 0.3f,
+             highlightW, LABEL_SIZE + 12.0f, 0.05f, 0.25f, 0.25f, 0.85f);
+
+    // 4. Volume bar (background + fill)
+    {                              
+        // Background
+        DrawRect(proj, BAR_CX, ROW_VOLUME + LABEL_SIZE * 0.3f,
+                 BAR_W, BAR_H, 0.2f, 0.2f, 0.2f, 1.0f);
+
+        // Fill (neon cyan tint)
+        float fillW = BAR_W * m_masterVolume;
+        if (fillW > 1.0f)
+        {
+            float fillCX = (BAR_CX - BAR_W * 0.5f) + fillW * 0.5f;
+            DrawRect(proj, fillCX, ROW_VOLUME + LABEL_SIZE * 0.3f,
+                     fillW, BAR_H, 0.0f, 0.85f, 0.75f, 1.0f);
+        }
+    }
+
+    // 5. Text rendering
     m_fontShader->use();
-    m_fontShader->setMat4("projection", projection);
+    m_fontShader->setMat4("projection", proj);
 
-    float fontSize = 64.0f;
-
-    if (m_currentPage == MenuPage::Main)
+    auto drawLabel = [&](const CachedTextureInfo& tex, float y)
     {
-        Math::Vec2 settingPos = { GAME_WIDTH / 2.0f - 150.f, GAME_HEIGHT / 2.0f + 50.f };
-        Math::Vec2 exitPos = { GAME_WIDTH / 2.0f - 150.f, GAME_HEIGHT / 2.0f - 50.f };
-
-        if (m_mainSelection == MainOption::Resume)
-        {
-            m_font->DrawBakedText(*m_fontShader, m_resumeSelectedText, settingPos, fontSize);
-            m_font->DrawBakedText(*m_fontShader, m_exitText, exitPos, fontSize);
-        }
-        else
-        {
-            m_font->DrawBakedText(*m_fontShader, m_resumeText, settingPos, fontSize);
-            m_font->DrawBakedText(*m_fontShader, m_exitSelectedText, exitPos, fontSize);
-        }
-    }
-    else if (m_currentPage == MenuPage::Display)
+        m_font->DrawBakedText(*m_fontShader, tex,
+                              { COL_LABEL - static_cast<float>(tex.width) * (LABEL_SIZE / tex.height), y },
+                              LABEL_SIZE);
+    };
+    auto drawValue = [&](const CachedTextureInfo& tex, float y)
     {
-        Math::Vec2 resRecPos = { GAME_WIDTH / 2.0f - 400.f, GAME_HEIGHT / 2.0f + 50.f };
+        m_font->DrawBakedText(*m_fontShader, tex, { COL_VALUE, y }, VALUE_SIZE);
+    };
 
-        if (m_displaySelection == 0)
-        {
-            // For the demo, always show the Recommended option as selected
-            std::string selectedStr = "> " + m_resRecommendedText.text + " <";
-            CachedTextureInfo selectedTex = m_font->PrintToTexture(*m_fontShader, selectedStr);
-            m_font->DrawBakedText(*m_fontShader, selectedTex, resRecPos, fontSize);
-        }
+    // Title
+    m_font->DrawBakedText(*m_fontShader, m_titleText,
+                          { GAME_WIDTH * 0.5f - m_titleText.width * (TITLE_SIZE / m_titleText.height) * 0.5f,
+                            ROW_TITLE },
+                          TITLE_SIZE);
+
+    // FPS row
+    drawLabel(m_fpsLabelText, ROW_FPS);
+    drawValue(m_fpsValueText, ROW_FPS);
+
+    // VSync row
+    drawLabel(m_vsyncLabelText, ROW_VSYNC);
+    drawValue(m_vsyncValueText, ROW_VSYNC);
+
+    // Fullscreen row
+    drawLabel(m_fullscreenLabelText, ROW_FULLSCREEN);
+    drawValue(m_fullscreenValueText, ROW_FULLSCREEN);
+
+    // Volume row  (label + percentage; bar drawn above in color shader pass)
+    drawLabel(m_volumeLabelText, ROW_VOLUME);
+    {
+        float pctX = BAR_CX + BAR_W * 0.5f + 24.0f;
+        m_font->DrawBakedText(*m_fontShader, m_volumePctText, { pctX, ROW_VOLUME }, VALUE_SIZE);
     }
+
+    // Exit row
+    if (m_selectedItem == MenuItem::Exit)
+    {
+        CachedTextureInfo exitSel = m_font->PrintToTexture(*m_fontShader, "> Exit <");
+        m_font->DrawBakedText(*m_fontShader, exitSel,
+                              { GAME_WIDTH * 0.5f - exitSel.width * (VALUE_SIZE / exitSel.height) * 0.5f,
+                                ROW_EXIT },
+                              VALUE_SIZE);
+    }
+    else
+    {
+        m_font->DrawBakedText(*m_fontShader, m_exitText,
+                              { GAME_WIDTH * 0.5f - m_exitText.width * (VALUE_SIZE / m_exitText.height) * 0.5f,
+                                ROW_EXIT },
+                              VALUE_SIZE);
+    }
+
+    // ESC hint
+    m_font->DrawBakedText(*m_fontShader, m_wasdHintText,
+                          { GAME_WIDTH * 0.5f - m_wasdHintText.width * (HINT_SIZE / m_wasdHintText.height) * 0.5f,
+                            ROW_HINT + 38.0f },
+                          HINT_SIZE);
+
+    // ESC hint
+    m_font->DrawBakedText(*m_fontShader, m_escHintText,
+                          { GAME_WIDTH * 0.5f - m_escHintText.width * (HINT_SIZE / m_escHintText.height) * 0.5f,
+                            ROW_HINT },
+                          HINT_SIZE);
 }
-
-
 
 void SettingState::Shutdown()
 {
-    // Release OpenGL resources
     GL::DeleteVertexArrays(1, &m_overlayVAO);
     GL::DeleteBuffers(1, &m_overlayVBO);
+    GL::DeleteVertexArrays(1, &m_barVAO);
+    GL::DeleteBuffers(1, &m_barVBO);
     Logger::Instance().Log(Logger::Severity::Info, "SettingState Shutdown");
 }

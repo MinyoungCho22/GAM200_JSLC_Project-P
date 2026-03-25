@@ -13,6 +13,7 @@ public:
 
     void DrawCircle(Shader& shader, Math::Vec2 center, float radius, Math::Vec2 color) const;
     void DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, Math::Vec2 color) const;
+    void DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, float r, float g, float b) const;
     void DrawLine(const Shader& shader, Math::Vec2 start, Math::Vec2 end, float r, float g, float b) const;
 
 private:

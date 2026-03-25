@@ -1,0 +1,80 @@
+[
+    {
+        "acceleration": 800.0,
+        "attackAngle": 0.0,
+        "attackDirection": 1,
+        "attackRadius": 100.0,
+        "baseSpeed": 200.0,
+        "detectionRange": 150.0,
+        "isTracer": false,
+        "name": "Default Drone",
+        "radarLength": 150.0,
+        "radarRotationSpeed": 200.0,
+        "timeToDestroy": 1.0
+    },
+    {
+        "acceleration": 800.0,
+        "attackAngle": 0.0,
+        "attackDirection": 1,
+        "attackRadius": 100.0,
+        "baseSpeed": 250.0,
+        "detectionRange": 200.0,
+        "isTracer": true,
+        "name": "Tracer Drone",
+        "radarLength": 150.0,
+        "radarRotationSpeed": 200.0,
+        "timeToDestroy": 1.0
+    },
+    {
+        "acceleration": 800.0,
+        "attackAngle": 0.0,
+        "attackDirection": 1,
+        "attackRadius": 100.0,
+        "baseSpeed": 200.0,
+        "detectionRange": 150.0,
+        "isTracer": false,
+        "name": "New Config 3",
+        "radarLength": 150.0,
+        "radarRotationSpeed": 200.0,
+        "timeToDestroy": 1.0
+    },
+    {
+        "acceleration": 800.0,
+        "attackAngle": 0.0,
+        "attackDirection": 1,
+        "attackRadius": 100.0,
+        "baseSpeed": 200.0,
+        "detectionRange": 150.0,
+        "isTracer": false,
+        "name": "New Config 4",
+        "radarLength": 150.0,
+        "radarRotationSpeed": 200.0,
+        "timeToDestroy": 1.0
+    },
+    {
+        "acceleration": 800.0,
+        "attackAngle": 0.0,
+        "attackDirection": 1,
+        "attackRadius": 100.0,
+        "baseSpeed": 200.0,
+        "detectionRange": 150.0,
+        "isTracer": false,
+        "name": "New Config 5",
+        "radarLength": 150.0,
+        "radarRotationSpeed": 200.0,
+        "timeToDestroy": 1.0
+    },
+    {
+        "acceleration": 800.0,
+        "attackAngle": 0.0,
+        "attackDirection": 1,
+        "attackRadius": 100.0,
+        "baseSpeed": 200.0,
+        "detectionRange": 150.0,
+        "isTracer": false,
+        "name": "New Config 6",
+        "radarLength": 150.0,
+        "radarRotationSpeed": 200.0,
+        "timeToDestroy": 1.0
+    }
+]

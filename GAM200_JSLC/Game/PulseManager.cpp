@@ -91,7 +91,6 @@ void PulseManager::Initialize()
 
 void PulseManager::Shutdown()
 {
-    if (m_circuitTexID != 0) GL::DeleteTextures(1, &m_circuitTexID);
     if (m_fluidTexID != 0) GL::DeleteTextures(1, &m_fluidTexID);
 
     if (m_texCornerNE) GL::DeleteTextures(1, &m_texCornerNE);
@@ -104,7 +103,6 @@ void PulseManager::Shutdown()
     GL::DeleteVertexArrays(1, &m_pulseVAO);
     GL::DeleteBuffers(1, &m_pulseVBO);
 
-    m_circuitTexID = 0;
     m_fluidTexID = 0;
     m_texCornerNE = m_texCornerNW = m_texCornerSE = m_texCornerSW = 0;
     m_texLineH = m_texLineV = 0;
@@ -186,8 +184,11 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     std::vector<PulseSource>& hallwaySources,
     std::vector<PulseSource>& rooftopSources,
     std::vector<PulseSource>& undergroundSources,
-    bool is_interact_key_pressed, double dt)
+    std::vector<PulseSource>& subwaySources,
+    bool is_interact_key_pressed, double dt, Math::Vec2 mouseWorldPos)
 {
+    (void)mouseWorldPos;
+
     float fdt = static_cast<float>(dt);
 
     if (m_isAttacking && m_attackPathValid)
@@ -210,6 +211,8 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     PulseSource* closest_source = nullptr;
     float closest_dist_sq = -1.0f;
 
+    bool overlapWithSource = false;
+
     auto checkSource = [&](PulseSource& source) {
         if (!source.HasPulse()) return;
         if (Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, source.GetPosition(), source.GetSize()))
@@ -219,29 +222,19 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
             {
                 closest_source = &source;
                 closest_dist_sq = dist_sq;
+                overlapWithSource = true;
             }
         }
         };
 
-    for (auto& source : roomSources)
-    {
-        checkSource(source);
-    }
-    for (auto& source : hallwaySources)
-    {
-        checkSource(source);
-    }
+    for (auto& source : roomSources)       checkSource(source);
+    for (auto& source : hallwaySources)    checkSource(source);
+    for (auto& source : rooftopSources)    checkSource(source);
+    for (auto& source : undergroundSources) checkSource(source);
+    for (auto& source : subwaySources)     checkSource(source);
 
-    for (auto& source : rooftopSources)
-    {
-        checkSource(source);
-    }
-    for (auto& source : undergroundSources)
-    {
-        checkSource(source);
-    }
-
-    bool is_near_charger = (closest_source != nullptr);
+    // More forgiving interaction: right-click charging activates when player overlaps the source.
+    bool is_near_charger = (closest_source != nullptr && overlapWithSource);
     PulseTickResult result = player.GetPulseCore().tick(is_interact_key_pressed, is_near_charger, false, dt);
 
     if (result.charged && closest_source != nullptr)
@@ -306,14 +299,6 @@ void PulseManager::DrawVFX(const Shader& shader) const
             float l = v.Length();
             if (l < 0.0001f) return Math::Vec2{ 1.f, 0.f };
             return v / l;
-        };
-
-    auto axisDir = [&](Math::Vec2 d) -> Math::Vec2
-        {
-            if (std::abs(d.x) >= std::abs(d.y))
-                return Math::Vec2{ (d.x >= 0.f) ? 1.f : -1.f, 0.f };
-            else
-                return Math::Vec2{ 0.f, (d.y >= 0.f) ? 1.f : -1.f };
         };
 
     auto cornerTexFromDirs = [&](Math::Vec2 inDir, Math::Vec2 outDir) -> GLuint
