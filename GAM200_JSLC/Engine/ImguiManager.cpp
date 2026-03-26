@@ -49,7 +49,9 @@ bool ImguiManager::Initialize()
     glfwSetWindowPos(m_debugWindow, mainX + mainW + 10, mainY);
 
     glfwMakeContextCurrent(m_debugWindow);
-   
+    
+    // Debug window must never throttle the main game loop.
+    // Keep debug swap interval disabled regardless of main window VSync.
     glfwSwapInterval(0);
 
     IMGUI_CHECKVERSION();
@@ -115,6 +117,15 @@ void ImguiManager::SetWarningLevel(int level)
     m_hasWarningLevel = true;
 }
 
+void ImguiManager::ForceDebugSwapIntervalOff()
+{
+    if (!m_initialized || !m_debugWindow) return;
+    GLFWwindow* prev = glfwGetCurrentContext();
+    glfwMakeContextCurrent(m_debugWindow);
+    glfwSwapInterval(0);
+    glfwMakeContextCurrent(prev);
+}
+
 void ImguiManager::UpdateFps(double dt)
 {
     m_fpsTimer += dt;
@@ -149,6 +160,9 @@ void ImguiManager::DrawDebugWindow()
 
     // Switch to debug window context
     glfwMakeContextCurrent(m_debugWindow);
+    // Some drivers reset swap interval per-context changes after monitor/fullscreen changes.
+    // Re-assert 0 each frame to prevent FPS halving from debug window vsync waits.
+    glfwSwapInterval(0);
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();

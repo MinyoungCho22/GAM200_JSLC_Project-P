@@ -121,6 +121,7 @@ bool Engine::Initialize(const std::string& windowTitle)
 void Engine::GameLoop()
 {
     m_lastFrameTime = glfwGetTime();
+    double nextFrameDeadline = m_lastFrameTime;
 
     while (!glfwWindowShouldClose(m_window) && m_gameStateManager->HasState())
     {
@@ -167,15 +168,32 @@ void Engine::GameLoop()
         if (!m_vsyncEnabled && m_fpsCap > 0)
         {
             double targetFrameTime = 1.0 / static_cast<double>(m_fpsCap);
-            double elapsed = glfwGetTime() - currentFrameTime;
-            if (elapsed < targetFrameTime)
+            // Use absolute deadline scheduling to reduce jitter/drift at 60/144 caps.
+            if (nextFrameDeadline < currentFrameTime)
             {
-                double sleepTime = targetFrameTime - elapsed - 0.0005;
-                if (sleepTime > 0.0)
-                    std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime));
-                // Spin-wait for sub-millisecond precision
-                while (glfwGetTime() - currentFrameTime < targetFrameTime) {}
+                nextFrameDeadline = currentFrameTime;
             }
+            nextFrameDeadline += targetFrameTime;
+
+            double remaining = nextFrameDeadline - glfwGetTime();
+            if (remaining > 0.0)
+            {
+                // Accuracy-first limiter: avoid sleep/yield overshoot on Windows scheduler.
+                while (glfwGetTime() < nextFrameDeadline)
+                {
+                    // Busy wait for precise cap timing (especially stable at 30/60/144).
+                }
+            }
+            else if (remaining < -targetFrameTime * 2.0)
+            {
+                // If we fall far behind, resync to avoid long-term phase error.
+                nextFrameDeadline = glfwGetTime();
+            }
+        }
+        else
+        {
+            // Keep deadline aligned when cap is disabled or vsync is enabled.
+            nextFrameDeadline = glfwGetTime();
         }
     }
 }
@@ -310,6 +328,13 @@ void Engine::SetVSync(bool enabled)
     m_vsyncEnabled = enabled;
     glfwMakeContextCurrent(m_window);
     glfwSwapInterval(enabled ? 1 : 0);
+
+    // Ensure debug window never adds an extra vsync wait.
+    if (m_imguiManager && m_imguiManager->IsInitialized())
+    {
+        m_imguiManager->ForceDebugSwapIntervalOff();
+        glfwMakeContextCurrent(m_window);
+    }
 }
 
 void Engine::SetFpsCap(int cap)

@@ -31,6 +31,7 @@ public:
     void EndFrame();
 
     void SetWarningLevel(int level);
+    void ForceDebugSwapIntervalOff();
     void SetDroneManager(DroneManager* manager) { m_droneManager = manager; }
     void SetDroneConfigManager(std::shared_ptr<DroneConfigManager> configManager) { m_configManager = configManager; }
     void SetRobotConfigManager(std::shared_ptr<RobotConfigManager> configManager) { m_robotConfigManager = configManager; }
