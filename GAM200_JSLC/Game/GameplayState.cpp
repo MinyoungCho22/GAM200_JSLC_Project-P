@@ -110,6 +110,7 @@ void GameplayState::Initialize()
     m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ...");
 
     m_tutorial = std::make_unique<Tutorial>();
+    m_miniMap = std::make_unique<MiniMap>();
 
     auto& roomPulseSources = m_room->GetPulseSources();
     if (!roomPulseSources.empty())
@@ -1009,6 +1010,13 @@ void GameplayState::Draw()
     m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, GAME_HEIGHT - 120.f }, 32.0f);
     m_font->DrawBakedText(*m_fontShader, m_warningLevelText, { 20.f, GAME_HEIGHT - 160.f }, 32.0f);
+
+    if (m_miniMap)
+    {
+        m_miniMap->Draw(textureShader, *colorShader, *m_fontShader, *m_font, *m_debugRenderer,
+                        player, *m_room, *m_hallway, *m_rooftop, *m_underground, *m_subway, *droneManager,
+                        m_undergroundAccessed, m_subwayAccessed, baseProjection);
+    }
 
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())

@@ -60,6 +60,7 @@ public:
     float GetMaxHP() const { return m_maxHp; }
     float GetDirectionX() const { return m_directionX; }
     RobotState GetState() const { return m_state; }
+    Math::Vec2 GetVelocity() const { return m_velocity; }
     float GetPatrolSpeed() const { return PATROL_SPEED; }
     float GetChaseSpeed() const { return CHASE_SPEED; }
     float GetDetectionRange() const { return DETECTION_RANGE; }

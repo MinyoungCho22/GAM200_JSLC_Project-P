@@ -5,7 +5,19 @@
 #if defined(__APPLE__)
 #include <OpenGL/gl3.h>
 #elif defined(USE_GLEW) || defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
+#if defined(__has_include)
+#if __has_include(<GL/glew.h>)
 #include <GL/glew.h>
+#else
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <GL/gl.h>
+#endif
+#else
+#include <GL/glew.h>
+#endif
 #else
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN

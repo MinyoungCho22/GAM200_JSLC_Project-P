@@ -82,6 +82,9 @@ private:
     float m_liftDirection = 1.0f; // 1.0 for right, -1.0 for left
     bool m_isPlayerNearLift = false;
     bool m_isLiftActivated = false; // Whether the player is currently riding the lift
+    bool m_isLiftGapUnlocked = false; // Becomes true after pressing lift button once
+    float m_prevPlayerX = 0.0f;
+    bool m_hasPrevPlayerX = false;
 
     Math::Vec2 m_position;
     Math::Vec2 m_size;

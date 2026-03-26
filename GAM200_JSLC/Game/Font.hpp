@@ -9,8 +9,6 @@
 #include <unordered_map>
 #include <memory> 
 
-#include "../OpenGL/GLWrapper.hpp" 
-
 class Shader;
 
 struct CachedTextureInfo

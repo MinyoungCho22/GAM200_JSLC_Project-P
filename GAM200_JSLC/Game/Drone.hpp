@@ -26,6 +26,7 @@ public:
     Math::Vec2 GetSize() const { return m_size; }
     bool IsAttacking() const { return m_isAttacking; }
     bool IsDead() const { return m_isDead; }
+    bool IsTracer() const { return m_isTracer; }
     bool ShouldDealDamage() const { return m_shouldDealDamage; }
     void ResetDamageFlag() { m_shouldDealDamage = false; }
     bool IsHit() const { return m_isHit; }

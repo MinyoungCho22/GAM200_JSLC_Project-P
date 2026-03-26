@@ -21,6 +21,7 @@
 #include "Tutorial.hpp"
 #include "Underground.hpp"
 #include "Subway.hpp"
+#include "MiniMap.hpp"
 #include <memory>
 #include <vector>
 
@@ -72,6 +73,7 @@ private:
     std::unique_ptr<Rooftop> m_rooftop;
     std::unique_ptr<TraceSystem> m_traceSystem;
     std::unique_ptr<Tutorial> m_tutorial;
+    std::unique_ptr<MiniMap> m_miniMap;
     std::unique_ptr<Underground> m_underground;
     std::unique_ptr<Subway> m_subway;
     bool m_undergroundAccessed = false;

@@ -187,8 +187,6 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     std::vector<PulseSource>& subwaySources,
     bool is_interact_key_pressed, double dt, Math::Vec2 mouseWorldPos)
 {
-    (void)mouseWorldPos;
-
     float fdt = static_cast<float>(dt);
 
     if (m_isAttacking && m_attackPathValid)
@@ -211,18 +209,20 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     PulseSource* closest_source = nullptr;
     float closest_dist_sq = -1.0f;
 
-    bool overlapWithSource = false;
+    bool overlapAndCursorOnSource = false;
 
     auto checkSource = [&](PulseSource& source) {
         if (!source.HasPulse()) return;
-        if (Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, source.GetPosition(), source.GetSize()))
+        bool playerOverlaps = Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, source.GetPosition(), source.GetSize());
+        bool cursorOnSource = Collision::CheckPointInAABB(mouseWorldPos, source.GetPosition(), source.GetSize());
+        if (playerOverlaps && cursorOnSource)
         {
             float dist_sq = (playerHitboxCenter - source.GetPosition()).LengthSq();
             if (closest_source == nullptr || dist_sq < closest_dist_sq)
             {
                 closest_source = &source;
                 closest_dist_sq = dist_sq;
-                overlapWithSource = true;
+                overlapAndCursorOnSource = true;
             }
         }
         };
@@ -233,8 +233,10 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     for (auto& source : undergroundSources) checkSource(source);
     for (auto& source : subwaySources)     checkSource(source);
 
-    // More forgiving interaction: right-click charging activates when player overlaps the source.
-    bool is_near_charger = (closest_source != nullptr && overlapWithSource);
+    // Charging is allowed only when:
+    // 1) player overlaps a pulse source and
+    // 2) mouse cursor is on that pulse source.
+    bool is_near_charger = (closest_source != nullptr && overlapAndCursorOnSource);
     PulseTickResult result = player.GetPulseCore().tick(is_interact_key_pressed, is_near_charger, false, dt);
 
     if (result.charged && closest_source != nullptr)

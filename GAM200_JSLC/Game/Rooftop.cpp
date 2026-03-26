@@ -48,6 +48,9 @@ void Rooftop::Initialize()
     m_liftSpeed = 250.0f;
     m_liftCountdown = 3.0f;
     m_isLiftActivated = false;
+    m_isLiftGapUnlocked = false;
+    m_hasPrevPlayerX = false;
+    m_prevPlayerX = 0.0f;
     m_liftDirection = 1.0f;
 
     // Initialize rooftop level dimensions
@@ -108,6 +111,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
 {
     float oldLiftX = m_liftPos.x;
     Math::Vec2 playerPos = player.GetPosition();
+    float prevPlayerX = m_hasPrevPlayerX ? m_prevPlayerX : playerPos.x;
     auto clampf = [](float v, float lo, float hi) { return std::max(lo, std::min(v, hi)); };
 
     // Check if the player is within the rooftop level boundaries
@@ -248,6 +252,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
                 m_liftState = LiftState::Countdown;
                 m_liftCountdown = 3.0f;
                 m_isLiftActivated = true;
+                m_isLiftGapUnlocked = true;
 
                 // Determine movement direction based on current position relative to start/target
                 if (m_liftPos.x < (m_liftInitialX + m_liftTargetX) / 2.0f)
@@ -370,8 +375,65 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         }
     }
 
+    // Prevent bypassing the lift gap by jumping over it.
+    // Crossing the gap is allowed only while physically on the lift.
+    bool blockedByLiftGapWall = false;
+    if (!m_isLiftGapUnlocked)
+    {
+        Math::Vec2 liftHalf = m_liftSize * 0.5f;
+        Math::Vec2 liftMinNow = m_liftPos - liftHalf;
+        Math::Vec2 liftMaxNow = m_liftPos + liftHalf;
+
+        Math::Vec2 curPlayerMin = currentPlayerPos - playerHalfSize;
+        Math::Vec2 curPlayerMax = currentPlayerPos + playerHalfSize;
+        bool overlapsLiftNow = (curPlayerMax.x > liftMinNow.x && curPlayerMin.x < liftMaxNow.x &&
+                                curPlayerMax.y > liftMinNow.y && curPlayerMin.y < liftMaxNow.y);
+        float playerFootY = currentPlayerPos.y - playerHalfSize.y;
+        float liftTopY = liftMaxNow.y;
+        bool nearLiftTop = std::fabs(playerFootY - liftTopY) <= 30.0f;
+        bool isRidingLiftNow = overlapsLiftNow && nearLiftTop && player.GetVelocity().y <= 0.0f;
+
+        if (!isRidingLiftNow)
+        {
+            const float leftWallX = abyssStartX - playerHalfSize.x;
+            const float rightWallX = abyssEndX + playerHalfSize.x;
+            const float wallMidX = (leftWallX + rightWallX) * 0.5f;
+            Math::Vec2 pos = currentPlayerPos;
+
+            // Use previous frame X to prevent jump/dash tunneling through the wall.
+            bool wasOnLeftSide = (prevPlayerX <= leftWallX);
+            bool wasOnRightSide = (prevPlayerX >= rightWallX);
+            bool isInsideGapBand = (pos.x > leftWallX && pos.x < rightWallX);
+            bool crossedLeftToRight = (wasOnLeftSide && pos.x >= rightWallX);
+            bool crossedRightToLeft = (wasOnRightSide && pos.x <= leftWallX);
+
+            if (isInsideGapBand || crossedLeftToRight || crossedRightToLeft)
+            {
+                if (wasOnLeftSide || crossedLeftToRight)
+                {
+                    pos.x = leftWallX;
+                }
+                else if (wasOnRightSide || crossedRightToLeft)
+                {
+                    pos.x = rightWallX;
+                }
+                else
+                {
+                    pos.x = (pos.x < wallMidX) ? leftWallX : rightWallX;
+                }
+                blockedByLiftGapWall = true;
+            }
+
+            if (blockedByLiftGapWall)
+            {
+                player.SetPosition(pos);
+                currentPlayerPos = pos;
+            }
+        }
+    }
+
     // AABB Collision with the rooftop hole (only if it is not yet closed)
-    if (!m_isClose && !blockedByHoleWall)
+    if (!m_isClose && !blockedByHoleWall && !blockedByLiftGapWall)
     {
         Math::Vec2 holeHalfSize = m_debugBoxSize * 0.5f;
         Math::Vec2 holeMin = m_debugBoxPos - holeHalfSize;
@@ -428,6 +490,13 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
             float overlapTop = playerMax.y - liftMin.y;
             float overlapBottom = liftMax.y - playerMin.y;
 
+            // Before lift unlock, do not allow "landing on lift top" from above.
+            // This prevents double-jump + drift bypass over the virtual gap walls.
+            if (!m_isLiftGapUnlocked)
+            {
+                overlapBottom = 1e9f;
+            }
+
             float minOverlap = std::min({ overlapLeft, overlapRight, overlapTop, overlapBottom });
 
             if (minOverlap == overlapLeft)
@@ -446,6 +515,8 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
             {
                 player.SetPosition({ currentPlayerPos.x, liftMax.y + playerHalfSize.y });
             }
+
+            currentPlayerPos = player.GetPosition();
         }
     }
 
@@ -482,6 +553,9 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
 
     // Update enemies (drones)
     m_droneManager->Update(dt, player, playerHitboxSize, false);
+
+    m_prevPlayerX = player.GetPosition().x;
+    m_hasPrevPlayerX = true;
 }
 
 void Rooftop::Draw(Shader& shader) const
@@ -578,9 +652,20 @@ void Rooftop::Shutdown()
 
 void Rooftop::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
-    // No rectangle debug boxes in Rooftop on Tab debug mode.
-    (void)colorShader;
-    (void)debugRenderer;
+    if (m_isLiftGapUnlocked)
+    {
+        return;
+    }
+
+    // Visualize virtual X-walls that block crossing the lift gap before activation.
+    const float wallHeight = 5000.0f;
+    const float wallWidth = 30.0f;
+    const float wallCenterY = MIN_Y + HEIGHT * 0.5f;
+    const float wallLeftX = m_liftInitialX - (m_liftSize.x * 0.5f) + 20.0f;
+    const float wallRightX = m_liftTargetX + (m_liftSize.x * 0.5f) - 20.0f;
+
+    debugRenderer.DrawBox(colorShader, { wallLeftX, wallCenterY }, { wallWidth, wallHeight }, { 0.0f, 1.0f });
+    debugRenderer.DrawBox(colorShader, { wallRightX, wallCenterY }, { wallWidth, wallHeight }, { 0.0f, 1.0f });
 }
 
 void Rooftop::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist) const

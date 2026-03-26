@@ -2,6 +2,7 @@
 
 #include "Font.hpp"
 #include "../OpenGL/Shader.hpp"
+#include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Matrix.hpp"
 #include <vector>
 #include <iostream>
