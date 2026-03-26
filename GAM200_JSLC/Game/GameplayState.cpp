@@ -945,13 +945,8 @@ void GameplayState::DrawMainLayer()
     textureShader.use();
     textureShader.setMat4("projection", projection);
     droneManager->Draw(textureShader);
-    player.Draw(textureShader);
 
     m_hallway->DrawForeground(textureShader);
-
-    textureShader.use();
-    textureShader.setMat4("projection", projection);
-    pulseManager->DrawVFX(textureShader);
     GL::Disable(GL_BLEND);
 }
 
@@ -1001,7 +996,22 @@ void GameplayState::DrawForegroundLayer()
         }
     }
 
-    // 2) World-space overlays (radars / gauges)
+    // 2) Foreground pulse / circuit VFX
+    Shader& textureShader = engine.GetTextureShader();
+    textureShader.use();
+    textureShader.setMat4("projection", projection);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+    player.Draw(textureShader);
+
+    // 3) Player (draw AFTER outlines and VFX so the player stays in front)
+    textureShader.use();
+    textureShader.setMat4("projection", projection);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+    pulseManager->DrawVFX(textureShader);
+
+    // 4) World-space overlays (radars / gauges)
     colorShader->use();
     colorShader->setMat4("projection", projection);
 
@@ -1017,7 +1027,7 @@ void GameplayState::DrawForegroundLayer()
     m_underground->DrawGauges(*colorShader, *m_debugRenderer);
     m_subway->DrawGauges(*colorShader, *m_debugRenderer);
 
-    // 3) HUD
+    // 5) HUD
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
     colorShader->setFloat("uAlpha", 1.0f);
@@ -1025,7 +1035,7 @@ void GameplayState::DrawForegroundLayer()
 
     m_pulseGauge.Draw(*colorShader);
 
-    // 4) Fonts / tutorial
+    // 6) Fonts / tutorial
     m_fontShader->use();
     m_fontShader->setMat4("projection", baseProjection);
 
@@ -1043,7 +1053,7 @@ void GameplayState::DrawForegroundLayer()
 
     m_tutorial->Draw(*m_font, *m_fontShader);
 
-    // 5) Cursor
+    // 7) Cursor
     Engine& engineForCursor = gsm.GetEngine();
     auto& inputForCursor = engineForCursor.GetInput();
 
@@ -1113,7 +1123,7 @@ void GameplayState::DrawForegroundLayer()
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     colorShader->setFloat("uAlpha", 1.0f);
 
-    // 6) Debug overlay
+    // 8) Debug overlay
     if (m_isDebugDraw)
     {
         colorShader->use();
