@@ -35,4 +35,7 @@ private:
                                       DroneManager& mainDroneManager, bool undergroundAccessed,
                                       bool subwayAccessed) const;
     std::string GetCurrentMapName(const Math::Vec2& playerPos) const;
+
+    bool m_hasSmoothedCenter = false;
+    Math::Vec2 m_smoothedCenter{};
 };

@@ -127,9 +127,12 @@ AnimationState Player::DetermineAnimationState() const
 
 void Player::Update(double dt, Input::Input& input)
 {
+    const float fdt = static_cast<float>(dt);
+
     if (IsDead())
     {
         velocity = { 0.0f, 0.0f };
+        m_currentHorizontalSpeed = 0.0f;
         return;
     }
 
@@ -138,8 +141,9 @@ void Player::Update(double dt, Input::Input& input)
         is_on_ground = false;
     }
 
-    if (input.IsKeyPressed(Input::Key::A)) MoveLeft();
-    if (input.IsKeyPressed(Input::Key::D)) MoveRight();
+    int moveInput = 0;
+    if (input.IsKeyPressed(Input::Key::A)) moveInput -= 1;
+    if (input.IsKeyPressed(Input::Key::D)) moveInput += 1;
 
     if (input.IsKeyTriggered(Input::Key::Space)) Jump();
 
@@ -149,7 +153,7 @@ void Player::Update(double dt, Input::Input& input)
 
     if (m_isInvincible)
     {
-        m_invincibilityTimer -= static_cast<float>(dt);
+        m_invincibilityTimer -= fdt;
         if (m_invincibilityTimer <= 0.0f)
         {
             m_isInvincible = false;
@@ -158,7 +162,7 @@ void Player::Update(double dt, Input::Input& input)
 
     if (is_dashing)
     {
-        dash_timer -= static_cast<float>(dt);
+        dash_timer -= fdt;
         if (dash_timer <= 0.0f)
         {
             is_dashing = false;
@@ -172,14 +176,47 @@ void Player::Update(double dt, Input::Input& input)
     // Fade out existing ghosts and remove expired ones
     for (auto& ghost : m_afterimageGhosts)
     {
-        ghost.alpha -= AFTERIMAGE_FADE_SPEED * static_cast<float>(dt);
+        ghost.alpha -= AFTERIMAGE_FADE_SPEED * fdt;
     }
     m_afterimageGhosts.erase(
         std::remove_if(m_afterimageGhosts.begin(), m_afterimageGhosts.end(),
             [](const AfterimageGhost& g) { return g.alpha <= 0.0f; }),
         m_afterimageGhosts.end());
 
-    velocity.y += GRAVITY * static_cast<float>(dt);
+    // Horizontal movement with acceleration/deceleration.
+    if (!is_dashing)
+    {
+        if (moveInput != 0 && !is_crouching)
+        {
+            float targetSpeed = static_cast<float>(moveInput) * m_maxSpeed;
+            if (m_currentHorizontalSpeed < targetSpeed)
+                m_currentHorizontalSpeed = (std::min)(targetSpeed, m_currentHorizontalSpeed + m_acceleration * fdt);
+            else if (m_currentHorizontalSpeed > targetSpeed)
+                m_currentHorizontalSpeed = (std::max)(targetSpeed, m_currentHorizontalSpeed - m_acceleration * fdt);
+
+            if (moveInput < 0)
+            {
+                last_move_direction = -1;
+                m_is_flipped = true;
+            }
+            else if (moveInput > 0)
+            {
+                last_move_direction = 1;
+                m_is_flipped = false;
+            }
+        }
+        else
+        {
+            if (m_currentHorizontalSpeed > 0.0f)
+                m_currentHorizontalSpeed = (std::max)(0.0f, m_currentHorizontalSpeed - m_friction * fdt);
+            else if (m_currentHorizontalSpeed < 0.0f)
+                m_currentHorizontalSpeed = (std::min)(0.0f, m_currentHorizontalSpeed + m_friction * fdt);
+        }
+
+        velocity.x = m_currentHorizontalSpeed;
+    }
+
+    velocity.y += GRAVITY * fdt;
 
     Math::Vec2 final_velocity = velocity;
     if (is_dashing)
@@ -187,7 +224,7 @@ void Player::Update(double dt, Input::Input& input)
         final_velocity.x = last_move_direction * dash_speed;
     }
 
-    position += final_velocity * static_cast<float>(dt);
+    position += final_velocity * fdt;
 
     if (position.y - size.y / 2.0f <= m_currentGroundLevel)
     {
@@ -208,7 +245,7 @@ void Player::Update(double dt, Input::Input& input)
 
         if (!m_crouchAnimationFinished)
         {
-            m_animations[static_cast<int>(AnimationState::Crouching)].Update(static_cast<float>(dt));
+            m_animations[static_cast<int>(AnimationState::Crouching)].Update(fdt);
 
             if (m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame >= 1)
             {
@@ -241,14 +278,14 @@ void Player::Update(double dt, Input::Input& input)
             m_animations[static_cast<int>(m_currentAnimState)].Reset();
             m_currentAnimState = newState;
         }
-        m_animations[static_cast<int>(m_currentAnimState)].Update(static_cast<float>(dt));
+        m_animations[static_cast<int>(m_currentAnimState)].Update(fdt);
     }
 
     // Spawn Sandevistan afterimage ghosts at fixed intervals.
     // Spawn after animation-state update so crouch-dash leaves crouching ghosts.
     if (is_dashing)
     {
-        m_afterimageSpawnTimer -= static_cast<float>(dt);
+        m_afterimageSpawnTimer -= fdt;
         if (m_afterimageSpawnTimer <= 0.0f)
         {
             m_afterimageSpawnTimer = AFTERIMAGE_INTERVAL;
@@ -262,7 +299,6 @@ void Player::Update(double dt, Input::Input& input)
         }
     }
 
-    velocity.x = 0;
 }
 
 void Player::Draw(const Shader& shader) const
@@ -537,9 +573,13 @@ void Player::StopCrouch()
 
 void Player::Dash()
 {
-    if (!is_dashing && m_pulseCore.getPulse().Value() >= m_pulseCore.getConfig().dashCost)
+    constexpr float MIN_PULSE_TO_ALLOW_DASH = 10.0f;
+    const float currentPulse = m_pulseCore.getPulse().Value();
+    const float dashCost = m_pulseCore.getConfig().dashCost;
+
+    if (!is_dashing && currentPulse > MIN_PULSE_TO_ALLOW_DASH && currentPulse >= dashCost)
     {
-        m_pulseCore.getPulse().spend(m_pulseCore.getConfig().dashCost);
+        m_pulseCore.getPulse().spend(dashCost);
         is_dashing = true;
         dash_timer = dash_duration;
     }

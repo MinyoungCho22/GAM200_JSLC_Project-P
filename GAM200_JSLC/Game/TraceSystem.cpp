@@ -40,18 +40,18 @@ void TraceSystem::SpawnTracerWave(DroneManager& droneManager, int warningLevel, 
 
     if (warningLevel == 1)
     {
-        // Spawn a small squad of 3 tracers with distinct, lower speeds (max reduced).
-        droneManager.SpawnDrone({ origin.x + offsetX, origin.y + offsetY }, "Asset/Drone.png", true).SetBaseSpeed(60.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX + 50.0f, origin.y + offsetY + 100.0f }, "Asset/Drone.png", true).SetBaseSpeed(80.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX - 50.0f, origin.y + offsetY + 200.0f }, "Asset/Drone.png", true).SetBaseSpeed(100.0f);
+        // More varied: slow / medium / fast mix.
+        droneManager.SpawnDrone({ origin.x + offsetX, origin.y + offsetY }, "Asset/Drone.png", true).SetBaseSpeed(55.0f);
+        droneManager.SpawnDrone({ origin.x + offsetX + 50.0f, origin.y + offsetY + 100.0f }, "Asset/Drone.png", true).SetBaseSpeed(95.0f);
+        droneManager.SpawnDrone({ origin.x + offsetX - 50.0f, origin.y + offsetY + 200.0f }, "Asset/Drone.png", true).SetBaseSpeed(145.0f);
     }
     else if (warningLevel == 2)
     {
-        // Spawn a larger squad with varied speeds; fastest is 100 (half of old 200).
-        droneManager.SpawnDrone({ origin.x + offsetX, origin.y + offsetY }, "Asset/Drone.png", true).SetBaseSpeed(55.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX + 50.0f, origin.y + offsetY + 100.0f }, "Asset/Drone.png", true).SetBaseSpeed(72.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX - 50.0f, origin.y + offsetY + 200.0f }, "Asset/Drone.png", true).SetBaseSpeed(100.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX + 100.0f, origin.y + offsetY + 50.0f }, "Asset/Drone.png", true).SetBaseSpeed(65.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX - 100.0f, origin.y + offsetY + 250.0f }, "Asset/Drone.png", true).SetBaseSpeed(90.0f);
+        // Broad variation: very slow to quite fast tracers.
+        droneManager.SpawnDrone({ origin.x + offsetX, origin.y + offsetY }, "Asset/Drone.png", true).SetBaseSpeed(50.0f);
+        droneManager.SpawnDrone({ origin.x + offsetX + 50.0f, origin.y + offsetY + 100.0f }, "Asset/Drone.png", true).SetBaseSpeed(80.0f);
+        droneManager.SpawnDrone({ origin.x + offsetX - 50.0f, origin.y + offsetY + 200.0f }, "Asset/Drone.png", true).SetBaseSpeed(165.0f);
+        droneManager.SpawnDrone({ origin.x + offsetX + 100.0f, origin.y + offsetY + 50.0f }, "Asset/Drone.png", true).SetBaseSpeed(70.0f);
+        droneManager.SpawnDrone({ origin.x + offsetX - 100.0f, origin.y + offsetY + 250.0f }, "Asset/Drone.png", true).SetBaseSpeed(130.0f);
     }
 }

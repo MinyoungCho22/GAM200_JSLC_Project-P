@@ -59,7 +59,8 @@ void GameplayState::Initialize()
 
     droneManager = std::make_unique<DroneManager>();
 
-    m_pulseGauge.Initialize({ 75.f, GAME_HEIGHT * 0.75f - 70.0f }, { 40.f, 300.f });
+    // Left-middle gauge position
+    m_pulseGauge.Initialize({ 75.f, GAME_HEIGHT * 0.5f }, { 40.f, 300.f });
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
 
@@ -106,8 +107,13 @@ void GameplayState::Initialize()
     m_font = std::make_unique<Font>();
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
-    m_debugToggleText = m_font->PrintToTexture(*m_fontShader, "Debug (TAB)");
     m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ...");
+
+    // Custom cursor sprites
+    m_mouseLeftCursor = std::make_unique<Background>();
+    m_mouseLeftCursor->Initialize("Asset/MouseLeft.png");
+    m_mouseRightCursor = std::make_unique<Background>();
+    m_mouseRightCursor->Initialize("Asset/MouseRight.png");
 
     m_tutorial = std::make_unique<Tutorial>();
     m_miniMap = std::make_unique<MiniMap>();
@@ -289,7 +295,7 @@ void GameplayState::Update(double dt)
         }
     }
 
-    m_tutorial->Update(static_cast<float>(dt), player, input, m_room.get(), m_hallway.get(), m_rooftop.get(), m_door.get(), m_rooftopDoor.get());
+    // Tutorial UI is disabled per request.
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
@@ -301,6 +307,7 @@ void GameplayState::Update(double dt)
     double mouseScreenX, mouseScreenY;
     input.GetMousePosition(mouseScreenX, mouseScreenY);
     Math::Vec2 mouseWorldPos = ScreenToWorldCoordinates(mouseScreenX, mouseScreenY);
+    m_lastMouseWorldPos = mouseWorldPos;
 
     // Auto hot-reload on file save for map object coordinates/sizes/sprites.
     if (MapObjectConfig::Instance().ReloadIfChanged())
@@ -1007,9 +1014,6 @@ void GameplayState::Draw()
     m_fontShader->setMat4("projection", baseProjection);
 
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
-    m_font->DrawBakedText(*m_fontShader, m_debugToggleText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
-    m_font->DrawBakedText(*m_fontShader, m_pulseText, { 20.f, GAME_HEIGHT - 120.f }, 32.0f);
-    m_font->DrawBakedText(*m_fontShader, m_warningLevelText, { 20.f, GAME_HEIGHT - 160.f }, 32.0f);
 
     if (m_miniMap)
     {
@@ -1024,8 +1028,6 @@ void GameplayState::Draw()
         CachedTextureInfo countdownTexture = m_font->PrintToTexture(*m_fontShader, countdownText);
         m_font->DrawBakedText(*m_fontShader, countdownTexture, { GAME_WIDTH / 2.0f - 250.0f, 100.0f }, 50.0f);
     }
-
-    m_tutorial->Draw(*m_font, *m_fontShader);
 
     // Draw mouse cursor
     Engine& engineForCursor = gsm.GetEngine();
@@ -1070,8 +1072,133 @@ void GameplayState::Draw()
     const float cursorThick = 2.5f;
     Math::Vec2 cursorPos = { mouseGameX, mouseGameY };
 
-    // Additive blending: cursor adds light to the scene, always visible in darkness
-    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE);
+    // Cursor sprite mode:
+    // - Hover a left-click target => MouseLeft.png
+    // - Hover a right-click (pulse charger) target => MouseRight.png
+    // - Otherwise => keep the original neon cross
+    bool overLeftClickTarget = false;
+    bool overRightClickTarget = false;
+
+    if (!m_isDebugDraw)
+    {
+        const Math::Vec2 mouseWorldPosForHover = m_lastMouseWorldPos;
+        const Math::Vec2 playerHitboxCenter = player.GetHitboxCenter();
+        const Math::Vec2 playerHitboxSize = player.GetHitboxSize();
+
+        // Left-click targets
+        if (m_door && !m_door->IsOpened() && m_door->IsPlayerNearby() &&
+            Collision::CheckPointInAABB(mouseWorldPosForHover, m_door->GetPosition(), m_door->GetSize()))
+            overLeftClickTarget = true;
+
+        if (!overLeftClickTarget && m_rooftopDoor && !m_rooftopDoor->IsOpened() && m_rooftopDoor->IsPlayerNearby() &&
+            Collision::CheckPointInAABB(mouseWorldPosForHover, m_rooftopDoor->GetPosition(), m_rooftopDoor->GetSize()))
+            overLeftClickTarget = true;
+
+        if (!overLeftClickTarget && m_room && m_room->IsPlayerInBlindArea() && !m_room->IsBlindOpen() &&
+            Collision::CheckPointInAABB(mouseWorldPosForHover, m_room->GetBlindPos(), m_room->GetBlindSize()))
+            overLeftClickTarget = true;
+
+        if (!overLeftClickTarget && m_rooftop && m_rooftop->IsPlayerCloseToHole() && !m_rooftop->IsHoleClosed() &&
+            Collision::CheckPointInAABB(mouseWorldPosForHover, m_rooftop->GetHolePos(), m_rooftop->GetHoleSize()))
+            overLeftClickTarget = true;
+
+        if (!overLeftClickTarget && m_rooftop && m_rooftop->IsPlayerNearLift() &&
+            Collision::CheckPointInAABB(mouseWorldPosForHover, m_rooftop->GetLiftButtonPos(), m_rooftop->GetLiftButtonSize()))
+            overLeftClickTarget = true;
+
+        // Right-click targets (pulse chargers): player overlaps AND cursor is inside the source
+        auto checkPulseSources = [&](const std::vector<PulseSource>& sources) {
+            for (const auto& src : sources)
+            {
+                if (!Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, src.GetPosition(), src.GetSize()))
+                    continue;
+                if (Collision::CheckPointInAABB(mouseWorldPosForHover, src.GetPosition(), src.GetSize()))
+                    return true;
+            }
+            return false;
+        };
+
+        if (checkPulseSources(m_room->GetPulseSources()) ||
+            checkPulseSources(m_hallway->GetPulseSources()) ||
+            checkPulseSources(m_rooftop->GetPulseSources()) ||
+            checkPulseSources(m_underground->GetPulseSources()) ||
+            checkPulseSources(m_subway->GetPulseSources()))
+        {
+            overRightClickTarget = true;
+        }
+
+        // Combat targets are also left-click targets: drones/robots/tracers.
+        auto isMouseOnDrone = [&](const Drone& drone) {
+            if (drone.IsDead() || drone.IsHit()) return false;
+            return Collision::CheckPointInAABB(mouseWorldPosForHover, drone.GetPosition(), drone.GetSize() * 0.8f);
+        };
+        auto isMouseOnRobot = [&](const Robot& robot) {
+            if (robot.IsDead()) return false;
+            return Collision::CheckPointInAABB(mouseWorldPosForHover, robot.GetPosition(), robot.GetSize());
+        };
+
+        if (!overLeftClickTarget)
+        {
+            for (const auto& d : droneManager->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
+        }
+        if (!overLeftClickTarget)
+        {
+            for (const auto& d : m_hallway->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
+        }
+        if (!overLeftClickTarget)
+        {
+            for (const auto& d : m_rooftop->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
+        }
+        if (!overLeftClickTarget && m_undergroundAccessed)
+        {
+            for (const auto& d : m_underground->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
+        }
+        if (!overLeftClickTarget && m_subwayAccessed)
+        {
+            for (const auto& d : m_subway->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
+        }
+        if (!overLeftClickTarget && m_undergroundAccessed)
+        {
+            for (const auto& r : m_underground->GetRobots()) { if (isMouseOnRobot(r)) { overLeftClickTarget = true; break; } }
+        }
+        if (!overLeftClickTarget && m_subwayAccessed)
+        {
+            for (const auto& r : m_subway->GetRobots()) { if (isMouseOnRobot(r)) { overLeftClickTarget = true; break; } }
+        }
+    }
+
+    const bool showLeftCursor = overLeftClickTarget && !overRightClickTarget;
+    const bool showRightCursor = overRightClickTarget && !overLeftClickTarget;
+
+    if (showLeftCursor || showRightCursor)
+    {
+        // Draw left/right cursor sprites
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        textureShader.use();
+        textureShader.setMat4("projection", baseProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        textureShader.setFloat("tintStrength", 0.0f);
+
+        const float iconSize = 32.0f;
+        // Tilt both cursor images 15 degrees to the left.
+        Math::Matrix iconModel =
+            Math::Matrix::CreateTranslation(cursorPos) *
+            Math::Matrix::CreateRotation(15.0f) *
+            Math::Matrix::CreateScale({ iconSize, iconSize });
+
+        if (showLeftCursor && m_mouseLeftCursor)
+            m_mouseLeftCursor->Draw(textureShader, iconModel);
+        else if (showRightCursor && m_mouseRightCursor)
+            m_mouseRightCursor->Draw(textureShader, iconModel);
+    }
+    else
+    {
+        // Additive blending: cursor adds light to the scene, always visible in darkness
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE);
 
     // Outer glow (neon cyan: R=0, G=1, B=0.8 via DrawCircle / B=0.2 via DrawBox)
     colorShader->setFloat("uAlpha", 0.07f);
@@ -1095,6 +1222,7 @@ void GameplayState::Draw()
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     colorShader->setFloat("uAlpha", 1.0f);
 
+    } // end cursor cross (else branch)
     if (m_isDebugDraw)
     {
         colorShader->use();
@@ -1187,6 +1315,9 @@ void GameplayState::Shutdown()
     m_door->Shutdown();
     m_rooftopDoor->Shutdown();
     pulseManager->Shutdown();
+
+    if (m_mouseLeftCursor) m_mouseLeftCursor->Shutdown();
+    if (m_mouseRightCursor) m_mouseRightCursor->Shutdown();
 
     m_bgm.Stop();
 

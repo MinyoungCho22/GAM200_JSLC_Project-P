@@ -51,7 +51,14 @@ public:
     // Interaction state queries
     bool IsPlayerCloseToHole() const { return m_isPlayerClose; }
     bool IsPlayerNearLift() const { return m_isPlayerNearLift; }
+    bool IsHoleClosed() const { return m_isClose; }
     std::string GetLiftCountdownText() const;
+
+    // Hitbox getters for UI cursor interaction feedback
+    Math::Vec2 GetHolePos() const { return m_debugBoxPos; }
+    Math::Vec2 GetHoleSize() const { return m_debugBoxSize; }
+    Math::Vec2 GetLiftButtonPos() const { return m_liftButtonPos; }
+    Math::Vec2 GetLiftButtonSize() const { return m_liftButtonSize; }
 
 private:
     enum class LiftState

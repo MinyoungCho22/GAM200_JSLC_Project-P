@@ -25,6 +25,8 @@
 #include <memory>
 #include <vector>
 
+class Background;
+
 
 class Shader;
 class GameStateManager;
@@ -76,6 +78,9 @@ private:
     std::unique_ptr<MiniMap> m_miniMap;
     std::unique_ptr<Underground> m_underground;
     std::unique_ptr<Subway> m_subway;
+    std::unique_ptr<Background> m_mouseLeftCursor;
+    std::unique_ptr<Background> m_mouseRightCursor;
+    Math::Vec2 m_lastMouseWorldPos{};
     bool m_undergroundAccessed = false;
     bool m_subwayAccessed = false;
     bool m_doorOpened = false;

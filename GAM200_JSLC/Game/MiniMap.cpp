@@ -14,6 +14,7 @@
 #include "../Engine/DebugRenderer.hpp"
 
 #include <limits>
+#include <algorithm>
 
 namespace
 {
@@ -25,7 +26,85 @@ constexpr int PANEL_MARGIN = 30;
 
 constexpr float VIEW_WORLD_WIDTH = 1100.0f;
 constexpr float VIEW_WORLD_HEIGHT = VIEW_WORLD_WIDTH;
-constexpr float MOVING_SPEED_SQ = 25.0f;
+
+enum class ActiveMap
+{
+    Room,
+    Hallway,
+    Rooftop,
+    Underground,
+    Subway
+};
+
+struct MapView
+{
+    ActiveMap type{};
+    float minX = 0.0f;
+    float maxX = 0.0f;
+    float minY = 0.0f;
+    float maxY = 0.0f;
+};
+
+MapView ResolveMapView(const Math::Vec2& playerPos)
+{
+    if (playerPos.y >= Rooftop::MIN_Y)
+        return { ActiveMap::Rooftop, Rooftop::MIN_X, Rooftop::MIN_X + Rooftop::WIDTH, Rooftop::MIN_Y, Rooftop::MIN_Y + Rooftop::HEIGHT };
+
+    if (playerPos.y <= Subway::MIN_Y + Subway::HEIGHT)
+        return { ActiveMap::Subway, Subway::MIN_X, Subway::MIN_X + Subway::WIDTH, Subway::MIN_Y, Subway::MIN_Y + Subway::HEIGHT };
+
+    if (playerPos.y <= Underground::MIN_Y + Underground::HEIGHT)
+        return { ActiveMap::Underground, Underground::MIN_X, Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y, Underground::MIN_Y + Underground::HEIGHT };
+
+    if (playerPos.x < GAME_WIDTH)
+        return { ActiveMap::Room, 0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT };
+
+    return { ActiveMap::Hallway, GAME_WIDTH, GAME_WIDTH + Hallway::WIDTH, 0.0f, Hallway::HEIGHT };
+}
+
+bool IsInsideMap(const Math::Vec2& p, const MapView& view)
+{
+    return p.x >= view.minX && p.x <= view.maxX && p.y >= view.minY && p.y <= view.maxY;
+}
+
+bool TryGetNextMapType(ActiveMap current, ActiveMap& next)
+{
+    switch (current)
+    {
+    case ActiveMap::Room:        next = ActiveMap::Hallway; return true;
+    case ActiveMap::Hallway:     next = ActiveMap::Rooftop; return true;
+    case ActiveMap::Rooftop:     next = ActiveMap::Underground; return true;
+    case ActiveMap::Underground: next = ActiveMap::Subway; return true;
+    case ActiveMap::Subway:      return false;
+    }
+    return false;
+}
+
+MapView GetMapViewByType(ActiveMap type)
+{
+    switch (type)
+    {
+    case ActiveMap::Room:        return { ActiveMap::Room, 0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT };
+    case ActiveMap::Hallway:     return { ActiveMap::Hallway, GAME_WIDTH, GAME_WIDTH + Hallway::WIDTH, 0.0f, Hallway::HEIGHT };
+    case ActiveMap::Rooftop:     return { ActiveMap::Rooftop, Rooftop::MIN_X, Rooftop::MIN_X + Rooftop::WIDTH, Rooftop::MIN_Y, Rooftop::MIN_Y + Rooftop::HEIGHT };
+    case ActiveMap::Underground: return { ActiveMap::Underground, Underground::MIN_X, Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y, Underground::MIN_Y + Underground::HEIGHT };
+    case ActiveMap::Subway:      return { ActiveMap::Subway, Subway::MIN_X, Subway::MIN_X + Subway::WIDTH, Subway::MIN_Y, Subway::MIN_Y + Subway::HEIGHT };
+    }
+    return { ActiveMap::Room, 0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT };
+}
+
+const char* GetMapNameFromType(ActiveMap type)
+{
+    switch (type)
+    {
+    case ActiveMap::Room: return "ROOM";
+    case ActiveMap::Hallway: return "HALLWAY";
+    case ActiveMap::Rooftop: return "ROOFTOP";
+    case ActiveMap::Underground: return "UNDERGROUND";
+    case ActiveMap::Subway: return "SUBWAY";
+    }
+    return "ROOM";
+}
 }
 
 MiniMap::EnemyFocus MiniMap::FindClosestMovingEnemy(const Math::Vec2& playerPos, Hallway& hallway, Rooftop& rooftop,
@@ -34,7 +113,7 @@ MiniMap::EnemyFocus MiniMap::FindClosestMovingEnemy(const Math::Vec2& playerPos,
                                                      bool subwayAccessed) const
 {
     EnemyFocus result{};
-    result.distSq = std::numeric_limits<float>::max();
+    result.distSq = (std::numeric_limits<float>::max)();
 
     auto considerPos = [&](const Math::Vec2& pos) {
         float d = (pos - playerPos).LengthSq();
@@ -46,11 +125,13 @@ MiniMap::EnemyFocus MiniMap::FindClosestMovingEnemy(const Math::Vec2& playerPos,
         }
     };
 
+    MapView currentMap = ResolveMapView(playerPos);
+
     auto considerDrones = [&](const std::vector<Drone>& drones) {
         for (const auto& d : drones)
         {
             if (d.IsDead()) continue;
-            if (d.GetVelocity().LengthSq() <= MOVING_SPEED_SQ) continue;
+            if (!IsInsideMap(d.GetPosition(), currentMap)) continue;
             considerPos(d.GetPosition());
         }
     };
@@ -70,7 +151,7 @@ MiniMap::EnemyFocus MiniMap::FindClosestMovingEnemy(const Math::Vec2& playerPos,
         for (const auto& r : robots)
         {
             if (r.IsDead()) continue;
-            if (r.GetVelocity().LengthSq() <= MOVING_SPEED_SQ) continue;
+            if (!IsInsideMap(r.GetPosition(), currentMap)) continue;
             considerPos(r.GetPosition());
         }
     };
@@ -108,6 +189,12 @@ void MiniMap::Draw(Shader& textureShader, Shader& colorShader, Shader& fontShade
                    Underground& underground, Subway& subway, DroneManager& mainDroneManager,
                    bool undergroundAccessed, bool subwayAccessed, const Math::Matrix& baseProjection)
 {
+    // Preserve GL state that we temporarily override for minimap rendering.
+    GLint prevViewport[4] = { 0, 0, 0, 0 };
+    GLint prevScissorBox[4] = { 0, 0, 0, 0 };
+    glGetIntegerv(GL_VIEWPORT, prevViewport);
+    glGetIntegerv(GL_SCISSOR_BOX, prevScissorBox);
+
     const int panelX = static_cast<int>(GAME_WIDTH) - PANEL_MARGIN - PANEL_SIZE;
     const int panelY = static_cast<int>(GAME_HEIGHT) - PANEL_MARGIN - PANEL_SIZE;
 
@@ -126,8 +213,81 @@ void MiniMap::Draw(Shader& textureShader, Shader& colorShader, Shader& fontShade
                           { 0.8f, 0.8f });
 
     Math::Vec2 playerPos = player.GetPosition();
-    EnemyFocus focus = FindClosestMovingEnemy(playerPos, hallway, rooftop, underground, subway, mainDroneManager, undergroundAccessed, subwayAccessed);
-    Math::Vec2 cameraCenter = focus.valid ? focus.pos : playerPos;
+    MapView currentMap = ResolveMapView(playerPos);
+    MapView displayMap = currentMap;
+
+    auto findClosestInMap = [&](const MapView& mapView) {
+        EnemyFocus f{};
+        f.distSq = (std::numeric_limits<float>::max)();
+
+        auto considerPos = [&](const Math::Vec2& pos) {
+            if (!IsInsideMap(pos, mapView)) return;
+            float d = (pos - playerPos).LengthSq();
+            if (d < f.distSq)
+            {
+                f.valid = true;
+                f.pos = pos;
+                f.distSq = d;
+            }
+        };
+
+        for (const auto& d : mainDroneManager.GetDrones()) if (!d.IsDead()) considerPos(d.GetPosition());
+        for (const auto& d : hallway.GetDrones()) if (!d.IsDead()) considerPos(d.GetPosition());
+        for (const auto& d : rooftop.GetDrones()) if (!d.IsDead()) considerPos(d.GetPosition());
+        for (const auto& d : underground.GetDrones()) if (!d.IsDead()) considerPos(d.GetPosition());
+        for (const auto& d : subway.GetDrones()) if (!d.IsDead()) considerPos(d.GetPosition());
+        for (const auto& r : underground.GetRobots()) if (!r.IsDead()) considerPos(r.GetPosition());
+        for (const auto& r : subway.GetRobots()) if (!r.IsDead()) considerPos(r.GetPosition());
+        return f;
+    };
+
+    EnemyFocus focus = findClosestInMap(currentMap);
+    if (!focus.valid)
+    {
+        ActiveMap nextType{};
+        if (TryGetNextMapType(currentMap.type, nextType))
+        {
+            MapView nextMap = GetMapViewByType(nextType);
+            EnemyFocus nextFocus = findClosestInMap(nextMap);
+            if (nextFocus.valid)
+            {
+                focus = nextFocus;
+                displayMap = nextMap;
+            }
+        }
+    }
+
+    Math::Vec2 targetCenter = focus.valid
+        ? focus.pos
+        : Math::Vec2{ (currentMap.minX + currentMap.maxX) * 0.5f, (currentMap.minY + currentMap.maxY) * 0.5f };
+
+    // Smooth minimap camera target to avoid one-frame jumps when nearest normal drone changes.
+    if (!m_hasSmoothedCenter)
+    {
+        m_smoothedCenter = targetCenter;
+        m_hasSmoothedCenter = true;
+    }
+    else
+    {
+        float d2 = (targetCenter - m_smoothedCenter).LengthSq();
+        if (d2 > 2500.0f * 2500.0f)
+        {
+            // Large teleports/map transitions: snap immediately.
+            m_smoothedCenter = targetCenter;
+        }
+        else
+        {
+            const float smooth = 0.14f;
+            m_smoothedCenter = m_smoothedCenter + (targetCenter - m_smoothedCenter) * smooth;
+        }
+    }
+    Math::Vec2 cameraCenter = m_smoothedCenter;
+
+    // Clamp minimap camera to displayed map bounds.
+    const float halfW = VIEW_WORLD_WIDTH * 0.5f;
+    const float halfH = VIEW_WORLD_HEIGHT * 0.5f;
+    cameraCenter.x = (std::max)(displayMap.minX + halfW, (std::min)(displayMap.maxX - halfW, cameraCenter.x));
+    cameraCenter.y = (std::max)(displayMap.minY + halfH, (std::min)(displayMap.maxY - halfH, cameraCenter.y));
 
     Math::Matrix miniProjection = Math::Matrix::CreateOrtho(
         cameraCenter.x - VIEW_WORLD_WIDTH * 0.5f, cameraCenter.x + VIEW_WORLD_WIDTH * 0.5f,
@@ -144,18 +304,30 @@ void MiniMap::Draw(Shader& textureShader, Shader& colorShader, Shader& fontShade
     textureShader.setMat4("projection", miniProjection);
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
-    room.Draw(textureShader);
-    hallway.Draw(textureShader);
-    rooftop.Draw(textureShader);
-    underground.Draw(textureShader);
-    subway.Draw(textureShader);
-    mainDroneManager.Draw(textureShader);
+    switch (displayMap.type)
+    {
+    case ActiveMap::Room:       room.Draw(textureShader); break;
+    case ActiveMap::Hallway:    hallway.Draw(textureShader); break;
+    case ActiveMap::Rooftop:    rooftop.Draw(textureShader); break;
+    case ActiveMap::Underground:underground.Draw(textureShader); break;
+    case ActiveMap::Subway:     subway.Draw(textureShader); break;
+    }
+
+    // Draw tracer/main drones only if they are in the displayed map bounds.
+    for (const auto& d : mainDroneManager.GetDrones())
+    {
+        if (d.IsDead()) continue;
+        if (!IsInsideMap(d.GetPosition(), displayMap)) continue;
+        d.Draw(textureShader);
+    }
     player.Draw(textureShader);
 
+    // Restore viewport and force-disable scissor for subsequent world/fullscreen draws.
+    GL::Viewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+    glScissor(prevScissorBox[0], prevScissorBox[1], prevScissorBox[2], prevScissorBox[3]);
     GL::Disable(GL_SCISSOR_TEST);
-    GL::Viewport(0, 0, static_cast<int>(GAME_WIDTH), static_cast<int>(GAME_HEIGHT));
 
-    std::string mapName = GetCurrentMapName(playerPos);
+    std::string mapName = GetMapNameFromType(displayMap.type);
     CachedTextureInfo mapText = font.PrintToTexture(fontShader, mapName);
     float textHeight = 24.0f;
     float textWidth = (mapText.height > 0) ? (static_cast<float>(mapText.width) * (textHeight / static_cast<float>(mapText.height))) : 0.0f;
