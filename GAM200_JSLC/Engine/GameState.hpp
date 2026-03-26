@@ -9,8 +9,7 @@ public:
 
     virtual void Initialize() = 0;
     virtual void Update(double dt) = 0;
-    virtual void DrawMainLayer() = 0;
-    virtual void DrawForegroundLayer() = 0;
+    virtual void Draw() = 0;
     virtual void Shutdown() = 0;
 
     // Return true if this state is rendered on top of the state below it

@@ -76,7 +76,7 @@ void MainMenu::Update(double dt)
     }
 }
 
-void MainMenu::DrawMainLayer()
+void MainMenu::Draw()
 {
     // Clear background
     GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -197,11 +197,6 @@ void MainMenu::DrawMainLayer()
     }
 
     GL::Disable(GL_BLEND);
-}
-
-void MainMenu::DrawForegroundLayer()
-{
-    // nothing
 }
 
 void MainMenu::Shutdown()

@@ -147,25 +147,10 @@ void Engine::GameLoop()
         const bool bypass = m_gameStateManager->TopBypassesPostProcess();
         m_postProcess->SetPassthrough(bypass);
 
-        if (bypass)
-        {
-            m_postProcess->BeginScene();
-            m_gameStateManager->DrawBackgroundMainLayer();
-            m_postProcess->EndScene();
-            m_postProcess->ApplyAndPresent();
-
-            m_gameStateManager->DrawTopMainLayer();
-            m_gameStateManager->DrawTopForegroundLayer();
-        }
-        else
-        {
-            m_postProcess->BeginScene();
-            m_gameStateManager->DrawMainLayer();
-            m_postProcess->EndScene();
-            m_postProcess->ApplyAndPresent();
-
-            m_gameStateManager->DrawForegroundLayer();
-        }
+        m_postProcess->BeginScene();
+        m_gameStateManager->Draw();
+        m_postProcess->EndScene();
+        m_postProcess->ApplyAndPresent();
 
         m_postProcess->SetPassthrough(false);
 

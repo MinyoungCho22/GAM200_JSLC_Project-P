@@ -12,14 +12,12 @@ class GameStateManager
 public:
     GameStateManager(Engine& engine);
     void Update(double dt);
-    void DrawMainLayer();
-    void DrawForegroundLayer();
+    void Draw();
 
     // Draw all states except the top (used when top state bypasses post-processing)
-    void DrawBackgroundMainLayer();
+    void DrawBackground();
     // Draw only the top state (used when top state bypasses post-processing)
-    void DrawTopMainLayer();
-    void DrawTopForegroundLayer();
+    void DrawTopState();
     // Returns true when the top state should skip the post-processing pass
     bool TopBypassesPostProcess() const;
 

@@ -14,8 +14,7 @@ public:
     GameOver(GameStateManager& gsm_ref, bool& isGameOverFlag);
     void Initialize() override;
     void Update(double dt) override;
-    void DrawMainLayer() override;
-    void DrawForegroundLayer() override;
+    void Draw() override;
     void Shutdown() override;
     bool BypassPostProcess() const override { return true; }
 

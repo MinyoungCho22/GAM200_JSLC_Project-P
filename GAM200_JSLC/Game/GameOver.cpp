@@ -67,7 +67,7 @@ void GameOver::Update(double dt)
     }
 }
 
-void GameOver::DrawMainLayer()
+void GameOver::Draw()
 {
     // Always clear to black so TERMINATED text is clearly visible.
     GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -197,11 +197,6 @@ void GameOver::DrawMainLayer()
     m_font->DrawBakedText(*m_fontShader, m_promptText, promptPos, promptHeight);
 
     GL::Disable(GL_BLEND);
-}
-
-void GameOver::DrawForegroundLayer()
-{
-    // nothing
 }
 
 void GameOver::Shutdown()

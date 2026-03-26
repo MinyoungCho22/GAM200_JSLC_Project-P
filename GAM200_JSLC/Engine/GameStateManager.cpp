@@ -13,49 +13,34 @@ void GameStateManager::Update(double dt)
     }
 }
 
-void GameStateManager::DrawMainLayer()
+void GameStateManager::Draw()
 {
     if (states.empty()) return;
 
     // If the top state is transparent (e.g. a fade-out overlay),
     // first render the state below it so it shows through.
     if (states.size() >= 2 && states.back()->IsTransparent())
-        states[states.size() - 2]->DrawMainLayer();
+        states[states.size() - 2]->Draw();
 
-    states.back()->DrawMainLayer();
+    states.back()->Draw();
 }
 
-void GameStateManager::DrawForegroundLayer()
-{
-    if (states.empty()) return;
-
-    if (states.size() >= 2 && states.back()->IsTransparent())
-        states[states.size() - 2]->DrawForegroundLayer();
-
-    states.back()->DrawForegroundLayer();
-}
-
-void GameStateManager::DrawBackgroundMainLayer()
+void GameStateManager::DrawBackground()
 {
     size_t n = states.size();
     if (n < 2) return;
 
+    // Draw the state just below the top, respecting its own transparency.
     if (n >= 3 && states[n - 2]->IsTransparent())
-        states[n - 3]->DrawMainLayer();
+        states[n - 3]->Draw();
 
-    states[n - 2]->DrawMainLayer();
+    states[n - 2]->Draw();
 }
 
-void GameStateManager::DrawTopMainLayer()
+void GameStateManager::DrawTopState()
 {
     if (!states.empty())
-        states.back()->DrawMainLayer();
-}
-
-void GameStateManager::DrawTopForegroundLayer()
-{
-    if (!states.empty())
-        states.back()->DrawForegroundLayer();
+        states.back()->Draw();
 }
 
 bool GameStateManager::TopBypassesPostProcess() const
