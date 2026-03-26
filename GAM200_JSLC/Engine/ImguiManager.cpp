@@ -14,6 +14,7 @@
 #include "../ThirdParty/imgui/imgui.h"
 #include "../ThirdParty/imgui/backends/imgui_impl_glfw.h"
 #include "../ThirdParty/imgui/backends/imgui_impl_opengl3.h"
+#include <cmath>
 
 
 bool ImguiManager::Initialize()
@@ -133,7 +134,15 @@ void ImguiManager::UpdateFps(double dt)
 
     if (m_fpsTimer >= 1.0)
     {
-        m_averageFps = (m_fpsTimer > 0.0) ? static_cast<int>(m_frameCount / m_fpsTimer) : 0;
+        const double rawFps = (m_fpsTimer > 0.0) ? (m_frameCount / m_fpsTimer) : 0.0;
+        m_averageFps = static_cast<int>(std::ceil(rawFps - 0.0001));
+
+        if (m_engine && !m_engine->IsVSyncEnabled())
+        {
+            const int cap = m_engine->GetFpsCap();
+            if (cap > 0 && m_averageFps > cap) m_averageFps = cap;
+        }
+
         m_fpsTimer -= 1.0;
         m_frameCount = 0;
     }

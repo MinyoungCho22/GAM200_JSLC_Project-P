@@ -16,6 +16,7 @@
 #include <GLFW/glfw3.h>
 #include <string>
 #include <sstream>
+#include <cmath>
 
 #include "../Engine/Sound.hpp"
 
@@ -689,7 +690,16 @@ void GameplayState::Update(double dt)
 
     if (m_fpsTimer >= 1.0)
     {
-        int average_fps = static_cast<int>(m_frameCount / m_fpsTimer);
+        const double rawFps = (m_fpsTimer > 0.0) ? (m_frameCount / m_fpsTimer) : 0.0;
+        int average_fps = static_cast<int>(std::ceil(rawFps - 0.0001));
+
+        const Engine& engineRef = gsm.GetEngine();
+        const int cap = engineRef.GetFpsCap();
+        if (!engineRef.IsVSyncEnabled() && cap > 0)
+        {
+            if (average_fps > cap) average_fps = cap;
+        }
+
         std::stringstream ss_fps;
         ss_fps << "FPS: " << average_fps;
         m_fpsText = m_font->PrintToTexture(*m_fontShader, ss_fps.str());
