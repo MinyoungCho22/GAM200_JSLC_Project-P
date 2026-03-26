@@ -200,7 +200,7 @@ void SplashState::Update(double dt)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-void SplashState::Draw()
+void SplashState::DrawMainLayer()
 {
     GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
@@ -346,6 +346,11 @@ void SplashState::Draw()
     }
 
     GL::Disable(GL_BLEND);
+}
+
+void SplashState::DrawForegroundLayer()
+{
+    // nothing
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

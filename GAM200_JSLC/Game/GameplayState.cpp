@@ -875,7 +875,7 @@ Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screen
     return worldPos;
 }
 
-void GameplayState::Draw()
+void GameplayState::DrawMainLayer()
 {
     // If GameOver has just popped, do not render the previous gameplay frame.
     if (m_isGameOver)
@@ -915,10 +915,11 @@ void GameplayState::Draw()
     }
 
     // Viewport is already set to FBO size (GAME_WIDTH x GAME_HEIGHT) by PostProcessManager::BeginScene().
-    // Do NOT call glfwGetFramebufferSize here — on Retina displays the physical framebuffer is larger
-    // than the FBO, which would cause only the bottom-left portion to be rendered.
     GL::ClearColor(r, g, b, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
+
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     Shader& textureShader = engine.GetTextureShader();
 
@@ -945,21 +946,44 @@ void GameplayState::Draw()
     textureShader.setMat4("projection", projection);
     droneManager->Draw(textureShader);
     player.Draw(textureShader);
+
     m_hallway->DrawForeground(textureShader);
+
     textureShader.use();
     textureShader.setMat4("projection", projection);
     pulseManager->DrawVFX(textureShader);
+    GL::Disable(GL_BLEND);
+}
 
-    // Pixel-perfect outlines for nearby sprite objects (always rendered).
+void GameplayState::DrawForegroundLayer()
+{
+    if (m_isGameOver)
+        return;
+
+    Engine& engine = gsm.GetEngine();
+
+    Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
+        0.0f, GAME_WIDTH,
+        0.0f, GAME_HEIGHT,
+        -1.0f, 1.0f
+    );
+    Math::Matrix view = m_camera.GetViewMatrix();
+    Math::Matrix projection = baseProjection * view;
+
+    // Always draw foreground stuff after post-process.
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // 1) Outlines
     m_outlineShader->use();
     m_outlineShader->setMat4("projection", projection);
+
     {
         Math::Vec2 playerPos = player.GetPosition();
         m_hallway->DrawSpriteOutlines(*m_outlineShader, playerPos);
         m_rooftop->DrawSpriteOutlines(*m_outlineShader, playerPos);
     }
+
     if (m_isDebugDraw)
     {
         player.DrawOutline(*m_outlineShader);
@@ -967,22 +991,20 @@ void GameplayState::Draw()
         for (const auto& robot : m_underground->GetRobots())
         {
             if (!robot.IsDead())
-            {
                 robot.DrawOutline(*m_outlineShader);
-            }
         }
+
         for (const auto& robot : m_subway->GetRobots())
         {
             if (!robot.IsDead())
-            {
                 robot.DrawOutline(*m_outlineShader);
-            }
         }
     }
-    GL::Disable(GL_BLEND);
 
+    // 2) World-space overlays (radars / gauges)
     colorShader->use();
     colorShader->setMat4("projection", projection);
+
     droneManager->DrawRadars(*colorShader, *m_debugRenderer);
     m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
     m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
@@ -995,13 +1017,15 @@ void GameplayState::Draw()
     m_underground->DrawGauges(*colorShader, *m_debugRenderer);
     m_subway->DrawGauges(*colorShader, *m_debugRenderer);
 
+    // 3) HUD
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
-    m_pulseGauge.Draw(*colorShader);
-
-    GL::Enable(GL_BLEND);
+    colorShader->setFloat("uAlpha", 1.0f);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    m_pulseGauge.Draw(*colorShader);
+
+    // 4) Fonts / tutorial
     m_fontShader->use();
     m_fontShader->setMat4("projection", baseProjection);
 
@@ -1019,9 +1043,10 @@ void GameplayState::Draw()
 
     m_tutorial->Draw(*m_font, *m_fontShader);
 
-    // Draw mouse cursor
+    // 5) Cursor
     Engine& engineForCursor = gsm.GetEngine();
     auto& inputForCursor = engineForCursor.GetInput();
+
     double mouseScreenX, mouseScreenY;
     inputForCursor.GetMousePosition(mouseScreenX, mouseScreenY);
 
@@ -1030,6 +1055,7 @@ void GameplayState::Draw()
 
     float windowAspectForCursor = static_cast<float>(windowWidthForCursor) / static_cast<float>(windowHeightForCursor);
     float gameAspectForCursor = GAME_WIDTH / GAME_HEIGHT;
+
     int viewportXForCursor = 0;
     int viewportYForCursor = 0;
     int viewportWidthForCursor = windowWidthForCursor;
@@ -1065,7 +1091,7 @@ void GameplayState::Draw()
     // Additive blending: cursor adds light to the scene, always visible in darkness
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-    // Outer glow (neon cyan: R=0, G=1, B=0.8 via DrawCircle / B=0.2 via DrawBox)
+    // Outer glow
     colorShader->setFloat("uAlpha", 0.07f);
     m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 3.2f, cursorThick * 6.0f }, { 0.0f, 1.0f });
     m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 6.0f, cursorSize * 3.2f }, { 0.0f, 1.0f });
@@ -1075,18 +1101,19 @@ void GameplayState::Draw()
     colorShader->setFloat("uAlpha", 0.18f);
     m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.5f, cursorThick * 3.5f }, { 0.0f, 1.0f });
     m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 3.5f, cursorSize * 2.5f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 15.0f, { 0.0f, 1.0f });
+    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 17.0f, { 0.0f, 1.0f });
 
-    // Sharp core (full brightness, neon cyan)
-    colorShader->setFloat("uAlpha", 1.0f);
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.0f, cursorThick }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick, cursorSize * 2.0f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 4.5f, { 0.5f, 1.0f });
+    // Bright core
+    colorShader->setFloat("uAlpha", 0.85f);
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 1.8f, cursorThick }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick, cursorSize * 1.8f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 5.5f, { 0.0f, 1.0f });
 
-    // Restore normal blending and reset alpha
+    // Restore default alpha blend for any later overlay/debug draws
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     colorShader->setFloat("uAlpha", 1.0f);
 
+    // 6) Debug overlay
     if (m_isDebugDraw)
     {
         colorShader->use();
@@ -1158,6 +1185,8 @@ void GameplayState::Draw()
         m_door->DrawDebug(*colorShader);
         m_rooftopDoor->DrawDebug(*colorShader);
     }
+
+    GL::Disable(GL_BLEND);
 }
 
 void GameplayState::Shutdown()
