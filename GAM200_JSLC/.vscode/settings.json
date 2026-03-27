@@ -34,9 +34,6 @@
         "VSLANG": "1033",
         "DOTNET_CLI_UI_LANGUAGE": "en-US"
     },
-    "cmake.buildToolArgs": [
-        "/p:PreferredUILang=en-US"
-    ],
     "cmake.outputLogEncoding": "utf-8",
     "terminal.integrated.automationProfile.windows": {
         "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
