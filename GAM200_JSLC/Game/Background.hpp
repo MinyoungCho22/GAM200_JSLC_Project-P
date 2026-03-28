@@ -17,6 +17,8 @@ public:
     int GetWidth()  const { return m_width; }
     int GetHeight() const { return m_height; }
 
+    unsigned int GetTextureID() const { return m_textureID; }
+
 private:
     unsigned int VAO = 0;
     unsigned int VBO = 0;

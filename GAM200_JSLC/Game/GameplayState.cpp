@@ -17,6 +17,7 @@
 #include <string>
 #include <sstream>
 #include <cmath>
+#include <algorithm>
 
 #include "../Engine/Sound.hpp"
 
@@ -120,7 +121,6 @@ void GameplayState::Initialize()
     m_hudFrame->Initialize("Asset/Hud.png");
 
     m_tutorial = std::make_unique<Tutorial>();
-    m_miniMap = std::make_unique<MiniMap>();
 
     auto& roomPulseSources = m_room->GetPulseSources();
     if (!roomPulseSources.empty())
@@ -581,11 +581,22 @@ void GameplayState::Update(double dt)
     }
 
     auto& pp = engine.GetPostProcess();
+    pp.Settings().cameraPos = m_camera.GetPosition();
 
     if (m_doorOpened && !m_rooftopAccessed)
-        pp.Settings().exposure = 0.35f;
+    {
+        pp.Settings().exposure = 0.4f;
+        pp.Settings().useLightOverlay = true;
+        pp.Settings().lightOverlayStrength = 0.6f;
+        pp.Settings().cameraPos = m_camera.GetPosition();
+    }
     else
+    {
         pp.Settings().exposure = 1.0f;
+        pp.Settings().useLightOverlay = false;
+        pp.Settings().lightOverlayStrength = 0.0f;
+        pp.Settings().cameraPos = m_camera.GetPosition();
+    }
 
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
     m_rooftop->Update(dt, player, playerHitboxSize, input, mouseWorldPos,
@@ -755,6 +766,15 @@ void GameplayState::HandleRoomToHallwayTransition()
     );
 
     m_cameraSmoothSpeed = 0.1f;
+
+    // First step into hallway: nudge slightly right and down from the door seam.
+    {
+        const float hallMinX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + 235.0f;
+        const float nudgeX = 72.0f;
+        const float nudgeY = 48.0f;
+        Math::Vec2 p = player.GetPosition();
+        player.SetPosition({ std::max(p.x, hallMinX + nudgeX), p.y - nudgeY });
+    }
 }
 
 void GameplayState::HandleHallwayToRooftopTransition()
@@ -896,7 +916,7 @@ Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screen
     return worldPos;
 }
 
-void GameplayState::Draw()
+void GameplayState::DrawSceneLayer()
 {
     // If GameOver has just popped, do not render the previous gameplay frame.
     if (m_isGameOver)
@@ -1038,6 +1058,24 @@ void GameplayState::Draw()
 
         GL::Disable(GL_BLEND);
     }
+}
+
+void GameplayState::DrawUILayer()
+{
+    if (m_isGameOver)
+        return;
+
+    Engine& engine = gsm.GetEngine();
+
+    Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
+        0.0f, GAME_WIDTH,
+        0.0f, GAME_HEIGHT,
+        -1.0f, 1.0f
+    );
+    Math::Matrix view = m_camera.GetViewMatrix();
+    Math::Matrix projection = baseProjection * view;
+
+    Shader& textureShader = engine.GetTextureShader();
 
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
@@ -1051,13 +1089,6 @@ void GameplayState::Draw()
 
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
 
-    if (m_miniMap)
-    {
-        m_miniMap->Draw(textureShader, *colorShader, *m_fontShader, *m_font, *m_debugRenderer,
-                        player, *m_room, *m_hallway, *m_rooftop, *m_underground, *m_subway, *droneManager,
-                        m_undergroundAccessed, m_subwayAccessed, baseProjection);
-    }
-
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())
     {
@@ -1065,14 +1096,14 @@ void GameplayState::Draw()
         m_font->DrawBakedText(*m_fontShader, countdownTexture, { GAME_WIDTH / 2.0f - 250.0f, 100.0f }, 50.0f);
     }
 
-    // Draw mouse cursor
-    Engine& engineForCursor = gsm.GetEngine();
-    auto& inputForCursor = engineForCursor.GetInput();
+    m_tutorial->Draw(*m_font, *m_fontShader);
+
+    auto& inputForCursor = engine.GetInput();
     double mouseScreenX, mouseScreenY;
     inputForCursor.GetMousePosition(mouseScreenX, mouseScreenY);
 
     int windowWidthForCursor, windowHeightForCursor;
-    glfwGetWindowSize(engineForCursor.GetWindow(), &windowWidthForCursor, &windowHeightForCursor);
+    glfwGetWindowSize(engine.GetWindow(), &windowWidthForCursor, &windowHeightForCursor);
 
     float windowAspectForCursor = static_cast<float>(windowWidthForCursor) / static_cast<float>(windowHeightForCursor);
     float gameAspectForCursor = GAME_WIDTH / GAME_HEIGHT;
@@ -1236,29 +1267,29 @@ void GameplayState::Draw()
         // Additive blending: cursor adds light to the scene, always visible in darkness
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-    // Outer glow (neon cyan: R=0, G=1, B=0.8 via DrawCircle / B=0.2 via DrawBox)
-    colorShader->setFloat("uAlpha", 0.07f);
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 3.2f, cursorThick * 6.0f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 6.0f, cursorSize * 3.2f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 24.0f, { 0.0f, 1.0f });
+        // Outer glow (neon cyan: R=0, G=1, B=0.8 via DrawCircle / B=0.2 via DrawBox)
+        colorShader->setFloat("uAlpha", 0.07f);
+        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 3.2f, cursorThick * 6.0f }, { 0.0f, 1.0f });
+        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 6.0f, cursorSize * 3.2f }, { 0.0f, 1.0f });
+        m_debugRenderer->DrawCircle(*colorShader, cursorPos, 24.0f, { 0.0f, 1.0f });
 
-    // Mid glow
-    colorShader->setFloat("uAlpha", 0.18f);
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.5f, cursorThick * 3.5f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 3.5f, cursorSize * 2.5f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 15.0f, { 0.0f, 1.0f });
+        // Mid glow
+        colorShader->setFloat("uAlpha", 0.18f);
+        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.5f, cursorThick * 3.5f }, { 0.0f, 1.0f });
+        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 3.5f, cursorSize * 2.5f }, { 0.0f, 1.0f });
+        m_debugRenderer->DrawCircle(*colorShader, cursorPos, 15.0f, { 0.0f, 1.0f });
 
-    // Sharp core (full brightness, neon cyan)
-    colorShader->setFloat("uAlpha", 1.0f);
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.0f, cursorThick }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick, cursorSize * 2.0f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 4.5f, { 0.5f, 1.0f });
+        // Sharp core (full brightness, neon cyan)
+        colorShader->setFloat("uAlpha", 1.0f);
+        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.0f, cursorThick }, { 0.0f, 1.0f });
+        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick, cursorSize * 2.0f }, { 0.0f, 1.0f });
+        m_debugRenderer->DrawCircle(*colorShader, cursorPos, 4.5f, { 0.5f, 1.0f });
 
-    // Restore normal blending and reset alpha
-    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    colorShader->setFloat("uAlpha", 1.0f);
+        // Restore normal blending and reset alpha
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        colorShader->setFloat("uAlpha", 1.0f);
+    }
 
-    } // end cursor cross (else branch)
     if (m_isDebugDraw)
     {
         colorShader->use();

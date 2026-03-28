@@ -43,11 +43,23 @@ void PostProcessManager::Initialize(int width, int height)
 
     m_postShader->use();
     m_postShader->setInt("uSceneTex", 0);
+    m_postShader->setInt("uLightOverlayTex", 1);
     m_postShader->setFloat("uExposure", m_settings.exposure);
+    m_postShader->setBool("uUseLightOverlay", m_settings.useLightOverlay);
+    m_postShader->setFloat("uLightOverlayStrength", m_settings.lightOverlayStrength);
+
+    m_lightOverlay = std::make_unique<Background>();
+    m_lightOverlay->Initialize("Asset/Hallway_Light.png");
 }
 
 void PostProcessManager::Shutdown()
 {
+    if (m_lightOverlay)
+    {
+        m_lightOverlay->Shutdown();
+        m_lightOverlay.reset();
+    }
+
     if (m_postShader)
         m_postShader.reset();
 
@@ -101,8 +113,6 @@ void PostProcessManager::ApplyAndPresent()
 {
     GL::Disable(GL_DEPTH_TEST);
 
-    // Preserve virtual aspect ratio on all displays (including HiDPI/Retina).
-    // This prevents stretching and keeps UI/gameplay consistent cross-platform.
     int vpX = 0, vpY = 0, vpW = m_displayWidth, vpH = m_displayHeight;
     ComputeLetterboxViewport(vpX, vpY, vpW, vpH);
 
@@ -112,14 +122,32 @@ void PostProcessManager::ApplyAndPresent()
 
     m_postShader->use();
     m_postShader->setFloat("uExposure", m_passthrough ? 1.0f : m_settings.exposure);
+    m_postShader->setBool("uUseLightOverlay", !m_passthrough && m_settings.useLightOverlay);
+    m_postShader->setFloat("uLightOverlayStrength", m_settings.lightOverlayStrength);
+
+    m_postShader->setVec2("uCameraPos", m_settings.cameraPos.x, m_settings.cameraPos.y);
+    m_postShader->setVec2("uGameSize", static_cast<float>(m_width), static_cast<float>(m_height));
+
+    m_postShader->setVec2("uHallwayMin", 1920.0f, 0.0f);
+    m_postShader->setVec2("uHallwaySize", 5940.0f, 1080.0f);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, m_sceneColorTex);
+
+    GL::ActiveTexture(GL_TEXTURE1);
+    if (m_lightOverlay)
+        GL::BindTexture(GL_TEXTURE_2D, m_lightOverlay->GetTextureID());
+    else
+        GL::BindTexture(GL_TEXTURE_2D, 0);
 
     GL::BindVertexArray(m_quadVAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
     GL::BindVertexArray(0);
 
+    GL::ActiveTexture(GL_TEXTURE1);
+    GL::BindTexture(GL_TEXTURE_2D, 0);
+
+    GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, 0);
 }
 
