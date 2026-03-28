@@ -569,11 +569,22 @@ void GameplayState::Update(double dt)
     }
 
     auto& pp = engine.GetPostProcess();
+    pp.Settings().cameraPos = m_camera.GetPosition();
 
     if (m_doorOpened && !m_rooftopAccessed)
-        pp.Settings().exposure = 0.35f;
+    {
+        pp.Settings().exposure = 0.4f;
+        pp.Settings().useLightOverlay = true;
+        pp.Settings().lightOverlayStrength = 0.6f;
+        pp.Settings().cameraPos = m_camera.GetPosition();
+    }
     else
+    {
         pp.Settings().exposure = 1.0f;
+        pp.Settings().useLightOverlay = false;
+        pp.Settings().lightOverlayStrength = 0.0f;
+        pp.Settings().cameraPos = m_camera.GetPosition();
+    }
 
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
     m_rooftop->Update(dt, player, playerHitboxSize, input, mouseWorldPos,

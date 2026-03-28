@@ -1,8 +1,18 @@
 #pragma once
 #include <memory>
 #include "Shader.hpp"
+#include "../Game/Background.hpp"
+#include "../Engine/Vec2.hpp"
 
-struct PostProcessSettings { float exposure = 1.0f; };
+struct PostProcessSettings
+{
+	float exposure = 1.0f;
+
+	bool useLightOverlay = false;
+	float lightOverlayStrength = 1.0f;
+
+	Math::Vec2 cameraPos = { 0.0f, 0.0f };
+};
 
 class PostProcessManager {
 public:
@@ -44,4 +54,5 @@ private:
 	bool m_passthrough = false;
 
 	std::unique_ptr<Shader> m_postShader;
+	std::unique_ptr<Background> m_lightOverlay;
 };
