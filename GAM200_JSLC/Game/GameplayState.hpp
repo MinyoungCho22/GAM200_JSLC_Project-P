@@ -80,6 +80,7 @@ private:
     std::unique_ptr<Subway> m_subway;
     std::unique_ptr<Background> m_mouseLeftCursor;
     std::unique_ptr<Background> m_mouseRightCursor;
+    std::unique_ptr<Background> m_hudFrame;
     Math::Vec2 m_lastMouseWorldPos{};
     bool m_undergroundAccessed = false;
     bool m_subwayAccessed = false;

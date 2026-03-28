@@ -102,5 +102,12 @@ Math::Matrix Camera::GetViewMatrix() const
     float offsetX = m_viewWidth / 2.0f - m_position.x;
     float offsetY = m_viewHeight / 2.0f - m_position.y;
 
+    // Snap scroll to integer pixels in framebuffer space. Sub-pixel camera
+    // translation lets adjacent quads land on fractional device coordinates;
+    // the rasterizer can then leave 1px gaps that show the clear color as
+    // flickering black/dark lines (more noticeable after upscaling to 1080p+).
+    offsetX = std::round(offsetX);
+    offsetY = std::round(offsetY);
+
     return Math::Matrix::CreateTranslation({ offsetX, offsetY });
 }

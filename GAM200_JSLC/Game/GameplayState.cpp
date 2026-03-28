@@ -116,6 +116,9 @@ void GameplayState::Initialize()
     m_mouseRightCursor = std::make_unique<Background>();
     m_mouseRightCursor->Initialize("Asset/MouseRight.png");
 
+    m_hudFrame = std::make_unique<Background>();
+    m_hudFrame->Initialize("Asset/Hud.png");
+
     m_tutorial = std::make_unique<Tutorial>();
     m_miniMap = std::make_unique<MiniMap>();
 
@@ -1013,6 +1016,29 @@ void GameplayState::Draw()
     m_underground->DrawGauges(*colorShader, *m_debugRenderer);
     m_subway->DrawGauges(*colorShader, *m_debugRenderer);
 
+    // Fullscreen frame overlay (1920x1080 texture), centered on the camera so it
+    // always matches the logical view while the map scrolls underneath.
+    if (m_hudFrame && m_hudFrame->GetWidth() > 0)
+    {
+        GL::Enable(GL_BLEND);
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        textureShader.use();
+        textureShader.setMat4("projection", projection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        textureShader.setFloat("tintStrength", 0.0f);
+
+        Math::Vec2 camCenter = m_camera.GetPosition();
+        Math::Matrix hudModel = Math::Matrix::CreateTranslation(camCenter)
+            * Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
+        m_hudFrame->Draw(textureShader, hudModel);
+
+        GL::Disable(GL_BLEND);
+    }
+
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
     m_pulseGauge.Draw(*colorShader);
@@ -1328,6 +1354,7 @@ void GameplayState::Shutdown()
 
     if (m_mouseLeftCursor) m_mouseLeftCursor->Shutdown();
     if (m_mouseRightCursor) m_mouseRightCursor->Shutdown();
+    if (m_hudFrame) m_hudFrame->Shutdown();
 
     m_bgm.Stop();
 
