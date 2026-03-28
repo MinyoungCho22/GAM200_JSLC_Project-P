@@ -17,7 +17,6 @@
 #include <string>
 #include <sstream>
 #include <cmath>
-#include <algorithm>
 
 #include "../Engine/Sound.hpp"
 
@@ -27,6 +26,16 @@ constexpr float ATTACK_RANGE = 400.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
+
+// Hallway hiding-box S.png: only while hall post-process is on; fades by player distance to spot top.
+constexpr float HIDING_S_PROMPT_DISTANCE = 300.0f;
+constexpr float HIDING_S_PROMPT_DISTANCE_SQ = HIDING_S_PROMPT_DISTANCE * HIDING_S_PROMPT_DISTANCE;
+constexpr float HIDING_S_ICON_WORLD_SIZE = 80.0f;
+constexpr float HIDING_S_ICON_OFFSET_Y = 55.0f;
+
+// Hallway entry spawn: slightly right/down from the previous defaults (door + Ctrl+2).
+constexpr float HALLWAY_ENTRY_MARGIN_X = 235.0f + 65.0f;
+constexpr float HALLWAY_ENTRY_POS_Y = GROUND_LEVEL + 60.0f;
 
 GameplayState::GameplayState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
@@ -119,6 +128,9 @@ void GameplayState::Initialize()
 
     m_hudFrame = std::make_unique<Background>();
     m_hudFrame->Initialize("Asset/Hud.png");
+
+    m_hallwayHidingPromptS = std::make_unique<Background>();
+    m_hallwayHidingPromptS->Initialize("Asset/S.png");
 
     m_tutorial = std::make_unique<Tutorial>();
 
@@ -265,7 +277,8 @@ void GameplayState::Update(double dt)
             m_tutorial->DisableAll();
             HandleRoomToHallwayTransition();
 
-            player.SetPosition({ 2000.0f, GROUND_LEVEL + 100.0f });
+            const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
+            player.SetPosition({ hallwaySpawnX, HALLWAY_ENTRY_POS_Y });
             player.ResetVelocity();
 
             Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleported to Hallway");
@@ -506,6 +519,9 @@ void GameplayState::Update(double dt)
     if (m_door->ShouldLoadNextMap() && !m_doorOpened)
     {
         HandleRoomToHallwayTransition();
+        const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
+        player.SetPosition({ hallwaySpawnX, HALLWAY_ENTRY_POS_Y });
+        player.ResetVelocity();
     }
 
     if (m_rooftopDoor->ShouldLoadNextMap() && !m_rooftopAccessed)
@@ -543,7 +559,7 @@ void GameplayState::Update(double dt)
 
     if (m_doorOpened)
     {
-        float leftLimit = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + 235.0f;
+        float leftLimit = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
 
         if (player.GetPosition().x < leftLimit)
         {
@@ -766,15 +782,6 @@ void GameplayState::HandleRoomToHallwayTransition()
     );
 
     m_cameraSmoothSpeed = 0.1f;
-
-    // First step into hallway: nudge slightly right and down from the door seam.
-    {
-        const float hallMinX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + 235.0f;
-        const float nudgeX = 72.0f;
-        const float nudgeY = 48.0f;
-        Math::Vec2 p = player.GetPosition();
-        player.SetPosition({ std::max(p.x, hallMinX + nudgeX), p.y - nudgeY });
-    }
 }
 
 void GameplayState::HandleHallwayToRooftopTransition()
@@ -916,7 +923,13 @@ Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screen
     return worldPos;
 }
 
-void GameplayState::DrawSceneLayer()
+void GameplayState::Draw()
+{
+    DrawMainLayer();
+    DrawForegroundLayer(false);
+}
+
+void GameplayState::DrawMainLayer()
 {
     // If GameOver has just popped, do not render the previous gameplay frame.
     if (m_isGameOver)
@@ -961,6 +974,9 @@ void GameplayState::DrawSceneLayer()
     GL::ClearColor(r, g, b, 1.0f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     Shader& textureShader = engine.GetTextureShader();
 
     Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
@@ -976,24 +992,53 @@ void GameplayState::DrawSceneLayer()
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
 
+    // 1) World maps (post-processed: exposure / hallway overlay)
     m_room->Draw(textureShader);
     m_hallway->Draw(textureShader);
     m_rooftop->Draw(textureShader);
     m_underground->Draw(textureShader);
     m_subway->Draw(textureShader);
 
-    textureShader.use();
-    textureShader.setMat4("projection", projection);
-    droneManager->Draw(textureShader);
-    player.Draw(textureShader);
-    m_hallway->DrawForeground(textureShader);
-    textureShader.use();
-    textureShader.setMat4("projection", projection);
-    pulseManager->DrawVFX(textureShader);
+    // Hallway railings: DrawForegroundLayer (after player / VFX) so Railing.png sits in front.
 
-    // Pixel-perfect outlines for nearby sprite objects (always rendered).
+    GL::Disable(GL_BLEND);
+}
+
+void GameplayState::DrawForegroundLayer(bool compositeToScreen)
+{
+    if (m_isGameOver)
+        return;
+
+    Engine& engine = gsm.GetEngine();
+
+    if (compositeToScreen)
+    {
+        GL::BindFramebuffer(GL_FRAMEBUFFER, 0);
+        int vpX = 0, vpY = 0, vpW = 0, vpH = 0;
+        engine.GetPostProcess().GetLetterboxViewport(vpX, vpY, vpW, vpH);
+        GL::Viewport(vpX, vpY, vpW, vpH);
+    }
+    else
+    {
+        GL::Viewport(0, 0, static_cast<int>(GAME_WIDTH), static_cast<int>(GAME_HEIGHT));
+    }
+
+    GL::Disable(GL_DEPTH_TEST);
+
+    Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
+        0.0f, GAME_WIDTH,
+        0.0f, GAME_HEIGHT,
+        -1.0f, 1.0f
+    );
+    Math::Matrix view = m_camera.GetViewMatrix();
+    Math::Matrix projection = baseProjection * view;
+
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    Shader& textureShader = engine.GetTextureShader();
+
+    // 4) Sprite outlines (world-space)
     m_outlineShader->use();
     m_outlineShader->setMat4("projection", projection);
     {
@@ -1022,6 +1067,76 @@ void GameplayState::DrawSceneLayer()
     }
     GL::Disable(GL_BLEND);
 
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    textureShader.use();
+    textureShader.setMat4("projection", projection);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+
+    // Drones (same order as former main pass: per-map managers, then room tracers)
+    m_hallway->DrawDrones(textureShader);
+    m_rooftop->DrawDrones(textureShader);
+    m_underground->DrawDrones(textureShader);
+    m_subway->DrawDrones(textureShader);
+    droneManager->Draw(textureShader);
+
+    textureShader.use();
+    textureShader.setMat4("projection", projection);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+    player.Draw(textureShader);
+
+    textureShader.use();
+    textureShader.setMat4("projection", projection);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+    pulseManager->DrawVFX(textureShader);
+
+    // DrawVFX ends with GL_BLEND disabled; re-enable so railing alpha blends correctly
+    // (otherwise transparent texels overwrite the scene with black during attacks).
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Hallway railings on top of player (and drones / pulse VFX in overlap)
+    textureShader.use();
+    textureShader.setMat4("projection", projection);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+    textureShader.setFloat("alpha", 1.0f);
+    textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+    textureShader.setFloat("tintStrength", 0.0f);
+    m_hallway->DrawForeground(textureShader);
+
+    // Hiding-box S.png: hall darkening active + player within range of spot top-center
+    if (m_doorOpened && !m_rooftopAccessed && m_hallwayHidingPromptS && m_hallwayHidingPromptS->GetTextureID() != 0)
+    {
+        const Math::Vec2 playerPos = player.GetPosition();
+        for (const auto& spot : m_hallway->GetHidingSpots())
+        {
+            const Math::Vec2 topCenter = {
+                spot.pos.x,
+                spot.pos.y + spot.size.y * 0.5f + HIDING_S_ICON_OFFSET_Y
+            };
+            if ((playerPos - topCenter).LengthSq() > HIDING_S_PROMPT_DISTANCE_SQ)
+                continue;
+
+            textureShader.use();
+            textureShader.setMat4("projection", projection);
+            textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+            textureShader.setBool("flipX", false);
+            textureShader.setFloat("alpha", 1.0f);
+            textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+            textureShader.setFloat("tintStrength", 0.0f);
+
+            Math::Matrix sModel = Math::Matrix::CreateTranslation(topCenter)
+                * Math::Matrix::CreateScale({ HIDING_S_ICON_WORLD_SIZE, HIDING_S_ICON_WORLD_SIZE });
+            m_hallwayHidingPromptS->Draw(textureShader, sModel);
+        }
+    }
+
+    // 6) World-space overlays (radars / gauges)
     colorShader->use();
     colorShader->setMat4("projection", projection);
     droneManager->DrawRadars(*colorShader, *m_debugRenderer);
@@ -1036,8 +1151,7 @@ void GameplayState::DrawSceneLayer()
     m_underground->DrawGauges(*colorShader, *m_debugRenderer);
     m_subway->DrawGauges(*colorShader, *m_debugRenderer);
 
-    // Fullscreen frame overlay (1920x1080 texture), centered on the camera so it
-    // always matches the logical view while the map scrolls underneath.
+    // 7) Fullscreen frame overlay (1920x1080), camera-locked in world space
     if (m_hudFrame && m_hudFrame->GetWidth() > 0)
     {
         GL::Enable(GL_BLEND);
@@ -1058,25 +1172,8 @@ void GameplayState::DrawSceneLayer()
 
         GL::Disable(GL_BLEND);
     }
-}
 
-void GameplayState::DrawUILayer()
-{
-    if (m_isGameOver)
-        return;
-
-    Engine& engine = gsm.GetEngine();
-
-    Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
-        0.0f, GAME_WIDTH,
-        0.0f, GAME_HEIGHT,
-        -1.0f, 1.0f
-    );
-    Math::Matrix view = m_camera.GetViewMatrix();
-    Math::Matrix projection = baseProjection * view;
-
-    Shader& textureShader = engine.GetTextureShader();
-
+    // 8) Screen-space HUD (pulse gauge)
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
     m_pulseGauge.Draw(*colorShader);
@@ -1084,6 +1181,7 @@ void GameplayState::DrawUILayer()
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    // 9) Fonts / minimap / tutorial
     m_fontShader->use();
     m_fontShader->setMat4("projection", baseProjection);
 
@@ -1098,12 +1196,14 @@ void GameplayState::DrawUILayer()
 
     m_tutorial->Draw(*m_font, *m_fontShader);
 
-    auto& inputForCursor = engine.GetInput();
+    // 10) Cursor
+    Engine& engineForCursor = gsm.GetEngine();
+    auto& inputForCursor = engineForCursor.GetInput();
     double mouseScreenX, mouseScreenY;
     inputForCursor.GetMousePosition(mouseScreenX, mouseScreenY);
 
     int windowWidthForCursor, windowHeightForCursor;
-    glfwGetWindowSize(engine.GetWindow(), &windowWidthForCursor, &windowHeightForCursor);
+    glfwGetWindowSize(engineForCursor.GetWindow(), &windowWidthForCursor, &windowHeightForCursor);
 
     float windowAspectForCursor = static_cast<float>(windowWidthForCursor) / static_cast<float>(windowHeightForCursor);
     float gameAspectForCursor = GAME_WIDTH / GAME_HEIGHT;
@@ -1267,29 +1367,31 @@ void GameplayState::DrawUILayer()
         // Additive blending: cursor adds light to the scene, always visible in darkness
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-        // Outer glow (neon cyan: R=0, G=1, B=0.8 via DrawCircle / B=0.2 via DrawBox)
-        colorShader->setFloat("uAlpha", 0.07f);
-        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 3.2f, cursorThick * 6.0f }, { 0.0f, 1.0f });
-        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 6.0f, cursorSize * 3.2f }, { 0.0f, 1.0f });
-        m_debugRenderer->DrawCircle(*colorShader, cursorPos, 24.0f, { 0.0f, 1.0f });
+    // Outer glow (neon cyan: R=0, G=1, B=0.8 via DrawCircle / B=0.2 via DrawBox)
+    colorShader->setFloat("uAlpha", 0.07f);
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 3.2f, cursorThick * 6.0f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 6.0f, cursorSize * 3.2f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 24.0f, { 0.0f, 1.0f });
 
-        // Mid glow
-        colorShader->setFloat("uAlpha", 0.18f);
-        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.5f, cursorThick * 3.5f }, { 0.0f, 1.0f });
-        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 3.5f, cursorSize * 2.5f }, { 0.0f, 1.0f });
-        m_debugRenderer->DrawCircle(*colorShader, cursorPos, 15.0f, { 0.0f, 1.0f });
+    // Mid glow
+    colorShader->setFloat("uAlpha", 0.18f);
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.5f, cursorThick * 3.5f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 3.5f, cursorSize * 2.5f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 15.0f, { 0.0f, 1.0f });
 
-        // Sharp core (full brightness, neon cyan)
-        colorShader->setFloat("uAlpha", 1.0f);
-        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.0f, cursorThick }, { 0.0f, 1.0f });
-        m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick, cursorSize * 2.0f }, { 0.0f, 1.0f });
-        m_debugRenderer->DrawCircle(*colorShader, cursorPos, 4.5f, { 0.5f, 1.0f });
+    // Sharp core (full brightness, neon cyan)
+    colorShader->setFloat("uAlpha", 1.0f);
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.0f, cursorThick }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick, cursorSize * 2.0f }, { 0.0f, 1.0f });
+    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 4.5f, { 0.5f, 1.0f });
 
-        // Restore normal blending and reset alpha
-        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        colorShader->setFloat("uAlpha", 1.0f);
-    }
+    // Restore normal blending and reset alpha
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    colorShader->setFloat("uAlpha", 1.0f);
 
+    } // end cursor cross (else branch)
+
+    // 11) Debug overlay
     if (m_isDebugDraw)
     {
         colorShader->use();
@@ -1361,6 +1463,8 @@ void GameplayState::DrawUILayer()
         m_door->DrawDebug(*colorShader);
         m_rooftopDoor->DrawDebug(*colorShader);
     }
+
+    GL::Disable(GL_BLEND);
 }
 
 void GameplayState::Shutdown()
@@ -1386,6 +1490,7 @@ void GameplayState::Shutdown()
     if (m_mouseLeftCursor) m_mouseLeftCursor->Shutdown();
     if (m_mouseRightCursor) m_mouseRightCursor->Shutdown();
     if (m_hudFrame) m_hudFrame->Shutdown();
+    if (m_hallwayHidingPromptS) m_hallwayHidingPromptS->Shutdown();
 
     m_bgm.Stop();
 

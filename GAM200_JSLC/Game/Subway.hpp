@@ -37,6 +37,7 @@ public:
     void ApplyConfig(const SubwayObjectConfig& cfg);
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
     void Draw(Shader& shader) const;
+    void DrawDrones(Shader& shader) const;
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;

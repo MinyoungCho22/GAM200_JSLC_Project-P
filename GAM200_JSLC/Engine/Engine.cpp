@@ -152,6 +152,7 @@ void Engine::GameLoop()
         m_gameStateManager->Draw();
         m_postProcess->EndScene();
         m_postProcess->ApplyAndPresent();
+        m_gameStateManager->DrawForegroundAfterPostProcess();
 
         m_postProcess->SetPassthrough(false);
 

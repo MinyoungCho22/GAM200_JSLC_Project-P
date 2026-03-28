@@ -191,6 +191,10 @@ void Underground::Draw(Shader& shader) const
     {
         robot.Draw(shader);
     }
+}
+
+void Underground::DrawDrones(Shader& shader) const
+{
     m_droneManager->Draw(shader);
 }
 

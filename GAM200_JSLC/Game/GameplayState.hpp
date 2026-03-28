@@ -21,7 +21,6 @@
 #include "Tutorial.hpp"
 #include "Underground.hpp"
 #include "Subway.hpp"
-#include "MiniMap.hpp"
 #include <memory>
 #include <vector>
 
@@ -39,6 +38,10 @@ public:
     void Update(double dt) override;
     void Draw() override;
     void Shutdown() override;
+
+    bool UsesLayeredDraw() const override { return true; }
+    void DrawMainLayer() override;
+    void DrawForegroundLayer(bool compositeToScreen = true) override;
 
 private:
     void HandleRoomToHallwayTransition();
@@ -75,12 +78,12 @@ private:
     std::unique_ptr<Rooftop> m_rooftop;
     std::unique_ptr<TraceSystem> m_traceSystem;
     std::unique_ptr<Tutorial> m_tutorial;
-    std::unique_ptr<MiniMap> m_miniMap;
     std::unique_ptr<Underground> m_underground;
     std::unique_ptr<Subway> m_subway;
     std::unique_ptr<Background> m_mouseLeftCursor;
     std::unique_ptr<Background> m_mouseRightCursor;
     std::unique_ptr<Background> m_hudFrame;
+    std::unique_ptr<Background> m_hallwayHidingPromptS;
     Math::Vec2 m_lastMouseWorldPos{};
     bool m_undergroundAccessed = false;
     bool m_subwayAccessed = false;

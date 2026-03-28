@@ -172,8 +172,10 @@ void Subway::Draw(Shader& shader) const
             robot.Draw(shader);
         }
     }
+}
 
-    // Draw drones
+void Subway::DrawDrones(Shader& shader) const
+{
     m_droneManager->Draw(shader);
 }
 

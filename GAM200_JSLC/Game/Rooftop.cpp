@@ -598,8 +598,10 @@ void Rooftop::Draw(Shader& shader) const
     Math::Matrix liftModel = Math::Matrix::CreateTranslation(m_liftPos) * Math::Matrix::CreateScale(m_liftSize);
     shader.setMat4("model", liftModel);
     m_lift->Draw(shader, liftModel);
+}
 
-    // Render drones
+void Rooftop::DrawDrones(Shader& shader) const
+{
     m_droneManager->Draw(shader);
 }
 

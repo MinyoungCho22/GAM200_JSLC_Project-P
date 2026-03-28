@@ -21,6 +21,9 @@ public:
     // Returns true when the top state should skip the post-processing pass
     bool TopBypassesPostProcess() const;
 
+    // After post-process present: draws layered foreground (e.g. player) on top of the final image.
+    void DrawForegroundAfterPostProcess();
+
     void PushState(std::unique_ptr<GameState> state);
     void InsertBelow(std::unique_ptr<GameState> state); // insert under current top
     void PopState();

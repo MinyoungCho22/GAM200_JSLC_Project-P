@@ -30,6 +30,9 @@ public:
 	// When enabled, ApplyAndPresent uses exposure=1.0 (no darkening) - used for UI overlays
 	void SetPassthrough(bool enabled) { m_passthrough = enabled; }
 
+	// Viewport used when presenting the scene (letterboxed on the default framebuffer).
+	void GetLetterboxViewport(int& outX, int& outY, int& outW, int& outH) const;
+
 	PostProcessSettings& Settings() { return m_settings; }
 	const PostProcessSettings& Settings() const { return m_settings; }
 

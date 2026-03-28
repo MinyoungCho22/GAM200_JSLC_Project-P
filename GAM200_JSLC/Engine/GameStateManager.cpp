@@ -17,12 +17,39 @@ void GameStateManager::Draw()
 {
     if (states.empty()) return;
 
+    const size_t n = states.size();
+    GameState* top = states.back().get();
+
     // If the top state is transparent (e.g. a fade-out overlay),
     // first render the state below it so it shows through.
-    if (states.size() >= 2 && states.back()->IsTransparent())
-        states[states.size() - 2]->Draw();
+    if (n >= 2 && top->IsTransparent())
+    {
+        GameState* below = states[n - 2].get();
+        if (below->UsesLayeredDraw())
+        {
+            below->DrawMainLayer();
+            below->DrawForegroundLayer(false);
+        }
+        else
+        {
+            below->Draw();
+        }
+    }
 
-    states.back()->Draw();
+    if (top->IsTransparent())
+        top->Draw();
+    else if (top->UsesLayeredDraw())
+        top->DrawMainLayer();
+    else
+        top->Draw();
+}
+
+void GameStateManager::DrawForegroundAfterPostProcess()
+{
+    if (states.empty()) return;
+    GameState* top = states.back().get();
+    if (top->UsesLayeredDraw())
+        top->DrawForegroundLayer(true);
 }
 
 void GameStateManager::DrawBackground()

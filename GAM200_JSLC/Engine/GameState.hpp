@@ -20,4 +20,13 @@ public:
     // The state below (background) is still rendered through post-processing;
     // this state is drawn directly to the default framebuffer afterwards.
     virtual bool BypassPostProcess() const { return false; }
+
+    // When true, Draw() is not used for the top state during the FBO pass; the engine calls
+    // DrawMainLayer() into the scene FBO, runs post-process, then DrawForegroundLayer(true)
+    // on the default framebuffer (player/UI stay un-darkened by exposure).
+    virtual bool UsesLayeredDraw() const { return false; }
+    virtual void DrawMainLayer() {}
+    // compositeToScreen: true = default FB + letterbox viewport after present; false = current
+    // FBO (same virtual resolution) when compositing under a transparent overlay.
+    virtual void DrawForegroundLayer(bool compositeToScreen = true) { (void)compositeToScreen; }
 };

@@ -109,6 +109,11 @@ void PostProcessManager::EndScene()
     GL::BindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void PostProcessManager::GetLetterboxViewport(int& outX, int& outY, int& outW, int& outH) const
+{
+    ComputeLetterboxViewport(outX, outY, outW, outH);
+}
+
 void PostProcessManager::ApplyAndPresent()
 {
     GL::Disable(GL_DEPTH_TEST);

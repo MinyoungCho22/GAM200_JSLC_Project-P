@@ -135,7 +135,10 @@ void Hallway::Draw(Shader& shader)
             spot.sprite->Draw(shader, spotModel);
         }
     }
+}
 
+void Hallway::DrawDrones(Shader& shader)
+{
     m_droneManager->Draw(shader);
 }
 
