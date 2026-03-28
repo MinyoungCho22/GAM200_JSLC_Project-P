@@ -302,8 +302,7 @@ void Hallway::DrawSpriteOutlines(Shader& outlineShader,
             if (w <= 0 || h <= 0) continue;
 
             outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
-            outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
-            outlineShader.setFloat("outlineWidthTexels", 2.0f);
+            outlineShader.setVec4("outlineColor", 0.15f, 1.0f, 0.35f, 1.0f);
 
             Math::Matrix model = Math::Matrix::CreateTranslation(spot.pos) * Math::Matrix::CreateScale(spot.size);
             spot.sprite->Draw(outlineShader, model);
