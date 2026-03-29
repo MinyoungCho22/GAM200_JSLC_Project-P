@@ -46,7 +46,6 @@ private:
 	void CreateSceneFBO();
 	void CreateFullscreenQuad();
 	void ComputeLetterboxViewport(int dispW, int dispH, int& outX, int& outY, int& outW, int& outH) const;
-	void ResolveDrawablePixelsForPresent(int& outW, int& outH);
 
 	GLFWwindow* m_presentationWindow = nullptr;
 

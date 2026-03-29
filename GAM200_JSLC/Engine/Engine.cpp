@@ -346,12 +346,7 @@ void Engine::ToggleFullscreen()
         glfwSetWindowMonitor(m_window, nullptr, m_windowedX, m_windowedY, restoreW, restoreH, 0);
         if (shouldMaximizeWindowed)
         {
-#ifndef __APPLE__
             glfwMaximizeWindow(m_window);
-#else
-            // Cocoa + glfwMaximizeWindow often leaves the GL backing size out of sync with
-            // glfwGetFramebufferSize for several frames after fullscreen -> windowed.
-#endif
         }
         Logger::Instance().Log(Logger::Severity::Event, "Switched to Windowed mode");
     }

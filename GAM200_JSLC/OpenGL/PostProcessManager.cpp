@@ -4,8 +4,6 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Logger.hpp"
 #include <GLFW/glfw3.h>
-#include <cmath>
-#include <cstdlib>
 
 // ---------------------------
 // Internal helpers (optional)
@@ -50,6 +48,7 @@ void PostProcessManager::Initialize(int width, int height)
     m_postShader->setFloat("uExposure", m_settings.exposure);
     m_postShader->setBool("uUseLightOverlay", m_settings.useLightOverlay);
     m_postShader->setFloat("uLightOverlayStrength", m_settings.lightOverlayStrength);
+    m_postShader->setVec2("uFramebufferSize", static_cast<float>(m_width), static_cast<float>(m_height));
 
     m_lightOverlay = std::make_unique<Background>();
     m_lightOverlay->Initialize("Asset/Hallway_Light.png");
@@ -119,114 +118,31 @@ void PostProcessManager::GetLetterboxViewport(int& outX, int& outY, int& outW, i
     ComputeLetterboxViewport(m_displayWidth, m_displayHeight, outX, outY, outW, outH);
 }
 
-void PostProcessManager::ResolveDrawablePixelsForPresent(int& outW, int& outH)
-{
-    outW = m_displayWidth;
-    outH = m_displayHeight;
-
-    if (!m_presentationWindow)
-        return;
-
-#ifndef __APPLE__
-    glfwGetFramebufferSize(m_presentationWindow, &outW, &outH);
-    return;
-#else
-    constexpr int kMaxPasses = 12;
-    constexpr int kSlack = 20;
-    constexpr int kStaleMargin = 48;
-
-    for (int pass = 0; pass < kMaxPasses; ++pass)
-    {
-        if (pass > 0)
-            glfwPollEvents();
-
-        int fbW = 0, fbH = 0, winW = 0, winH = 0;
-        float xs = 1.0f, ys = 1.0f;
-        glfwGetFramebufferSize(m_presentationWindow, &fbW, &fbH);
-        glfwGetWindowSize(m_presentationWindow, &winW, &winH);
-        glfwGetWindowContentScale(m_presentationWindow, &xs, &ys);
-
-        if (fbW <= 0 || fbH <= 0)
-            continue;
-
-        if (winW <= 0 || winH <= 0)
-        {
-            outW = fbW;
-            outH = fbH;
-            return;
-        }
-
-        const int expW = static_cast<int>(std::lround(static_cast<float>(winW) * xs));
-        const int expH = static_cast<int>(std::lround(static_cast<float>(winH) * ys));
-
-        const bool matches =
-            std::abs(fbW - expW) <= kSlack && std::abs(fbH - expH) <= kSlack;
-        if (matches)
-        {
-            outW = fbW;
-            outH = fbH;
-            return;
-        }
-
-        const bool staleLarge =
-            fbW > expW + kStaleMargin || fbH > expH + kStaleMargin;
-        const bool staleSmall =
-            fbW < expW - kStaleMargin || fbH < expH - kStaleMargin;
-        if ((staleLarge || staleSmall) && expW > 0 && expH > 0)
-        {
-            outW = expW;
-            outH = expH;
-            return;
-        }
-    }
-
-    {
-        int fbW = 0, fbH = 0, winW = 0, winH = 0;
-        float xs = 1.0f, ys = 1.0f;
-        glfwGetFramebufferSize(m_presentationWindow, &fbW, &fbH);
-        glfwGetWindowSize(m_presentationWindow, &winW, &winH);
-        glfwGetWindowContentScale(m_presentationWindow, &xs, &ys);
-        if (winW > 0 && winH > 0 && fbW > 0 && fbH > 0)
-        {
-            const int expW = static_cast<int>(std::lround(static_cast<float>(winW) * xs));
-            const int expH = static_cast<int>(std::lround(static_cast<float>(winH) * ys));
-            if (std::abs(fbW - expW) <= kSlack && std::abs(fbH - expH) <= kSlack)
-            {
-                outW = fbW;
-                outH = fbH;
-            }
-            else
-            {
-                outW = expW;
-                outH = expH;
-            }
-        }
-        else if (fbW > 0 && fbH > 0)
-        {
-            outW = fbW;
-            outH = fbH;
-        }
-    }
-#endif
-}
-
 void PostProcessManager::ApplyAndPresent()
 {
     GL::Disable(GL_DEPTH_TEST);
 
-    int dispW = m_displayWidth;
-    int dispH = m_displayHeight;
-    ResolveDrawablePixelsForPresent(dispW, dispH);
-    if (dispW > 0 && dispH > 0)
+    int fbW = 0;
+    int fbH = 0;
+    if (m_presentationWindow)
     {
-        m_displayWidth = dispW;
-        m_displayHeight = dispH;
+#ifdef __APPLE__
+        glfwPollEvents();
+#endif
+        glfwGetFramebufferSize(m_presentationWindow, &fbW, &fbH);
     }
+    if (fbW <= 0 || fbH <= 0)
+    {
+        fbW = m_displayWidth;
+        fbH = m_displayHeight;
+    }
+    if (fbW <= 0 || fbH <= 0)
+        return;
 
-    int vpX = 0, vpY = 0, vpW = dispW, vpH = dispH;
-    ComputeLetterboxViewport(dispW, dispH, vpX, vpY, vpW, vpH);
+    m_displayWidth = fbW;
+    m_displayHeight = fbH;
 
-    GL::Viewport(vpX, vpY, vpW, vpH);
+    GL::Viewport(0, 0, fbW, fbH);
     GL::ClearColor(0.f, 0.f, 0.f, 1.f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
 
@@ -237,6 +153,7 @@ void PostProcessManager::ApplyAndPresent()
 
     m_postShader->setVec2("uCameraPos", m_settings.cameraPos.x, m_settings.cameraPos.y);
     m_postShader->setVec2("uGameSize", static_cast<float>(m_width), static_cast<float>(m_height));
+    m_postShader->setVec2("uFramebufferSize", static_cast<float>(fbW), static_cast<float>(fbH));
 
     m_postShader->setVec2("uHallwayMin", 1920.0f, 0.0f);
     m_postShader->setVec2("uHallwaySize", 5940.0f, 1080.0f);

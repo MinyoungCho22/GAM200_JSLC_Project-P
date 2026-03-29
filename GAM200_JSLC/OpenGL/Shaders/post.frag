@@ -11,6 +11,7 @@ uniform float uLightOverlayStrength;
 
 uniform vec2 uCameraPos;
 uniform vec2 uGameSize;
+uniform vec2 uFramebufferSize;
 
 uniform vec2 uHallwayMin;
 uniform vec2 uHallwaySize;
@@ -33,15 +34,43 @@ vec3 OverlayBlend(vec3 base, vec3 blend)
 
 void main()
 {
-    vec3 color = texture(uSceneTex, vUV).rgb;
+    vec2 uv = vUV;
+    float screenAspect = uFramebufferSize.x / max(uFramebufferSize.y, 1.0);
+    float gameAspect = uGameSize.x / max(uGameSize.y, 1.0);
+
+    vec2 sceneUV = uv;
+    if (screenAspect > gameAspect)
+    {
+        float w = gameAspect / screenAspect;
+        float left = (1.0 - w) * 0.5;
+        sceneUV.x = (uv.x - left) / w;
+        if (sceneUV.x < 0.0 || sceneUV.x > 1.0)
+        {
+            FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            return;
+        }
+    }
+    else if (screenAspect < gameAspect)
+    {
+        float h = screenAspect / gameAspect;
+        float bottom = (1.0 - h) * 0.5;
+        sceneUV.y = (uv.y - bottom) / h;
+        if (sceneUV.y < 0.0 || sceneUV.y > 1.0)
+        {
+            FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            return;
+        }
+    }
+
+    vec3 color = texture(uSceneTex, sceneUV).rgb;
 
     color *= uExposure;
 
     if (uUseLightOverlay)
     {
         vec2 worldPos = vec2(
-            vUV.x * uGameSize.x + (uCameraPos.x - uGameSize.x * 0.5),
-            vUV.y * uGameSize.y + (uCameraPos.y - uGameSize.y * 0.5)
+            sceneUV.x * uGameSize.x + (uCameraPos.x - uGameSize.x * 0.5),
+            sceneUV.y * uGameSize.y + (uCameraPos.y - uGameSize.y * 0.5)
         );
 
         vec2 overlayUV = (worldPos - uHallwayMin) / uHallwaySize;
