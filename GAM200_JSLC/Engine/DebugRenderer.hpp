@@ -21,5 +21,6 @@ private:
     unsigned int boxVAO = 0;
     unsigned int lineVAO = 0;
     unsigned int VBO = 0, EBO = 0;
-    static constexpr int CIRCLE_SEGMENTS = 24;
+    // Enough segments so attack-range / debug circles read as smooth curves, not obvious polygons.
+    static constexpr int CIRCLE_SEGMENTS = 96;
 };
