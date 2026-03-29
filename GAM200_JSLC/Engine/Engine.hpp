@@ -62,7 +62,10 @@ private:
 
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void FramebufferSizeCallback(GLFWwindow* window, int width, int height);
+    static void WindowFocusCallback(GLFWwindow* window, int focused);
     void OnFramebufferResize(int newScreenWidth, int newScreenHeight);
+    void SyncPostProcessDisplaySize();
+    void ApplyCustomCursorHidden();
 
     GLFWwindow* m_window = nullptr;
 

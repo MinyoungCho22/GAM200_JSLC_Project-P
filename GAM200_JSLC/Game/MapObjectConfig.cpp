@@ -163,7 +163,6 @@ MapObjectConfigData MapObjectConfig::DefaultData()
 
     data.underground.robotSpawns = { {18239.0f, -1685.0f}, {21060.0f, -1685.0f} };
     data.underground.pulseSources = {
-        { {243.0f, 480.0f}, {408.0f, 132.0f}, "", {} },
         { {1949.0f, 309.0f}, {69.0f, 255.0f}, "", {} },
         { {4485.0f, 309.0f}, {69.0f, 255.0f}, "", {} },
         { {5847.0f, 375.0f}, {1013.0f, 477.0f}, "", {} }

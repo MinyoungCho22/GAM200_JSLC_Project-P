@@ -64,9 +64,10 @@ bool Engine::Initialize(const std::string& windowTitle)
 
     glfwSetKeyCallback(m_window, Engine::KeyCallback);
     glfwSetFramebufferSizeCallback(m_window, Engine::FramebufferSizeCallback);
+    glfwSetWindowFocusCallback(m_window, Engine::WindowFocusCallback);
 
     // Hide the default OS cursor so we can render our custom cursor
-    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+    ApplyCustomCursorHidden();
 
     m_input = std::make_unique<Input::Input>();
     m_input->Initialize(m_window);
@@ -96,12 +97,7 @@ bool Engine::Initialize(const std::string& windowTitle)
 
     // On HiDPI/Retina displays (e.g. macOS), the framebuffer can be larger than the window size.
     // Fetch the real framebuffer dimensions and inform PostProcessManager.
-    {
-        int fbWidth = 0, fbHeight = 0;
-        glfwGetFramebufferSize(m_window, &fbWidth, &fbHeight);
-        if (fbWidth > 0 && fbHeight > 0)
-            m_postProcess->SetDisplaySize(fbWidth, fbHeight);
-    }
+    SyncPostProcessDisplaySize();
 
     m_imguiManager = std::make_unique<ImguiManager>();
     (void)m_imguiManager->Initialize();
@@ -133,14 +129,19 @@ void Engine::GameLoop()
         m_input->Update();
         Update();
 
-        // Sync display size every frame — covers Windows DPI scaling and macOS Retina
-        // cases where the physical framebuffer may differ from the logical window size.
+#ifdef __APPLE__
+        // Monitor/fullscreen transitions often commit after the first poll; reading FB size
+        // immediately after Update() can still see the previous drawable (wrong letterbox).
+        glfwPollEvents();
+        // AppKit can restore the arrow cursor after Cmd+Tab even when focus callbacks ran.
+        if (glfwGetWindowAttrib(m_window, GLFW_FOCUSED) &&
+            glfwGetInputMode(m_window, GLFW_CURSOR) != GLFW_CURSOR_HIDDEN)
         {
-            int fbW = 0, fbH = 0;
-            glfwGetFramebufferSize(m_window, &fbW, &fbH);
-            if (fbW > 0 && fbH > 0)
-                m_postProcess->SetDisplaySize(fbW, fbH);
+            ApplyCustomCursorHidden();
         }
+#endif
+
+        SyncPostProcessDisplaySize();
 
         // When the top state bypasses post-processing (e.g. settings UI),
         // render everything to the FBO normally but present with exposure=1.0
@@ -242,6 +243,9 @@ void Engine::SetResolution(int width, int height)
     }
 
     Logger::Instance().Log(Logger::Severity::Event, "Resolution set to %d x %d", width, height);
+
+    glfwPollEvents();
+    SyncPostProcessDisplaySize();
 }
 
 void Engine::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -269,6 +273,23 @@ void Engine::FramebufferSizeCallback(GLFWwindow* window, int width, int height)
     }
 }
 
+void Engine::WindowFocusCallback(GLFWwindow* window, int focused)
+{
+    Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
+    if (engine && focused)
+    {
+        // macOS often re-shows the system cursor after Cmd+Tab / app switch; re-apply hidden mode.
+        engine->ApplyCustomCursorHidden();
+    }
+}
+
+void Engine::ApplyCustomCursorHidden()
+{
+    if (!m_window)
+        return;
+    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+}
+
 void Engine::OnFramebufferResize(int newScreenWidth, int newScreenHeight)
 {
     Logger::Instance().Log(Logger::Severity::Event,
@@ -276,6 +297,16 @@ void Engine::OnFramebufferResize(int newScreenWidth, int newScreenHeight)
 
     if (m_postProcess)
         m_postProcess->SetDisplaySize(newScreenWidth, newScreenHeight);
+}
+
+void Engine::SyncPostProcessDisplaySize()
+{
+    if (!m_window || !m_postProcess)
+        return;
+    int fbW = 0, fbH = 0;
+    glfwGetFramebufferSize(m_window, &fbW, &fbH);
+    if (fbW > 0 && fbH > 0)
+        m_postProcess->SetDisplaySize(fbW, fbH);
 }
 
 void Engine::ToggleFullscreen()
@@ -316,6 +347,10 @@ void Engine::ToggleFullscreen()
         }
         Logger::Instance().Log(Logger::Severity::Event, "Switched to Windowed mode");
     }
+
+    glfwPollEvents();
+    SyncPostProcessDisplaySize();
+    ApplyCustomCursorHidden();
 }
 
 void Engine::SetFullscreen(bool enabled)
