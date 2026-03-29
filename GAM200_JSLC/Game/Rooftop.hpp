@@ -63,6 +63,7 @@ private:
     };
 
     std::unique_ptr<Background> m_background;
+    std::unique_ptr<Background> m_light;
     std::unique_ptr<Background> m_closeBackground; // Visual state for when the rooftop hole is closed
     std::unique_ptr<Background> m_lift;
     std::unique_ptr<Background> m_holeSprite;

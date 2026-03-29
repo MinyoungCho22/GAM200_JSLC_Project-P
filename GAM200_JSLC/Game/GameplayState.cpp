@@ -578,6 +578,13 @@ void GameplayState::Update(double dt)
         pp.Settings().lightOverlayStrength = 0.6f;
         pp.Settings().cameraPos = m_camera.GetPosition();
     }
+    else if (m_rooftopAccessed && !m_undergroundAccessed)
+    {
+        // rooftop
+        pp.Settings().exposure = 0.85f; 
+        pp.Settings().useLightOverlay = false;
+        pp.Settings().lightOverlayStrength = 0.0f;
+    }
     else
     {
         pp.Settings().exposure = 1.0f;
