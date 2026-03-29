@@ -21,6 +21,11 @@ experiment that can absorb and gear up the city’s neon energy, ”Pulse”.
 With the pulse will you share this stolen light to become a savior to 
 its citizens, or consume it all to become the perfect tool you were designed to be?
 
+TEAM MEMBERS
+- RYUNGJAE LEE (PRODUCER)
+- MINYOUNG CHO (TECH LEAD)
+- SEOYOUNG JEONG (DESGIN LEAD)
+- JISU SON (QA & ART)
 
 HOW TO PLAY
   - PRESS THE EXE FILE TO OPEN THE GAME
