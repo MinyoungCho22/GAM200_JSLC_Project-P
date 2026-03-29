@@ -3,6 +3,9 @@
 #include "PostProcessManager.h"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Logger.hpp"
+#include <GLFW/glfw3.h>
+#include <cmath>
+#include <cstdlib>
 
 // ---------------------------
 // Internal helpers (optional)
@@ -54,6 +57,8 @@ void PostProcessManager::Initialize(int width, int height)
 
 void PostProcessManager::Shutdown()
 {
+    m_presentationWindow = nullptr;
+
     if (m_lightOverlay)
     {
         m_lightOverlay->Shutdown();
@@ -111,15 +116,115 @@ void PostProcessManager::EndScene()
 
 void PostProcessManager::GetLetterboxViewport(int& outX, int& outY, int& outW, int& outH) const
 {
-    ComputeLetterboxViewport(outX, outY, outW, outH);
+    ComputeLetterboxViewport(m_displayWidth, m_displayHeight, outX, outY, outW, outH);
+}
+
+void PostProcessManager::ResolveDrawablePixelsForPresent(int& outW, int& outH)
+{
+    outW = m_displayWidth;
+    outH = m_displayHeight;
+
+    if (!m_presentationWindow)
+        return;
+
+#ifndef __APPLE__
+    glfwGetFramebufferSize(m_presentationWindow, &outW, &outH);
+    return;
+#else
+    constexpr int kMaxPasses = 12;
+    constexpr int kSlack = 20;
+    constexpr int kStaleMargin = 48;
+
+    for (int pass = 0; pass < kMaxPasses; ++pass)
+    {
+        if (pass > 0)
+            glfwPollEvents();
+
+        int fbW = 0, fbH = 0, winW = 0, winH = 0;
+        float xs = 1.0f, ys = 1.0f;
+        glfwGetFramebufferSize(m_presentationWindow, &fbW, &fbH);
+        glfwGetWindowSize(m_presentationWindow, &winW, &winH);
+        glfwGetWindowContentScale(m_presentationWindow, &xs, &ys);
+
+        if (fbW <= 0 || fbH <= 0)
+            continue;
+
+        if (winW <= 0 || winH <= 0)
+        {
+            outW = fbW;
+            outH = fbH;
+            return;
+        }
+
+        const int expW = static_cast<int>(std::lround(static_cast<float>(winW) * xs));
+        const int expH = static_cast<int>(std::lround(static_cast<float>(winH) * ys));
+
+        const bool matches =
+            std::abs(fbW - expW) <= kSlack && std::abs(fbH - expH) <= kSlack;
+        if (matches)
+        {
+            outW = fbW;
+            outH = fbH;
+            return;
+        }
+
+        const bool staleLarge =
+            fbW > expW + kStaleMargin || fbH > expH + kStaleMargin;
+        const bool staleSmall =
+            fbW < expW - kStaleMargin || fbH < expH - kStaleMargin;
+        if ((staleLarge || staleSmall) && expW > 0 && expH > 0)
+        {
+            outW = expW;
+            outH = expH;
+            return;
+        }
+    }
+
+    {
+        int fbW = 0, fbH = 0, winW = 0, winH = 0;
+        float xs = 1.0f, ys = 1.0f;
+        glfwGetFramebufferSize(m_presentationWindow, &fbW, &fbH);
+        glfwGetWindowSize(m_presentationWindow, &winW, &winH);
+        glfwGetWindowContentScale(m_presentationWindow, &xs, &ys);
+        if (winW > 0 && winH > 0 && fbW > 0 && fbH > 0)
+        {
+            const int expW = static_cast<int>(std::lround(static_cast<float>(winW) * xs));
+            const int expH = static_cast<int>(std::lround(static_cast<float>(winH) * ys));
+            if (std::abs(fbW - expW) <= kSlack && std::abs(fbH - expH) <= kSlack)
+            {
+                outW = fbW;
+                outH = fbH;
+            }
+            else
+            {
+                outW = expW;
+                outH = expH;
+            }
+        }
+        else if (fbW > 0 && fbH > 0)
+        {
+            outW = fbW;
+            outH = fbH;
+        }
+    }
+#endif
 }
 
 void PostProcessManager::ApplyAndPresent()
 {
     GL::Disable(GL_DEPTH_TEST);
 
-    int vpX = 0, vpY = 0, vpW = m_displayWidth, vpH = m_displayHeight;
-    ComputeLetterboxViewport(vpX, vpY, vpW, vpH);
+    int dispW = m_displayWidth;
+    int dispH = m_displayHeight;
+    ResolveDrawablePixelsForPresent(dispW, dispH);
+    if (dispW > 0 && dispH > 0)
+    {
+        m_displayWidth = dispW;
+        m_displayHeight = dispH;
+    }
+
+    int vpX = 0, vpY = 0, vpW = dispW, vpH = dispH;
+    ComputeLetterboxViewport(dispW, dispH, vpX, vpY, vpW, vpH);
 
     GL::Viewport(vpX, vpY, vpW, vpH);
     GL::ClearColor(0.f, 0.f, 0.f, 1.f);
@@ -156,31 +261,31 @@ void PostProcessManager::ApplyAndPresent()
     GL::BindTexture(GL_TEXTURE_2D, 0);
 }
 
-void PostProcessManager::ComputeLetterboxViewport(int& outX, int& outY, int& outW, int& outH) const
+void PostProcessManager::ComputeLetterboxViewport(int dispW, int dispH, int& outX, int& outY, int& outW, int& outH) const
 {
     outX = 0;
     outY = 0;
-    outW = m_displayWidth;
-    outH = m_displayHeight;
+    outW = dispW;
+    outH = dispH;
 
-    if (m_displayWidth <= 0 || m_displayHeight <= 0 || m_width <= 0 || m_height <= 0) return;
+    if (dispW <= 0 || dispH <= 0 || m_width <= 0 || m_height <= 0) return;
 
     const float virtualAspect = static_cast<float>(m_width) / static_cast<float>(m_height);
-    const float displayAspect = static_cast<float>(m_displayWidth) / static_cast<float>(m_displayHeight);
+    const float displayAspect = static_cast<float>(dispW) / static_cast<float>(dispH);
 
     if (displayAspect > virtualAspect)
     {
-        outH = m_displayHeight;
+        outH = dispH;
         outW = static_cast<int>(static_cast<float>(outH) * virtualAspect);
-        outX = (m_displayWidth - outW) / 2;
+        outX = (dispW - outW) / 2;
         outY = 0;
     }
     else if (displayAspect < virtualAspect)
     {
-        outW = m_displayWidth;
+        outW = dispW;
         outH = static_cast<int>(static_cast<float>(outW) / virtualAspect);
         outX = 0;
-        outY = (m_displayHeight - outH) / 2;
+        outY = (dispH - outH) / 2;
     }
 }
 

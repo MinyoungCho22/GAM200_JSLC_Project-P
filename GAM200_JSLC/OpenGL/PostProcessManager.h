@@ -4,6 +4,8 @@
 #include "../Game/Background.hpp"
 #include "../Engine/Vec2.hpp"
 
+struct GLFWwindow;
+
 struct PostProcessSettings
 {
 	float exposure = 1.0f;
@@ -27,6 +29,9 @@ public:
 	// Set the actual screen framebuffer size (differs from virtual size on HiDPI/Retina displays)
 	void SetDisplaySize(int w, int h) { m_displayWidth = w; m_displayHeight = h; }
 
+	// Main GLFW window: used each frame in ApplyAndPresent to read the real drawable size (macOS).
+	void SetPresentationWindow(GLFWwindow* window) { m_presentationWindow = window; }
+
 	// When enabled, ApplyAndPresent uses exposure=1.0 (no darkening) - used for UI overlays
 	void SetPassthrough(bool enabled) { m_passthrough = enabled; }
 
@@ -40,7 +45,10 @@ public:
 private:
 	void CreateSceneFBO();
 	void CreateFullscreenQuad();
-	void ComputeLetterboxViewport(int& outX, int& outY, int& outW, int& outH) const;
+	void ComputeLetterboxViewport(int dispW, int dispH, int& outX, int& outY, int& outW, int& outH) const;
+	void ResolveDrawablePixelsForPresent(int& outW, int& outH);
+
+	GLFWwindow* m_presentationWindow = nullptr;
 
 	PostProcessSettings m_settings{};
 
