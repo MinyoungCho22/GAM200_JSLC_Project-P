@@ -10,7 +10,28 @@
 #include "../Engine/Collision.hpp"
 #include "MapObjectConfig.hpp"
 #include <algorithm>
+#include <unordered_map>
+#include <vector>
 
+namespace
+{
+// Other drones use Drone::Init default (100) unless live_drone_states.json overrides them.
+// Entry tracer max HP = base * 2; must match ReapplyEntryTracerDroneAfterLiveState().
+constexpr float kUndergroundEntryTracerHpBase = 400.0f;
+constexpr float kUndergroundEntryTracerMaxHp = kUndergroundEntryTracerHpBase * 2.0f;
+}
+
+void Underground::ReapplyEntryTracerDroneAfterLiveState()
+{
+    if (!m_droneManager)
+        return;
+    std::vector<Drone>& drones = m_droneManager->GetDrones();
+    if (drones.empty())
+        return;
+    Drone& entryTracer = drones[0];
+    entryTracer.SetMaxHP(kUndergroundEntryTracerMaxHp);
+    entryTracer.SetHP(kUndergroundEntryTracerMaxHp);
+}
 
 void Underground::Initialize()
 {
@@ -23,11 +44,25 @@ void Underground::Initialize()
 
     m_droneManager = std::make_unique<DroneManager>();
 
-    // Spawn aerial drones with varying speeds
+    // Spawn aerial drones with varying speeds (higher patrol band)
     float droneY = MIN_Y + 550.0f;
-    m_droneManager->SpawnDrone({ 19423.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(180.0f);
+    {
+        Drone& entryTracer = m_droneManager->SpawnDrone({ MIN_X + 1350.0f, droneY }, "Asset/Drone.png", true);
+        entryTracer.SetBaseSpeed(55.0f);
+        entryTracer.SetMaxHP(kUndergroundEntryTracerMaxHp);
+        entryTracer.SetHP(kUndergroundEntryTracerMaxHp);
+    }
+    // First patrol drone: shifted left toward robot patrol (~18.2k)
+    m_droneManager->SpawnDrone({ 18470.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(180.0f);
     m_droneManager->SpawnDrone({ 22203.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(250.0f);
     m_droneManager->SpawnDrone({ 22787.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(400.0f);
+    m_droneManager->SpawnDrone({ 23920.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(290.0f);
+
+    // Two extra drones skimming much lower (near floor / robot height band)
+    const float lowDroneY = MIN_Y + 300.0f;
+    // One low drone further ahead (right) than the first high drone
+    m_droneManager->SpawnDrone({ 22150.0f, lowDroneY }, "Asset/Drone.png", false).SetBaseSpeed(175.0f);
+    m_droneManager->SpawnDrone({ 23580.0f, lowDroneY }, "Asset/Drone.png", false).SetBaseSpeed(210.0f);
 
     ApplyConfig(MapObjectConfig::Instance().GetData().underground);
 }
@@ -35,9 +70,18 @@ void Underground::Initialize()
 void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
 {
     for (auto& source : m_pulseSources) source.Shutdown();
+    for (auto& obs : m_obstacles)
+    {
+        if (obs.sprite) obs.sprite->Shutdown();
+    }
+    for (auto& lit : m_lights)
+    {
+        if (lit.sprite) lit.sprite->Shutdown();
+    }
     for (auto& robot : m_robots) robot.Shutdown();
     m_pulseSources.clear();
     m_obstacles.clear();
+    m_lights.clear();
     m_ramps.clear();
     m_robots.clear();
 
@@ -45,21 +89,128 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
     {
         m_robots.emplace_back();
         m_robots.back().Init(spawn);
+        m_robots.back().ApplyUndergroundDifficultyBoost();
+    }
+
+    for (const auto& o : cfg.lights)
+    {
+        if (o.spritePath.empty())
+            continue;
+        Math::Vec2 sz = o.size;
+        if ((sz.x <= 0.0f || sz.y <= 0.0f))
+        {
+            Background probe;
+            probe.Initialize(o.spritePath.c_str());
+            const int w = probe.GetWidth();
+            const int h = probe.GetHeight();
+            probe.Shutdown();
+            if (w > 0 && h > 0)
+                sz = { static_cast<float>(w), static_cast<float>(h) };
+        }
+        if (sz.x <= 0.0f || sz.y <= 0.0f)
+        {
+            if (o.fallbackSize.x > 0.0f && o.fallbackSize.y > 0.0f)
+                sz = o.fallbackSize;
+            else
+                sz = { 1.0f, 1.0f };
+        }
+        float cx = MIN_X + o.topLeft.x + sz.x * 0.5f;
+        float cy = MIN_Y + (HEIGHT - o.topLeft.y) - sz.y * 0.5f;
+        LightOverlay layer{};
+        layer.pos = { cx, cy };
+        layer.size = sz;
+        layer.sprite = std::make_unique<Background>();
+        layer.sprite->Initialize(o.spritePath.c_str());
+        m_lights.push_back(std::move(layer));
     }
 
     for (const auto& o : cfg.obstacles)
     {
         float cx = MIN_X + o.topLeft.x + o.size.x * 0.5f;
         float cy = MIN_Y + (HEIGHT - o.topLeft.y) - o.size.y * 0.5f;
-        m_obstacles.push_back({ {cx, cy}, o.size });
+        Obstacle obs{};
+        obs.pos = { cx, cy };
+        obs.size = o.size;
+        if (!o.spritePath.empty())
+        {
+            obs.sprite = std::make_unique<Background>();
+            obs.sprite->Initialize(o.spritePath.c_str());
+        }
+        m_obstacles.push_back(std::move(obs));
     }
 
-    for (const auto& p : cfg.pulseSources)
+    const auto& pulses = cfg.pulseSources;
+    const size_t pulseCount = pulses.size();
+    std::vector<Math::Vec2> effPulseSizes(pulseCount);
+    std::vector<Math::Vec2> effPulseTopLeft(pulseCount);
+
+    for (size_t i = 0; i < pulseCount; ++i)
     {
-        float cx = MIN_X + p.topLeft.x + p.size.x * 0.5f;
-        float cy = MIN_Y + (HEIGHT - p.topLeft.y) - p.size.y * 0.5f;
+        const auto& p = pulses[i];
+        Math::Vec2 sz = p.size;
+        if ((sz.x <= 0.0f || sz.y <= 0.0f) && !p.spritePath.empty())
+        {
+            Background probe;
+            probe.Initialize(p.spritePath.c_str());
+            const int w = probe.GetWidth();
+            const int h = probe.GetHeight();
+            probe.Shutdown();
+            if (w > 0 && h > 0)
+                sz = { static_cast<float>(w), static_cast<float>(h) };
+        }
+        if (sz.x <= 0.0f || sz.y <= 0.0f)
+        {
+            if (p.fallbackSize.x > 0.0f && p.fallbackSize.y > 0.0f)
+                sz = p.fallbackSize;
+            else
+                sz = { 1.0f, 1.0f };
+        }
+        effPulseSizes[i] = sz;
+        effPulseTopLeft[i] = p.topLeft;
+    }
+
+    std::unordered_map<int, size_t> groupFirstPulseIdx;
+    for (size_t i = 0; i < pulseCount; ++i)
+    {
+        const auto& p = pulses[i];
+        const int g = p.sharedPulseGroup;
+        if (g == 0)
+            continue;
+        auto it = groupFirstPulseIdx.find(g);
+        if (it == groupFirstPulseIdx.end())
+            groupFirstPulseIdx[g] = i;
+        else if (p.leaderRightGap >= 0.0f)
+        {
+            const size_t j = it->second;
+            effPulseTopLeft[i].x = effPulseTopLeft[j].x + effPulseSizes[j].x + p.leaderRightGap + p.layoutOffsetX;
+            effPulseTopLeft[i].y = p.topLeft.y;
+        }
+    }
+
+    std::unordered_map<int, size_t> sharedLeaderIdx;
+    for (size_t i = 0; i < pulseCount; ++i)
+    {
+        const auto& p = pulses[i];
+        const Math::Vec2& sz = effPulseSizes[i];
+        const Math::Vec2& tl = effPulseTopLeft[i];
+        float cx = MIN_X + tl.x + sz.x * 0.5f;
+        float cy = MIN_Y + (HEIGHT - tl.y) - sz.y * 0.5f;
         m_pulseSources.emplace_back();
-        m_pulseSources.back().Initialize({ cx, cy }, p.size, 100.0f);
+        PulseSource& ps = m_pulseSources.back();
+        ps.Initialize({ cx, cy }, sz, 100.0f);
+        ps.SetHitboxMargin(p.hitboxMargin);
+        ps.SetDrawRemainGauge(p.gaugeAnchor);
+        if (!p.spritePath.empty())
+            ps.InitializeSprite(p.spritePath.c_str());
+
+        if (p.sharedPulseGroup != 0)
+        {
+            auto it = sharedLeaderIdx.find(p.sharedPulseGroup);
+            if (it == sharedLeaderIdx.end())
+                sharedLeaderIdx[p.sharedPulseGroup] = m_pulseSources.size() - 1;
+            else
+                ps.SharePulseStorageWith(m_pulseSources[it->second]);
+        }
     }
 
     for (const auto& r : cfg.ramps)
@@ -186,6 +337,30 @@ void Underground::Draw(Shader& shader) const
     shader.setMat4("model", model);
     m_background->Draw(shader, model);
 
+    shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    shader.setBool("flipX", false);
+    for (const auto& lit : m_lights)
+    {
+        if (!lit.sprite) continue;
+        Math::Matrix lightModel = Math::Matrix::CreateTranslation(lit.pos) * Math::Matrix::CreateScale(lit.size);
+        shader.setMat4("model", lightModel);
+        lit.sprite->Draw(shader, lightModel);
+    }
+
+    for (const auto& obs : m_obstacles)
+    {
+        if (!obs.sprite) continue;
+        Math::Matrix obsModel = Math::Matrix::CreateTranslation(obs.pos) * Math::Matrix::CreateScale(obs.size);
+        shader.setMat4("model", obsModel);
+        obs.sprite->Draw(shader, obsModel);
+    }
+
+    for (const auto& source : m_pulseSources)
+    {
+        if (source.HasSprite())
+            source.DrawSprite(shader);
+    }
+
     // Draw enemies
     for (const auto& robot : m_robots)
     {
@@ -224,7 +399,7 @@ void Underground::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) c
 
     for (const auto& source : m_pulseSources)
     {
-        debugRenderer.DrawBox(colorShader, source.GetPosition(), source.GetSize(), { 1.0f, 0.5f });
+        debugRenderer.DrawBox(colorShader, source.GetPosition(), source.GetHitboxSize(), { 1.0f, 0.5f });
     }
 
     for (const auto& ramp : m_ramps)
@@ -239,6 +414,14 @@ void Underground::Shutdown()
     if (m_background) m_background->Shutdown();
     if (m_droneManager) m_droneManager->Shutdown();
 
+    for (auto& obs : m_obstacles)
+    {
+        if (obs.sprite) obs.sprite->Shutdown();
+    }
+    for (auto& lit : m_lights)
+    {
+        if (lit.sprite) lit.sprite->Shutdown();
+    }
     for (auto& robot : m_robots) robot.Shutdown();
     for (auto& source : m_pulseSources) source.Shutdown();
 }

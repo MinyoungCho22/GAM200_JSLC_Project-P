@@ -109,24 +109,14 @@ void Rooftop::ApplyConfig(const RooftopObjectConfig& cfg)
     m_liftButtonPos = { cfg.liftButton.topLeft.x + w * 0.5f, cfg.liftButton.topLeft.y - h * 0.5f };
 }
 
-void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input,
-                     Math::Vec2 mouseWorldPos, bool isLeftClickTriggered)
+void Rooftop::SyncGroundLevelForPlayer(Player& player, Math::Vec2 playerHitboxSize)
 {
-    float oldLiftX = m_liftPos.x;
     Math::Vec2 playerPos = player.GetPosition();
-    float prevPlayerX = m_hasPrevPlayerX ? m_prevPlayerX : playerPos.x;
-    auto clampf = [](float v, float lo, float hi) { return std::max(lo, std::min(v, hi)); };
-
-    // Check if the player is within the rooftop level boundaries
     bool isPlayerInRooftop = (playerPos.y >= MIN_Y - 1000.0f && playerPos.y <= MIN_Y + HEIGHT &&
         playerPos.x >= MIN_X && playerPos.x <= MIN_X + WIDTH);
-
     if (!isPlayerInRooftop)
-    {
         return;
-    }
 
-    // Calculate lift and player AABB boundaries for collision checking
     Math::Vec2 liftHalfSizeCheck = m_liftSize / 2.0f;
     Math::Vec2 liftMinCheck = m_liftPos - liftHalfSizeCheck;
     Math::Vec2 liftMaxCheck = m_liftPos + liftHalfSizeCheck;
@@ -135,39 +125,79 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
     Math::Vec2 playerMinCheck = playerPos - playerHalfCheck;
     Math::Vec2 playerMaxCheck = playerPos + playerHalfCheck;
 
-    // Determine if the player is currently touching/standing on the lift
     bool isTouchingLift = (playerMaxCheck.x > liftMinCheck.x && playerMinCheck.x < liftMaxCheck.x &&
         playerMaxCheck.y > liftMinCheck.y && playerMinCheck.y < liftMaxCheck.y);
+    const bool horizontallyOnLift = (playerMaxCheck.x > liftMinCheck.x && playerMinCheck.x < liftMaxCheck.x);
 
-    // Define Y levels for safe ground vs the falling abyss
-    float safeGroundY = MIN_Y + 180.0f + 200.0f;
-    float abyssGroundY = MIN_Y - 800.0f;
+    const float safeGroundY = FLOOR_SURFACE_Y;
+    const float abyssGroundY = MIN_Y - 800.0f;
+    const float abyssStartX = m_liftInitialX - (m_liftSize.x / 2.0f) + 20.0f;
+    const float abyssEndX = m_liftTargetX + (m_liftSize.x / 2.0f) - 20.0f;
 
-    // Define X range of the abyss gap
-    float abyssStartX = m_liftInitialX - (m_liftSize.x / 2.0f) + 20.0f;
-    float abyssEndX = m_liftTargetX + (m_liftSize.x / 2.0f) - 20.0f;
-
-    // Manage ground level logic: if in gap, player must be on lift to avoid falling
     if (playerPos.x > abyssStartX && playerPos.x < abyssEndX)
     {
-        if (isTouchingLift)
+        // While riding, ground matches the lift base deck (above image bottom), not the AABB top.
+        if (isTouchingLift || (m_isLiftActivated && horizontallyOnLift))
         {
-            player.SetCurrentGroundLevel(safeGroundY);
+            if (m_isLiftActivated)
+            {
+                const float deckY = liftMinCheck.y + LIFT_DECK_SURFACE_OFFSET_FROM_MIN_Y;
+                player.SetCurrentGroundLevel(std::max(safeGroundY, deckY));
+            }
+            else
+                player.SetCurrentGroundLevel(safeGroundY);
         }
         else
         {
             player.SetCurrentGroundLevel(abyssGroundY);
-
             if (playerPos.y > abyssGroundY + 50.0f)
-            {
                 player.SetOnGround(false);
-            }
         }
     }
     else
     {
         player.SetCurrentGroundLevel(safeGroundY);
     }
+}
+
+void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input,
+                     Math::Vec2 mouseWorldPos, bool isLeftClickTriggered)
+{
+    float oldLiftX = m_liftPos.x;
+    Math::Vec2 playerPos = player.GetPosition();
+    float prevPlayerX = m_hasPrevPlayerX ? m_prevPlayerX : playerPos.x;
+    auto clampf = [](float v, float lo, float hi) { return std::max(lo, std::min(v, hi)); };
+
+    bool isPlayerInRooftop = (playerPos.y >= MIN_Y - 1000.0f && playerPos.y <= MIN_Y + HEIGHT &&
+        playerPos.x >= MIN_X && playerPos.x <= MIN_X + WIDTH);
+
+    if (!isPlayerInRooftop)
+    {
+        return;
+    }
+
+    {
+        Math::Vec2 phsWall = playerHitboxSize / 2.0f;
+        if (playerPos.x - phsWall.x < SPAWN_LEFT_WALL_FACE_X)
+        {
+            Math::Vec2 clamped = playerPos;
+            clamped.x = SPAWN_LEFT_WALL_FACE_X + phsWall.x;
+            player.SetPosition(clamped);
+            playerPos = clamped;
+        }
+    }
+
+    const float abyssStartX = m_liftInitialX - (m_liftSize.x / 2.0f) + 20.0f;
+    const float abyssEndX = m_liftTargetX + (m_liftSize.x / 2.0f) - 20.0f;
+
+    Math::Vec2 liftHalfForAbyss = m_liftSize / 2.0f;
+    Math::Vec2 liftMinForAbyss = m_liftPos - liftHalfForAbyss;
+    Math::Vec2 liftMaxForAbyss = m_liftPos + liftHalfForAbyss;
+    Math::Vec2 playerHalfForLift = playerHitboxSize / 2.0f;
+    Math::Vec2 playerMinForLift = playerPos - playerHalfForLift;
+    Math::Vec2 playerMaxForLift = playerPos + playerHalfForLift;
+    bool isTouchingLift = (playerMaxForLift.x > liftMinForAbyss.x && playerMinForLift.x < liftMaxForAbyss.x &&
+        playerMaxForLift.y > liftMinForAbyss.y && playerMinForLift.y < liftMaxForAbyss.y);
 
     // Hole Interaction Logic: Check if player is close to the interactable rooftop hole
     {
@@ -392,9 +422,9 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         bool overlapsLiftNow = (curPlayerMax.x > liftMinNow.x && curPlayerMin.x < liftMaxNow.x &&
                                 curPlayerMax.y > liftMinNow.y && curPlayerMin.y < liftMaxNow.y);
         float playerFootY = currentPlayerPos.y - playerHalfSize.y;
-        float liftTopY = liftMaxNow.y;
-        bool nearLiftTop = std::fabs(playerFootY - liftTopY) <= 30.0f;
-        bool isRidingLiftNow = overlapsLiftNow && nearLiftTop && player.GetVelocity().y <= 0.0f;
+        const float liftDeckY = liftMinNow.y + LIFT_DECK_SURFACE_OFFSET_FROM_MIN_Y;
+        bool nearLiftDeck = std::fabs(playerFootY - liftDeckY) <= 40.0f;
+        bool isRidingLiftNow = overlapsLiftNow && nearLiftDeck && player.GetVelocity().y <= 0.0f;
 
         if (!isRidingLiftNow)
         {
@@ -516,7 +546,8 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
             }
             else if (minOverlap == overlapBottom)
             {
-                player.SetPosition({ currentPlayerPos.x, liftMax.y + playerHalfSize.y });
+                const float deckY = liftMin.y + LIFT_DECK_SURFACE_OFFSET_FROM_MIN_Y;
+                player.SetPosition({ currentPlayerPos.x, deckY + playerHalfSize.y });
             }
 
             currentPlayerPos = player.GetPosition();

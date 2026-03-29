@@ -20,6 +20,7 @@ private:
     std::string m_path;
     long long m_lastWriteTime = 0;
     bool m_hasTimestamp = false;
+    bool m_didResolveConfigPath = false;
     MapObjectConfigData m_data;
 };
 

@@ -28,9 +28,18 @@ public:
     static constexpr float HEIGHT = 1080.0f;
     static constexpr float MIN_X = 8130.0f;
     static constexpr float MIN_Y = 1080.0f;
+    // Vertical wall just left of rooftop entry spawn; blocks moving further west toward map edge.
+    static constexpr float SPAWN_LEFT_WALL_FACE_X = MIN_X + 1340.0f;
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    static constexpr float FLOOR_VERTICAL_ADJUST = -40.0f;
+    static constexpr float FLOOR_SURFACE_Y = MIN_Y + 180.0f + 200.0f + FLOOR_VERTICAL_ADJUST;
+    /// Y-up: feet stand on lift base (above sprite bottom), not on the AABB top.
+    static constexpr float LIFT_DECK_SURFACE_OFFSET_FROM_MIN_Y = 48.0f;
 
     void Initialize();
     void ApplyConfig(const RooftopObjectConfig& cfg);
+
+    void SyncGroundLevelForPlayer(Player& player, Math::Vec2 playerHitboxSize);
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input,
                 Math::Vec2 mouseWorldPos, bool isLeftClickTriggered);
     void Draw(Shader& shader) const;

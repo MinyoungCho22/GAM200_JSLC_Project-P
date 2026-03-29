@@ -2,6 +2,8 @@
 
 #include "Drone.hpp"
 #include "Player.hpp"
+#include "Hallway.hpp"
+#include "Rooftop.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
@@ -16,8 +18,10 @@
 
 constexpr float PI = 3.14159265359f;
 constexpr float GROUND_LEVEL = 180.0f;
-constexpr float ROOFTOP_GROUND_LEVEL = 1460.0f;
 constexpr float ROOFTOP_MIN_Y = 1080.0f;
+constexpr float HALLWAY_MIN_WORLD_X = 1920.0f;
+constexpr float HALLWAY_GROUND_LEVEL = GROUND_LEVEL - 20.0f;
+constexpr float HALLWAY_MAX_WORLD_X = HALLWAY_MIN_WORLD_X + Hallway::WIDTH;
 
 std::default_random_engine drone_generator;
 std::uniform_real_distribution<float> drone_distribution(-1.0f, 1.0f);
@@ -37,7 +41,11 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
 
     if (startPos.y >= ROOFTOP_MIN_Y)
     {
-        m_groundLevel = ROOFTOP_GROUND_LEVEL;
+        m_groundLevel = Rooftop::FLOOR_SURFACE_Y;
+    }
+    else if (startPos.x >= HALLWAY_MIN_WORLD_X && startPos.x < HALLWAY_MAX_WORLD_X)
+    {
+        m_groundLevel = HALLWAY_GROUND_LEVEL;
     }
     else
     {
@@ -244,6 +252,7 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
             m_isAttacking = false;
             m_position = m_attackStartPos;
             m_attackTimer = 0.0f;
+            m_shouldDealDamage = false;
         }
     }
     else if (canDetectPlayer && distSq < effectiveDetectionRangeSq && m_attackCooldown <= 0.0f)

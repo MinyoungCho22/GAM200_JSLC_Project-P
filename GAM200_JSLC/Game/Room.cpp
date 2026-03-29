@@ -109,7 +109,18 @@ void Room::Update(Player& player, double dt, Input::Input& input, Math::Vec2 mou
             pulse.spend(BLIND_TOGGLE_COST);
             m_isBright = true;
         }
+        else
+        {
+            m_blindInteractDenied = true;
+        }
     }
+}
+
+bool Room::ConsumeBlindInteractDenied()
+{
+    const bool v = m_blindInteractDenied;
+    m_blindInteractDenied = false;
+    return v;
 }
 
 void Room::Draw(Shader& textureShader) const

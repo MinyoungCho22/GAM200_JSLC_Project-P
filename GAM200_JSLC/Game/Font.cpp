@@ -158,6 +158,13 @@ CachedTextureInfo Font::PrintToTexture(Shader& atlasShader, const std::string& t
     return newTextureInfo;
 }
 
+CachedTextureInfo Font::CreateTextTexture(Shader& atlasShader, const std::string& text)
+{
+    if (text.empty())
+        return { 0, 0, 0 };
+    return BakeTextToTexture(atlasShader, text);
+}
+
 CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string& text)
 {
     Math::ivec2 textSize = measureText(text);

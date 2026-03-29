@@ -213,8 +213,8 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
 
     auto checkSource = [&](PulseSource& source) {
         if (!source.HasPulse()) return;
-        bool playerOverlaps = Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, source.GetPosition(), source.GetSize());
-        bool cursorOnSource = Collision::CheckPointInAABB(mouseWorldPos, source.GetPosition(), source.GetSize());
+        bool playerOverlaps = Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, source.GetPosition(), source.GetHitboxSize());
+        bool cursorOnSource = Collision::CheckPointInAABB(mouseWorldPos, source.GetPosition(), source.GetHitboxSize());
         if (playerOverlaps && cursorOnSource)
         {
             float dist_sq = (playerHitboxCenter - source.GetPosition()).LengthSq();

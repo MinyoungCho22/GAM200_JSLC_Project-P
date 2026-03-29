@@ -8,6 +8,7 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include <random>
 #include <cmath>
+#include <algorithm>
 
 #pragma warning(push, 0)
 #include <stb_image.h>
@@ -57,6 +58,10 @@ void Robot::Init(Math::Vec2 startPos)
     m_spawnX = startPos.x;
     m_velocity = { 0.0f, 0.0f };
     m_hp = 100.0f;
+    m_maxHp = 100.0f;
+    m_patrolSpeed = 140.0f;
+    m_chaseSpeed = 350.0f;
+    m_windupTime = 0.8f;
     m_state = RobotState::Patrol;
     m_directionX = 1.0f;
 
@@ -97,6 +102,19 @@ void Robot::Init(Math::Vec2 startPos)
     GL::BindVertexArray(0);
 }
 
+void Robot::ApplyUndergroundDifficultyBoost()
+{
+    constexpr float kHpMul = 3.0f;
+    constexpr float kSpeedMul = 1.5f;
+    constexpr float kWindupReduction = 0.3f;
+
+    m_maxHp *= kHpMul;
+    m_hp *= kHpMul;
+    m_patrolSpeed *= kSpeedMul;
+    m_chaseSpeed *= kSpeedMul;
+    m_windupTime = (std::max)(0.05f, m_windupTime - kWindupReduction);
+}
+
 void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& obstacles, float mapMinX, float mapMaxX)
 {
     if (m_state == RobotState::Dead) return;
@@ -127,7 +145,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         {
             m_directionX = 1.0f;
         }
-        m_velocity.x = m_directionX * PATROL_SPEED;
+        m_velocity.x = m_directionX * m_patrolSpeed;
 
         // Transition to Chase if player is detected
         if (distToPlayer < DETECTION_RANGE && heightDiff < 300.0f)
@@ -139,7 +157,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
 
     case RobotState::Chase:
         m_directionX = (playerPos.x > m_position.x) ? 1.0f : -1.0f;
-        m_velocity.x = m_directionX * CHASE_SPEED;
+        m_velocity.x = m_directionX * m_chaseSpeed;
 
         if (distToPlayer < ATTACK_RANGE)
         {
@@ -147,7 +165,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             {
                 DecideAttackPattern();
                 m_state = RobotState::Windup;
-                m_stateTimer = WINDUP_TIME;
+                m_stateTimer = m_windupTime;
                 m_velocity.x = 0.0f;
                 m_hasDealtDamage = false;
             }
@@ -163,7 +181,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
 
     case RobotState::Retreat:
-        m_velocity.x = m_directionX * PATROL_SPEED;
+        m_velocity.x = m_directionX * m_patrolSpeed;
         if (m_stateTimer <= 0.0f)
         {
             m_state = RobotState::Chase;

@@ -61,17 +61,47 @@
       [18239.0, -1685.0],
       [21060.0, -1685.0]
     ],
+    "lights": [
+      {
+        "top_left": [0.0, 0.0],
+        "size": [0.0, 0.0],
+        "sprite": "Asset/Light.png"
+      }
+    ],
     "pulse_sources": [
-      { "top_left": [1949.0, 309.0], "size": [69.0, 255.0] },
-      { "top_left": [4485.0, 309.0], "size": [69.0, 255.0] },
-      { "top_left": [5847.0, 375.0], "size": [1013.0, 477.0] }
+      {
+        "top_left": [1949.0, 309.0],
+        "size": [69.0, 255.0],
+        "sprite": "Asset/Underground_Pulse.png",
+        "hitbox_margin": 28.0
+      },
+      {
+        "top_left": [4485.0, 309.0],
+        "size": [69.0, 255.0],
+        "sprite": "Asset/Underground_Pulse.png",
+        "hitbox_margin": 28.0
+      },
+      {
+        "top_left": [5847.0, 375.0],
+        "size": [0.0, 0.0],
+        "sprite": "Asset/disco_part1.png",
+        "shared_pulse_group": 101,
+        "gauge_anchor": false
+      },
+      {
+        "top_left": [5847.0, 375.0],
+        "size": [0.0, 0.0],
+        "sprite": "Asset/disco_part2.png",
+        "shared_pulse_group": 101,
+        "gauge_anchor": true,
+        "leader_right_gap": 123.0
+      }
     ],
     "obstacles": [
       { "top_left": [939.0, 834.0], "size": [561.0, 162.0] },
-      { "top_left": [1584.0, 627.0], "size": [288.0, 369.0] },
-      { "top_left": [2466.0, 834.0], "size": [561.0, 162.0] },
+      { "top_left": [1584.0, 627.0], "size": [288.0, 369.0], "sprite": "Asset/pannel1.png" },
       { "top_left": [3471.0, 834.0], "size": [561.0, 162.0] },
-      { "top_left": [4116.0, 627.0], "size": [288.0, 369.0] },
+      { "top_left": [4116.0, 627.0], "size": [288.0, 369.0], "sprite": "Asset/pannel2.png" },
       { "top_left": [5235.0, 834.0], "size": [561.0, 162.0] },
       { "top_left": [6825.0, 627.0], "size": [296.0, 369.0] }
     ],

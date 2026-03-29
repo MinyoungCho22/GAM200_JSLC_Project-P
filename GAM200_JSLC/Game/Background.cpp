@@ -63,6 +63,69 @@ void Background::Initialize(const char* texturePath)
     GL::BindVertexArray(0);
 }
 
+void Background::InitializeWithBlackKeyTransparency(const char* texturePath, unsigned char rgbMaxTransparent)
+{
+    stbi_set_flip_vertically_on_load(true);
+    int width = 0;
+    int height = 0;
+    unsigned char* data = stbi_load(texturePath, &width, &height, nullptr, 4);
+    if (!data)
+    {
+        std::cout << "Failed to load texture (keyed): " << texturePath << std::endl;
+        return;
+    }
+
+    m_width = width;
+    m_height = height;
+
+    const int nPix = width * height;
+    for (int i = 0; i < nPix; ++i)
+    {
+        unsigned char* p = data + i * 4;
+        unsigned char m = p[0];
+        if (p[1] > m) m = p[1];
+        if (p[2] > m) m = p[2];
+        if (m <= rgbMaxTransparent)
+            p[3] = 0;
+    }
+
+    GL::GenTextures(1, &m_textureID);
+    GL::BindTexture(GL_TEXTURE_2D, m_textureID);
+    GL::TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    GL::GenerateMipmap(GL_TEXTURE_2D);
+
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    stbi_image_free(data);
+
+    float vertices[] = {
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f,
+        -0.5f, -0.5f,   0.0f, 0.0f,
+
+        -0.5f,  0.5f,   0.0f, 1.0f,
+         0.5f,  0.5f,   1.0f, 1.0f,
+         0.5f, -0.5f,   1.0f, 0.0f
+    };
+
+    GL::GenVertexArrays(1, &VAO);
+    GL::GenBuffers(1, &VBO);
+    GL::BindVertexArray(VAO);
+
+    GL::BindBuffer(GL_ARRAY_BUFFER, VBO);
+    GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    GL::EnableVertexAttribArray(0);
+    GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    GL::EnableVertexAttribArray(1);
+
+    GL::BindVertexArray(0);
+}
+
 void Background::Shutdown()
 {
     GL::DeleteVertexArrays(1, &VAO);

@@ -1,12 +1,40 @@
 #include "MapObjectConfig.hpp"
 #include "../Engine/Logger.hpp"
+#include <filesystem>
 #include <fstream>
 #include <sys/stat.h>
 #include <regex>
 #include <sstream>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace
 {
+namespace fs = std::filesystem;
+
+std::string ResolveMapObjectConfigPathString()
+{
+    try
+    {
+#ifdef _WIN32
+        wchar_t buf[MAX_PATH];
+        const DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
+        if (n > 0 && n < MAX_PATH)
+        {
+            const fs::path candidate = fs::path(buf).parent_path() / "Asset" / "config" / "map_objects.json";
+            if (fs::exists(candidate))
+                return candidate.string();
+        }
+#endif
+    }
+    catch (...) {}
+    return "Asset/config/map_objects.json";
+}
+
 Math::Vec2 ParseVec2(const std::string& objText, const std::string& key, Math::Vec2 fallback)
 {
     std::regex rgx("\"" + key + "\"\\s*:\\s*\\[\\s*([-0-9\\.]+)\\s*,\\s*([-0-9\\.]+)\\s*\\]");
@@ -21,6 +49,30 @@ std::string ParseString(const std::string& objText, const std::string& key, cons
     std::smatch m;
     if (!std::regex_search(objText, m, rgx)) return fallback;
     return m[1].str();
+}
+
+float ParseFloatKey(const std::string& objText, const std::string& key, float fallback)
+{
+    std::regex rgx("\"" + key + "\"\\s*:\\s*([-0-9\\.eE+]+)");
+    std::smatch m;
+    if (!std::regex_search(objText, m, rgx)) return fallback;
+    return std::stof(m[1].str());
+}
+
+int ParseIntKey(const std::string& objText, const std::string& key, int fallback)
+{
+    std::regex rgx("\"" + key + "\"\\s*:\\s*([-0-9]+)");
+    std::smatch m;
+    if (!std::regex_search(objText, m, rgx)) return fallback;
+    return std::stoi(m[1].str());
+}
+
+bool ParseBoolKey(const std::string& objText, const std::string& key, bool fallbackIfMissing)
+{
+    std::regex rgx("\"" + key + "\"\\s*:\\s*(true|false)");
+    std::smatch m;
+    if (!std::regex_search(objText, m, rgx)) return fallbackIfMissing;
+    return m[1].str() == "true";
 }
 
 Math::Vec2 ParseVec2Direct(const std::string& text, Math::Vec2 fallback)
@@ -106,6 +158,11 @@ SpriteRectConfig ParseSpriteRect(const std::string& objText, const SpriteRectCon
     out.size = ParseVec2(objText, "size", fallback.size);
     out.fallbackSize = ParseVec2(objText, "fallback_size", fallback.fallbackSize);
     out.spritePath = ParseString(objText, "sprite", fallback.spritePath);
+    out.hitboxMargin = ParseFloatKey(objText, "hitbox_margin", fallback.hitboxMargin);
+    out.sharedPulseGroup = ParseIntKey(objText, "shared_pulse_group", fallback.sharedPulseGroup);
+    out.gaugeAnchor = ParseBoolKey(objText, "gauge_anchor", fallback.gaugeAnchor);
+    out.leaderRightGap = ParseFloatKey(objText, "leader_right_gap", fallback.leaderRightGap);
+    out.layoutOffsetX = ParseFloatKey(objText, "layout_offset_x", fallback.layoutOffsetX);
     return out;
 }
 
@@ -163,21 +220,24 @@ MapObjectConfigData MapObjectConfig::DefaultData()
 
     data.underground.robotSpawns = { {18239.0f, -1685.0f}, {21060.0f, -1685.0f} };
     data.underground.pulseSources = {
-        { {1949.0f, 309.0f}, {69.0f, 255.0f}, "", {} },
-        { {4485.0f, 309.0f}, {69.0f, 255.0f}, "", {} },
-        { {5847.0f, 375.0f}, {1013.0f, 477.0f}, "", {} }
+        { {1949.0f, 309.0f}, {69.0f, 255.0f}, "Asset/Underground_Pulse.png", {}, 28.0f, 0, true, -1.0f, 0.0f },
+        { {4485.0f, 309.0f}, {69.0f, 255.0f}, "Asset/Underground_Pulse.png", {}, 28.0f, 0, true, -1.0f, 0.0f },
+        { {5847.0f, 375.0f}, {0.0f, 0.0f}, "Asset/disco_part1.png", {}, 0.0f, 101, false, -1.0f, 0.0f },
+        { {5847.0f, 375.0f}, {0.0f, 0.0f}, "Asset/disco_part2.png", {}, 0.0f, 101, true, 123.0f, 0.0f }
     };
     data.underground.obstacles = {
         { {939.0f, 834.0f}, {561.0f, 162.0f}, "", {} },
-        { {1584.0f, 627.0f}, {288.0f, 369.0f}, "", {} },
-        { {2466.0f, 834.0f}, {561.0f, 162.0f}, "", {} },
+        { {1584.0f, 627.0f}, {288.0f, 369.0f}, "Asset/pannel1.png", {} },
         { {3471.0f, 834.0f}, {561.0f, 162.0f}, "", {} },
-        { {4116.0f, 627.0f}, {288.0f, 369.0f}, "", {} },
+        { {4116.0f, 627.0f}, {288.0f, 369.0f}, "Asset/pannel2.png", {} },
         { {5235.0f, 834.0f}, {561.0f, 162.0f}, "", {} },
         { {6825.0f, 627.0f}, {296.0f, 369.0f}, "", {} }
     };
     data.underground.ramps = {
         { {7140.0f, 790.0f}, {780.0f, 300.0f}, "", {} }
+    };
+    data.underground.lights = {
+        { {0.0f, 0.0f}, {0.0f, 0.0f}, "Asset/Light.png", {} }
     };
 
     data.subway.pulseSources = {
@@ -302,6 +362,14 @@ bool MapObjectConfig::ParseFile()
                 next.underground.ramps.push_back(ParseSpriteRect(obj, SpriteRectConfig{}));
         }
 
+        const std::string lightsArray = ExtractArrayByKey(undergroundObj, "lights");
+        if (!lightsArray.empty())
+        {
+            next.underground.lights.clear();
+            for (const auto& obj : SplitTopLevelObjectsInArray(lightsArray))
+                next.underground.lights.push_back(ParseSpriteRect(obj, SpriteRectConfig{}));
+        }
+
         const std::string robotArray = ExtractArrayByKey(undergroundObj, "robot_spawns");
         if (!robotArray.empty())
         {
@@ -340,6 +408,13 @@ bool MapObjectConfig::ParseFile()
 
 bool MapObjectConfig::Load()
 {
+    if (!m_didResolveConfigPath)
+    {
+        m_path = ResolveMapObjectConfigPathString();
+        m_didResolveConfigPath = true;
+        Logger::Instance().Log(Logger::Severity::Info,
+            "MapObjectConfig: config file: %s", m_path.c_str());
+    }
     bool ok = ParseFile();
     long long ts = GetFileWriteTime(m_path);
     if (ts > 0)

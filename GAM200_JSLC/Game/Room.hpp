@@ -45,6 +45,8 @@ public:
 
     bool IsPlayerInBlindArea() const { return m_playerInBlindArea; }
     bool IsBlindOpen() const { return m_isBright; }
+    /// True once after a left-click on the blinds while closed but pulse was too low to open.
+    bool ConsumeBlindInteractDenied();
 
 private:
     std::unique_ptr<Background> m_background;       // Normal (dark) state background
@@ -63,4 +65,5 @@ private:
 
     bool m_isBright = false;           // Current lighting state of the room
     bool m_playerInBlindArea = false;  // Whether the player is overlapping with the blind trigger
+    bool m_blindInteractDenied = false;
 };

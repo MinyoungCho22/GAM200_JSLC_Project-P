@@ -19,6 +19,7 @@
 #include "TraceSystem.hpp" 
 #include "MainMenu.hpp"
 #include "Tutorial.hpp"
+#include "StoryDialogue.hpp"
 #include "Underground.hpp"
 #include "Subway.hpp"
 #include <memory>
@@ -44,7 +45,9 @@ public:
     void DrawForegroundLayer(bool compositeToScreen = true) override;
 
 private:
+    void OpenHallwayDoorLayoutOnly();
     void HandleRoomToHallwayTransition();
+    void ApplyHallwayCameraBounds();
     void HandleHallwayToRooftopTransition();
     void HandleRooftopToUndergroundTransition();
     void HandleUndergroundToSubwayTransition();
@@ -78,6 +81,17 @@ private:
     std::unique_ptr<Rooftop> m_rooftop;
     std::unique_ptr<TraceSystem> m_traceSystem;
     std::unique_ptr<Tutorial> m_tutorial;
+    std::unique_ptr<StoryDialogue> m_storyDialogue;
+    bool m_wasBlindOpen = false;
+    bool m_roomBlindLowPulseStoryDone = false;
+    /// After room->hall door opens: camera updates run, then this delay before hallway lines enqueue.
+    bool m_hallwayEntryStoryPending = false;
+    float m_hallwayEntryStoryDelayRemaining = 0.0f;
+    /// Seconds to wait after gameplay starts before the opening story (player visible first).
+    float m_openingStoryDelayRemaining = 0.0f;
+    bool m_wasNearLiftRooftop = false;
+    bool m_rooftopLiftStoryDone = false;
+    bool m_hallwayFaradayBoxStoryDone = false;
     std::unique_ptr<Underground> m_underground;
     std::unique_ptr<Subway> m_subway;
     std::unique_ptr<Background> m_mouseLeftCursor;
@@ -90,6 +104,8 @@ private:
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;
+    /// After any Ctrl+1..5 map cheat, ambient story lines stay off until a new game (Initialize).
+    bool m_blockAmbientStoryForSession = false;
     float m_cameraSmoothSpeed = 0.1f;
     Sound m_bgm;
 };

@@ -17,6 +17,7 @@
 #include <string>
 #include <sstream>
 #include <cmath>
+#include <algorithm>
 
 #include "../Engine/Sound.hpp"
 
@@ -35,7 +36,14 @@ constexpr float HIDING_S_ICON_OFFSET_Y = 55.0f;
 
 // Hallway entry spawn: slightly right/down from the previous defaults (door + Ctrl+2).
 constexpr float HALLWAY_ENTRY_MARGIN_X = 235.0f + 65.0f;
-constexpr float HALLWAY_ENTRY_POS_Y = GROUND_LEVEL + 60.0f;
+constexpr float HALLWAY_FLOOR_VERTICAL_ADJUST = -20.0f;
+constexpr float HALLWAY_GROUND_LEVEL = GROUND_LEVEL + HALLWAY_FLOOR_VERTICAL_ADJUST;
+constexpr float HALLWAY_ENTRY_POS_Y = GROUND_LEVEL + 60.0f + 50.0f + HALLWAY_FLOOR_VERTICAL_ADJUST;
+
+constexpr float OPENING_STORY_DELAY_SEC = 1.5f;
+constexpr float HALLWAY_ENTRY_STORY_DELAY_SEC = 1.0f;
+/// Caps dt so a single huge tick (first frame, focus loss) does not skip story delays.
+constexpr float STORY_DELAY_DT_CAP = 0.1f;
 
 GameplayState::GameplayState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
@@ -100,6 +108,7 @@ void GameplayState::Initialize()
     m_subway = std::make_unique<Subway>();
     m_subway->Initialize();
     m_subwayAccessed = false;
+    m_rooftopAccessed = false;
 
     // Apply JSON config once at startup (the same path used by hot-reload).
     {
@@ -122,9 +131,9 @@ void GameplayState::Initialize()
 
     // Custom cursor sprites
     m_mouseLeftCursor = std::make_unique<Background>();
-    m_mouseLeftCursor->Initialize("Asset/MouseLeft.png");
+    m_mouseLeftCursor->InitializeWithBlackKeyTransparency("Asset/MouseLeft.png");
     m_mouseRightCursor = std::make_unique<Background>();
-    m_mouseRightCursor->Initialize("Asset/MouseRight.png");
+    m_mouseRightCursor->InitializeWithBlackKeyTransparency("Asset/MouseRight.png");
 
     m_hudFrame = std::make_unique<Background>();
     m_hudFrame->Initialize("Asset/Hud.png");
@@ -154,9 +163,21 @@ void GameplayState::Initialize()
     m_tutorial->AddDroneCrashMessage(*m_font, *m_fontShader);
     m_tutorial->AddLiftMessage(*m_font, *m_fontShader);
 
+    m_storyDialogue = std::make_unique<StoryDialogue>();
+    m_storyDialogue->Initialize();
+    m_openingStoryDelayRemaining = OPENING_STORY_DELAY_SEC;
+    m_wasBlindOpen = false;
+    m_roomBlindLowPulseStoryDone = false;
+    m_wasNearLiftRooftop = false;
+    m_rooftopLiftStoryDone = false;
+    m_hallwayFaradayBoxStoryDone = false;
+    m_hallwayEntryStoryPending = false;
+    m_hallwayEntryStoryDelayRemaining = 0.0f;
+
     m_fpsTimer = 0.0;
     m_frameCount = 0;
     m_isGameOver = false;
+    m_blockAmbientStoryForSession = false;
     m_doorOpened = false;
 
     if (m_bgm.Load("Asset/BackgroundMusic.mp3", true))
@@ -216,6 +237,7 @@ void GameplayState::Initialize()
             {
                 configManager->ApplyLiveStateToDrone("Underground", static_cast<int>(i), undergroundDrones[i]);
             }
+            m_underground->ReapplyEntryTracerDroneAfterLiveState();
 
             auto& subwayDrones = m_subway->GetDrones();
             for (size_t i = 0; i < subwayDrones.size(); ++i)
@@ -265,57 +287,204 @@ void GameplayState::Update(double dt)
         return;
     }
 
-    if (input.IsKeyTriggered(Input::Key::Tab))
+    bool suppressAmbientStoryThisFrame = false;
+    const auto silenceStoryForMapCheat = [&]() {
+        m_blockAmbientStoryForSession = true;
+        suppressAmbientStoryThisFrame = true;
+        if (m_storyDialogue)
+            m_storyDialogue->ResetForNewRun();
+    };
+
+    if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num1))
     {
-        m_isDebugDraw = !m_isDebugDraw;
+        silenceStoryForMapCheat();
+        m_tutorial->DisableAll();
+        m_doorOpened = false;
+        m_rooftopAccessed = false;
+        m_undergroundAccessed = false;
+        m_subwayAccessed = false;
+        m_room->SetRightBoundaryActive(true);
+        m_door->ResetMapTransition();
+        m_rooftopDoor->ResetMapTransition();
+        m_camera.StopAnimation();
+        m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
+        m_cameraSmoothSpeed = 0.1f;
+        player.SetCurrentGroundLevel(GROUND_LEVEL);
+        player.SetPosition({ 200.0f, GROUND_LEVEL + 100.0f });
+        player.ResetVelocity();
+        m_camera.SetPosition(player.GetPosition());
+        engine.GetPostProcess().Settings().exposure = 1.0f;
+        engine.GetPostProcess().Settings().useLightOverlay = false;
+        engine.GetPostProcess().Settings().lightOverlayStrength = 0.0f;
+        m_wasBlindOpen = false;
+        m_roomBlindLowPulseStoryDone = false;
+        m_wasNearLiftRooftop = false;
+        m_rooftopLiftStoryDone = false;
+        m_hallwayFaradayBoxStoryDone = false;
+        m_hallwayEntryStoryPending = false;
+        m_hallwayEntryStoryDelayRemaining = 0.0f;
+        m_openingStoryDelayRemaining = 0.0f;
+        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleported to Room (Ctrl+1)");
     }
 
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num2))
     {
-        if (!m_doorOpened)
+        silenceStoryForMapCheat();
+        m_hallwayEntryStoryPending = false;
+        m_hallwayEntryStoryDelayRemaining = 0.0f;
+
+        const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
+        const float hallwaySpawnY = HALLWAY_GROUND_LEVEL + player.GetSize().y * 0.5f;
+
+        if (m_rooftopAccessed && !m_undergroundAccessed)
         {
             m_tutorial->DisableAll();
-            HandleRoomToHallwayTransition();
-
-            const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
-            player.SetPosition({ hallwaySpawnX, HALLWAY_ENTRY_POS_Y });
+            OpenHallwayDoorLayoutOnly();
+            m_rooftopAccessed = false;
+            m_rooftopDoor->ResetMapTransition();
+            m_camera.StopAnimation();
+            player.SetCurrentGroundLevel(HALLWAY_GROUND_LEVEL);
+            player.SetPosition({ hallwaySpawnX, hallwaySpawnY });
             player.ResetVelocity();
+            player.SetOnGround(true);
+            m_camera.SetPosition(player.GetPosition());
+            Logger::Instance().Log(Logger::Severity::Event, "Cheat: Rooftop -> Hallway (Ctrl+2)");
+        }
+        else if (!m_doorOpened)
+        {
+            m_tutorial->DisableAll();
+            OpenHallwayDoorLayoutOnly();
+
+            player.SetCurrentGroundLevel(HALLWAY_GROUND_LEVEL);
+            player.SetPosition({ hallwaySpawnX, hallwaySpawnY });
+            player.ResetVelocity();
+            player.SetOnGround(true);
+            m_camera.SetPosition(player.GetPosition());
 
             Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleported to Hallway");
+        }
+        else if (m_doorOpened && !m_rooftopAccessed)
+        {
+            m_tutorial->DisableAll();
+            m_room->SetRightBoundaryActive(false);
+            ApplyHallwayCameraBounds();
+            player.SetCurrentGroundLevel(HALLWAY_GROUND_LEVEL);
+            player.SetPosition({ hallwaySpawnX, hallwaySpawnY });
+            player.ResetVelocity();
+            player.SetOnGround(true);
+            m_camera.SetPosition(player.GetPosition());
+            Logger::Instance().Log(Logger::Severity::Event, "Cheat: Room -> Hallway (Ctrl+2, door already open)");
         }
     }
 
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num3))
     {
-        if (!m_rooftopAccessed)
-        {
-            m_tutorial->DisableAll();
-            HandleHallwayToRooftopTransition();
-        }
+        silenceStoryForMapCheat();
+        m_tutorial->DisableAll();
+        m_camera.StopAnimation();
+        m_undergroundAccessed = false;
+        m_subwayAccessed = false;
+        HandleHallwayToRooftopTransition();
+        m_camera.SetPosition(player.GetPosition());
+        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Rooftop (Ctrl+3)");
     }
 
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num4))
     {
-        if (!m_undergroundAccessed)
+        silenceStoryForMapCheat();
+        m_tutorial->DisableAll();
+        m_camera.StopAnimation();
+        if (m_subwayAccessed)
         {
-            m_tutorial->DisableAll();
+            m_subwayAccessed = false;
+            m_rooftopAccessed = true;
+            m_undergroundAccessed = true;
+
+            float playerStartX = Underground::MIN_X + 100.0f;
+            float playerStartY = Underground::MIN_Y + 300.0f;
+            float newGroundLevel = Underground::MIN_Y + 90.0f;
+            player.SetCurrentGroundLevel(newGroundLevel);
+            player.SetPosition({ playerStartX, playerStartY });
+            player.ResetVelocity();
+            player.SetOnGround(false);
+
+            m_camera.SetBounds(
+                { Underground::MIN_X, Underground::MIN_Y },
+                { Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y + Underground::HEIGHT });
+            m_cameraSmoothSpeed = 0.05f;
+            m_camera.SetPosition(player.GetPosition());
+            Logger::Instance().Log(Logger::Severity::Event, "Cheat: Subway -> Underground (Ctrl+4)");
+        }
+        else
+        {
             HandleRooftopToUndergroundTransition();
+            m_camera.SetPosition(player.GetPosition());
+            Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Underground (Ctrl+4)");
         }
     }
 
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num5))
     {
-        if (!m_subwayAccessed)
+        silenceStoryForMapCheat();
+        m_tutorial->DisableAll();
+        m_camera.StopAnimation();
+        m_rooftopAccessed = true;
+        m_undergroundAccessed = true;
+        m_subwayAccessed = true;
+
+        m_underground->ClearAllDrones();
+
+        float playerStartX = Subway::MIN_X + 300.0f;
+        float playerStartY = Subway::MIN_Y + 540.0f;
+        float newGroundLevel = Subway::MIN_Y + 90.0f;
+        player.SetCurrentGroundLevel(newGroundLevel);
+        player.SetPosition({ playerStartX, playerStartY });
+        player.ResetVelocity();
+        player.SetOnGround(false);
+
+        m_camera.SetBounds(
+            { Subway::MIN_X, Subway::MIN_Y },
+            { Subway::MIN_X + Subway::WIDTH, Subway::MIN_Y + Subway::HEIGHT });
+        m_cameraSmoothSpeed = 0.05f;
+        m_camera.SetPosition({ Subway::MIN_X + GAME_WIDTH / 2.0f, Subway::MIN_Y + GAME_HEIGHT / 2.0f });
+        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Subway (Ctrl+5)");
+    }
+
+    const float delayTick = std::min(static_cast<float>(dt), STORY_DELAY_DT_CAP);
+    if (!m_blockAmbientStoryForSession && !suppressAmbientStoryThisFrame && m_openingStoryDelayRemaining > 0.0f && m_storyDialogue && m_font && m_fontShader)
+    {
+        m_openingStoryDelayRemaining -= delayTick;
+        if (m_openingStoryDelayRemaining <= 0.0f)
         {
-            m_tutorial->DisableAll();
-            HandleUndergroundToSubwayTransition();
+            m_openingStoryDelayRemaining = 0.0f;
+            m_storyDialogue->EnqueueOpening(*m_font, *m_fontShader);
         }
+    }
+
+    if (m_storyDialogue)
+    {
+        m_storyDialogue->Update(static_cast<float>(dt), input, *m_font, *m_fontShader);
+        if (m_storyDialogue->IsBlocking())
+        {
+            if (!m_camera.IsAnimating())
+                m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
+            SoundSystem::Instance().Update();
+            return;
+        }
+    }
+
+    if (input.IsKeyTriggered(Input::Key::Tab))
+    {
+        m_isDebugDraw = !m_isDebugDraw;
     }
 
     // Tutorial UI is disabled per request.
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
+
+    const bool hallwayHidingBlocksDroneAttack = m_doorOpened && !m_rooftopAccessed
+        && m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
 
     bool isPressingInteract = input.IsMouseButtonPressed(Input::MouseButton::Right);
     bool isPressingAttack = input.IsMouseButtonPressed(Input::MouseButton::Left);
@@ -389,7 +558,8 @@ void GameplayState::Update(double dt)
             };
 
             checkDrones(droneManager->GetDrones());
-            checkDrones(m_hallway->GetDrones());
+            if (!hallwayHidingBlocksDroneAttack)
+                checkDrones(m_hallway->GetDrones());
             checkDrones(m_rooftop->GetDrones());
             if (m_undergroundAccessed) checkDrones(m_underground->GetDrones());
             if (m_subwayAccessed) checkDrones(m_subway->GetDrones());
@@ -522,6 +692,7 @@ void GameplayState::Update(double dt)
         const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
         player.SetPosition({ hallwaySpawnX, HALLWAY_ENTRY_POS_Y });
         player.ResetVelocity();
+        m_camera.SetPosition(player.GetPosition());
     }
 
     if (m_rooftopDoor->ShouldLoadNextMap() && !m_rooftopAccessed)
@@ -555,6 +726,16 @@ void GameplayState::Update(double dt)
     player.SetHiding(isPlayerHiding);
 
     droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
+
+    if (m_rooftopAccessed && !m_undergroundAccessed && !m_subwayAccessed)
+    {
+        m_rooftop->SyncGroundLevelForPlayer(player, playerHitboxSize);
+    }
+    else if (m_doorOpened && !m_rooftopAccessed)
+    {
+        player.SetCurrentGroundLevel(HALLWAY_GROUND_LEVEL);
+    }
+
     player.Update(dt, input);
 
     if (m_doorOpened)
@@ -594,6 +775,37 @@ void GameplayState::Update(double dt)
     if (!m_rooftopAccessed)
     {
         m_room->Update(player, dt, input, mouseWorldPos);
+
+        if (m_storyDialogue && m_room && !m_blockAmbientStoryForSession && !suppressAmbientStoryThisFrame)
+        {
+            if (m_room->IsBlindOpen() && !m_wasBlindOpen)
+            {
+                m_storyDialogue->EnqueueLines(
+                    {
+                        "It's getting dark... but the whole city is already blacked out.",
+                        "I need to get out of here.",
+                    },
+                    *m_font,
+                    *m_fontShader);
+            }
+            m_wasBlindOpen = m_room->IsBlindOpen();
+
+            if (m_room->ConsumeBlindInteractDenied())
+            {
+                if (!m_roomBlindLowPulseStoryDone && !m_storyDialogue->IsBlocking())
+                {
+                    m_storyDialogue->EnqueueLines(
+                        {
+                            "It won't open.",
+                            "Maybe it needs energy... or pulse.",
+                            "I should find something electrical to recharge from.",
+                        },
+                        *m_font,
+                        *m_fontShader,
+                        [this] { m_roomBlindLowPulseStoryDone = true; });
+                }
+            }
+        }
     }
 
     auto& pp = engine.GetPostProcess();
@@ -622,8 +834,52 @@ void GameplayState::Update(double dt)
     }
 
     m_hallway->Update(dt, playerCenter, playerHitboxSize, player, isPlayerHiding);
+
+    if (m_storyDialogue && m_font && m_fontShader && m_doorOpened && !m_rooftopAccessed && m_hallway
+        && !m_hallwayFaradayBoxStoryDone && !m_storyDialogue->IsBlocking() && !m_blockAmbientStoryForSession
+        && !suppressAmbientStoryThisFrame)
+    {
+        const Math::Vec2 playerPos = player.GetPosition();
+        bool inHidingPromptRange = false;
+        for (const auto& spot : m_hallway->GetHidingSpots())
+        {
+            const Math::Vec2 topCenter = {
+                spot.pos.x,
+                spot.pos.y + spot.size.y * 0.5f + HIDING_S_ICON_OFFSET_Y
+            };
+            if ((playerPos - topCenter).LengthSq() <= HIDING_S_PROMPT_DISTANCE_SQ)
+            {
+                inHidingPromptRange = true;
+                break;
+            }
+        }
+        if (inHidingPromptRange)
+        {
+            m_hallwayFaradayBoxStoryDone = true;
+            m_storyDialogue->EnqueueLines(
+                { "Wait, a Faraday box? This might actually keep us off their radar. Time to disappear." },
+                *m_font,
+                *m_fontShader);
+        }
+    }
+
     m_rooftop->Update(dt, player, playerHitboxSize, input, mouseWorldPos,
                       input.IsMouseButtonTriggered(Input::MouseButton::Left));
+
+    if (m_storyDialogue && m_rooftopAccessed && !m_undergroundAccessed && m_rooftop && !m_blockAmbientStoryForSession
+        && !suppressAmbientStoryThisFrame)
+    {
+        const bool nearLift = m_rooftop->IsPlayerNearLift();
+        if (nearLift && !m_wasNearLiftRooftop && !m_rooftopLiftStoryDone)
+        {
+            m_storyDialogue->EnqueueLines(
+                { "There's no way across unless I activate that lift." },
+                *m_font,
+                *m_fontShader);
+            m_rooftopLiftStoryDone = true;
+        }
+        m_wasNearLiftRooftop = nearLift;
+    }
 
     if (m_undergroundAccessed)
     {
@@ -640,10 +896,13 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            auto* imguiManager = gsm.GetEngine().GetImguiManager();
-            if (!imguiManager || !imguiManager->IsPlayerGodMode())
+            if (!isPlayerHidingInHallway)
             {
-                player.TakeDamage(10.0f);
+                auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                {
+                    player.TakeDamage(10.0f);
+                }
             }
             drone.ResetDamageFlag();
             break;
@@ -711,6 +970,26 @@ void GameplayState::Update(double dt)
         m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
     }
 
+    if (m_hallwayEntryStoryPending && m_storyDialogue && m_font && m_fontShader && !m_blockAmbientStoryForSession
+        && !suppressAmbientStoryThisFrame)
+    {
+        if (m_hallwayEntryStoryDelayRemaining > 0.0f)
+            m_hallwayEntryStoryDelayRemaining -= delayTick;
+        if (m_hallwayEntryStoryDelayRemaining <= 0.0f)
+        {
+            m_hallwayEntryStoryPending = false;
+            m_hallwayEntryStoryDelayRemaining = 0.0f;
+            m_storyDialogue->EnqueueLines(
+                {
+                    "There's a drone. I should avoid it for now.",
+                    "But... maybe I can use this power against it.",
+                    "First, I need to find somewhere to charge.",
+                },
+                *m_font,
+                *m_fontShader);
+        }
+    }
+
     static double cameraLogTimer = 0.0f;
     cameraLogTimer += dt;
     if (cameraLogTimer > 1.0f && m_rooftopAccessed)
@@ -769,26 +1048,32 @@ void GameplayState::Update(double dt)
     SoundSystem::Instance().Update();
 }
 
-void GameplayState::HandleRoomToHallwayTransition()
+void GameplayState::ApplyHallwayCameraBounds()
 {
-    Logger::Instance().Log(Logger::Severity::Event, "Door opened! Hallway accessible.");
-    m_door->ResetMapTransition();
-    m_doorOpened = true;
-
-    m_room->SetRightBoundaryActive(false);
     float cameraViewWidth = GAME_WIDTH;
     float roomToShow = cameraViewWidth * 0.20f;
     float newMinWorldX = GAME_WIDTH - roomToShow;
-
     float worldMaxX = GAME_WIDTH + Hallway::WIDTH;
     float worldMaxY = GAME_HEIGHT;
 
-    m_camera.SetBounds(
-        { newMinWorldX, 0.0f },
-        { worldMaxX, worldMaxY }
-    );
-
+    m_camera.SetBounds({ newMinWorldX, 0.0f }, { worldMaxX, worldMaxY });
     m_cameraSmoothSpeed = 0.1f;
+}
+
+void GameplayState::OpenHallwayDoorLayoutOnly()
+{
+    m_door->ResetMapTransition();
+    m_doorOpened = true;
+    m_room->SetRightBoundaryActive(false);
+    ApplyHallwayCameraBounds();
+}
+
+void GameplayState::HandleRoomToHallwayTransition()
+{
+    Logger::Instance().Log(Logger::Severity::Event, "Door opened! Hallway accessible.");
+    OpenHallwayDoorLayoutOnly();
+    m_hallwayEntryStoryPending = true;
+    m_hallwayEntryStoryDelayRemaining = HALLWAY_ENTRY_STORY_DELAY_SEC;
 }
 
 void GameplayState::HandleHallwayToRooftopTransition()
@@ -796,11 +1081,11 @@ void GameplayState::HandleHallwayToRooftopTransition()
     m_rooftopDoor->ResetMapTransition();
     m_rooftopAccessed = true;
 
-    float newGroundLevel = Rooftop::MIN_Y + GROUND_LEVEL + 200.0f;
+    float newGroundLevel = Rooftop::FLOOR_SURFACE_Y;
     player.SetCurrentGroundLevel(newGroundLevel);
 
     float playerStartX = Rooftop::MIN_X + 1550.0f;
-    float playerStartY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f + 200.0f);
+    float playerStartY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f + 200.0f) + 50.0f;
 
     player.SetPosition({ playerStartX, playerStartY });
     player.ResetVelocity();
@@ -1089,6 +1374,22 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     m_subway->DrawDrones(textureShader);
     droneManager->Draw(textureShader);
 
+    // Pulse charger "remain" bars: draw before the player so the gauge sits behind the character.
+    colorShader->use();
+    colorShader->setMat4("projection", projection);
+    colorShader->setFloat("uAlpha", 0.72f);
+    for (const auto& src : m_room->GetPulseSources())
+        src.DrawRemainGauge(*colorShader);
+    for (const auto& src : m_hallway->GetPulseSources())
+        src.DrawRemainGauge(*colorShader);
+    for (const auto& src : m_rooftop->GetPulseSources())
+        src.DrawRemainGauge(*colorShader);
+    for (const auto& src : m_underground->GetPulseSources())
+        src.DrawRemainGauge(*colorShader);
+    for (const auto& src : m_subway->GetPulseSources())
+        src.DrawRemainGauge(*colorShader);
+    colorShader->setFloat("uAlpha", 1.0f);
+
     textureShader.use();
     textureShader.setMat4("projection", projection);
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
@@ -1203,6 +1504,37 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
     m_tutorial->Draw(*m_font, *m_fontShader);
 
+    if (m_storyDialogue && m_storyDialogue->IsBlocking())
+    {
+        Shader& texForStory = engine.GetTextureShader();
+        m_storyDialogue->Draw(*m_font, texForStory, *m_fontShader, baseProjection);
+
+        // Click hint (matches StoryDialogue box size/margin); keyed cursor texture, no black matte.
+        constexpr float STORY_BOX_WIDTH = 1680.0f;
+        constexpr float STORY_BOX_BOTTOM_MARGIN = 36.0f;
+        if (m_mouseLeftCursor && m_mouseLeftCursor->GetWidth() > 0)
+        {
+            GL::Enable(GL_BLEND);
+            GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            Shader& ts = engine.GetTextureShader();
+            ts.use();
+            ts.setMat4("projection", baseProjection);
+            ts.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+            ts.setBool("flipX", false);
+            ts.setFloat("alpha", 1.0f);
+            ts.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+            ts.setFloat("tintStrength", 0.0f);
+            const float boxCx = GAME_WIDTH * 0.5f;
+            const Math::Vec2 hintPos = { boxCx + STORY_BOX_WIDTH * 0.5f - 72.0f, STORY_BOX_BOTTOM_MARGIN + 50.0f };
+            constexpr float kHintIconSize = 28.0f;
+            Math::Matrix hintModel =
+                Math::Matrix::CreateTranslation(hintPos) * Math::Matrix::CreateScale({ kHintIconSize, kHintIconSize });
+            m_mouseLeftCursor->Draw(ts, hintModel);
+        }
+    }
+
+    GL::Enable(GL_BLEND);
+
     // 10) Cursor
     Engine& engineForCursor = gsm.GetEngine();
     auto& inputForCursor = engineForCursor.GetInput();
@@ -1253,7 +1585,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     bool overLeftClickTarget = false;
     bool overRightClickTarget = false;
 
-    if (!m_isDebugDraw)
+    const bool storyDialogueBlocking = m_storyDialogue && m_storyDialogue->IsBlocking();
+
+    if (!m_isDebugDraw && !storyDialogueBlocking)
     {
         const Math::Vec2 mouseWorldPosForHover = m_lastMouseWorldPos;
         const Math::Vec2 playerHitboxCenter = player.GetHitboxCenter();
@@ -1284,9 +1618,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         auto checkPulseSources = [&](const std::vector<PulseSource>& sources) {
             for (const auto& src : sources)
             {
-                if (!Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, src.GetPosition(), src.GetSize()))
+                if (!Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, src.GetPosition(), src.GetHitboxSize()))
                     continue;
-                if (Collision::CheckPointInAABB(mouseWorldPosForHover, src.GetPosition(), src.GetSize()))
+                if (Collision::CheckPointInAABB(mouseWorldPosForHover, src.GetPosition(), src.GetHitboxSize()))
                     return true;
             }
             return false;
@@ -1498,6 +1832,8 @@ void GameplayState::Shutdown()
     if (m_mouseRightCursor) m_mouseRightCursor->Shutdown();
     if (m_hudFrame) m_hudFrame->Shutdown();
     if (m_hallwayHidingPromptS) m_hallwayHidingPromptS->Shutdown();
+
+    if (m_storyDialogue) m_storyDialogue->Shutdown();
 
     m_bgm.Stop();
 

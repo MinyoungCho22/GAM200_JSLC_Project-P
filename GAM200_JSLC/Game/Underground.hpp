@@ -3,11 +3,10 @@
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseSource.hpp"
-#include "Robot.hpp" 
+#include "Background.hpp"
+#include "Robot.hpp"
 #include <memory>
 #include <vector>
-
-class Background;
 class Shader;
 class Player;
 class DroneManager;
@@ -27,6 +26,7 @@ public:
     {
         Math::Vec2 pos;
         Math::Vec2 size;
+        std::unique_ptr<Background> sprite;
     };
 
     struct Ramp
@@ -36,7 +36,16 @@ public:
         bool isLeftLow;
     };
 
+    struct LightOverlay
+    {
+        Math::Vec2 pos;
+        Math::Vec2 size;
+        std::unique_ptr<Background> sprite;
+    };
+
     void Initialize();
+    /// Entry tracer is drone index 0; live_drone_states.json overwrites HP at startup—call after ApplyLiveStateToDrone.
+    void ReapplyEntryTracerDroneAfterLiveState();
     void ApplyConfig(const UndergroundObjectConfig& cfg);
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
     void Draw(Shader& shader) const;
@@ -63,6 +72,7 @@ private:
     std::unique_ptr<DroneManager> m_droneManager;
 
     std::vector<Obstacle> m_obstacles;
+    std::vector<LightOverlay> m_lights;
     std::vector<Ramp> m_ramps;
     std::vector<PulseSource> m_pulseSources;
     std::vector<Robot> m_robots;

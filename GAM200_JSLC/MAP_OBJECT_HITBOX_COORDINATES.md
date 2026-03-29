@@ -49,23 +49,24 @@ Top-Left 기준
 
 ## Underground
 
-<!-- 지하 맵: 장애물, 램프, 펄스 소스, 적 스폰 -->
+<!-- 지하 맵: 장애물, 램프, 펄스 소스, 적 스폰 -->                
 
 | 오브젝트 | Raw Position (x, y) | Size (w, h) | 비고 |
 |---|---:|---:|---|
 | Underground Map Bounds | (16260.0, -2000.0) | (7920.0, 1080.0) | `Underground::MIN_X`, `Underground::MIN_Y` |
+| Light overlay(s) | `underground.lights[]` in `map_objects.json` | 장애물과 동일 raw 좌표 | 배경 직후 그림, `size` 0×0이면 텍스처 원본 크기 |
 | Obstacle 1 | (939.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
-| Obstacle 2 | (1584.0, 627.0) | (288.0, 369.0) | `AddObstacle` 입력값 |
-| Obstacle 3 | (2466.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
-| Obstacle 4 | (3471.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
-| Obstacle 5 | (4116.0, 627.0) | (288.0, 369.0) | `AddObstacle` 입력값 |
-| Obstacle 6 | (5235.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
-| Obstacle 7 | (6825.0, 627.0) | (296.0, 369.0) | `AddObstacle` 입력값 |
-| Pulse Source 1 | (243.0, 480.0) | (408.0, 132.0) | `AddPulseSource` 입력값 |
-| Pulse Source 2 | (1949.0, 309.0) | (69.0, 255.0) | `AddPulseSource` 입력값 |
-| Pulse Source 3 | (4485.0, 309.0) | (69.0, 255.0) | `AddPulseSource` 입력값 |
-| Pulse Source 4 | (5847.0, 375.0) | (1013.0, 477.0) | `AddPulseSource` 입력값 |
+| Obstacle 2 | (1584.0, 627.0) | (288.0, 369.0) | `pannel1.png` 스프라이트 |
+| Obstacle 3 | (3471.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
+| Obstacle 4 | (4116.0, 627.0) | (288.0, 369.0) | `pannel2.png` 스프라이트 |
+| Obstacle 5 | (5235.0, 834.0) | (561.0, 162.0) | `AddObstacle` 입력값 |
+| Obstacle 6 | (6825.0, 627.0) | (296.0, 369.0) | `AddObstacle` 입력값 |
+| Pulse Source 1 | (1949.0, 309.0) | (69.0, 255.0) | `Underground_Pulse.png`, 상호작용 히트박스 `hitbox_margin` 28 |
+| Pulse Source 2 | (4485.0, 309.0) | (69.0, 255.0) | 동일 |
+| Pulse Source 3a (디스코 좌) | (5847.0, 375.0) | 텍스처 원본 크기 | `disco_part1.png` (`size` 0×0 → 런타임에 픽셀 크기), `shared_pulse_group` 공유 잔량 |
+| Pulse Source 3b (디스코 우) | part1 오른쪽 +123 + `layout_offset_x` | 텍스처 원본 크기 |
 | Ramp 1 | (23400.0, -2010.0) | (780.0, 300.0) | `AddRamp(startX, bottomY, ...)` 입력값 |
+
 
 ### Underground Enemy Spawn Reference
 

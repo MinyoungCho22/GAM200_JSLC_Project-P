@@ -11,6 +11,8 @@ public:
     Background() = default;
 
     void Initialize(const char* texturePath);
+    /// Load as RGBA; pixels darker than threshold become fully transparent (for UI cursors on black mats).
+    void InitializeWithBlackKeyTransparency(const char* texturePath, unsigned char rgbMaxTransparent = 40);
     void Shutdown();
     void Draw(Shader& shader, const Math::Matrix& model);
 
