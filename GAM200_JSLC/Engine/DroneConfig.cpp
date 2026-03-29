@@ -2,15 +2,17 @@
 #include "../Game/Drone.hpp"
 #include "../Engine/Vec2.hpp"
 #include "Logger.hpp"
+#include <filesystem>
 #include <fstream>
 #include <sys/stat.h>
 
+namespace fs = std::filesystem;
+
 DroneConfigManager::DroneConfigManager()
 {
-    // Load default configurations if file doesn't exist
-    if (!LoadFromFile())
+    if (!LoadFromFile("Config/drone_config.json") && !LoadFromFile("drone_config.json"))
     {
-        // Create default drone configurations
+        m_filename = "Config/drone_config.json";
         DroneConfigData defaultConfig;
         defaultConfig.name = "Default Drone";
         AddConfig(defaultConfig);
@@ -22,7 +24,6 @@ DroneConfigManager::DroneConfigManager()
         tracerConfig.detectionRange = 200.0f;
         AddConfig(tracerConfig);
 
-        // Save defaults
         SaveToFile();
     }
 }
@@ -81,14 +82,20 @@ bool DroneConfigManager::LoadFromFile(const std::string& filename)
 
 bool DroneConfigManager::SaveToFile(const std::string& filename)
 {
-    if (filename != m_filename)
+    if (!filename.empty() && filename != m_filename)
         m_filename = filename;
+    if (m_filename.empty())
+        m_filename = "Config/drone_config.json";
 
     try
     {
+        fs::path outPath(m_filename);
+        if (outPath.has_parent_path())
+            fs::create_directories(outPath.parent_path());
+
         nlohmann::json jsonData = m_configs;
 
-        std::ofstream file(filename);
+        std::ofstream file(m_filename);
         if (!file.is_open())
         {
             Logger::Instance().Log(Logger::Severity::Error,
@@ -190,18 +197,26 @@ bool DroneConfigManager::SaveLiveStatesToFile(const std::string& filename)
 {
     try
     {
+        std::string path = filename.empty() ? m_liveStatesFilename : filename;
+        if (path.empty())
+            path = "Config/live_drone_states.json";
+
+        fs::path outPath(path);
+        if (outPath.has_parent_path())
+            fs::create_directories(outPath.parent_path());
+
         nlohmann::json j = m_liveStates;
-        std::ofstream file(filename);
+        std::ofstream file(path);
         if (!file.is_open())
         {
             return false;
         }
         file << j.dump(4); // Pretty print with 4 spaces
         file.close();
-        m_liveStatesFilename = filename;
+        m_liveStatesFilename = path;
         return true;
     }
-    catch (const std::exception& e)
+    catch (const std::exception&)
     {
         return false;
     }
@@ -209,26 +224,33 @@ bool DroneConfigManager::SaveLiveStatesToFile(const std::string& filename)
 
 bool DroneConfigManager::LoadLiveStatesFromFile(const std::string& filename)
 {
-    try
-    {
-        std::ifstream file(filename);
-        if (!file.is_open())
+    auto tryLoad = [this](const std::string& path) -> bool {
+        try
+        {
+            std::ifstream file(path);
+            if (!file.is_open())
+                return false;
+
+            nlohmann::json j;
+            file >> j;
+            file.close();
+
+            m_liveStates = j.get<std::vector<LiveDroneState>>();
+            m_liveStatesFilename = path;
+            return true;
+        }
+        catch (const std::exception&)
         {
             return false;
         }
+    };
 
-        nlohmann::json j;
-        file >> j;
-        file.close();
+    if (!filename.empty())
+        return tryLoad(filename);
 
-        m_liveStates = j.get<std::vector<LiveDroneState>>();
-        m_liveStatesFilename = filename;
+    if (tryLoad("Config/live_drone_states.json"))
         return true;
-    }
-    catch (const std::exception& e)
-    {
-        return false;
-    }
+    return tryLoad("live_drone_states.json");
 }
 
 LiveDroneState* DroneConfigManager::GetLiveState(const std::string& mapName, int droneIndex)

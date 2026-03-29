@@ -3,8 +3,11 @@
 #include "../Game/Robot.hpp"
 #include "../Engine/Vec2.hpp"
 
+#include <filesystem>
 #include <fstream>
 #include <sys/stat.h>
+
+namespace fs = std::filesystem;
 #ifdef _WIN32
     #include <stdlib.h> // for _fullpath
 #else
@@ -12,10 +15,7 @@
     #include <stdlib.h> // for realpath
 #endif
 
-RobotConfigManager::RobotConfigManager()
-    : m_liveStatesFilename("live_robot_states.json")
-{
-}
+RobotConfigManager::RobotConfigManager() = default;
 
 RobotConfigManager::~RobotConfigManager()
 {
@@ -27,9 +27,15 @@ bool RobotConfigManager::SaveLiveStatesToFile(const std::string& filename)
 {
     if (!filename.empty())
         m_liveStatesFilename = filename;
+    if (m_liveStatesFilename.empty())
+        m_liveStatesFilename = "Config/live_robot_states.json";
 
     try
     {
+        fs::path outPath(m_liveStatesFilename);
+        if (outPath.has_parent_path())
+            fs::create_directories(outPath.parent_path());
+
         nlohmann::json j = m_liveStates;
         
         // Get absolute path for logging
@@ -72,50 +78,58 @@ bool RobotConfigManager::SaveLiveStatesToFile(const std::string& filename)
 
 bool RobotConfigManager::LoadLiveStatesFromFile(const std::string& filename)
 {
+    std::vector<std::string> candidates;
     if (!filename.empty())
-        m_liveStatesFilename = filename;
-
-    try
+        candidates.push_back(filename);
+    else
     {
-        // Check if file exists
-        struct stat buffer;
-        if (stat(m_liveStatesFilename.c_str(), &buffer) != 0)
-        {
-            Logger::Instance().Log(Logger::Severity::Debug,
-                "RobotConfig: Config file '%s' does not exist", m_liveStatesFilename.c_str());
-            return false;
-        }
+        candidates.push_back("Config/live_robot_states.json");
+        candidates.push_back("live_robot_states.json");
+    }
 
-        std::ifstream file(m_liveStatesFilename);
-        if (!file.is_open())
+    for (const std::string& path : candidates)
+    {
+        try
+        {
+            struct stat buffer;
+            if (stat(path.c_str(), &buffer) != 0)
+                continue;
+
+            std::ifstream file(path);
+            if (!file.is_open())
+            {
+                Logger::Instance().Log(Logger::Severity::Error,
+                    "RobotConfig: Failed to open file '%s'", path.c_str());
+                continue;
+            }
+
+            nlohmann::json j;
+            file >> j;
+            file.close();
+
+            m_liveStates = j.get<std::vector<LiveRobotState>>();
+            m_liveStatesFilename = path;
+
+            for (auto& state : m_liveStates)
+                state.modified = false;
+
+            Logger::Instance().Log(Logger::Severity::Info,
+                "RobotConfig: Loaded %zu robot states from '%s'", m_liveStates.size(), path.c_str());
+            return true;
+        }
+        catch (const std::exception& e)
         {
             Logger::Instance().Log(Logger::Severity::Error,
-                "RobotConfig: Failed to open file '%s'", m_liveStatesFilename.c_str());
-            return false;
+                "RobotConfig: Failed to load file '%s': %s", path.c_str(), e.what());
         }
-
-        nlohmann::json j;
-        file >> j;
-        file.close();
-
-        m_liveStates = j.get<std::vector<LiveRobotState>>();
-        
-        // Reset modified flags
-        for (auto& state : m_liveStates)
-        {
-            state.modified = false;
-        }
-
-        Logger::Instance().Log(Logger::Severity::Info,
-            "RobotConfig: Loaded %zu robot states from '%s'", m_liveStates.size(), m_liveStatesFilename.c_str());
-        return true;
     }
-    catch (const std::exception& e)
+
+    if (filename.empty())
     {
-        Logger::Instance().Log(Logger::Severity::Error,
-            "RobotConfig: Failed to load file '%s': %s", m_liveStatesFilename.c_str(), e.what());
-        return false;
+        Logger::Instance().Log(Logger::Severity::Debug,
+            "RobotConfig: No live robot state file found (Config/ or legacy path)");
     }
+    return false;
 }
 
 LiveRobotState* RobotConfigManager::GetLiveState(const std::string& mapName, int robotIndex)

@@ -82,14 +82,14 @@ public:
      * @param filename JSON file path
      * @return true if loaded successfully
      */
-    bool LoadFromFile(const std::string& filename = "drone_config.json");
+    bool LoadFromFile(const std::string& filename = "Config/drone_config.json");
 
     /**
      * @brief Save configurations to JSON file
      * @param filename JSON file path
      * @return true if saved successfully
      */
-    bool SaveToFile(const std::string& filename = "drone_config.json");
+    bool SaveToFile(const std::string& filename = "");
 
     /**
      * @brief Get configuration by index
@@ -146,14 +146,14 @@ public:
      * @param filename JSON file path
      * @return true if saved successfully
      */
-    bool SaveLiveStatesToFile(const std::string& filename = "live_drone_states.json");
+    bool SaveLiveStatesToFile(const std::string& filename = "");
 
     /**
      * @brief Load live drone states from JSON file
      * @param filename JSON file path
      * @return true if loaded successfully
      */
-    bool LoadLiveStatesFromFile(const std::string& filename = "live_drone_states.json");
+    bool LoadLiveStatesFromFile(const std::string& filename = "");
 
     /**
      * @brief Get live drone state by map and index
@@ -190,5 +190,5 @@ private:
     bool m_autoSaveEnabled = true;
 
     std::vector<LiveDroneState> m_liveStates;
-    std::string m_liveStatesFilename;
+    std::string m_liveStatesFilename = "Config/live_drone_states.json";
 };

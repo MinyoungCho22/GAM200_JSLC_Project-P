@@ -70,6 +70,17 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <TargetName>No. 99</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(ProjectDir)Release\</OutDir>
+    <IntDir>$(ProjectDir)Release\intermediate\Win32\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(ProjectDir)Release\</OutDir>
+    <IntDir>$(ProjectDir)Release\intermediate\x64\</IntDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -86,6 +97,9 @@
       <AdditionalDependencies>fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)Engine;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)Win32\RefreshAppIcon.ps1"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
@@ -108,8 +122,22 @@
       <AdditionalDependencies>fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)Engine;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)Win32\RefreshAppIcon.ps1"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
-      <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
+      <Command>if not exist "$(OutDir)bin" mkdir "$(OutDir)bin"
+if exist "$(ProjectDir)DLLs\*.dll" xcopy /Y /D "$(ProjectDir)DLLs\*.dll" "$(OutDir)bin\"
+if exist "$(ProjectDir)DLLs\*.dll" xcopy /Y /D "$(ProjectDir)DLLs\*.dll" "$(OutDir)"
+if exist "$(ProjectDir)fmod.dll" copy /Y "$(ProjectDir)fmod.dll" "$(OutDir)bin\"
+if exist "$(ProjectDir)fmod.dll" copy /Y "$(ProjectDir)fmod.dll" "$(OutDir)"
+xcopy /E /I /Y "$(ProjectDir)Asset" "$(OutDir)Asset"
+if not exist "$(OutDir)OpenGL\Shaders" mkdir "$(OutDir)OpenGL\Shaders"
+xcopy /E /I /Y "$(ProjectDir)OpenGL\Shaders" "$(OutDir)OpenGL\Shaders\"
+if not exist "$(OutDir)Config" mkdir "$(OutDir)Config"
+if exist "$(ProjectDir)Config\*.json" xcopy /Y /D "$(ProjectDir)Config\*.json" "$(OutDir)Config\"
+if exist "$(ProjectDir)Asset\config\map_objects.json" copy /Y "$(ProjectDir)Asset\config\map_objects.json" "$(OutDir)Config\map_objects.json"
+if exist "$(OutDir)GAM200JSLC.exe" del /q "$(OutDir)GAM200JSLC.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -128,6 +156,9 @@
       <AdditionalDependencies>fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)Engine;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)Win32\RefreshAppIcon.ps1"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
@@ -150,8 +181,22 @@
       <AdditionalDependencies>fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)Engine;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PreBuildEvent>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)Win32\RefreshAppIcon.ps1"</Command>
+    </PreBuildEvent>
     <PostBuildEvent>
-      <Command>xcopy /y /d "$(ProjectDir)fmod.dll" "$(OutDir)"</Command>
+      <Command>if not exist "$(OutDir)bin" mkdir "$(OutDir)bin"
+if exist "$(ProjectDir)DLLs\*.dll" xcopy /Y /D "$(ProjectDir)DLLs\*.dll" "$(OutDir)bin\"
+if exist "$(ProjectDir)DLLs\*.dll" xcopy /Y /D "$(ProjectDir)DLLs\*.dll" "$(OutDir)"
+if exist "$(ProjectDir)fmod.dll" copy /Y "$(ProjectDir)fmod.dll" "$(OutDir)bin\"
+if exist "$(ProjectDir)fmod.dll" copy /Y "$(ProjectDir)fmod.dll" "$(OutDir)"
+xcopy /E /I /Y "$(ProjectDir)Asset" "$(OutDir)Asset"
+if not exist "$(OutDir)OpenGL\Shaders" mkdir "$(OutDir)OpenGL\Shaders"
+xcopy /E /I /Y "$(ProjectDir)OpenGL\Shaders" "$(OutDir)OpenGL\Shaders\"
+if not exist "$(OutDir)Config" mkdir "$(OutDir)Config"
+if exist "$(ProjectDir)Config\*.json" xcopy /Y /D "$(ProjectDir)Config\*.json" "$(OutDir)Config\"
+if exist "$(ProjectDir)Asset\config\map_objects.json" copy /Y "$(ProjectDir)Asset\config\map_objects.json" "$(OutDir)Config\map_objects.json"
+if exist "$(OutDir)GAM200JSLC.exe" del /q "$(OutDir)GAM200JSLC.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -261,6 +306,9 @@
     <None Include="OpenGL\Shaders\simple.vert" />
     <None Include="OpenGL\Shaders\solid_color.frag" />
     <None Include="OpenGL\Shaders\solid_color.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Win32\app.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

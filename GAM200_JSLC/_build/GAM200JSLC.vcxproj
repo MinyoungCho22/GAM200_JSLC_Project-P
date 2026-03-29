@@ -1,0 +1,865 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{17E0A86A-628A-36AB-A03A-45F8C5345620}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>GAM200JSLC</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">GAM200JSLC.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No. 99</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</GenerateManifest>
+    <LocalDebuggerWorkingDirectory Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug</LocalDebuggerWorkingDirectory>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GAM200JSLC.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">No. 99</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</GenerateManifest>
+    <LocalDebuggerWorkingDirectory Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release</LocalDebuggerWorkingDirectory>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">GAM200JSLC.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">No. 99</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</GenerateManifest>
+    <LocalDebuggerWorkingDirectory Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release</LocalDebuggerWorkingDirectory>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">GAM200JSLC.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">No. 99</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</GenerateManifest>
+    <LocalDebuggerWorkingDirectory Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release</LocalDebuggerWorkingDirectory>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;_CONSOLE;USE_GLEW;IMGUI_IMPL_OPENGL_LOADER_GLEW;SDL_MAIN_HANDLED;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;_CONSOLE;USE_GLEW;IMGUI_IMPL_OPENGL_LOADER_GLEW;SDL_MAIN_HANDLED;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <Message>Refresh app_icon.ico from Asset/Robot_High.png</Message>
+      <Command>setlocal
+cd C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Win32/RefreshAppIcon.ps1
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message>Copying Asset folder...	Copying OpenGL/Shaders...	Copying DLLs to bin/...	Copying glew32.dll next to exe...	Removing stale GAM200JSLC.exe if present...	Copying Config JSON...	Removing glfw/SDL/fmod next to exe (loaded from bin/)...</Message>
+      <Command>setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Asset C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/Asset
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/OpenGL/Shaders C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/OpenGL/Shaders
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/bin
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/DLLs C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/bin
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/DLLs/glew32.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/glew32.dll
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E remove C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/GAM200JSLC.exe
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Config C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/Config
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Asset/config/map_objects.json C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/Config/map_objects.json
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E remove C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/glfw3.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/SDL2.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/fmod.dll
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>opengl32.lib;opengl32.lib;glew32.lib;SDL2.lib;glfw3dll.lib;fmod_vc.lib;delayimp.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/lib;C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/lib/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <DataExecutionPrevention></DataExecutionPrevention>
+      <DelayLoadDLLs>glfw3.dll;SDL2.dll;fmod.dll</DelayLoadDLLs>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
+      <ImportLibrary>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/No. 99.lib</ImportLibrary>
+      <LinkErrorReporting></LinkErrorReporting>
+      <ProgramDataBaseFile>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Debug/No. 99.pdb</ProgramDataBaseFile>
+      <RandomizedBaseAddress></RandomizedBaseAddress>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CONSOLE;USE_GLEW;IMGUI_IMPL_OPENGL_LOADER_GLEW;SDL_MAIN_HANDLED;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CONSOLE;USE_GLEW;IMGUI_IMPL_OPENGL_LOADER_GLEW;SDL_MAIN_HANDLED;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <Message>Refresh app_icon.ico from Asset/Robot_High.png</Message>
+      <Command>setlocal
+cd C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Win32/RefreshAppIcon.ps1
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message>Copying Asset folder...	Copying OpenGL/Shaders...	Copying DLLs to bin/...	Copying glew32.dll next to exe...	Removing stale GAM200JSLC.exe if present...	Copying Config JSON...	Removing glfw/SDL/fmod next to exe (loaded from bin/)...</Message>
+      <Command>setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Asset C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/Asset
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/OpenGL/Shaders C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/OpenGL/Shaders
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/bin
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/DLLs C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/bin
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/DLLs/glew32.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/glew32.dll
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E remove C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/GAM200JSLC.exe
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Config C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/Config
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Asset/config/map_objects.json C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/Config/map_objects.json
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E remove C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/glfw3.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/SDL2.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/fmod.dll
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>opengl32.lib;opengl32.lib;glew32.lib;SDL2.lib;glfw3dll.lib;fmod_vc.lib;delayimp.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/lib;C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/lib/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <DataExecutionPrevention></DataExecutionPrevention>
+      <DelayLoadDLLs>glfw3.dll;SDL2.dll;fmod.dll</DelayLoadDLLs>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
+      <ImportLibrary>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/Release/No. 99.lib</ImportLibrary>
+      <LinkErrorReporting></LinkErrorReporting>
+      <ProgramDataBaseFile>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/No. 99.pdb</ProgramDataBaseFile>
+      <RandomizedBaseAddress></RandomizedBaseAddress>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CONSOLE;USE_GLEW;IMGUI_IMPL_OPENGL_LOADER_GLEW;SDL_MAIN_HANDLED;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CONSOLE;USE_GLEW;IMGUI_IMPL_OPENGL_LOADER_GLEW;SDL_MAIN_HANDLED;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <Message>Refresh app_icon.ico from Asset/Robot_High.png</Message>
+      <Command>setlocal
+cd C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Win32/RefreshAppIcon.ps1
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message>Copying Asset folder...	Copying OpenGL/Shaders...	Copying DLLs to bin/...	Copying glew32.dll next to exe...	Removing stale GAM200JSLC.exe if present...	Copying Config JSON...	Removing glfw/SDL/fmod next to exe (loaded from bin/)...</Message>
+      <Command>setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Asset C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/Asset
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/OpenGL/Shaders C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/OpenGL/Shaders
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/bin
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/DLLs C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/bin
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/DLLs/glew32.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/glew32.dll
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E remove C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/GAM200JSLC.exe
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Config C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/Config
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Asset/config/map_objects.json C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/Config/map_objects.json
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E remove C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/glfw3.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/SDL2.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/fmod.dll
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>opengl32.lib;opengl32.lib;glew32.lib;SDL2.lib;glfw3dll.lib;fmod_vc.lib;delayimp.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/lib;C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/lib/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <DataExecutionPrevention></DataExecutionPrevention>
+      <DelayLoadDLLs>glfw3.dll;SDL2.dll;fmod.dll</DelayLoadDLLs>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
+      <ImportLibrary>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/MinSizeRel/No. 99.lib</ImportLibrary>
+      <LinkErrorReporting></LinkErrorReporting>
+      <ProgramDataBaseFile>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/No. 99.pdb</ProgramDataBaseFile>
+      <RandomizedBaseAddress></RandomizedBaseAddress>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CONSOLE;USE_GLEW;IMGUI_IMPL_OPENGL_LOADER_GLEW;SDL_MAIN_HANDLED;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CONSOLE;USE_GLEW;IMGUI_IMPL_OPENGL_LOADER_GLEW;SDL_MAIN_HANDLED;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\include;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\json;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <Message>Refresh app_icon.ico from Asset/Robot_High.png</Message>
+      <Command>setlocal
+cd C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Win32/RefreshAppIcon.ps1
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message>Copying Asset folder...	Copying OpenGL/Shaders...	Copying DLLs to bin/...	Copying glew32.dll next to exe...	Removing stale GAM200JSLC.exe if present...	Copying Config JSON...	Removing glfw/SDL/fmod next to exe (loaded from bin/)...</Message>
+      <Command>setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Asset C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/Asset
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/OpenGL/Shaders C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/OpenGL/Shaders
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/bin
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/DLLs C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/bin
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/DLLs/glew32.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/glew32.dll
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E remove C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/GAM200JSLC.exe
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_directory C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Config C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/Config
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Asset/config/map_objects.json C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/Config/map_objects.json
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E remove C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/glfw3.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/SDL2.dll C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/fmod.dll
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>opengl32.lib;opengl32.lib;glew32.lib;SDL2.lib;glfw3dll.lib;fmod_vc.lib;delayimp.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/lib;C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/lib/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <DataExecutionPrevention></DataExecutionPrevention>
+      <DelayLoadDLLs>glfw3.dll;SDL2.dll;fmod.dll</DelayLoadDLLs>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
+      <ImportLibrary>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/RelWithDebInfo/No. 99.lib</ImportLibrary>
+      <LinkErrorReporting></LinkErrorReporting>
+      <ProgramDataBaseFile>C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/Release/No. 99.pdb</ProgramDataBaseFile>
+      <RandomizedBaseAddress></RandomizedBaseAddress>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC -BC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build --check-stamp-file C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCXXInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCommonLanguageInclude.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeLanguageInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeRCInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindOpenGL.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPkgConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CMakeCXXLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Linker\MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Linker\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\WindowsPaths.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeCXXCompiler.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeRCCompiler.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeSystem.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC -BC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build --check-stamp-file C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCXXInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCommonLanguageInclude.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeLanguageInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeRCInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindOpenGL.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPkgConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CMakeCXXLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Linker\MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Linker\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\WindowsPaths.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeCXXCompiler.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeRCCompiler.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeSystem.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC -BC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build --check-stamp-file C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCXXInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCommonLanguageInclude.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeLanguageInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeRCInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindOpenGL.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPkgConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CMakeCXXLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Linker\MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Linker\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\WindowsPaths.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeCXXCompiler.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeRCCompiler.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeSystem.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC -BC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build --check-stamp-file C:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/_build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCXXInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCommonLanguageInclude.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeLanguageInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeRCInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Compiler\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindOpenGL.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPkgConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CMakeCXXLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CMakeCommonLinkerInformation.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Linker\MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Linker\MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Linker\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-MSVC-CXX.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows-MSVC.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Platform\WindowsPaths.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeCXXCompiler.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeRCCompiler.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\4.2.3\CMakeSystem.cmake;C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\cmake.verify_globs;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200\RenderingAPI.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Camera.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Collision.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\DebugRenderer.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\DroneConfig.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Engine.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\GameStateManager.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\ImguiManager.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Input.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Logger.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Matrix.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\RobotConfig.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Sound.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Vec2.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Window.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Background.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Door.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Drone.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\DroneManager.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Font.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameOver.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameplayState.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Hallway.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\MainMenu.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\MapObjectConfig.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Player.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseGauge.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseManager.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseSource.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Robot.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Rooftop.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Room.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Setting.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\SplashState.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\StoryDialogue.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Subway.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\TraceSystem.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Tutorial.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Underground.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\PostProcessManager.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shader.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\backends\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\imgui.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\imgui_draw.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\imgui_tables.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\ThirdParty\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\main.cpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200\RGBA.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\CS200\RenderingAPI.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Camera.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Collision.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\DebugRenderer.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\DroneConfig.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Engine.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\GameState.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\GameStateManager.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\ImguiManager.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Input.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Logger.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Matrix.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Rect.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\RobotConfig.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Sound.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Vec2.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\Window.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\fmod.h" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\fmod.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\fmod_codec.h" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\fmod_common.h" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\fmod_dsp.h" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\fmod_dsp_effects.h" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\fmod_errors.h" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Engine\fmod_output.h" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Background.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Door.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Drone.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\DroneManager.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Font.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameOver.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\GameplayState.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Hallway.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\MainMenu.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\MapObjectConfig.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\MapObjectTypes.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Player.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseCore.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseGauge.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseManager.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\PulseSource.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Robot.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Rooftop.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Room.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Setting.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\SplashState.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\StoryDialogue.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Subway.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\TraceSystem.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Tutorial.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Game\Underground.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\GLWrapper.hpp" />
+    <ClInclude Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shader.hpp" />
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\outline.frag">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\outline.vert">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\post.frag">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\post.vert">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\silhouette.frag">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\simple.frag">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\simple.vert">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\solid_color.frag">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\solid_color.vert">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\splash.frag">
+    </None>
+    <None Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\OpenGL\Shaders\splash.vert">
+    </None>
+    <ResourceCompile Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\Win32\app.rc" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="C:\Users\MinyoungCho\Documents\DigiPen\GAM250\GAM200_JSLC_Project-P\GAM200_JSLC\_build\ZERO_CHECK.vcxproj">
+      <Project>{F8ED07FC-E503-367E-91B2-0C3BFE8B1226}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

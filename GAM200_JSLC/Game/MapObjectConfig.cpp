@@ -25,14 +25,22 @@ std::string ResolveMapObjectConfigPathString()
         const DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
         if (n > 0 && n < MAX_PATH)
         {
-            const fs::path candidate = fs::path(buf).parent_path() / "Asset" / "config" / "map_objects.json";
-            if (fs::exists(candidate))
-                return candidate.string();
+            const fs::path exeDir = fs::path(buf).parent_path();
+            const fs::path configJson = exeDir / "Config" / "map_objects.json";
+            if (fs::exists(configJson))
+                return configJson.string();
+            const fs::path assetJson = exeDir / "Asset" / "config" / "map_objects.json";
+            if (fs::exists(assetJson))
+                return assetJson.string();
         }
 #endif
+        if (fs::exists("Config/map_objects.json"))
+            return "Config/map_objects.json";
+        if (fs::exists("Asset/config/map_objects.json"))
+            return "Asset/config/map_objects.json";
     }
     catch (...) {}
-    return "Asset/config/map_objects.json";
+    return "Config/map_objects.json";
 }
 
 Math::Vec2 ParseVec2(const std::string& objText, const std::string& key, Math::Vec2 fallback)
@@ -187,7 +195,7 @@ MapObjectConfig& MapObjectConfig::Instance()
 }
 
 MapObjectConfig::MapObjectConfig()
-    : m_path("Asset/config/map_objects.json"), m_data(DefaultData())
+    : m_path("Config/map_objects.json"), m_data(DefaultData())
 {
 }
 

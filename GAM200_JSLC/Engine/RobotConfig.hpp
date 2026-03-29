@@ -46,14 +46,14 @@ public:
      * @param filename JSON file path
      * @return true if saved successfully
      */
-    bool SaveLiveStatesToFile(const std::string& filename = "live_robot_states.json");
+    bool SaveLiveStatesToFile(const std::string& filename = "");
 
     /**
      * @brief Load live robot states from JSON file
      * @param filename JSON file path
      * @return true if loaded successfully
      */
-    bool LoadLiveStatesFromFile(const std::string& filename = "live_robot_states.json");
+    bool LoadLiveStatesFromFile(const std::string& filename = "");
 
     /**
      * @brief Get live robot state by map and index
@@ -96,6 +96,6 @@ public:
 
 private:
     std::vector<LiveRobotState> m_liveStates;
-    std::string m_liveStatesFilename;
+    std::string m_liveStatesFilename = "Config/live_robot_states.json";
     bool m_autoSaveEnabled = true;
 };

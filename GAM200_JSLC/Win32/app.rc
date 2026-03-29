@@ -1,0 +1,2 @@
+// Application icon: use ID 1 so Explorer uses it as the file icon
+1 ICON "app_icon.ico"

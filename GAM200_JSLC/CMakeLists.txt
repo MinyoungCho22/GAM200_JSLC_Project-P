@@ -42,6 +42,27 @@ file(GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS
 # 3. Create Executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${SHADER_FILES})
 
+# Windows: product name + icon (Robot_High.png → Win32/app_icon.ico via Win32/RefreshAppIcon.ps1; embedded by app.rc)
+if(WIN32)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        OUTPUT_NAME "No. 99"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/Release"
+        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}/Release"
+        RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}/Release"
+    )
+    target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Win32/app.rc")
+    set_source_files_properties(
+        "${CMAKE_CURRENT_SOURCE_DIR}/Win32/app.rc"
+        PROPERTIES OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Win32/app_icon.ico"
+    )
+    # Regenerate ICO before compile so Release always embeds latest Robot_High.png (and rc recompiles).
+    add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/Win32/RefreshAppIcon.ps1"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Refresh app_icon.ico from Asset/Robot_High.png"
+    )
+endif()
+
 # 4. Compiler/Platform Options
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
@@ -166,6 +187,19 @@ else()
     target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_FMOD)
 endif()
 
+# GLEW cannot be delay-loaded (LNK1194: data symbol imports). glew32.dll stays next to the exe.
+# GLFW / SDL2 / FMOD delay-load so they can be resolved from bin/ after SetDllDirectory in main().
+if(WIN32 AND MSVC)
+    target_link_options(${PROJECT_NAME} PRIVATE
+        /DELAYLOAD:glfw3.dll
+        /DELAYLOAD:SDL2.dll
+    )
+    target_link_libraries(${PROJECT_NAME} PRIVATE delayimp.lib)
+    if(ENABLE_FMOD)
+        target_link_options(${PROJECT_NAME} PRIVATE /DELAYLOAD:fmod.dll)
+    endif()
+endif()
+
 # ==========================================================
 # [Post-Build Events (Auto Copy)]
 # ==========================================================
@@ -178,26 +212,64 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMENT "Copying Asset folder..."
 )
 
-# 2. Copy OpenGL
+# 2. Copy OpenGL shaders (runtime path: OpenGL/Shaders/...)
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_CURRENT_SOURCE_DIR}/OpenGL
-    $<TARGET_FILE_DIR:${PROJECT_NAME}>/OpenGL
-    COMMENT "Copying OpenGL folder..."
+    ${CMAKE_CURRENT_SOURCE_DIR}/OpenGL/Shaders
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/OpenGL/Shaders
+    COMMENT "Copying OpenGL/Shaders..."
 )
 
 if(WIN32)
-    # 3. Auto Copy DLL Files (always copy to ensure they are present)
-    file(GLOB DLL_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/DLLs/*.dll")
+    # bin/: GLFW/SDL/FMOD (delay-loaded). Exe dir: glew32.dll (must load before main; GLEW cannot use /DELAYLOAD).
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/DLLs")
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/bin"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/DLLs"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/bin"
+            COMMENT "Copying DLLs to bin/..."
+        )
+    endif()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/DLLs/glew32.dll")
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/DLLs/glew32.dll"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/glew32.dll"
+            COMMENT "Copying glew32.dll next to exe..."
+        )
+    endif()
 
+    # Drop stale exe from before OUTPUT_NAME was set to "No. 99"
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/DLLs"
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>
-        COMMENT "Copying all DLL files..."
+        COMMAND ${CMAKE_COMMAND} -E remove
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/GAM200JSLC.exe"
+        COMMENT "Removing stale GAM200JSLC.exe if present..."
     )
 
-    # Set working directory for Visual Studio debugger so relative paths resolve correctly
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Config")
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/Config"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Config"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/Asset/config/map_objects.json"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Config/map_objects.json"
+            COMMENT "Copying Config JSON..."
+        )
+    endif()
+
+    # Remove applocal copies for DLLs that load from bin/ (glew32 stays next to exe).
+    if(MSVC)
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E remove
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/glfw3.dll"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/SDL2.dll"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/fmod.dll"
+            COMMENT "Removing glfw/SDL/fmod next to exe (loaded from bin/)..."
+        )
+    endif()
+
     set_target_properties(${PROJECT_NAME} PROPERTIES
         VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
     )
