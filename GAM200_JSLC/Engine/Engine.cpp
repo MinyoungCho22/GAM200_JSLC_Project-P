@@ -10,6 +10,8 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp"
 #include <GLFW/glfw3.h>
+#include <cmath>
+#include <cstdlib>
 #include <thread>
 #include <chrono>
 
@@ -303,10 +305,79 @@ void Engine::SyncPostProcessDisplaySize()
 {
     if (!m_window || !m_postProcess)
         return;
+
+#ifdef __APPLE__
+    // After fullscreen -> windowed, Cocoa can report a new window size while the OpenGL
+    // drawable still reports the old (larger) framebuffer for a few polls. Letterboxing
+    // then uses the stale FB size and the scene is squashed into the bottom-right.
+    constexpr int kMaxPasses = 24;
+    for (int pass = 0; pass < kMaxPasses; ++pass)
+    {
+        if (pass > 0)
+            glfwPollEvents();
+
+        int fbW = 0, fbH = 0, winW = 0, winH = 0;
+        float xs = 1.0f, ys = 1.0f;
+        glfwGetFramebufferSize(m_window, &fbW, &fbH);
+        glfwGetWindowSize(m_window, &winW, &winH);
+        glfwGetWindowContentScale(m_window, &xs, &ys);
+
+        if (fbW <= 0 || fbH <= 0)
+            continue;
+
+        if (winW <= 0 || winH <= 0)
+        {
+            m_postProcess->SetDisplaySize(fbW, fbH);
+            return;
+        }
+
+        const int expW = static_cast<int>(std::lround(static_cast<float>(winW) * xs));
+        const int expH = static_cast<int>(std::lround(static_cast<float>(winH) * ys));
+        const int slack = 16;
+
+        const bool matches = std::abs(fbW - expW) <= slack && std::abs(fbH - expH) <= slack;
+        if (matches)
+        {
+            m_postProcess->SetDisplaySize(fbW, fbH);
+            return;
+        }
+
+        // Framebuffer still describes the old fullscreen drawable — trust window * content scale.
+        const bool fbLooksStaleLarge = (fbW > expW + 64 || fbH > expH + 64);
+        if (fbLooksStaleLarge && expW > 0 && expH > 0)
+        {
+            m_postProcess->SetDisplaySize(expW, expH);
+            return;
+        }
+    }
+
+    {
+        int fbW = 0, fbH = 0, winW = 0, winH = 0;
+        float xs = 1.0f, ys = 1.0f;
+        glfwGetFramebufferSize(m_window, &fbW, &fbH);
+        glfwGetWindowSize(m_window, &winW, &winH);
+        glfwGetWindowContentScale(m_window, &xs, &ys);
+        if (winW > 0 && winH > 0 && fbW > 0 && fbH > 0)
+        {
+            const int expW = static_cast<int>(std::lround(static_cast<float>(winW) * xs));
+            const int expH = static_cast<int>(std::lround(static_cast<float>(winH) * ys));
+            const int slack = 16;
+            if (std::abs(fbW - expW) <= slack && std::abs(fbH - expH) <= slack)
+                m_postProcess->SetDisplaySize(fbW, fbH);
+            else if (expW > 0 && expH > 0)
+                m_postProcess->SetDisplaySize(expW, expH);
+        }
+        else if (fbW > 0 && fbH > 0)
+        {
+            m_postProcess->SetDisplaySize(fbW, fbH);
+        }
+    }
+#else
     int fbW = 0, fbH = 0;
     glfwGetFramebufferSize(m_window, &fbW, &fbH);
     if (fbW > 0 && fbH > 0)
         m_postProcess->SetDisplaySize(fbW, fbH);
+#endif
 }
 
 void Engine::ToggleFullscreen()
