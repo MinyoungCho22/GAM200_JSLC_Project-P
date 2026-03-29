@@ -21,6 +21,9 @@ void Rooftop::Initialize()
     m_closeBackground = std::make_unique<Background>();
     m_closeBackground->Initialize("Asset/Rooftop_Close.png");
 
+    m_light = std::make_unique<Background>();
+    m_light->Initialize("Asset/Rooftop_Light.png");
+
     // Initialize the lift platform
     m_lift = std::make_unique<Background>();
     m_lift->Initialize("Asset/Lift.png");
@@ -567,10 +570,12 @@ void Rooftop::Draw(Shader& shader) const
     if (m_isClose)
     {
         m_closeBackground->Draw(shader, model);
+        m_light->Draw(shader, model);
     }
     else
     {
         m_background->Draw(shader, model);
+        m_light->Draw(shader, model);
     }
 
     // Hole sprite: m_isClose(true) once player fills pulse and closes hole.
