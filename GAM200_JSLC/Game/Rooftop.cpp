@@ -129,8 +129,11 @@ void Rooftop::SyncGroundLevelForPlayer(Player& player, Math::Vec2 playerHitboxSi
         playerMaxCheck.y > liftMinCheck.y && playerMinCheck.y < liftMaxCheck.y);
     const float deckY = liftMinCheck.y + LIFT_DECK_SURFACE_OFFSET_FROM_MIN_Y;
     const float playerFootY = playerPos.y - playerHalfCheck.y;
+    const bool horizontallyOnLift = (playerMaxCheck.x > liftMinCheck.x && playerMinCheck.x < liftMaxCheck.x);
     const bool nearLiftDeck = std::fabs(playerFootY - deckY) <= 40.0f;
-    const bool isRidingLiftNow = isTouchingLift && nearLiftDeck && player.GetVelocity().y <= 0.0f;
+    const bool approachingDeckFromAbove = playerFootY >= deckY - 20.0f;
+    const bool isRidingLiftNow = isTouchingLift && horizontallyOnLift && nearLiftDeck &&
+        approachingDeckFromAbove && player.GetVelocity().y <= 0.0f;
 
     const float safeGroundY = FLOOR_SURFACE_Y;
     const float abyssGroundY = MIN_Y - 800.0f;
@@ -139,8 +142,9 @@ void Rooftop::SyncGroundLevelForPlayer(Player& player, Math::Vec2 playerHitboxSi
 
     if (playerPos.x > abyssStartX && playerPos.x < abyssEndX)
     {
-        // Gap area: only the actual lift deck is safe. Otherwise, keep abyss ground to allow falling.
-        if (isRidingLiftNow)
+        // Gap area: the lift deck is safe while standing on it, including countdown before motion.
+        if (isRidingLiftNow || (m_isLiftGapUnlocked && isTouchingLift && horizontallyOnLift &&
+            nearLiftDeck && approachingDeckFromAbove))
         {
             player.SetCurrentGroundLevel(std::max(safeGroundY, deckY));
         }
@@ -508,8 +512,11 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         }
     }
 
-    // AABB Collision with the lift platform (acts as a solid block when not activated/moving)
-    if (!m_isLiftActivated && m_liftState != LiftState::AtDestination)
+    // AABB Collision with the lift platform.
+    // After the player presses the button, the countdown should let the player walk onto the lift
+    // instead of getting blocked by the lift body before boarding.
+    const bool allowBoardingDuringCountdown = m_isLiftGapUnlocked && m_liftState == LiftState::Countdown;
+    if (!m_isLiftActivated && m_liftState != LiftState::AtDestination && !allowBoardingDuringCountdown)
     {
         Math::Vec2 liftHalfSize = m_liftSize * 0.5f;
         Math::Vec2 liftMin = m_liftPos - liftHalfSize;
