@@ -29,15 +29,10 @@ std::string ResolveMapObjectConfigPathString()
             const fs::path configJson = exeDir / "Config" / "map_objects.json";
             if (fs::exists(configJson))
                 return configJson.string();
-            const fs::path assetJson = exeDir / "Asset" / "config" / "map_objects.json";
-            if (fs::exists(assetJson))
-                return assetJson.string();
         }
 #endif
         if (fs::exists("Config/map_objects.json"))
             return "Config/map_objects.json";
-        if (fs::exists("Asset/config/map_objects.json"))
-            return "Asset/config/map_objects.json";
     }
     catch (...) {}
     return "Config/map_objects.json";

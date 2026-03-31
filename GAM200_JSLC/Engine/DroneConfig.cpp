@@ -8,6 +8,17 @@
 
 namespace fs = std::filesystem;
 
+namespace
+{
+long long GetFileWriteStamp(const std::string& path)
+{
+    struct stat st {};
+    if (stat(path.c_str(), &st) != 0)
+        return 0;
+    return (static_cast<long long>(st.st_mtime) << 32) ^ static_cast<long long>(st.st_size);
+}
+}
+
 DroneConfigManager::DroneConfigManager()
 {
     if (!LoadFromFile("Config/drone_config.json") && !LoadFromFile("drone_config.json"))
@@ -70,6 +81,7 @@ bool DroneConfigManager::LoadFromFile(const std::string& filename)
 
         Logger::Instance().Log(Logger::Severity::Info,
             "DroneConfig: Loaded %zu configurations from '%s'", m_configs.size(), filename.c_str());
+        m_configWriteTime = GetFileWriteStamp(filename);
         return true;
     }
     catch (const std::exception& e)
@@ -105,6 +117,7 @@ bool DroneConfigManager::SaveToFile(const std::string& filename)
 
         file << jsonData.dump(4); // Pretty print with 4 spaces
         file.close();
+        m_configWriteTime = GetFileWriteStamp(m_filename);
 
         // Reset modified flags
         for (auto& config : m_configs)
@@ -214,6 +227,7 @@ bool DroneConfigManager::SaveLiveStatesToFile(const std::string& filename)
         file << j.dump(4); // Pretty print with 4 spaces
         file.close();
         m_liveStatesFilename = path;
+        m_liveStatesWriteTime = GetFileWriteStamp(path);
         return true;
     }
     catch (const std::exception&)
@@ -237,6 +251,7 @@ bool DroneConfigManager::LoadLiveStatesFromFile(const std::string& filename)
 
             m_liveStates = j.get<std::vector<LiveDroneState>>();
             m_liveStatesFilename = path;
+            m_liveStatesWriteTime = GetFileWriteStamp(path);
             return true;
         }
         catch (const std::exception&)
@@ -251,6 +266,30 @@ bool DroneConfigManager::LoadLiveStatesFromFile(const std::string& filename)
     if (tryLoad("Config/live_drone_states.json"))
         return true;
     return tryLoad("live_drone_states.json");
+}
+
+bool DroneConfigManager::ReloadConfigIfChanged()
+{
+    if (m_filename.empty())
+        m_filename = "Config/drone_config.json";
+
+    const long long current = GetFileWriteStamp(m_filename);
+    if (current <= 0 || current == m_configWriteTime)
+        return false;
+
+    return LoadFromFile(m_filename);
+}
+
+bool DroneConfigManager::ReloadLiveStatesIfChanged()
+{
+    if (m_liveStatesFilename.empty())
+        m_liveStatesFilename = "Config/live_drone_states.json";
+
+    const long long current = GetFileWriteStamp(m_liveStatesFilename);
+    if (current <= 0 || current == m_liveStatesWriteTime)
+        return false;
+
+    return LoadLiveStatesFromFile(m_liveStatesFilename);
 }
 
 LiveDroneState* DroneConfigManager::GetLiveState(const std::string& mapName, int droneIndex)

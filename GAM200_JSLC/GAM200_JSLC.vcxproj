@@ -74,11 +74,11 @@
     <TargetName>No. 99</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(ProjectDir)Release\</OutDir>
+    <OutDir>$(ProjectDir)build\Release\</OutDir>
     <IntDir>$(ProjectDir)Release\intermediate\Win32\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(ProjectDir)Release\</OutDir>
+    <OutDir>$(ProjectDir)build\Release\</OutDir>
     <IntDir>$(ProjectDir)Release\intermediate\x64\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -132,11 +132,17 @@ if exist "$(ProjectDir)DLLs\*.dll" xcopy /Y /D "$(ProjectDir)DLLs\*.dll" "$(OutD
 if exist "$(ProjectDir)fmod.dll" copy /Y "$(ProjectDir)fmod.dll" "$(OutDir)bin\"
 if exist "$(ProjectDir)fmod.dll" copy /Y "$(ProjectDir)fmod.dll" "$(OutDir)"
 xcopy /E /I /Y "$(ProjectDir)Asset" "$(OutDir)Asset"
+if exist "$(OutDir)Asset\config" rmdir /S /Q "$(OutDir)Asset\config"
+if exist "$(OutDir)OpenGL" rmdir /S /Q "$(OutDir)OpenGL"
 if not exist "$(OutDir)OpenGL\Shaders" mkdir "$(OutDir)OpenGL\Shaders"
 xcopy /E /I /Y "$(ProjectDir)OpenGL\Shaders" "$(OutDir)OpenGL\Shaders\"
 if not exist "$(OutDir)Config" mkdir "$(OutDir)Config"
 if exist "$(ProjectDir)Config\*.json" xcopy /Y /D "$(ProjectDir)Config\*.json" "$(OutDir)Config\"
-if exist "$(ProjectDir)Asset\config\map_objects.json" copy /Y "$(ProjectDir)Asset\config\map_objects.json" "$(OutDir)Config\map_objects.json"
+if exist "$(OutDir)imgui.ini" del /q "$(OutDir)imgui.ini"
+if exist "$(OutDir)drone_config.json" del /q "$(OutDir)drone_config.json"
+if exist "$(OutDir)live_drone_states.json" del /q "$(OutDir)live_drone_states.json"
+if exist "$(OutDir)live_robot_states.json" del /q "$(OutDir)live_robot_states.json"
+if exist "$(OutDir)map_objects.json" del /q "$(OutDir)map_objects.json"
 if exist "$(OutDir)GAM200JSLC.exe" del /q "$(OutDir)GAM200JSLC.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -191,11 +197,17 @@ if exist "$(ProjectDir)DLLs\*.dll" xcopy /Y /D "$(ProjectDir)DLLs\*.dll" "$(OutD
 if exist "$(ProjectDir)fmod.dll" copy /Y "$(ProjectDir)fmod.dll" "$(OutDir)bin\"
 if exist "$(ProjectDir)fmod.dll" copy /Y "$(ProjectDir)fmod.dll" "$(OutDir)"
 xcopy /E /I /Y "$(ProjectDir)Asset" "$(OutDir)Asset"
+if exist "$(OutDir)Asset\config" rmdir /S /Q "$(OutDir)Asset\config"
+if exist "$(OutDir)OpenGL" rmdir /S /Q "$(OutDir)OpenGL"
 if not exist "$(OutDir)OpenGL\Shaders" mkdir "$(OutDir)OpenGL\Shaders"
 xcopy /E /I /Y "$(ProjectDir)OpenGL\Shaders" "$(OutDir)OpenGL\Shaders\"
 if not exist "$(OutDir)Config" mkdir "$(OutDir)Config"
 if exist "$(ProjectDir)Config\*.json" xcopy /Y /D "$(ProjectDir)Config\*.json" "$(OutDir)Config\"
-if exist "$(ProjectDir)Asset\config\map_objects.json" copy /Y "$(ProjectDir)Asset\config\map_objects.json" "$(OutDir)Config\map_objects.json"
+if exist "$(OutDir)imgui.ini" del /q "$(OutDir)imgui.ini"
+if exist "$(OutDir)drone_config.json" del /q "$(OutDir)drone_config.json"
+if exist "$(OutDir)live_drone_states.json" del /q "$(OutDir)live_drone_states.json"
+if exist "$(OutDir)live_robot_states.json" del /q "$(OutDir)live_robot_states.json"
+if exist "$(OutDir)map_objects.json" del /q "$(OutDir)map_objects.json"
 if exist "$(OutDir)GAM200JSLC.exe" del /q "$(OutDir)GAM200JSLC.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>

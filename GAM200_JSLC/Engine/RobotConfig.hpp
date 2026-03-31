@@ -54,6 +54,7 @@ public:
      * @return true if loaded successfully
      */
     bool LoadLiveStatesFromFile(const std::string& filename = "");
+    bool ReloadLiveStatesIfChanged();
 
     /**
      * @brief Get live robot state by map and index
@@ -97,5 +98,6 @@ public:
 private:
     std::vector<LiveRobotState> m_liveStates;
     std::string m_liveStatesFilename = "Config/live_robot_states.json";
+    long long m_liveStatesWriteTime = 0;
     bool m_autoSaveEnabled = true;
 };

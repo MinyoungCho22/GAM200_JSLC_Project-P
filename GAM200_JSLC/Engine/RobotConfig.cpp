@@ -8,6 +8,17 @@
 #include <sys/stat.h>
 
 namespace fs = std::filesystem;
+
+namespace
+{
+long long GetFileWriteStamp(const std::string& path)
+{
+    struct stat st {};
+    if (stat(path.c_str(), &st) != 0)
+        return 0;
+    return (static_cast<long long>(st.st_mtime) << 32) ^ static_cast<long long>(st.st_size);
+}
+}
 #ifdef _WIN32
     #include <stdlib.h> // for _fullpath
 #else
@@ -66,6 +77,7 @@ bool RobotConfigManager::SaveLiveStatesToFile(const std::string& filename)
         Logger::Instance().Log(Logger::Severity::Info,
             "RobotConfig: Saved %zu robot states to '%s' (absolute: %s)", 
             m_liveStates.size(), m_liveStatesFilename.c_str(), absolutePath);
+        m_liveStatesWriteTime = GetFileWriteStamp(m_liveStatesFilename);
         return true;
     }
     catch (const std::exception& e)
@@ -109,6 +121,7 @@ bool RobotConfigManager::LoadLiveStatesFromFile(const std::string& filename)
 
             m_liveStates = j.get<std::vector<LiveRobotState>>();
             m_liveStatesFilename = path;
+            m_liveStatesWriteTime = GetFileWriteStamp(path);
 
             for (auto& state : m_liveStates)
                 state.modified = false;
@@ -130,6 +143,18 @@ bool RobotConfigManager::LoadLiveStatesFromFile(const std::string& filename)
             "RobotConfig: No live robot state file found (Config/ or legacy path)");
     }
     return false;
+}
+
+bool RobotConfigManager::ReloadLiveStatesIfChanged()
+{
+    if (m_liveStatesFilename.empty())
+        m_liveStatesFilename = "Config/live_robot_states.json";
+
+    const long long current = GetFileWriteStamp(m_liveStatesFilename);
+    if (current <= 0 || current == m_liveStatesWriteTime)
+        return false;
+
+    return LoadLiveStatesFromFile(m_liveStatesFilename);
 }
 
 LiveRobotState* RobotConfigManager::GetLiveState(const std::string& mapName, int robotIndex)

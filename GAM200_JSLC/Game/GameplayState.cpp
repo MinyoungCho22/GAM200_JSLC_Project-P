@@ -401,8 +401,8 @@ void GameplayState::Update(double dt)
             m_undergroundAccessed = true;
 
             float playerStartX = Underground::MIN_X + 100.0f;
-            float playerStartY = Underground::MIN_Y + 300.0f;
-            float newGroundLevel = Underground::MIN_Y + 90.0f;
+            float playerStartY = Underground::MIN_Y + 270.0f;
+            float newGroundLevel = Underground::MIN_Y + 75.0f;
             player.SetCurrentGroundLevel(newGroundLevel);
             player.SetPosition({ playerStartX, playerStartY });
             player.ResetVelocity();
@@ -487,7 +487,11 @@ void GameplayState::Update(double dt)
         && m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
 
     bool isPressingInteract = input.IsMouseButtonPressed(Input::MouseButton::Right);
-    bool isPressingAttack = input.IsMouseButtonPressed(Input::MouseButton::Left);
+    const bool isPlayerHidingInRoomForAttack = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool isPlayerHidingInHallwayForAttack = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool crouchHidingBlocksAttack = player.IsCrouching() &&
+        (isPlayerHidingInRoomForAttack || isPlayerHidingInHallwayForAttack);
+    bool isPressingAttack = input.IsMouseButtonPressed(Input::MouseButton::Left) && !crouchHidingBlocksAttack;
 
     // Get mouse world position
     double mouseScreenX, mouseScreenY;
@@ -504,6 +508,46 @@ void GameplayState::Update(double dt)
         m_rooftop->ApplyConfig(cfg.rooftop);
         m_underground->ApplyConfig(cfg.underground);
         m_subway->ApplyConfig(cfg.subway);
+    }
+
+    auto configManager = gsm.GetEngine().GetDroneConfigManager();
+    if (configManager)
+    {
+        configManager->ReloadConfigIfChanged();
+        if (configManager->ReloadLiveStatesIfChanged())
+        {
+            for (size_t i = 0; i < droneManager->GetDrones().size(); ++i)
+                configManager->ApplyLiveStateToDrone("Main", static_cast<int>(i), const_cast<Drone&>(droneManager->GetDrones()[i]));
+
+            auto& hallwayDrones = m_hallway->GetDrones();
+            for (size_t i = 0; i < hallwayDrones.size(); ++i)
+                configManager->ApplyLiveStateToDrone("Hallway", static_cast<int>(i), hallwayDrones[i]);
+
+            auto& rooftopDrones = m_rooftop->GetDrones();
+            for (size_t i = 0; i < rooftopDrones.size(); ++i)
+                configManager->ApplyLiveStateToDrone("Rooftop", static_cast<int>(i), rooftopDrones[i]);
+
+            auto& undergroundDrones = m_underground->GetDrones();
+            for (size_t i = 0; i < undergroundDrones.size(); ++i)
+                configManager->ApplyLiveStateToDrone("Underground", static_cast<int>(i), undergroundDrones[i]);
+            m_underground->ReapplyEntryTracerDroneAfterLiveState();
+
+            auto& subwayDrones = m_subway->GetDrones();
+            for (size_t i = 0; i < subwayDrones.size(); ++i)
+                configManager->ApplyLiveStateToDrone("Subway", static_cast<int>(i), subwayDrones[i]);
+        }
+    }
+
+    auto robotConfigManager = gsm.GetEngine().GetRobotConfigManager();
+    if (robotConfigManager && robotConfigManager->ReloadLiveStatesIfChanged())
+    {
+        auto& undergroundRobots = m_underground->GetRobots();
+        for (size_t i = 0; i < undergroundRobots.size(); ++i)
+            robotConfigManager->ApplyLiveStateToRobot("Underground", static_cast<int>(i), undergroundRobots[i]);
+
+        auto& subwayRobots = m_subway->GetRobots();
+        for (size_t i = 0; i < subwayRobots.size(); ++i)
+            robotConfigManager->ApplyLiveStateToRobot("Subway", static_cast<int>(i), subwayRobots[i]);
     }
 
     const float PULSE_COST_PER_SECOND = 1.0f;
@@ -1113,9 +1157,9 @@ void GameplayState::HandleRooftopToUndergroundTransition()
     m_rooftop->ClearAllDrones();
 
     float playerStartX = Underground::MIN_X + 100.0f;
-    float playerStartY = Underground::MIN_Y + 300.0f;
+    float playerStartY = Underground::MIN_Y + 270.0f;
 
-    float newGroundLevel = Underground::MIN_Y + 90.0f;
+    float newGroundLevel = Underground::MIN_Y + 75.0f;
     player.SetCurrentGroundLevel(newGroundLevel);
 
     player.SetPosition({ playerStartX, playerStartY });

@@ -154,6 +154,8 @@ public:
      * @return true if loaded successfully
      */
     bool LoadLiveStatesFromFile(const std::string& filename = "");
+    bool ReloadConfigIfChanged();
+    bool ReloadLiveStatesIfChanged();
 
     /**
      * @brief Get live drone state by map and index
@@ -191,4 +193,6 @@ private:
 
     std::vector<LiveDroneState> m_liveStates;
     std::string m_liveStatesFilename = "Config/live_drone_states.json";
+    long long m_configWriteTime = 0;
+    long long m_liveStatesWriteTime = 0;
 };

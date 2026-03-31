@@ -6,6 +6,7 @@ project(GAM200JSLC VERSION 1.0 LANGUAGES CXX)
 # 2. C++ Standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ENABLE_FMOD "Enable FMOD audio if platform libraries are available" ON)
 
@@ -46,9 +47,9 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${SHADER_FILES})
 if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         OUTPUT_NAME "No. 99"
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/Release"
-        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_SOURCE_DIR}/Release"
-        RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_SOURCE_DIR}/Release"
+        # Keep runtime outputs inside the CMake build tree:
+        #   build/Debug, build/Release, ...
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     )
     target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Win32/app.rc")
     set_source_files_properties(
@@ -209,15 +210,21 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_CURRENT_SOURCE_DIR}/Asset
     $<TARGET_FILE_DIR:${PROJECT_NAME}>/Asset
+    COMMAND ${CMAKE_COMMAND} -E remove_directory
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/Asset/config
     COMMENT "Copying Asset folder..."
 )
 
-# 2. Copy OpenGL shaders (runtime path: OpenGL/Shaders/...)
+# 2. Copy only shader runtime files (runtime path: OpenGL/Shaders/...)
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E remove_directory
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/OpenGL
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/OpenGL/Shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_CURRENT_SOURCE_DIR}/OpenGL/Shaders
-    $<TARGET_FILE_DIR:${PROJECT_NAME}>/OpenGL/Shaders
-    COMMENT "Copying OpenGL/Shaders..."
+        ${CMAKE_CURRENT_SOURCE_DIR}/OpenGL/Shaders
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/OpenGL/Shaders
+    COMMENT "Copying OpenGL/Shaders only..."
 )
 
 if(WIN32)
@@ -249,12 +256,17 @@ if(WIN32)
 
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Config")
         add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Config"
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/Config"
                 "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Config"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_CURRENT_SOURCE_DIR}/Asset/config/map_objects.json"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Config/map_objects.json"
+            COMMAND ${CMAKE_COMMAND} -E remove
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/imgui.ini"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/drone_config.json"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/live_drone_states.json"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/live_robot_states.json"
+                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/map_objects.json"
             COMMENT "Copying Config JSON..."
         )
     endif()

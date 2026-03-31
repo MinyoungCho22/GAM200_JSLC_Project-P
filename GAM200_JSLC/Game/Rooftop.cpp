@@ -127,25 +127,22 @@ void Rooftop::SyncGroundLevelForPlayer(Player& player, Math::Vec2 playerHitboxSi
 
     bool isTouchingLift = (playerMaxCheck.x > liftMinCheck.x && playerMinCheck.x < liftMaxCheck.x &&
         playerMaxCheck.y > liftMinCheck.y && playerMinCheck.y < liftMaxCheck.y);
-    const bool horizontallyOnLift = (playerMaxCheck.x > liftMinCheck.x && playerMinCheck.x < liftMaxCheck.x);
+    const float deckY = liftMinCheck.y + LIFT_DECK_SURFACE_OFFSET_FROM_MIN_Y;
+    const float playerFootY = playerPos.y - playerHalfCheck.y;
+    const bool nearLiftDeck = std::fabs(playerFootY - deckY) <= 40.0f;
+    const bool isRidingLiftNow = isTouchingLift && nearLiftDeck && player.GetVelocity().y <= 0.0f;
 
     const float safeGroundY = FLOOR_SURFACE_Y;
     const float abyssGroundY = MIN_Y - 800.0f;
-    const float abyssStartX = m_liftInitialX - (m_liftSize.x / 2.0f) + 20.0f;
-    const float abyssEndX = m_liftTargetX + (m_liftSize.x / 2.0f) - 20.0f;
+    const float abyssStartX = m_liftInitialX - (m_liftSize.x / 2.0f) + 90.0f;
+    const float abyssEndX = m_liftTargetX + (m_liftSize.x / 2.0f) + 50.0f;
 
     if (playerPos.x > abyssStartX && playerPos.x < abyssEndX)
     {
-        // While riding, ground matches the lift base deck (above image bottom), not the AABB top.
-        if (isTouchingLift || (m_isLiftActivated && horizontallyOnLift))
+        // Gap area: only the actual lift deck is safe. Otherwise, keep abyss ground to allow falling.
+        if (isRidingLiftNow)
         {
-            if (m_isLiftActivated)
-            {
-                const float deckY = liftMinCheck.y + LIFT_DECK_SURFACE_OFFSET_FROM_MIN_Y;
-                player.SetCurrentGroundLevel(std::max(safeGroundY, deckY));
-            }
-            else
-                player.SetCurrentGroundLevel(safeGroundY);
+            player.SetCurrentGroundLevel(std::max(safeGroundY, deckY));
         }
         else
         {
@@ -187,8 +184,8 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         }
     }
 
-    const float abyssStartX = m_liftInitialX - (m_liftSize.x / 2.0f) + 20.0f;
-    const float abyssEndX = m_liftTargetX + (m_liftSize.x / 2.0f) - 20.0f;
+    const float abyssStartX = m_liftInitialX - (m_liftSize.x / 2.0f) + 90.0f;
+    const float abyssEndX = m_liftTargetX + (m_liftSize.x / 2.0f) + 50.0f;
 
     Math::Vec2 liftHalfForAbyss = m_liftSize / 2.0f;
     Math::Vec2 liftMinForAbyss = m_liftPos - liftHalfForAbyss;
@@ -284,7 +281,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
                 pulse.spend(LIFT_COST);
                 m_liftState = LiftState::Countdown;
                 m_liftCountdown = 3.0f;
-                m_isLiftActivated = true;
+                m_isLiftActivated = false;
                 m_isLiftGapUnlocked = true;
 
                 // Determine movement direction based on current position relative to start/target
@@ -341,18 +338,24 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
 
     // Moving Platform Physics: Move the player horizontally if they are standing on the lift
     float deltaX = m_liftPos.x - oldLiftX;
-    if (m_isLiftActivated)
     {
         Math::Vec2 liftHalfSize = m_liftSize * 0.5f;
         Math::Vec2 liftMin = m_liftPos - liftHalfSize;
         Math::Vec2 liftMax = m_liftPos + liftHalfSize;
 
         Math::Vec2 playerHalfSize = playerHitboxSize * 0.5f;
-        Math::Vec2 playerMin = playerPos - playerHalfSize;
-        Math::Vec2 playerMax = playerPos + playerHalfSize;
+        Math::Vec2 livePlayerPos = player.GetPosition();
+        Math::Vec2 playerMin = livePlayerPos - playerHalfSize;
+        Math::Vec2 playerMax = livePlayerPos + playerHalfSize;
 
-        if (playerMax.x > liftMin.x && playerMin.x < liftMax.x &&
-            playerMax.y > liftMin.y && playerMin.y < liftMax.y)
+        const bool overlapsLift = (playerMax.x > liftMin.x && playerMin.x < liftMax.x &&
+            playerMax.y > liftMin.y && playerMin.y < liftMax.y);
+        const float deckY = liftMin.y + LIFT_DECK_SURFACE_OFFSET_FROM_MIN_Y;
+        const float playerFootY = livePlayerPos.y - playerHalfSize.y;
+        const bool nearLiftDeck = std::fabs(playerFootY - deckY) <= 40.0f;
+        m_isLiftActivated = overlapsLift && nearLiftDeck && player.GetVelocity().y <= 0.0f;
+
+        if (m_isLiftActivated)
         {
             player.SetPosition({ player.GetPosition().x + deltaX, player.GetPosition().y });
         }
@@ -523,6 +526,14 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
             float overlapTop = playerMax.y - liftMin.y;
             float overlapBottom = liftMax.y - playerMin.y;
 
+            const float deckY = liftMin.y + LIFT_DECK_SURFACE_OFFSET_FROM_MIN_Y;
+            const float playerFootY = currentPlayerPos.y - playerHalfSize.y;
+            const bool canLandOnDeck = (player.GetVelocity().y <= 0.0f) && (playerFootY >= deckY - 30.0f);
+            if (!canLandOnDeck)
+            {
+                overlapBottom = 1e9f;
+            }
+
             // Before lift unlock, do not allow "landing on lift top" from above.
             // This prevents double-jump + drift bypass over the virtual gap walls.
             if (!m_isLiftGapUnlocked)
@@ -690,6 +701,15 @@ void Rooftop::Shutdown()
 
 void Rooftop::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
+    // Visualize actual abyss/fall range regardless of unlock state.
+    const float abyssWallHeight = 5000.0f;
+    const float abyssWallWidth = 24.0f;
+    const float abyssWallCenterY = MIN_Y + HEIGHT * 0.5f;
+    const float abyssStartX = m_liftInitialX - (m_liftSize.x * 0.5f) + 90.0f;
+    const float abyssEndX = m_liftTargetX + (m_liftSize.x * 0.5f) + 50.0f;
+    debugRenderer.DrawBox(colorShader, { abyssStartX, abyssWallCenterY }, { abyssWallWidth, abyssWallHeight }, { 1.0f, 0.85f });
+    debugRenderer.DrawBox(colorShader, { abyssEndX, abyssWallCenterY }, { abyssWallWidth, abyssWallHeight }, { 1.0f, 0.85f });
+
     if (m_isLiftGapUnlocked)
     {
         return;
@@ -699,8 +719,8 @@ void Rooftop::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
     const float wallHeight = 5000.0f;
     const float wallWidth = 30.0f;
     const float wallCenterY = MIN_Y + HEIGHT * 0.5f;
-    const float wallLeftX = m_liftInitialX - (m_liftSize.x * 0.5f) + 20.0f;
-    const float wallRightX = m_liftTargetX + (m_liftSize.x * 0.5f) - 20.0f;
+    const float wallLeftX = m_liftInitialX - (m_liftSize.x * 0.5f) + 90.0f;
+    const float wallRightX = m_liftTargetX + (m_liftSize.x * 0.5f) + 50.0f;
 
     debugRenderer.DrawBox(colorShader, { wallLeftX, wallCenterY }, { wallWidth, wallHeight }, { 0.0f, 1.0f });
     debugRenderer.DrawBox(colorShader, { wallRightX, wallCenterY }, { wallWidth, wallHeight }, { 0.0f, 1.0f });

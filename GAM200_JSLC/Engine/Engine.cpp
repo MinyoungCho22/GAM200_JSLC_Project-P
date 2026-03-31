@@ -10,8 +10,7 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp"
 #include <GLFW/glfw3.h>
-#include <thread>
-#include <chrono>
+
 
 Engine::Engine() = default;
 Engine::~Engine() = default;

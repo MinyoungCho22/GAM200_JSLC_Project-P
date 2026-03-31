@@ -30,21 +30,13 @@ void Logger::Initialize(Severity severity, bool use_console)
 {
     min_severity = severity;
     use_console_output = use_console;
-
-    // Open file in write mode (overwrite)
-    log_file.open("GameLog.txt", std::ios::out | std::ios::trunc);
-    
+    // Disable file logging; keep console output only.
     if (log_file.is_open())
     {
-        Log(Severity::Info, "Logger initialized.");
+        log_file.close();
     }
-    else
-    {
-        if (use_console_output)
-        {
-            std::cout << "[Logger] Error: Could not open GameLog.txt for writing." << std::endl;
-        }
-    }
+
+    Log(Severity::Info, "Logger initialized.");
 }
 
 void Logger::Log(Severity severity, const char* format, ...)

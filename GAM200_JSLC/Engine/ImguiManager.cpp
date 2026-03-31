@@ -59,6 +59,7 @@ bool ImguiManager::Initialize()
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
+    io.IniFilename = "Config/imgui.ini";
 
     ImGui::StyleColorsDark();
 
