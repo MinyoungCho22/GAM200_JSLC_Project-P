@@ -1,10 +1,10 @@
 //Player.cpp
 
 #include "Player.hpp"
+#include "../Engine/ControlBindings.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include <GLFW/glfw3.h>
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -125,7 +125,7 @@ AnimationState Player::DetermineAnimationState() const
     return AnimationState::Idle;
 }
 
-void Player::Update(double dt, Input::Input& input)
+void Player::Update(double dt, Input::Input& input, const ControlBindings& controls)
 {
     const float fdt = static_cast<float>(dt);
 
@@ -141,15 +141,13 @@ void Player::Update(double dt, Input::Input& input)
         is_on_ground = false;
     }
 
-    int moveInput = 0;
-    if (input.IsKeyPressed(Input::Key::A)) moveInput -= 1;
-    if (input.IsKeyPressed(Input::Key::D)) moveInput += 1;
+    const float moveAxis = controls.GetMoveHorizontalAxis(input);
 
-    if (input.IsKeyTriggered(Input::Key::Space)) Jump();
+    if (controls.IsActionTriggered(ControlAction::Jump, input)) Jump();
 
     if (input.IsKeyPressed(Input::Key::S)) Crouch();
     else StopCrouch();
-    if (input.IsKeyPressed(Input::Key::LeftShift)) Dash();
+    if (controls.IsActionPressed(ControlAction::Dash, input)) Dash();
 
     if (m_isInvincible)
     {
@@ -186,20 +184,20 @@ void Player::Update(double dt, Input::Input& input)
     // Horizontal movement with acceleration/deceleration.
     if (!is_dashing)
     {
-        if (moveInput != 0 && !is_crouching)
+        if (moveAxis != 0.0f && !is_crouching)
         {
-            float targetSpeed = static_cast<float>(moveInput) * m_maxSpeed;
+            float targetSpeed = moveAxis * m_maxSpeed;
             if (m_currentHorizontalSpeed < targetSpeed)
                 m_currentHorizontalSpeed = (std::min)(targetSpeed, m_currentHorizontalSpeed + m_acceleration * fdt);
             else if (m_currentHorizontalSpeed > targetSpeed)
                 m_currentHorizontalSpeed = (std::max)(targetSpeed, m_currentHorizontalSpeed - m_acceleration * fdt);
 
-            if (moveInput < 0)
+            if (moveAxis < 0.0f)
             {
                 last_move_direction = -1;
                 m_is_flipped = true;
             }
-            else if (moveInput > 0)
+            else if (moveAxis > 0.0f)
             {
                 last_move_direction = 1;
                 m_is_flipped = false;

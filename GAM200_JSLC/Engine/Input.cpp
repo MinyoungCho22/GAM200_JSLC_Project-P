@@ -1,49 +1,36 @@
 // Input.cpp
 
 #include "Input.hpp"
-#include <GLFW/glfw3.h>
+#include <algorithm>
+#include <cmath>
+#include <cstring>
 
 namespace Input
 {
-    /**
-     * @brief Initializes the input system by attaching a window and resetting key states.
-     * @param window The GLFW window to poll input from.
-     */
     void Input::Initialize(GLFWwindow* window)
     {
         m_window = window;
 
-        // Initialize both current and previous buffers to a released state
         m_keyState.fill(GLFW_RELEASE);
         m_keyStatePrevious.fill(GLFW_RELEASE);
         m_mouseButtonState.fill(GLFW_RELEASE);
         m_mouseButtonStatePrevious.fill(GLFW_RELEASE);
+        std::memset(&m_gamepadCurr, 0, sizeof(m_gamepadCurr));
+        std::memset(&m_gamepadPrev, 0, sizeof(m_gamepadPrev));
     }
 
-    /**
-     * @brief Updates the input buffers. Should be called at the start of every frame.
-     */
-    void Input::Update()
+    void Input::Update(double dt)
     {
-        // Move current frame states to the previous frame buffer
         m_keyStatePrevious = m_keyState;
         m_mouseButtonStatePrevious = m_mouseButtonState;
+        m_gamepadPrev = m_gamepadCurr;
 
-        // Poll the status of every key supported by GLFW
         for (int key = 0; key <= GLFW_KEY_LAST; ++key)
-        {
-            // Update the current state of the key
-            m_keyState[key] = glfwGetKey(m_window, key);
-        }
+            m_keyState[static_cast<size_t>(key)] = glfwGetKey(m_window, key);
 
-        // Poll mouse button states
         for (int button = 0; button < 8; ++button)
-        {
-            m_mouseButtonState[button] = glfwGetMouseButton(m_window, button);
-        }
+            m_mouseButtonState[static_cast<size_t>(button)] = glfwGetMouseButton(m_window, button);
 
-        // Poll mouse position (GLFW returns window coordinates in screen points).
-        // Convert to framebuffer pixel coordinates to match our viewport math.
         double windowMouseX = 0.0;
         double windowMouseY = 0.0;
         glfwGetCursorPos(m_window, &windowMouseX, &windowMouseY);
@@ -65,59 +52,80 @@ namespace Input
         }
         else
         {
-            // Fallback for minimized/invalid window size cases.
             m_mouseX = windowMouseX;
             m_mouseY = windowMouseY;
         }
+
+        m_gamepadConnected = glfwJoystickPresent(GLFW_JOYSTICK_1) != 0
+            && glfwJoystickIsGamepad(GLFW_JOYSTICK_1) != 0;
+        if (m_gamepadConnected)
+        {
+            if (glfwGetGamepadState(GLFW_JOYSTICK_1, &m_gamepadCurr) != GLFW_TRUE)
+                std::memset(&m_gamepadCurr, 0, sizeof(m_gamepadCurr));
+        }
+        else
+        {
+            std::memset(&m_gamepadCurr, 0, sizeof(m_gamepadCurr));
+        }
+
+        // Right stick moves the logical cursor (same space as mouse) for targeting with a gamepad.
+        if (m_gamepadConnected && framebufferWidth > 0 && framebufferHeight > 0)
+        {
+            const float rx = m_gamepadCurr.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
+            const float ry = m_gamepadCurr.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
+            constexpr float rdz = 0.15f;
+            if (std::fabs(rx) > rdz || std::fabs(ry) > rdz)
+            {
+                const double speed = 2200.0 * dt;
+                m_mouseX += static_cast<double>(rx) * speed;
+                m_mouseY += static_cast<double>(ry) * speed;
+                m_mouseX = (std::max)(0.0, (std::min)(static_cast<double>(framebufferWidth - 1), m_mouseX));
+                m_mouseY = (std::max)(0.0, (std::min)(static_cast<double>(framebufferHeight - 1), m_mouseY));
+
+                const double scaleX = static_cast<double>(framebufferWidth) / static_cast<double>(windowWidth);
+                const double scaleY = static_cast<double>(framebufferHeight) / static_cast<double>(windowHeight);
+                glfwSetCursorPos(m_window, m_mouseX / scaleX, m_mouseY / scaleY);
+            }
+        }
     }
 
-    /**
-     * @brief Checks if a key is currently held down.
-     * @param key The enum code of the key to check.
-     * @return True if the key is currently in a pressed state.
-     */
     bool Input::IsKeyPressed(Key key) const
     {
-        return m_keyState.at(key) == GLFW_PRESS;
+        return m_keyState.at(static_cast<size_t>(key)) == GLFW_PRESS;
     }
 
-    /**
-     * @brief Detects a new key press (Edge Triggering).
-     * @param key The enum code of the key to check.
-     * @return True only if the key was released in the last frame and pressed in this frame.
-     */
     bool Input::IsKeyTriggered(Key key) const
     {
-        // Detect the transition from RELEASE (previous) to PRESS (current)
-        return (m_keyState.at(key) == GLFW_PRESS && m_keyStatePrevious.at(key) == GLFW_RELEASE);
+        return m_keyState.at(static_cast<size_t>(key)) == GLFW_PRESS
+            && m_keyStatePrevious.at(static_cast<size_t>(key)) == GLFW_RELEASE;
     }
 
-    /**
-     * @brief Checks if a mouse button is currently held down.
-     * @param button The mouse button to check.
-     * @return True if the button is currently in a pressed state.
-     */
+    bool Input::IsGlfwKeyPressed(int glfwKey) const
+    {
+        if (glfwKey < 0 || glfwKey >= static_cast<int>(m_keyState.size()))
+            return false;
+        return m_keyState[static_cast<size_t>(glfwKey)] == GLFW_PRESS;
+    }
+
+    bool Input::IsGlfwKeyTriggered(int glfwKey) const
+    {
+        if (glfwKey < 0 || glfwKey >= static_cast<int>(m_keyState.size()))
+            return false;
+        return m_keyState[static_cast<size_t>(glfwKey)] == GLFW_PRESS
+            && m_keyStatePrevious[static_cast<size_t>(glfwKey)] == GLFW_RELEASE;
+    }
+
     bool Input::IsMouseButtonPressed(MouseButton button) const
     {
-        return m_mouseButtonState.at(static_cast<int>(button)) == GLFW_PRESS;
+        return m_mouseButtonState.at(static_cast<size_t>(button)) == GLFW_PRESS;
     }
 
-    /**
-     * @brief Detects a new mouse button press (Edge Triggering).
-     * @param button The mouse button to check.
-     * @return True only if the button was released in the last frame and pressed in this frame.
-     */
     bool Input::IsMouseButtonTriggered(MouseButton button) const
     {
-        return (m_mouseButtonState.at(static_cast<int>(button)) == GLFW_PRESS && 
-                m_mouseButtonStatePrevious.at(static_cast<int>(button)) == GLFW_RELEASE);
+        return m_mouseButtonState.at(static_cast<size_t>(button)) == GLFW_PRESS
+            && m_mouseButtonStatePrevious.at(static_cast<size_t>(button)) == GLFW_RELEASE;
     }
 
-    /**
-     * @brief Gets the current mouse position in screen coordinates.
-     * @param x Reference to store the x coordinate.
-     * @param y Reference to store the y coordinate.
-     */
     void Input::GetMousePosition(double& x, double& y) const
     {
         x = m_mouseX;

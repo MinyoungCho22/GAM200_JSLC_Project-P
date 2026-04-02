@@ -2,6 +2,7 @@
 
 #include "GameplayState.hpp"
 #include "../Engine/GameStateManager.hpp"
+#include "../Engine/ControlBindings.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Logger.hpp"
@@ -13,7 +14,6 @@
 #include "GameOver.hpp"
 #include "MapObjectConfig.hpp"
 #include "Background.hpp"
-#include <GLFW/glfw3.h>
 #include <string>
 #include <sstream>
 #include <cmath>
@@ -267,6 +267,7 @@ void GameplayState::Update(double dt)
 {
     Engine& engine = gsm.GetEngine();
     auto& input = engine.GetInput();
+    auto& ctl = engine.GetControlBindings();
 
     // Update player god mode from ImGui settings
     auto* imguiManager = engine.GetImguiManager();
@@ -463,7 +464,7 @@ void GameplayState::Update(double dt)
 
     if (m_storyDialogue)
     {
-        m_storyDialogue->Update(static_cast<float>(dt), input, *m_font, *m_fontShader);
+        m_storyDialogue->Update(static_cast<float>(dt), input, ctl, *m_font, *m_fontShader);
         if (m_storyDialogue->IsBlocking())
         {
             if (!m_camera.IsAnimating())
@@ -486,12 +487,12 @@ void GameplayState::Update(double dt)
     const bool hallwayHidingBlocksDroneAttack = m_doorOpened && !m_rooftopAccessed
         && m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
 
-    bool isPressingInteract = input.IsMouseButtonPressed(Input::MouseButton::Right);
+    bool isPressingInteract = ctl.IsActionPressed(ControlAction::PulseAbsorb, input);
     const bool isPlayerHidingInRoomForAttack = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     const bool isPlayerHidingInHallwayForAttack = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     const bool crouchHidingBlocksAttack = player.IsCrouching() &&
         (isPlayerHidingInRoomForAttack || isPlayerHidingInHallwayForAttack);
-    bool isPressingAttack = input.IsMouseButtonPressed(Input::MouseButton::Left) && !crouchHidingBlocksAttack;
+    bool isPressingAttack = ctl.IsActionPressed(ControlAction::Attack, input) && !crouchHidingBlocksAttack;
 
     // Get mouse world position
     double mouseScreenX, mouseScreenY;
@@ -710,7 +711,7 @@ void GameplayState::Update(double dt)
     {
         pulseManager->UpdateAttackVFX(false, {}, {});
 
-        if (input.IsMouseButtonTriggered(Input::MouseButton::Left))
+        if (ctl.IsActionTriggered(ControlAction::Attack, input))
         {
             if (m_room->IsBlindOpen())
             {
@@ -780,7 +781,7 @@ void GameplayState::Update(double dt)
         player.SetCurrentGroundLevel(HALLWAY_GROUND_LEVEL);
     }
 
-    player.Update(dt, input);
+    player.Update(dt, input, ctl);
 
     if (m_doorOpened)
     {
@@ -818,7 +819,7 @@ void GameplayState::Update(double dt)
 
     if (!m_rooftopAccessed)
     {
-        m_room->Update(player, dt, input, mouseWorldPos);
+        m_room->Update(player, dt, input, mouseWorldPos, ctl);
 
         if (m_storyDialogue && m_room && !m_blockAmbientStoryForSession && !suppressAmbientStoryThisFrame)
         {
@@ -908,7 +909,7 @@ void GameplayState::Update(double dt)
     }
 
     m_rooftop->Update(dt, player, playerHitboxSize, input, mouseWorldPos,
-                      input.IsMouseButtonTriggered(Input::MouseButton::Left));
+                      ctl.IsActionTriggered(ControlAction::Attack, input));
 
     if (m_storyDialogue && m_rooftopAccessed && !m_undergroundAccessed && m_rooftop && !m_blockAmbientStoryForSession
         && !suppressAmbientStoryThisFrame)

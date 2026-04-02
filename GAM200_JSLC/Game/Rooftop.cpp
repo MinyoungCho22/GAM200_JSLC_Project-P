@@ -224,7 +224,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
         m_isPlayerClose = (distanceSq <= PROXIMITY_RANGE_SQ);
 
         // Interact to close the hole using energy
-        if (m_isPlayerClose && input.IsMouseButtonTriggered(Input::MouseButton::Left) && !m_isClose)
+        if (m_isPlayerClose && isLeftClickTriggered && !m_isClose)
         {
             const float INTERACT_COST = 5.0f;
             Pulse& pulse = player.GetPulseCore().getPulse();

@@ -13,6 +13,7 @@
 namespace Input {
 class Input;
 }
+class ControlBindings;
 class Shader;
 class Background;
 
@@ -34,7 +35,7 @@ public:
         std::function<void()> onSequenceComplete = nullptr);
     void EnqueueOpening(Font& font, Shader& fontShader);
 
-    void Update(float dt, const Input::Input& input, Font& font, Shader& fontShader);
+    void Update(float dt, const Input::Input& input, const ControlBindings& controls, Font& font, Shader& fontShader);
     void Draw(Font& font, Shader& textureShader, Shader& fontShader, const Math::Matrix& screenProjection);
 
 private:

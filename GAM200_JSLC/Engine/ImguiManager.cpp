@@ -2,9 +2,11 @@
 
 #include "ImguiManager.hpp"
 #include "Engine.hpp"
+#include "ControlBindings.hpp"
 #include "Logger.hpp"
 
 #include "../include/GLFW/glfw3.h"
+#include "../OpenGL/GLWrapper.hpp"
 #include "../Game/DroneManager.hpp"
 #include "../Game/Drone.hpp"
 #include "../Game/Robot.hpp"
@@ -238,9 +240,9 @@ void ImguiManager::DrawDebugWindow()
     ImGui::Render();
     int display_w, display_h;
     glfwGetFramebufferSize(m_debugWindow, &display_w, &display_h);
-    glViewport(0, 0, display_w, display_h);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    GL::Viewport(0, 0, display_w, display_h);
+    GL::ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    GL::Clear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
     glfwSwapBuffers(m_debugWindow);
@@ -326,6 +328,39 @@ void ImguiManager::DrawSettingsPanel()
         ImGui::Text("FPS Cap       : No Limit");
     else
         ImGui::Text("FPS Cap       : %d FPS", fpsValues[m_fpsCapIndex]);
+
+    ImGui::Spacing();
+    ImGui::SeparatorText("Controls (rebind)");
+    if (!m_controlBindings || !m_engine || !m_engine->GetWindow())
+    {
+        ImGui::TextDisabled("Control bindings unavailable.");
+    }
+    else
+    {
+        ControlBindings& cb = *m_controlBindings;
+        GLFWwindow* mainWin = m_engine->GetWindow();
+        if (cb.IsRebinding())
+        {
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Capturing: %s",
+                cb.FormatActionLabel(cb.RebindTarget()).c_str());
+            ImGui::TextWrapped("Press a key (focus the game window), mouse button, or gamepad input. Esc cancels.");
+        }
+        for (int i = 0; i < static_cast<int>(ControlAction::Count); ++i)
+        {
+            const auto a = static_cast<ControlAction>(i);
+            ImGui::PushID(i);
+            ImGui::BulletText("%s", cb.FormatActionLabel(a).c_str());
+            ImGui::SameLine(260.0f);
+            ImGui::TextUnformatted(cb.FormatBindingList(a).c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Rebind"))
+                cb.BeginRebind(a, mainWin);
+            ImGui::PopID();
+        }
+        if (ImGui::Button("Save to Config/control_bindings.json"))
+            cb.Save();
+        ImGui::TextDisabled("Right stick moves aim cursor when a gamepad is connected.");
+    }
 }
 
 void ImguiManager::DrawLiveDronePanel()

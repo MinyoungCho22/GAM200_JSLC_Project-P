@@ -5,6 +5,8 @@
 #include "../Game/PulseCore.hpp"
 #include "../Engine/Input.hpp"
 
+class ControlBindings;
+
 #include <vector>
 
 class Shader;
@@ -45,7 +47,7 @@ class Player
 {
 public:
     void Init(Math::Vec2 startPos);
-    void Update(double dt, Input::Input& input);
+    void Update(double dt, Input::Input& input, const ControlBindings& controls);
     void Draw(const Shader& shader) const;
     void DrawOutline(const Shader& outlineShader) const;
     void Shutdown();

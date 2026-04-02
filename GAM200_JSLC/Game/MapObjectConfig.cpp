@@ -12,6 +12,9 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#elif defined(__linux__)
+#include <limits.h>
+#include <unistd.h>
 #endif
 
 namespace
@@ -28,6 +31,17 @@ std::string ResolveMapObjectConfigPathString()
         if (n > 0 && n < MAX_PATH)
         {
             const fs::path exeDir = fs::path(buf).parent_path();
+            const fs::path configJson = exeDir / "Config" / "map_objects.json";
+            if (fs::exists(configJson))
+                return configJson.string();
+        }
+#elif defined(__linux__)
+        char exeBuf[PATH_MAX];
+        const ssize_t n = readlink("/proc/self/exe", exeBuf, sizeof(exeBuf) - 1);
+        if (n > 0)
+        {
+            exeBuf[n] = '\0';
+            const fs::path exeDir = fs::path(exeBuf).parent_path();
             const fs::path configJson = exeDir / "Config" / "map_objects.json";
             if (fs::exists(configJson))
                 return configJson.string();

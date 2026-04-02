@@ -3,8 +3,8 @@
 #pragma once
 #include <vector>
 #include <memory>
+#include "GameState.hpp"
 
-class GameState;
 class Engine;
 
 class GameStateManager

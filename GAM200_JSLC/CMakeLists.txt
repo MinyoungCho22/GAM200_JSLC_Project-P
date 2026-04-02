@@ -107,6 +107,13 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLEW
 find_package(OpenGL REQUIRED)
 find_package(PkgConfig QUIET)
 
+if(UNIX AND NOT APPLE)
+    message(STATUS "Linux/WSL build: install dev packages if configure fails, e.g. "
+        "sudo apt install build-essential cmake ninja-build libglew-dev libglfw3-dev libsdl2-dev libgl1-mesa-dev pkg-config")
+    # Bundled include/GL/*.h are MSVC/Windows-oriented; skip GLFW's GL include and use GLEW + system GL only.
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GLFW_INCLUDE_NONE)
+endif()
+
 # SDL2
 find_package(SDL2 CONFIG QUIET)
 if(NOT SDL2_FOUND AND PKG_CONFIG_FOUND AND NOT WIN32)
@@ -120,12 +127,41 @@ elseif(SDL2_LIBRARIES)
     target_link_libraries(${PROJECT_NAME} PRIVATE ${SDL2_LIBRARIES})
 endif()
 
-# GLEW (only required on Windows where bundled binaries exist)
+# GLEW: Windows uses bundled DLL; Linux/*BSD need system GLEW for core GL entry points.
 if(WIN32)
     target_compile_definitions(${PROJECT_NAME} PRIVATE USE_GLEW)
+elseif(UNIX AND NOT APPLE)
+    find_package(GLEW QUIET)
+    if(NOT GLEW_FOUND AND PKG_CONFIG_FOUND)
+        pkg_check_modules(PC_GLEW QUIET glew)
+    endif()
+    if(GLEW_FOUND)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_GLEW)
+        if(TARGET GLEW::GLEW)
+            target_link_libraries(${PROJECT_NAME} PRIVATE GLEW::GLEW)
+        else()
+            target_include_directories(${PROJECT_NAME} PRIVATE ${GLEW_INCLUDE_DIRS})
+            target_link_libraries(${PROJECT_NAME} PRIVATE ${GLEW_LIBRARIES})
+        endif()
+    elseif(PC_GLEW_FOUND)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_GLEW)
+        target_include_directories(${PROJECT_NAME} PRIVATE ${PC_GLEW_INCLUDE_DIRS})
+        target_link_directories(${PROJECT_NAME} PRIVATE ${PC_GLEW_LIBRARY_DIRS})
+        target_link_libraries(${PROJECT_NAME} PRIVATE ${PC_GLEW_LINK_LIBRARIES})
+    else()
+        message(FATAL_ERROR "Linux/Unix: GLEW not found. Install e.g. sudo apt install libglew-dev")
+    endif()
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
+
+if(UNIX AND NOT APPLE)
+    find_package(Threads REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
+    if(CMAKE_DL_LIBS)
+        target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
+    endif()
+endif()
 
 # GLFW
 if(NOT WIN32)
@@ -139,6 +175,25 @@ if(NOT WIN32)
     elseif(GLFW_FOUND)
         target_include_directories(${PROJECT_NAME} PRIVATE ${GLFW_INCLUDE_DIRS})
         target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARIES})
+    endif()
+
+    if(UNIX AND NOT APPLE)
+        if(NOT glfw3_FOUND AND NOT GLFW_FOUND)
+            message(FATAL_ERROR "Linux/Unix: GLFW not found. Install libglfw3-dev (Debian/Ubuntu) or equivalent.")
+        endif()
+        if(NOT SDL2_FOUND AND NOT SDL2_LIBRARIES)
+            message(FATAL_ERROR "Linux/Unix: SDL2 not found. Install libsdl2-dev (Debian/Ubuntu) or equivalent.")
+        endif()
+        # Pkg-config SDL2/GLFW often attach required compile/link flags (e.g. -pthread, -D_REENTRANT).
+        if(SDL2_CFLAGS_OTHER)
+            target_compile_options(${PROJECT_NAME} PRIVATE ${SDL2_CFLAGS_OTHER})
+        endif()
+        if(GLFW_CFLAGS_OTHER)
+            target_compile_options(${PROJECT_NAME} PRIVATE ${GLFW_CFLAGS_OTHER})
+        endif()
+        if(GLFW_LDFLAGS_OTHER)
+            target_link_options(${PROJECT_NAME} PRIVATE ${GLFW_LDFLAGS_OTHER})
+        endif()
     endif()
 endif()
 
@@ -179,8 +234,11 @@ if(ENABLE_FMOD)
             target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_FMOD)
             message(WARNING "FMOD enabled but ${FMOD_DYLIB} not found; building with DISABLE_FMOD")
         endif()
+    elseif(UNIX AND NOT APPLE)
+        # Linux/WSL: no bundled FMOD in repo; audio stubs via DISABLE_FMOD
+        target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_FMOD)
+        message(STATUS "FMOD: disabled on Linux/Unix (not bundled); building with DISABLE_FMOD")
     else()
-        # Other non-Windows platforms not configured for FMOD in this repo
         target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_FMOD)
         message(WARNING "FMOD enabled but not configured for this platform; building with DISABLE_FMOD")
     endif()
@@ -284,6 +342,18 @@ if(WIN32)
 
     set_target_properties(${PROJECT_NAME} PROPERTIES
         VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+    )
+endif()
+
+# Non-Windows: keep Config next to the executable (paths like Config/imgui.ini are relative to CWD).
+if(NOT WIN32 AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Config")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Config"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/Config"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Config"
+        COMMENT "Copying Config folder next to executable..."
     )
 endif()
 

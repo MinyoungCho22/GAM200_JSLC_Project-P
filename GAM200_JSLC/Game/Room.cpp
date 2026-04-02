@@ -1,6 +1,7 @@
 // Room.cpp
 
 #include "Room.hpp"
+#include "../Engine/ControlBindings.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "Player.hpp"
@@ -68,7 +69,7 @@ void Room::Shutdown()
     for (auto& source : m_pulseSources) source.Shutdown();
 }
 
-void Room::Update(Player& player, double dt, Input::Input& input, Math::Vec2 mouseWorldPos)
+void Room::Update(Player& player, double dt, Input::Input& input, Math::Vec2 mouseWorldPos, const ControlBindings& controls)
 {
     (void)dt;
     (void)mouseWorldPos;
@@ -97,7 +98,7 @@ void Room::Update(Player& player, double dt, Input::Input& input, Math::Vec2 mou
 
     // More forgiving interaction: if player is in blind area, left click works
     // without requiring a precise cursor-over-blind point test.
-    if (m_playerInBlindArea && input.IsMouseButtonTriggered(Input::MouseButton::Left) && !m_isBright)
+    if (m_playerInBlindArea && controls.IsActionTriggered(ControlAction::Attack, input) && !m_isBright)
     {
         const float BLIND_TOGGLE_COST = 20.0f;
         const float MIN_PULSE_TO_OPERATE_BLIND = 30.0f;

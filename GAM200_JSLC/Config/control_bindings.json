@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "bindings": {
+    "move_left": [
+      { "type": "key", "key": 65 }
+    ],
+    "move_right": [
+      { "type": "key", "key": 68 }
+    ],
+    "jump": [
+      { "type": "key", "key": 32 },
+      { "type": "gamepad_button", "button": 0 }
+    ],
+    "dash": [
+      { "type": "key", "key": 340 },
+      { "type": "gamepad_button", "button": 2 }
+    ],
+    "attack": [
+      { "type": "mouse", "button": 0 },
+      { "type": "gamepad_button", "button": 5 }
+    ],
+    "pulse_absorb": [
+      { "type": "mouse", "button": 1 },
+      { "type": "gamepad_button", "button": 4 }
+    ]
+  }
+}

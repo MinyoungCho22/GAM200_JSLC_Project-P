@@ -1,6 +1,7 @@
 //StoryDialogue.cpp
 
 #include "StoryDialogue.hpp"
+#include "../Engine/ControlBindings.hpp"
 #include "Background.hpp"
 #include "../Engine/Input.hpp"
 #include "../Engine/Matrix.hpp"
@@ -144,14 +145,14 @@ void StoryDialogue::EnqueueOpening(Font& font, Shader& fontShader)
     RebuildLineTexture(font, fontShader);
 }
 
-void StoryDialogue::Update(float dt, const Input::Input& input, Font& font, Shader& fontShader)
+void StoryDialogue::Update(float dt, const Input::Input& input, const ControlBindings& controls, Font& font, Shader& fontShader)
 {
     if (!m_active || m_lines.empty())
         return;
 
     if (m_preTypeDelayRemaining > 0.0f)
     {
-        if (input.IsMouseButtonTriggered(Input::MouseButton::Left))
+        if (controls.IsActionTriggered(ControlAction::Attack, input))
             m_preTypeDelayRemaining = 0.0f;
         else
             m_preTypeDelayRemaining -= dt;
@@ -161,7 +162,7 @@ void StoryDialogue::Update(float dt, const Input::Input& input, Font& font, Shad
 
     const std::string& line = m_lines[m_lineIndex];
 
-    if (input.IsMouseButtonTriggered(Input::MouseButton::Left))
+    if (controls.IsActionTriggered(ControlAction::Attack, input))
     {
         if (m_visibleChars < line.size())
         {

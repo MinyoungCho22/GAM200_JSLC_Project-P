@@ -3,17 +3,17 @@
 #pragma once
 #include <string>
 #include <memory>
+#include "ControlBindings.hpp"
 #include "Input.hpp"
 #include "Vec2.hpp"
 #include "../OpenGL/PostProcessManager.h"
+#include "GameStateManager.hpp"
 
 struct GLFWwindow;
-class GameStateManager;
 class Shader;
 class ImguiManager;
 class DroneConfigManager;
 class RobotConfigManager;
-
 
 constexpr int VIRTUAL_WIDTH = 1920;
 constexpr int VIRTUAL_HEIGHT = 1080;
@@ -34,6 +34,8 @@ public:
     int GetHeight() const { return VIRTUAL_HEIGHT; }
 
     Input::Input& GetInput() const { return *m_input; }
+
+    ControlBindings& GetControlBindings() const { return *m_controlBindings; }
 
     Shader& GetTextureShader() const { return *m_textureShader; }
 
@@ -76,6 +78,7 @@ private:
     double m_lastFrameTime = 0.0;
 
     std::unique_ptr<Input::Input> m_input;
+    std::unique_ptr<ControlBindings> m_controlBindings;
 
     std::unique_ptr<Shader> m_textureShader;
 

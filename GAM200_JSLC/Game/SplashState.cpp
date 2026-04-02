@@ -293,9 +293,9 @@ void SplashState::Draw()
 
         // ── Y positions with running / hover bobs ────────────────────────
         float midY   = screenH * 0.5f;
-        float girlY  = midY + std::sinf(t * 18.0f) * 5.0f;
-        float robotY = midY + std::sinf(t * 13.0f + 0.8f) * 3.5f;
-        float droneY = midY + 75.0f + std::sinf(t * 7.0f + 1.5f) * 9.0f; // hovering above
+        float girlY  = midY + std::sin(t * 18.0f) * 5.0f;
+        float robotY = midY + std::sin(t * 13.0f + 0.8f) * 3.5f;
+        float droneY = midY + 75.0f + std::sin(t * 7.0f + 1.5f) * 9.0f; // hovering above
 
         // ── Player walk-cycle frame (7 frames @ ~10 fps) ─────────────────
         int   frameIdx = static_cast<int>(t * 10.0f) % PLAYER_FRAMES;

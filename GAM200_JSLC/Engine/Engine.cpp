@@ -9,7 +9,6 @@
 #include "../Game/SplashState.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp"
-#include <GLFW/glfw3.h>
 
 
 Engine::Engine() = default;
@@ -71,6 +70,9 @@ bool Engine::Initialize(const std::string& windowTitle)
     m_input = std::make_unique<Input::Input>();
     m_input->Initialize(m_window);
 
+    m_controlBindings = std::make_unique<ControlBindings>();
+    m_controlBindings->LoadOrDefaults("Config/control_bindings.json");
+
 #ifdef USE_GLEW
     glewExperimental = GL_TRUE;
     if (glewInit() != GLEW_OK) {
@@ -102,6 +104,7 @@ bool Engine::Initialize(const std::string& windowTitle)
     m_imguiManager = std::make_unique<ImguiManager>();
     (void)m_imguiManager->Initialize();
     m_imguiManager->SetEngine(this);
+    m_imguiManager->SetControlBindings(m_controlBindings.get());
 
     // Initialize drone config manager
     m_droneConfigManager = std::make_shared<DroneConfigManager>();
@@ -126,7 +129,9 @@ void Engine::GameLoop()
         m_lastFrameTime = currentFrameTime;
 
         glfwPollEvents();
-        m_input->Update();
+        m_input->Update(m_deltaTime);
+        if (m_controlBindings)
+            m_controlBindings->TickRebindCapture(m_window, *m_input);
         Update();
 
 #ifdef __APPLE__

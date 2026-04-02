@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <cstring>
 #include <sys/stat.h>
 
 namespace fs = std::filesystem;
@@ -52,11 +53,16 @@ bool RobotConfigManager::SaveLiveStatesToFile(const std::string& filename)
         nlohmann::json j = m_liveStates;
         
         // Get absolute path for logging
-        char absolutePath[1024];
+        char absolutePath[1024] = {};
         #ifdef _WIN32
-            _fullpath(absolutePath, m_liveStatesFilename.c_str(), sizeof(absolutePath));
+            if (!_fullpath(absolutePath, m_liveStatesFilename.c_str(), sizeof(absolutePath)))
+                strncpy_s(absolutePath, sizeof(absolutePath), m_liveStatesFilename.c_str(), _TRUNCATE);
         #else
-            realpath(m_liveStatesFilename.c_str(), absolutePath);
+            if (!realpath(m_liveStatesFilename.c_str(), absolutePath))
+            {
+                std::strncpy(absolutePath, m_liveStatesFilename.c_str(), sizeof(absolutePath) - 1);
+                absolutePath[sizeof(absolutePath) - 1] = '\0';
+            }
         #endif
         
         std::ofstream file(m_liveStatesFilename);

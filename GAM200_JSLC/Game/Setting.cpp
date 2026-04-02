@@ -8,7 +8,6 @@
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
-#include <GLFW/glfw3.h>
 #include <string>
 #include <cmath>
 

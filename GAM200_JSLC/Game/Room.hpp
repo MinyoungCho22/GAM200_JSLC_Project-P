@@ -12,6 +12,7 @@ class Engine;
 class Shader;
 class Player;
 class DebugRenderer;
+class ControlBindings;
 struct RoomObjectConfig;
 
 /**
@@ -25,7 +26,7 @@ public:
     void Initialize(Engine& engine, const char* texturePath);
     void ApplyConfig(const RoomObjectConfig& cfg);
     void Shutdown();
-    void Update(Player& player, double dt, Input::Input& input, Math::Vec2 mouseWorldPos);
+    void Update(Player& player, double dt, Input::Input& input, Math::Vec2 mouseWorldPos, const ControlBindings& controls);
     void Draw(Shader& textureShader) const;
     
     Math::Vec2 GetBlindPos() const { return m_blindPos; }

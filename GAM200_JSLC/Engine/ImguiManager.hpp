@@ -13,6 +13,7 @@ class Drone;
 class Robot;
 class Underground;
 class Engine;
+class ControlBindings;
 
 /**
  * @brief Dear ImGui debug window manager (GLFW + OpenGL3).
@@ -40,6 +41,7 @@ public:
     void AddMapDroneManager(const std::string& mapName, DroneManager* manager);
     void SetUnderground(Underground* underground) { m_underground = underground; }
     void SetEngine(Engine* engine) { m_engine = engine; }
+    void SetControlBindings(ControlBindings* bindings) { m_controlBindings = bindings; }
 
            void SetEnabled(bool enabled) { m_enabled = enabled; }
            bool IsEnabled() const { return m_enabled; }
@@ -99,6 +101,7 @@ private:
 
     // Engine reference for settings control
     Engine* m_engine = nullptr;
+    ControlBindings* m_controlBindings = nullptr;
 
     // Settings tab state
     bool m_vsyncEnabled = false;
