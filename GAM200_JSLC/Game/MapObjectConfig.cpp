@@ -1,3 +1,5 @@
+//MapObjectConfig.cpp
+
 #include "MapObjectConfig.hpp"
 #include "../Engine/Logger.hpp"
 #include <filesystem>

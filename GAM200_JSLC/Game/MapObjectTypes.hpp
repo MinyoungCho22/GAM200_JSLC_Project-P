@@ -1,3 +1,5 @@
+//MapObjectTypes.hpp
+
 #pragma once
 
 #include "../Engine/Vec2.hpp"

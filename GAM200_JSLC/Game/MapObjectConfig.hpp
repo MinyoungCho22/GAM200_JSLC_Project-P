@@ -1,3 +1,5 @@
+//MapObjectConfig.hpp
+
 #pragma once
 
 #include "MapObjectTypes.hpp"
