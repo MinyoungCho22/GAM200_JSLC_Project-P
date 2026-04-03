@@ -301,7 +301,7 @@ void Engine::OnFramebufferResize(int newScreenWidth, int newScreenHeight)
         "Framebuffer resized to %d x %d", newScreenWidth, newScreenHeight);
 
     if (m_postProcess)
-        m_postProcess->SetDisplaySize(newScreenWidth, newScreenHeight);
+        m_postProcess->SyncPresentationFramebufferSizeFromWindow();
 }
 
 void Engine::SyncPostProcessDisplaySize()
@@ -309,11 +309,7 @@ void Engine::SyncPostProcessDisplaySize()
     if (!m_window || !m_postProcess)
         return;
 
-    // macOS drawable vs GLFW framebuffer is reconciled again in PostProcessManager::ApplyAndPresent.
-    int fbW = 0, fbH = 0;
-    glfwGetFramebufferSize(m_window, &fbW, &fbH);
-    if (fbW > 0 && fbH > 0)
-        m_postProcess->SetDisplaySize(fbW, fbH);
+    m_postProcess->SyncPresentationFramebufferSizeFromWindow();
 }
 
 void Engine::ToggleFullscreen()

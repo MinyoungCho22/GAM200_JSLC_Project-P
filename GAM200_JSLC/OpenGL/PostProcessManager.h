@@ -29,6 +29,10 @@ public:
 	// Set the actual screen framebuffer size (differs from virtual size on HiDPI/Retina displays)
 	void SetDisplaySize(int w, int h) { m_displayWidth = w; m_displayHeight = h; }
 
+	// Re-read drawable size from the presentation window (macOS: reconciles stale glfwGetFramebufferSize
+	// after fullscreen/windowed transitions with window size × content scale).
+	void SyncPresentationFramebufferSizeFromWindow();
+
 	// Main GLFW window: used each frame in ApplyAndPresent to read the real drawable size (macOS).
 	void SetPresentationWindow(GLFWwindow* window) { m_presentationWindow = window; }
 

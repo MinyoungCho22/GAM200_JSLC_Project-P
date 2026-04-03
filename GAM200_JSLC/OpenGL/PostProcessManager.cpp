@@ -7,6 +7,38 @@
 #define GLFW_INCLUDE_NONE
 #endif
 #include <GLFW/glfw3.h>
+#ifdef __APPLE__
+#include <cmath>
+#endif
+
+namespace {
+
+// After macOS Space / fullscreen transitions, glfwGetFramebufferSize can lag the real backing store
+// for a frame while window size × content scale already matches Cocoa. That mismatch skews post.frag
+// letterboxing (uFramebufferSize vs actual viewport pixels).
+void QueryPresentationFramebufferSize(GLFWwindow* window, int& outW, int& outH)
+{
+    glfwGetFramebufferSize(window, &outW, &outH);
+#ifdef __APPLE__
+    int ww = 0, wh = 0;
+    glfwGetWindowSize(window, &ww, &wh);
+    float sx = 1.f, sy = 1.f;
+    glfwGetWindowContentScale(window, &sx, &sy);
+    const int sw = static_cast<int>(std::ceil(static_cast<float>(ww) * sx));
+    const int sh = static_cast<int>(std::ceil(static_cast<float>(wh) * sy));
+    if (sw <= 0 || sh <= 0)
+        return;
+    const int dw = outW > sw ? outW - sw : sw - outW;
+    const int dh = outH > sh ? outH - sh : sh - outH;
+    if (dw > 1 || dh > 1)
+    {
+        outW = sw;
+        outH = sh;
+    }
+#endif
+}
+
+} // namespace
 
 // ---------------------------
 // Internal helpers (optional)
@@ -116,6 +148,19 @@ void PostProcessManager::EndScene()
     GL::BindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void PostProcessManager::SyncPresentationFramebufferSizeFromWindow()
+{
+    if (!m_presentationWindow)
+        return;
+    int fbW = 0, fbH = 0;
+    QueryPresentationFramebufferSize(m_presentationWindow, fbW, fbH);
+    if (fbW > 0 && fbH > 0)
+    {
+        m_displayWidth = fbW;
+        m_displayHeight = fbH;
+    }
+}
+
 void PostProcessManager::GetLetterboxViewport(int& outX, int& outY, int& outW, int& outH) const
 {
     ComputeLetterboxViewport(m_displayWidth, m_displayHeight, outX, outY, outW, outH);
@@ -132,7 +177,7 @@ void PostProcessManager::ApplyAndPresent()
 #ifdef __APPLE__
         glfwPollEvents();
 #endif
-        glfwGetFramebufferSize(m_presentationWindow, &fbW, &fbH);
+        QueryPresentationFramebufferSize(m_presentationWindow, fbW, fbH);
     }
     if (fbW <= 0 || fbH <= 0)
     {
