@@ -62,6 +62,7 @@ bool ImguiManager::Initialize()
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
     io.IniFilename = "Config/imgui.ini";
+    io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
     ImGui::StyleColorsDark();
 
@@ -245,7 +246,10 @@ void ImguiManager::DrawDebugWindow()
     GL::Clear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-    glfwSwapBuffers(m_debugWindow);
+#if defined(__linux__)
+    if (!glfwGetWindowAttrib(m_debugWindow, GLFW_ICONIFIED))
+#endif
+        glfwSwapBuffers(m_debugWindow);
 
     // Switch back to main window context
     glfwMakeContextCurrent(m_mainWindow);

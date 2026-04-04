@@ -10,6 +10,45 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp"
 
+#include <chrono>
+#include <thread>
+
+#if defined(__linux__) && defined(GAM200_HAVE_XFIXES)
+#define GLFW_EXPOSE_NATIVE_X11
+#include <GLFW/glfw3native.h>
+#include <X11/Xlib.h>
+#include <X11/extensions/Xfixes.h>
+
+namespace
+{
+// Depth-1 empty pixmap cursor; WSLg sometimes ignores GLFW HIDDEN/XFixes alone (see microsoft/wslg#376).
+unsigned long CreateInvisibleX11Cursor(Display* dpy)
+{
+    if (!dpy)
+        return 0;
+    const Window root = DefaultRootWindow(dpy);
+    Pixmap empty = XCreatePixmap(dpy, root, 1, 1, 1);
+    if (empty == None)
+        return 0;
+    GC gc = XCreateGC(dpy, empty, 0, nullptr);
+    if (!gc)
+    {
+        XFreePixmap(dpy, empty);
+        return 0;
+    }
+    XSetForeground(dpy, gc, 0);
+    XSetBackground(dpy, gc, 0);
+    XDrawPoint(dpy, empty, gc, 0, 0);
+    XColor fg{};
+    XColor bg{};
+    fg.flags = bg.flags = DoRed | DoGreen | DoBlue;
+    const Cursor c = XCreatePixmapCursor(dpy, empty, empty, &fg, &bg, 0, 0);
+    XFreeGC(dpy, gc);
+    XFreePixmap(dpy, empty);
+    return static_cast<unsigned long>(c);
+}
+} // namespace
+#endif
 
 Engine::Engine() = default;
 Engine::~Engine() = default;
@@ -63,12 +102,13 @@ bool Engine::Initialize(const std::string& windowTitle)
     glfwSetKeyCallback(m_window, Engine::KeyCallback);
     glfwSetFramebufferSizeCallback(m_window, Engine::FramebufferSizeCallback);
     glfwSetWindowFocusCallback(m_window, Engine::WindowFocusCallback);
-
-    // Hide the default OS cursor so we can render our custom cursor
-    ApplyCustomCursorHidden();
+    glfwSetCursorEnterCallback(m_window, Engine::CursorEnterCallback);
 
     m_input = std::make_unique<Input::Input>();
     m_input->Initialize(m_window);
+
+    // Hide the default OS cursor so we can render our custom cursor
+    ApplyCustomCursorHidden();
 
     m_controlBindings = std::make_unique<ControlBindings>();
     m_controlBindings->LoadOrDefaults("Config/control_bindings.json");
@@ -169,6 +209,14 @@ void Engine::GameLoop()
             m_imguiManager->EndFrame();
         }
 
+#if defined(__linux__)
+        if (m_window && glfwGetWindowAttrib(m_window, GLFW_FOCUSED))
+            ApplyCustomCursorHidden();
+#endif
+
+        // WSL/Wayland/X11 sometimes reset swap interval after other contexts; re-apply on the main window.
+        glfwMakeContextCurrent(m_window);
+        glfwSwapInterval(m_vsyncEnabled ? 1 : 0);
         glfwSwapBuffers(m_window);
 
         // FPS cap: sleep to maintain target frame rate when VSync is off
@@ -185,10 +233,18 @@ void Engine::GameLoop()
             double remaining = nextFrameDeadline - glfwGetTime();
             if (remaining > 0.0)
             {
-                // Accuracy-first limiter: avoid sleep/yield overshoot on Windows scheduler.
+#if defined(__linux__)
+                // Pure busy-wait can starve WSLg/Wayland scheduling and cap apparent FPS (~80Hz).
+                constexpr double kSpinReserveSec = 0.0015;
+                if (remaining > kSpinReserveSec)
+                {
+                    std::this_thread::sleep_for(
+                        std::chrono::duration<double>(remaining - kSpinReserveSec));
+                }
+#endif
                 while (glfwGetTime() < nextFrameDeadline)
                 {
-                    // Busy wait for precise cap timing (especially stable at 30/60/144).
+                    // Short spin tail for accuracy (Windows keeps full spin; Linux uses sleep above).
                 }
             }
             else if (remaining < -targetFrameTime * 2.0)
@@ -283,16 +339,48 @@ void Engine::WindowFocusCallback(GLFWwindow* window, int focused)
     Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
     if (engine && focused)
     {
-        // macOS often re-shows the system cursor after Cmd+Tab / app switch; re-apply hidden mode.
+        // macOS / WSL(X11) may re-show the system cursor after focus changes; re-apply hide.
         engine->ApplyCustomCursorHidden();
     }
+}
+
+void Engine::CursorEnterCallback(GLFWwindow* window, int entered)
+{
+    Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
+    if (engine && entered)
+        engine->ApplyCustomCursorHidden();
 }
 
 void Engine::ApplyCustomCursorHidden()
 {
     if (!m_window)
         return;
+#if defined(__linux__)
+    // Do not use GLFW_CURSOR_DISABLED here: it is for FPS-style relative look and breaks 2D glfwGetCursorPos.
+    glfwSetCursor(m_window, nullptr);
     glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+#if defined(GAM200_HAVE_XFIXES)
+    if (Display* dpy = glfwGetX11Display())
+    {
+        const Window xw = glfwGetX11Window(m_window);
+        if (xw)
+        {
+            if (m_x11InvisibleCursor == 0)
+                m_x11InvisibleCursor = CreateInvisibleX11Cursor(dpy);
+            if (m_x11InvisibleCursor != 0)
+            {
+                XDefineCursor(dpy, xw, static_cast<Cursor>(m_x11InvisibleCursor));
+                XFlush(dpy);
+            }
+            XFixesHideCursor(dpy, xw);
+            XFlush(dpy);
+            m_xfixesCursorHidden = true;
+        }
+    }
+#endif
+#else
+    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+#endif
 }
 
 void Engine::OnFramebufferResize(int newScreenWidth, int newScreenHeight)
@@ -400,6 +488,27 @@ void Engine::Shutdown()
     }
 
     if (m_window) {
+#if defined(__linux__) && defined(GAM200_HAVE_XFIXES)
+        if (Display* dpy = glfwGetX11Display())
+        {
+            const Window xw = glfwGetX11Window(m_window);
+            if (xw)
+            {
+                if (m_xfixesCursorHidden)
+                {
+                    XFixesShowCursor(dpy, xw);
+                    m_xfixesCursorHidden = false;
+                }
+                if (m_x11InvisibleCursor != 0)
+                {
+                    XUndefineCursor(dpy, xw);
+                    XFreeCursor(dpy, static_cast<Cursor>(m_x11InvisibleCursor));
+                    m_x11InvisibleCursor = 0;
+                    XFlush(dpy);
+                }
+            }
+        }
+#endif
         glfwDestroyWindow(m_window);
         m_window = nullptr;
     }

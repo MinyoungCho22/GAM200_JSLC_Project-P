@@ -65,6 +65,7 @@ private:
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void FramebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void WindowFocusCallback(GLFWwindow* window, int focused);
+    static void CursorEnterCallback(GLFWwindow* window, int entered);
     void OnFramebufferResize(int newScreenWidth, int newScreenHeight);
     void SyncPostProcessDisplaySize();
     void ApplyCustomCursorHidden();
@@ -97,4 +98,9 @@ private:
     int m_windowedHeight = VIRTUAL_HEIGHT;
 
     std::unique_ptr<PostProcessManager> m_postProcess;
+
+#if defined(__linux__) && defined(GAM200_HAVE_XFIXES)
+    bool m_xfixesCursorHidden = false;
+    unsigned long m_x11InvisibleCursor = 0; // X11 Cursor XID; 0 = not created
+#endif
 };

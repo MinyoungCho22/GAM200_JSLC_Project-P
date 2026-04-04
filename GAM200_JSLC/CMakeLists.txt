@@ -109,7 +109,7 @@ find_package(PkgConfig QUIET)
 
 if(UNIX AND NOT APPLE)
     message(STATUS "Linux/WSL build: install dev packages if configure fails, e.g. "
-        "sudo apt install build-essential cmake ninja-build libglew-dev libglfw3-dev libsdl2-dev libgl1-mesa-dev pkg-config")
+        "sudo apt install build-essential cmake ninja-build libglew-dev libglfw3-dev libsdl2-dev libgl1-mesa-dev libxfixes-dev pkg-config")
     # Bundled include/GL/*.h are MSVC/Windows-oriented; skip GLFW's GL include and use GLEW + system GL only.
     target_compile_definitions(${PROJECT_NAME} PRIVATE GLFW_INCLUDE_NONE)
 endif()
@@ -160,6 +160,17 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
     if(CMAKE_DL_LIBS)
         target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
+    endif()
+    # XFixesHideCursor: WSLg/XWayland often still draws the system pointer over GLFW_CURSOR_HIDDEN.
+    find_library(GAM200_XFIXES_LIB NAMES Xfixes)
+    find_path(GAM200_XFIXES_INCLUDE_DIR NAMES Xfixes.h PATH_SUFFIXES X11/extensions
+        PATHS /usr/include /usr/local/include)
+    if(GAM200_XFIXES_LIB AND GAM200_XFIXES_INCLUDE_DIR)
+        find_library(GAM200_X11_LIB NAMES X11)
+        if(GAM200_X11_LIB)
+            target_compile_definitions(${PROJECT_NAME} PRIVATE GAM200_HAVE_XFIXES=1)
+            target_link_libraries(${PROJECT_NAME} PRIVATE ${GAM200_XFIXES_LIB} ${GAM200_X11_LIB})
+        endif()
     endif()
 endif()
 
