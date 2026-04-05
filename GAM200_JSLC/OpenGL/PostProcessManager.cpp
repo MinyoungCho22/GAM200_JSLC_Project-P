@@ -30,7 +30,11 @@ void QueryPresentationFramebufferSize(GLFWwindow* window, int& outW, int& outH)
         return;
     const int dw = outW > sw ? outW - sw : sw - outW;
     const int dh = outH > sh ? outH - sh : sh - outH;
-    if (dw > 1 || dh > 1)
+    // Only replace when the framebuffer still looks oversized vs. window x content scale.
+    // After leaving fullscreen, glfwGetFramebufferSize often updates before glfwGetWindowSize;
+    // the old logic would clobber the correct FB dimensions with stale (larger) ww*scale and
+    // break post.frag letterboxing (settings / passthrough looks stretched).
+    if ((dw > 1 || dh > 1) && outW >= sw && outH >= sh)
     {
         outW = sw;
         outH = sh;
