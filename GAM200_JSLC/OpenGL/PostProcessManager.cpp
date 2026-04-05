@@ -88,6 +88,7 @@ void PostProcessManager::Initialize(int width, int height)
     m_postShader->setBool("uUseLightOverlay", m_settings.useLightOverlay);
     m_postShader->setFloat("uLightOverlayStrength", m_settings.lightOverlayStrength);
     m_postShader->setVec2("uFramebufferSize", static_cast<float>(m_width), static_cast<float>(m_height));
+    m_postShader->setBool("uViewportLetterboxPresent", false);
 
     m_lightOverlay = std::make_unique<Background>();
     m_lightOverlay->Initialize("Asset/Hallway_Light.png");
@@ -178,10 +179,24 @@ void PostProcessManager::ApplyAndPresent()
     int fbH = 0;
     if (m_presentationWindow)
     {
+        if (m_passthrough)
+        {
 #ifdef __APPLE__
-        glfwPollEvents();
+            // Fullscreen <-> windowed can commit over multiple event ticks; drain before reading size.
+            for (int i = 0; i < 4; ++i)
+                glfwPollEvents();
 #endif
-        QueryPresentationFramebufferSize(m_presentationWindow, fbW, fbH);
+            // Passthrough (settings / game over): avoid macOS window×scale heuristics — they can disagree
+            // with the real drawable right after leaving fullscreen while the UI is visible.
+            glfwGetFramebufferSize(m_presentationWindow, &fbW, &fbH);
+        }
+        else
+        {
+#ifdef __APPLE__
+            glfwPollEvents();
+#endif
+            QueryPresentationFramebufferSize(m_presentationWindow, fbW, fbH);
+        }
     }
     if (fbW <= 0 || fbH <= 0)
     {
@@ -194,14 +209,32 @@ void PostProcessManager::ApplyAndPresent()
     m_displayWidth = fbW;
     m_displayHeight = fbH;
 
-    GL::Viewport(0, 0, fbW, fbH);
     GL::ClearColor(0.f, 0.f, 0.f, 1.f);
-    GL::Clear(GL_COLOR_BUFFER_BIT);
+
+    int presentVpX = 0;
+    int presentVpY = 0;
+    int presentVpW = fbW;
+    int presentVpH = fbH;
+
+    if (m_passthrough)
+    {
+        // Letterbox in the viewport so fragment UVs match scene texels 1:1 (no shader aspect remap).
+        GL::Viewport(0, 0, fbW, fbH);
+        GL::Clear(GL_COLOR_BUFFER_BIT);
+        ComputeLetterboxViewport(fbW, fbH, presentVpX, presentVpY, presentVpW, presentVpH);
+        GL::Viewport(presentVpX, presentVpY, presentVpW, presentVpH);
+    }
+    else
+    {
+        GL::Viewport(0, 0, fbW, fbH);
+        GL::Clear(GL_COLOR_BUFFER_BIT);
+    }
 
     m_postShader->use();
     m_postShader->setFloat("uExposure", m_passthrough ? 1.0f : m_settings.exposure);
     m_postShader->setBool("uUseLightOverlay", !m_passthrough && m_settings.useLightOverlay);
     m_postShader->setFloat("uLightOverlayStrength", m_settings.lightOverlayStrength);
+    m_postShader->setBool("uViewportLetterboxPresent", m_passthrough);
 
     m_postShader->setVec2("uCameraPos", m_settings.cameraPos.x, m_settings.cameraPos.y);
     m_postShader->setVec2("uGameSize", static_cast<float>(m_width), static_cast<float>(m_height));
