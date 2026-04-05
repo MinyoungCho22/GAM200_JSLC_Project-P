@@ -49,7 +49,7 @@ unsigned long CreateInvisibleX11Cursor(Display* dpy)
 }
 } // namespace
 #endif
-
+//
 Engine::Engine() = default;
 Engine::~Engine() = default;
 
