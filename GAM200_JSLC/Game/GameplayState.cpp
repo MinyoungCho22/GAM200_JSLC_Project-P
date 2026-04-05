@@ -21,12 +21,33 @@
 
 #include "../Engine/Sound.hpp"
 
+#ifndef GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_NONE
+#endif
+#include <GLFW/glfw3.h>
+
 constexpr float GROUND_LEVEL = 180.0f;
 constexpr float VISUAL_Y_OFFSET = 0.0f;
 constexpr float ATTACK_RANGE = 400.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
+
+// Gamepad: wider drone “aim” box than mouse (collision unchanged elsewhere).
+constexpr float kGamepadDroneAimHitboxScale = 2.35f;
+// Magnet snap in virtual view pixels (~game projection units).
+constexpr float kPadMagnetInnerGame = 42.0f;
+constexpr float kPadMagnetOuterGame = 125.0f;
+constexpr float kPadManualSnapMaxWorld = 3000.0f;
+
+namespace
+{
+Math::Vec2 DronePulseTargetCenter(const Drone& d)
+{
+    const Math::Vec2 hb = d.GetSize() * 0.8f;
+    return d.GetPosition() + hb * 0.5f;
+}
+} // namespace
 
 // Hallway hiding-box S.png: only while hall post-process is on; fades by player distance to spot top.
 constexpr float HIDING_S_PROMPT_DISTANCE = 300.0f;
@@ -498,6 +519,8 @@ void GameplayState::Update(double dt)
     double mouseScreenX, mouseScreenY;
     input.GetMousePosition(mouseScreenX, mouseScreenY);
     Math::Vec2 mouseWorldPos = ScreenToWorldCoordinates(mouseScreenX, mouseScreenY);
+    if (!m_isGameOver && input.IsGamepadConnected())
+        ApplyGamepadDroneTargetingAssist(dt, input, mouseWorldPos);
     m_lastMouseWorldPos = mouseWorldPos;
 
     // Auto hot-reload on file save for map object coordinates/sizes/sprites.
@@ -585,7 +608,8 @@ void GameplayState::Update(double dt)
                 {
                     if (drone.IsDead() || drone.IsHit()) continue;
                     float distSq = (playerCenter - drone.GetPosition()).LengthSq();
-                    Math::Vec2 droneHitboxSize = drone.GetSize() * 0.8f;
+                    Math::Vec2 droneHitboxSize = drone.GetSize() *
+                        (input.IsGamepadConnected() ? kGamepadDroneAimHitboxScale : 0.8f);
                     float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
                     float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
                     float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
@@ -1260,6 +1284,176 @@ Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screen
     return worldPos;
 }
 
+void GameplayState::WorldToFramebuffer(Math::Vec2 world, double& outFbX, double& outFbY) const
+{
+    Math::Vec2 cam = m_camera.GetPosition();
+    const float mouseGameX = world.x - cam.x + GAME_WIDTH * 0.5f;
+    const float mouseGameY = world.y - cam.y + GAME_HEIGHT * 0.5f;
+    const float mouseNDCX = mouseGameX / GAME_WIDTH;
+    const float mouseNDCY = 1.0f - mouseGameY / GAME_HEIGHT;
+
+    GLFWwindow* w = gsm.GetEngine().GetWindow();
+    int winW = 0;
+    int winH = 0;
+    glfwGetWindowSize(w, &winW, &winH);
+    int fbW = 0;
+    int fbH = 0;
+    glfwGetFramebufferSize(w, &fbW, &fbH);
+    if (winW <= 0 || winH <= 0 || fbW <= 0 || fbH <= 0)
+    {
+        outFbX = 0.0;
+        outFbY = 0.0;
+        return;
+    }
+
+    const float wa = static_cast<float>(winW) / static_cast<float>(winH);
+    const float ga = GAME_WIDTH / GAME_HEIGHT;
+    int vx = 0;
+    int vy = 0;
+    int vw = winW;
+    int vh = winH;
+    if (wa > ga)
+    {
+        vw = static_cast<int>(static_cast<float>(winH) * ga);
+        vx = (winW - vw) / 2;
+    }
+    else if (wa < ga)
+    {
+        vh = static_cast<int>(static_cast<float>(winW) / ga);
+        vy = (winH - vh) / 2;
+    }
+
+    const float mvx = mouseNDCX * static_cast<float>(vw);
+    const float mvy = mouseNDCY * static_cast<float>(vh);
+    const double winX = static_cast<double>(vx) + static_cast<double>(mvx);
+    const double winY = static_cast<double>(vy) + static_cast<double>(mvy);
+    outFbX = winX * static_cast<double>(fbW) / static_cast<double>(winW);
+    outFbY = winY * static_cast<double>(fbH) / static_cast<double>(winH);
+}
+
+void GameplayState::ApplyGamepadDroneTargetingAssist(double dt, Input::Input& input, Math::Vec2& inOutMouseWorldPos)
+{
+    const Math::Vec2 cam = m_camera.GetPosition();
+    const float curGameX = inOutMouseWorldPos.x - cam.x + GAME_WIDTH * 0.5f;
+    const float curGameY = inOutMouseWorldPos.y - cam.y + GAME_HEIGHT * 0.5f;
+
+    const Drone* nearestMagnet = nullptr;
+    float bestMagnetDistSq = 1.0e30f;
+
+    auto considerMagnet = [&](const Drone& d) {
+        if (d.IsDead() || d.IsHit())
+            return;
+        const Math::Vec2 c = DronePulseTargetCenter(d);
+        const float gX = c.x - cam.x + GAME_WIDTH * 0.5f;
+        const float gY = c.y - cam.y + GAME_HEIGHT * 0.5f;
+        const float dx = gX - curGameX;
+        const float dy = gY - curGameY;
+        const float dsq = dx * dx + dy * dy;
+        if (dsq < bestMagnetDistSq)
+        {
+            bestMagnetDistSq = dsq;
+            nearestMagnet = &d;
+        }
+    };
+
+    for (const auto& d : droneManager->GetDrones())
+        considerMagnet(d);
+    for (const auto& d : m_hallway->GetDrones())
+        considerMagnet(d);
+    for (const auto& d : m_rooftop->GetDrones())
+        considerMagnet(d);
+    if (m_undergroundAccessed)
+    {
+        for (const auto& d : m_underground->GetDrones())
+            considerMagnet(d);
+    }
+    if (m_subwayAccessed)
+    {
+        for (const auto& d : m_subway->GetDrones())
+            considerMagnet(d);
+    }
+
+    // R3: snap cursor to nearest drone within world distance (LB is pulse absorb).
+    if (input.IsGamepadButtonTriggered(GLFW_GAMEPAD_BUTTON_RIGHT_THUMB))
+    {
+        const Drone* best = nullptr;
+        float bestWorldSq = 1.0e30f;
+        const float maxSq = kPadManualSnapMaxWorld * kPadManualSnapMaxWorld;
+
+        auto considerManual = [&](const Drone& d) {
+            if (d.IsDead() || d.IsHit())
+                return;
+            const Math::Vec2 c = DronePulseTargetCenter(d);
+            const float dx = inOutMouseWorldPos.x - c.x;
+            const float dy = inOutMouseWorldPos.y - c.y;
+            const float dsq = dx * dx + dy * dy;
+            if (dsq <= maxSq && dsq < bestWorldSq)
+            {
+                bestWorldSq = dsq;
+                best = &d;
+            }
+        };
+
+        for (const auto& d : droneManager->GetDrones())
+            considerManual(d);
+        for (const auto& d : m_hallway->GetDrones())
+            considerManual(d);
+        for (const auto& d : m_rooftop->GetDrones())
+            considerManual(d);
+        if (m_undergroundAccessed)
+        {
+            for (const auto& d : m_underground->GetDrones())
+                considerManual(d);
+        }
+        if (m_subwayAccessed)
+        {
+            for (const auto& d : m_subway->GetDrones())
+                considerManual(d);
+        }
+
+        if (best)
+        {
+            const Math::Vec2 targetW = DronePulseTargetCenter(*best);
+            double fbX = 0.0;
+            double fbY = 0.0;
+            WorldToFramebuffer(targetW, fbX, fbY);
+            input.SetMouseFramebufferPosition(fbX, fbY);
+            input.ClearGamepadAimVelocity();
+            inOutMouseWorldPos = targetW;
+            return;
+        }
+    }
+
+    if (!nearestMagnet)
+        return;
+
+    const float dist = std::sqrt(bestMagnetDistSq);
+    const Math::Vec2 targetW = DronePulseTargetCenter(*nearestMagnet);
+    double curFbX = 0.0;
+    double curFbY = 0.0;
+    input.GetMousePosition(curFbX, curFbY);
+    double tgtFbX = 0.0;
+    double tgtFbY = 0.0;
+    WorldToFramebuffer(targetW, tgtFbX, tgtFbY);
+
+    if (dist < kPadMagnetInnerGame)
+    {
+        input.SetMouseFramebufferPosition(tgtFbX, tgtFbY);
+        input.ClearGamepadAimVelocity();
+        inOutMouseWorldPos = targetW;
+    }
+    else if (dist < kPadMagnetOuterGame)
+    {
+        const float span = (std::max)(1.0e-3f, kPadMagnetOuterGame - kPadMagnetInnerGame);
+        const float u = (kPadMagnetOuterGame - dist) / span;
+        const float alpha = (std::min)(1.0f, u * u * (22.0f * static_cast<float>(dt)));
+        const double nx = curFbX + (tgtFbX - curFbX) * static_cast<double>(alpha);
+        const double ny = curFbY + (tgtFbY - curFbY) * static_cast<double>(alpha);
+        input.SetMouseFramebufferPosition(nx, ny);
+        inOutMouseWorldPos = ScreenToWorldCoordinates(nx, ny);
+    }
+}
+
 void GameplayState::Draw()
 {
     DrawMainLayer();
@@ -1681,9 +1875,12 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         }
 
         // Combat targets are also left-click targets: drones/robots/tracers.
+        const float droneHoverScale =
+            inputForCursor.IsGamepadConnected() ? kGamepadDroneAimHitboxScale : 0.8f;
         auto isMouseOnDrone = [&](const Drone& drone) {
             if (drone.IsDead() || drone.IsHit()) return false;
-            return Collision::CheckPointInAABB(mouseWorldPosForHover, drone.GetPosition(), drone.GetSize() * 0.8f);
+            return Collision::CheckPointInAABB(mouseWorldPosForHover, drone.GetPosition(),
+                                               drone.GetSize() * droneHoverScale);
         };
         auto isMouseOnRobot = [&](const Robot& robot) {
             if (robot.IsDead()) return false;

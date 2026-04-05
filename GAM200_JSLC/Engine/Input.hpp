@@ -80,6 +80,13 @@ namespace Input
         void SetGamepadAimSensitivity(float sensitivity);
         float GetGamepadAimSensitivity() const { return m_gamepadAimSensitivity; }
 
+        /** Move logical cursor in framebuffer pixel space (matches GetMousePosition). */
+        void SetMouseFramebufferPosition(double framebufferX, double framebufferY);
+        void ClearGamepadAimVelocity();
+
+        bool IsGamepadButtonPressed(int glfwGamepadButton) const;
+        bool IsGamepadButtonTriggered(int glfwGamepadButton) const;
+
     private:
         GLFWwindow* m_window = nullptr;
 

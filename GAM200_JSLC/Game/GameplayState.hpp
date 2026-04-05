@@ -52,6 +52,8 @@ private:
     void HandleRooftopToUndergroundTransition();
     void HandleUndergroundToSubwayTransition();
     Math::Vec2 ScreenToWorldCoordinates(double screenX, double screenY) const;
+    void WorldToFramebuffer(Math::Vec2 world, double& outFbX, double& outFbY) const;
+    void ApplyGamepadDroneTargetingAssist(double dt, Input::Input& input, Math::Vec2& inOutMouseWorldPos);
 
     GameStateManager& gsm;
     Player player;

@@ -12,8 +12,8 @@ namespace Input
         // Right stick → virtual cursor (framebuffer pixels/sec at full deflection before curve).
         constexpr double kGamepadAimBaseSpeed = 2200.0;
         constexpr float kGamepadAimDeadzone = 0.18f;
-        // >1: finer control when barely tilting the stick.
-        constexpr float kGamepadAimCurveExponent = 1.38f;
+        // Higher = finer micro-aim on stick (pad-only curve in Update).
+        constexpr float kGamepadAimCurveExponent = 2.25f;
         // Velocity low-pass toward stick target (higher = snappier, lower = smoother).
         constexpr double kGamepadAimSmoothLambda = 16.0;
         constexpr float kGamepadStickMaxMag = 1.41421356f; // sqrt(2) for per-axis ±1 pads
@@ -22,6 +22,46 @@ namespace Input
     void Input::SetGamepadAimSensitivity(float sensitivity)
     {
         m_gamepadAimSensitivity = std::max(0.1f, std::min(sensitivity, 4.0f));
+    }
+
+    void Input::SetMouseFramebufferPosition(double framebufferX, double framebufferY)
+    {
+        if (!m_window)
+            return;
+        int winW = 0;
+        int winH = 0;
+        int fbW = 0;
+        int fbH = 0;
+        glfwGetWindowSize(m_window, &winW, &winH);
+        glfwGetFramebufferSize(m_window, &fbW, &fbH);
+        if (winW <= 0 || winH <= 0 || fbW <= 0 || fbH <= 0)
+            return;
+        m_mouseX = (std::max)(0.0, (std::min)(static_cast<double>(fbW - 1), framebufferX));
+        m_mouseY = (std::max)(0.0, (std::min)(static_cast<double>(fbH - 1), framebufferY));
+        const double scaleX = static_cast<double>(fbW) / static_cast<double>(winW);
+        const double scaleY = static_cast<double>(fbH) / static_cast<double>(winH);
+        glfwSetCursorPos(m_window, m_mouseX / scaleX, m_mouseY / scaleY);
+    }
+
+    void Input::ClearGamepadAimVelocity()
+    {
+        m_gamepadAimVelX = 0.0;
+        m_gamepadAimVelY = 0.0;
+    }
+
+    bool Input::IsGamepadButtonPressed(int glfwGamepadButton) const
+    {
+        if (!m_gamepadConnected || glfwGamepadButton < 0 || glfwGamepadButton > GLFW_GAMEPAD_BUTTON_LAST)
+            return false;
+        return m_gamepadCurr.buttons[static_cast<size_t>(glfwGamepadButton)] == GLFW_PRESS;
+    }
+
+    bool Input::IsGamepadButtonTriggered(int glfwGamepadButton) const
+    {
+        if (!m_gamepadConnected || glfwGamepadButton < 0 || glfwGamepadButton > GLFW_GAMEPAD_BUTTON_LAST)
+            return false;
+        const size_t i = static_cast<size_t>(glfwGamepadButton);
+        return m_gamepadCurr.buttons[i] == GLFW_PRESS && m_gamepadPrev.buttons[i] == GLFW_RELEASE;
     }
 
     void Input::Initialize(GLFWwindow* window)
