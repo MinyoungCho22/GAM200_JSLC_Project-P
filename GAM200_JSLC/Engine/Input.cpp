@@ -7,6 +7,23 @@
 
 namespace Input
 {
+    namespace
+    {
+        // Right stick → virtual cursor (framebuffer pixels/sec at full deflection before curve).
+        constexpr double kGamepadAimBaseSpeed = 2200.0;
+        constexpr float kGamepadAimDeadzone = 0.18f;
+        // >1: finer control when barely tilting the stick.
+        constexpr float kGamepadAimCurveExponent = 1.38f;
+        // Velocity low-pass toward stick target (higher = snappier, lower = smoother).
+        constexpr double kGamepadAimSmoothLambda = 16.0;
+        constexpr float kGamepadStickMaxMag = 1.41421356f; // sqrt(2) for per-axis ±1 pads
+    }
+
+    void Input::SetGamepadAimSensitivity(float sensitivity)
+    {
+        m_gamepadAimSensitivity = std::max(0.1f, std::min(sensitivity, 4.0f));
+    }
+
     void Input::Initialize(GLFWwindow* window)
     {
         m_window = window;
@@ -17,6 +34,8 @@ namespace Input
         m_mouseButtonStatePrevious.fill(GLFW_RELEASE);
         std::memset(&m_gamepadCurr, 0, sizeof(m_gamepadCurr));
         std::memset(&m_gamepadPrev, 0, sizeof(m_gamepadPrev));
+        m_gamepadAimVelX = 0.0;
+        m_gamepadAimVelY = 0.0;
     }
 
     void Input::Update(double dt)
@@ -66,6 +85,8 @@ namespace Input
         else
         {
             std::memset(&m_gamepadCurr, 0, sizeof(m_gamepadCurr));
+            m_gamepadAimVelX = 0.0;
+            m_gamepadAimVelY = 0.0;
         }
 
         // Right stick moves the logical cursor (same space as mouse) for targeting with a gamepad.
@@ -73,12 +94,32 @@ namespace Input
         {
             const float rx = m_gamepadCurr.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
             const float ry = m_gamepadCurr.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
-            constexpr float rdz = 0.15f;
-            if (std::fabs(rx) > rdz || std::fabs(ry) > rdz)
+            const float mag = std::sqrt(rx * rx + ry * ry);
+
+            double targetVx = 0.0;
+            double targetVy = 0.0;
+            if (mag > kGamepadAimDeadzone)
             {
-                const double speed = 2200.0 * dt;
-                m_mouseX += static_cast<double>(rx) * speed;
-                m_mouseY += static_cast<double>(ry) * speed;
+                const float dirX = rx / mag;
+                const float dirY = ry / mag;
+                const float denom = (std::max)(1.0e-4f, kGamepadStickMaxMag - kGamepadAimDeadzone);
+                const float rawT = (mag - kGamepadAimDeadzone) / denom;
+                const float t = (std::min)(1.0f, (std::max)(0.0f, rawT));
+                const float curved = std::pow(t, kGamepadAimCurveExponent);
+                const double speed =
+                    static_cast<double>(curved) * kGamepadAimBaseSpeed * static_cast<double>(m_gamepadAimSensitivity);
+                targetVx = static_cast<double>(dirX) * speed;
+                targetVy = static_cast<double>(dirY) * speed;
+            }
+
+            const double smoothAlpha = 1.0 - std::exp(-kGamepadAimSmoothLambda * dt);
+            m_gamepadAimVelX += (targetVx - m_gamepadAimVelX) * smoothAlpha;
+            m_gamepadAimVelY += (targetVy - m_gamepadAimVelY) * smoothAlpha;
+
+            if (std::fabs(m_gamepadAimVelX) > 1e-3 || std::fabs(m_gamepadAimVelY) > 1e-3)
+            {
+                m_mouseX += m_gamepadAimVelX * dt;
+                m_mouseY += m_gamepadAimVelY * dt;
                 m_mouseX = (std::max)(0.0, (std::min)(static_cast<double>(framebufferWidth - 1), m_mouseX));
                 m_mouseY = (std::max)(0.0, (std::min)(static_cast<double>(framebufferHeight - 1), m_mouseY));
 
@@ -86,6 +127,11 @@ namespace Input
                 const double scaleY = static_cast<double>(framebufferHeight) / static_cast<double>(windowHeight);
                 glfwSetCursorPos(m_window, m_mouseX / scaleX, m_mouseY / scaleY);
             }
+        }
+        else
+        {
+            m_gamepadAimVelX = 0.0;
+            m_gamepadAimVelY = 0.0;
         }
     }
 

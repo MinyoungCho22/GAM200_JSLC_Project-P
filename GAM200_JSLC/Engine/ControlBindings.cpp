@@ -148,6 +148,7 @@ void ControlBindings::ApplyDefaults()
     m_slots[static_cast<size_t>(ControlAction::MoveRight)] = { { BindKind::Key, GLFW_KEY_D, 0 } };
     m_slots[static_cast<size_t>(ControlAction::Jump)] = {
         { BindKind::Key, GLFW_KEY_SPACE, 0 },
+        { BindKind::Key, GLFW_KEY_W, 0 },
         { BindKind::GamepadButton, GLFW_GAMEPAD_BUTTON_A, 0 },
     };
     m_slots[static_cast<size_t>(ControlAction::Dash)] = {

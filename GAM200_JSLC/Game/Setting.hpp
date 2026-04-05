@@ -30,11 +30,15 @@ public:
     bool BypassPostProcess() const override { return true; }
 
 private:
-    enum class MenuItem { FPS, VSync, Fullscreen, Volume, Exit };
+    enum class MenuItem { FPS, VSync, Fullscreen, Volume, PadAim, Exit };
+    static constexpr int MENU_ITEM_COUNT = 6;
 
     static constexpr int FPS_COUNT = 5;
     static constexpr int FPS_VALUES[FPS_COUNT] = { 30, 60, 144, 240, 0 };
     static constexpr float VOLUME_STEP = 0.05f;
+    static constexpr float PAD_AIM_STEP = 0.1f;
+    static constexpr float PAD_AIM_MIN = 0.5f;
+    static constexpr float PAD_AIM_MAX = 2.0f;
 
     GameStateManager& gsm;
     std::unique_ptr<Shader> m_colorShader;
@@ -47,6 +51,7 @@ private:
     bool  m_vsyncEnabled = false;
     bool  m_fullscreenEnabled = false;
     float m_masterVolume = 0.8f;   // 0.0 to 1.0
+    float m_padAimSensitivity = 1.0f;
 
     // OpenGL objects
     unsigned int m_overlayVAO = 0;
@@ -60,6 +65,7 @@ private:
     CachedTextureInfo m_vsyncLabelText;
     CachedTextureInfo m_fullscreenLabelText;
     CachedTextureInfo m_volumeLabelText;
+    CachedTextureInfo m_padAimLabelText;
     CachedTextureInfo m_exitText;
     CachedTextureInfo m_wasdHintText;
     CachedTextureInfo m_escHintText;
@@ -69,6 +75,7 @@ private:
     CachedTextureInfo m_vsyncValueText;
     CachedTextureInfo m_fullscreenValueText;
     CachedTextureInfo m_volumePctText;
+    CachedTextureInfo m_padAimValueText;
 
     // Rebuild dynamic text strings after a value changes
     void RebuildValueTexts();
@@ -82,6 +89,7 @@ private:
     void ApplyVSync();
     void ApplyFullscreen();
     void ApplyVolume();
+    void ApplyPadAim();
 
     const char* GetFpsLabel(int index) const;
 };

@@ -73,6 +73,10 @@ namespace Input
         const GLFWgamepadstate& GamepadCurrent() const { return m_gamepadCurr; }
         const GLFWgamepadstate& GamepadPrevious() const { return m_gamepadPrev; }
 
+        /** Right-stick virtual cursor speed multiplier (default 1; typical UI range 0.5–2). */
+        void SetGamepadAimSensitivity(float sensitivity);
+        float GetGamepadAimSensitivity() const { return m_gamepadAimSensitivity; }
+
     private:
         GLFWwindow* m_window = nullptr;
 
@@ -88,5 +92,9 @@ namespace Input
         bool m_gamepadConnected = false;
         GLFWgamepadstate m_gamepadCurr{};
         GLFWgamepadstate m_gamepadPrev{};
+
+        float m_gamepadAimSensitivity = 1.0f;
+        double m_gamepadAimVelX = 0.0;
+        double m_gamepadAimVelY = 0.0;
     };
 } // namespace Input

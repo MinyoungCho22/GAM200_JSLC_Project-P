@@ -22,8 +22,9 @@ constexpr float ROW_TITLE  = 800.0f;
 constexpr float ROW_FPS    = 640.0f;
 constexpr float ROW_VSYNC  = 520.0f;
 constexpr float ROW_FULLSCREEN = 400.0f;
-constexpr float ROW_VOLUME = 300.0f;
-constexpr float ROW_EXIT   = 180.0f;
+constexpr float ROW_VOLUME = 280.0f;
+constexpr float ROW_PAD_AIM = 200.0f;
+constexpr float ROW_EXIT   = 120.0f;
 constexpr float ROW_HINT   =  70.0f;
 
 constexpr float LABEL_SIZE = 52.0f;
@@ -81,6 +82,12 @@ void SettingState::ApplyVolume()
     SoundSystem::Instance().SetMasterVolume(m_masterVolume);
 }
 
+void SettingState::ApplyPadAim()
+{
+    m_padAimSensitivity = std::max(PAD_AIM_MIN, std::min(PAD_AIM_MAX, m_padAimSensitivity));
+    gsm.GetEngine().GetInput().SetGamepadAimSensitivity(m_padAimSensitivity);
+}
+
 // -----------------------------------------------------------------------------
 // Dynamic text rebuild
 // -----------------------------------------------------------------------------
@@ -109,6 +116,13 @@ void SettingState::RebuildValueTexts()
         int pct = static_cast<int>(std::round(m_masterVolume * 100.0f));
         m_volumePctText = m_font->PrintToTexture(*m_fontShader, std::to_string(pct) + "%");
     }
+
+    // Gamepad right-stick aim sensitivity (50%–200%)
+    {
+        int pct = static_cast<int>(std::round(m_padAimSensitivity * 100.0f));
+        std::string s = std::string("< ") + std::to_string(pct) + "% >";
+        m_padAimValueText = m_font->PrintToTexture(*m_fontShader, s);
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -133,6 +147,8 @@ void SettingState::Initialize()
     m_vsyncEnabled = engine.IsVSyncEnabled();
     m_fullscreenEnabled = engine.IsFullscreen();
     m_masterVolume = SoundSystem::Instance().GetMasterVolume();
+    m_padAimSensitivity = engine.GetInput().GetGamepadAimSensitivity();
+    m_padAimSensitivity = std::max(PAD_AIM_MIN, std::min(PAD_AIM_MAX, m_padAimSensitivity));
 
     int currentCap = engine.GetFpsCap();
     m_fpsIndex = FPS_COUNT - 1; // default: No Limit
@@ -147,10 +163,12 @@ void SettingState::Initialize()
     m_vsyncLabelText  = m_font->PrintToTexture(*m_fontShader, "VSync");
     m_fullscreenLabelText = m_font->PrintToTexture(*m_fontShader, "Fullscreen");
     m_volumeLabelText = m_font->PrintToTexture(*m_fontShader, "Volume");
+    m_padAimLabelText = m_font->PrintToTexture(*m_fontShader, "Pad Aim");
     m_exitText        = m_font->PrintToTexture(*m_fontShader, "Exit");
     m_wasdHintText    = m_font->PrintToTexture(*m_fontShader, "W: Up   S: Down   A: Left   D: Right");
     m_escHintText     = m_font->PrintToTexture(*m_fontShader, "[ESC] Back");
 
+    ApplyPadAim();
     RebuildValueTexts();
 
     // ---- Fullscreen overlay quad (0..1 range) --------------------------------
@@ -210,13 +228,13 @@ void SettingState::Update(double /*dt*/)
     if (moveUp)
     {
         int idx = static_cast<int>(m_selectedItem);
-        idx = (idx + 4) % 5; // 5 items, wrap upward
+        idx = (idx + MENU_ITEM_COUNT - 1) % MENU_ITEM_COUNT;
         m_selectedItem = static_cast<MenuItem>(idx);
     }
     else if (moveDown)
     {
         int idx = static_cast<int>(m_selectedItem);
-        idx = (idx + 1) % 5;
+        idx = (idx + 1) % MENU_ITEM_COUNT;
         m_selectedItem = static_cast<MenuItem>(idx);
     }
 
@@ -252,6 +270,15 @@ void SettingState::Update(double /*dt*/)
             ApplyVolume();
             RebuildValueTexts();
         }
+    }
+    else if (m_selectedItem == MenuItem::PadAim && (goLeft || goRight))
+    {
+        if (goRight)
+            m_padAimSensitivity = std::min(PAD_AIM_MAX, m_padAimSensitivity + PAD_AIM_STEP);
+        else
+            m_padAimSensitivity = std::max(PAD_AIM_MIN, m_padAimSensitivity - PAD_AIM_STEP);
+        ApplyPadAim();
+        RebuildValueTexts();
     }
     else if (m_selectedItem == MenuItem::Exit)
     {
@@ -340,6 +367,11 @@ void SettingState::Draw()
         selRowLeft = COL_LABEL - static_cast<float>(m_volumeLabelText.width) * (LABEL_SIZE / m_volumeLabelText.height);
         selRowRight = BAR_CX + BAR_W * 0.5f + 24.0f + static_cast<float>(m_volumePctText.width) * (VALUE_SIZE / m_volumePctText.height);
         break;
+    case MenuItem::PadAim:
+        selRowY = ROW_PAD_AIM;
+        selRowLeft = COL_LABEL - static_cast<float>(m_padAimLabelText.width) * (LABEL_SIZE / m_padAimLabelText.height);
+        selRowRight = COL_VALUE + static_cast<float>(m_padAimValueText.width) * (VALUE_SIZE / m_padAimValueText.height);
+        break;
     case MenuItem::Exit:
         selRowY = ROW_EXIT;
         selRowLeft = GAME_WIDTH * 0.5f - static_cast<float>(m_exitText.width) * (VALUE_SIZE / m_exitText.height) * 0.5f;
@@ -407,6 +439,10 @@ void SettingState::Draw()
         float pctX = BAR_CX + BAR_W * 0.5f + 24.0f;
         m_font->DrawBakedText(*m_fontShader, m_volumePctText, { pctX, ROW_VOLUME }, VALUE_SIZE);
     }
+
+    // Gamepad aim sensitivity
+    drawLabel(m_padAimLabelText, ROW_PAD_AIM);
+    drawValue(m_padAimValueText, ROW_PAD_AIM);
 
     // Exit row
     if (m_selectedItem == MenuItem::Exit)

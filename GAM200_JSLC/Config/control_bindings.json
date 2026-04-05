@@ -9,6 +9,7 @@
     ],
     "jump": [
       { "type": "key", "key": 32 },
+      { "type": "key", "key": 87 },
       { "type": "gamepad_button", "button": 0 }
     ],
     "dash": [
