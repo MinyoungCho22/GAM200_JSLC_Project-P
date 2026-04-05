@@ -145,7 +145,7 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
 
     if (controls.IsActionTriggered(ControlAction::Jump, input)) Jump();
 
-    if (input.IsKeyPressed(Input::Key::S)) Crouch();
+    if (input.IsCrouchHeld()) Crouch();
     else StopCrouch();
     if (controls.IsActionPressed(ControlAction::Dash, input)) Dash();
 

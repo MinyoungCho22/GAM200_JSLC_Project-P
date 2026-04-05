@@ -148,7 +148,7 @@ void Tutorial::DisableAll()
 void Tutorial::Update(float dt, Player& player, const Input::Input& input, Room* room, Hallway* hallway, Rooftop* rooftop, Door* roomDoor, Door* rooftopDoor)
 {
     // Manage state for the "Hold S to Hide" tutorial
-    if (!m_crouchTutorialCompleted && input.IsKeyPressed(Input::Key::S))
+    if (!m_crouchTutorialCompleted && input.IsCrouchHeld())
     {
         m_crouchTimer += dt;
     }

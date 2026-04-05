@@ -64,6 +64,9 @@ namespace Input
         bool IsMouseButtonPressed(MouseButton button) const;
         bool IsMouseButtonTriggered(MouseButton button) const;
 
+        /** Crouch: S key or gamepad left stick down (same threshold as horizontal move stick). */
+        bool IsCrouchHeld() const;
+
         void GetMousePosition(double& x, double& y) const;
 
         double GetMouseX() const { return m_mouseX; }

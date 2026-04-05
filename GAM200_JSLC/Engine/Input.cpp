@@ -172,6 +172,21 @@ namespace Input
             && m_mouseButtonStatePrevious.at(static_cast<size_t>(button)) == GLFW_RELEASE;
     }
 
+    bool Input::IsCrouchHeld() const
+    {
+        if (IsKeyPressed(Key::S))
+            return true;
+        if (m_gamepadConnected)
+        {
+            // GLFW: left stick Y positive = down (same as ControlBindings move deadzone).
+            constexpr float dz = 0.2f;
+            const float ly = m_gamepadCurr.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+            if (ly > dz)
+                return true;
+        }
+        return false;
+    }
+
     void Input::GetMousePosition(double& x, double& y) const
     {
         x = m_mouseX;

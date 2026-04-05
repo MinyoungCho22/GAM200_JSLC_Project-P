@@ -23,9 +23,11 @@ constexpr float ROW_FPS    = 640.0f;
 constexpr float ROW_VSYNC  = 520.0f;
 constexpr float ROW_FULLSCREEN = 400.0f;
 constexpr float ROW_VOLUME = 280.0f;
-constexpr float ROW_PAD_AIM = 200.0f;
-constexpr float ROW_EXIT   = 120.0f;
-constexpr float ROW_HINT   =  70.0f;
+constexpr float ROW_PAD_AIM = 220.0f;
+constexpr float ROW_EXIT   = 168.0f;
+// Hints at bottom (ortho y-up): keep clear gap below Exit row + highlight bar.
+constexpr float ROW_HINT_WASD = 95.0f;
+constexpr float ROW_HINT_ESC  = 42.0f;
 
 constexpr float LABEL_SIZE = 52.0f;
 constexpr float VALUE_SIZE = 52.0f;
@@ -461,16 +463,14 @@ void SettingState::Draw()
                               VALUE_SIZE);
     }
 
-    // ESC hint
     m_font->DrawBakedText(*m_fontShader, m_wasdHintText,
                           { GAME_WIDTH * 0.5f - m_wasdHintText.width * (HINT_SIZE / m_wasdHintText.height) * 0.5f,
-                            ROW_HINT + 38.0f },
+                            ROW_HINT_WASD },
                           HINT_SIZE);
 
-    // ESC hint
     m_font->DrawBakedText(*m_fontShader, m_escHintText,
                           { GAME_WIDTH * 0.5f - m_escHintText.width * (HINT_SIZE / m_escHintText.height) * 0.5f,
-                            ROW_HINT },
+                            ROW_HINT_ESC },
                           HINT_SIZE);
 }
 
