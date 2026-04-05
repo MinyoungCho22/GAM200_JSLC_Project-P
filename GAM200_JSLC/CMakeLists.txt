@@ -40,8 +40,17 @@ file(GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS
     "OpenGL/Shaders/*.frag"
 )
 
+if(APPLE)
+    enable_language(OBJCXX)
+endif()
+
 # 3. Create Executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${SHADER_FILES})
+
+if(APPLE)
+    target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/OpenGL/MacFramebufferSize.mm")
+    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework Cocoa")
+endif()
 
 # Windows: product name + icon (Robot_High.png → Win32/app_icon.ico via Win32/RefreshAppIcon.ps1; embedded by app.rc)
 if(WIN32)
