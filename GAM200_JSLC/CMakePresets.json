@@ -7,6 +7,21 @@
   },
   "configurePresets": [
     {
+      "name": "vs2022-x64",
+      "displayName": "Visual Studio 2022 (x64)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "binaryDir": "${sourceDir}/build/build-vs2022",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
       "name": "web-release",
       "displayName": "Web Release (Emscripten)",
       "generator": "Ninja",
@@ -17,6 +32,18 @@
     }
   ],
   "buildPresets": [
+    {
+      "name": "vs2022-debug",
+      "displayName": "VS2022 Debug",
+      "configurePreset": "vs2022-x64",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2022-release",
+      "displayName": "VS2022 Release",
+      "configurePreset": "vs2022-x64",
+      "configuration": "Release"
+    },
     {
       "name": "web-release",
       "configurePreset": "web-release"

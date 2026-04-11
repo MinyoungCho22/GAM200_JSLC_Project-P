@@ -33,6 +33,11 @@ void SplashState::Initialize()
     // ── Shaders ───────────────────────────────────────────────────────────
     m_splashShader = std::make_unique<Shader>(
         "OpenGL/Shaders/splash.vert",
+
+
+
+
+        
         "OpenGL/Shaders/splash.frag");
     m_splashShader->use();
     m_splashShader->setInt("ourTexture", 0);

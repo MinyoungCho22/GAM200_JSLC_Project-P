@@ -454,7 +454,7 @@ if(EMSCRIPTEN)
     target_compile_definitions(${PROJECT_NAME} PRIVATE WITH_SDL2_STATIC)
     # SoLoud SDL2 backend includes SDL.h — Emscripten only exposes real SDL2 when this is set at compile time too.
     # contrib.glfw3: full GLFW 3.4 (gamepad via glfwGetGamepadState); built-in -sUSE_GLFW=3 lacks these symbols.
-    target_compile_options(${PROJECT_NAME} PRIVATE "SHELL:-sUSE_SDL=2" "SHELL:--use-port=contrib.glfw3" -fexceptions)
+    target_compile_options(${PROJECT_NAME} PRIVATE "SHELL:-s USE_SDL=2" "SHELL:--use-port=contrib.glfw3" -fexceptions)
 
     # Emscripten link flags:
     #   contrib.glfw3 — GLFW 3.4 port (gamepad, vs legacy -sUSE_GLFW=3)
