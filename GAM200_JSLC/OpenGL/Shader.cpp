@@ -8,6 +8,29 @@
 #include <sstream>
 #include <vector>
 
+#ifdef __EMSCRIPTEN__
+// WebGL2(GLSL ES 3.0)용 셰이더 소스 자동 변환:
+// #version 330 core 줄을 제거하고, 파일 맨 앞에 #version 300 es 를 삽입한다.
+// (셰이더 파일 첫 줄이 주석인 경우에도 #version이 1번 줄에 오도록 보장)
+static std::string PatchShaderForWebGL(const std::string& src)
+{
+    std::string out = src;
+    const std::string from = "#version 330 core";
+    auto pos = out.find(from);
+    if (pos != std::string::npos)
+    {
+        // 원본 #version 줄(+ 뒤따르는 개행)을 제거
+        size_t endPos = pos + from.size();
+        if (endPos < out.size() && out[endPos] == '\n')
+            ++endPos;
+        out.erase(pos, endPos - pos);
+        // WebGL2 버전 지시자를 파일 맨 앞에 삽입
+        out = "#version 300 es\nprecision highp float;\n" + out;
+    }
+    return out;
+}
+#endif
+
 Shader::Shader(const char* vertexPath, const char* fragmentPath)
 {
     // 1. Retrieve the vertex/fragment source code from filePath
@@ -43,7 +66,12 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath)
     {
         Logger::Instance().Log(Logger::Severity::Error, "SHADER: FILE_NOT_SUCCESSFULLY_READ: %s", e.what());
     }
-    
+
+#ifdef __EMSCRIPTEN__
+    vertexCode   = PatchShaderForWebGL(vertexCode);
+    fragmentCode = PatchShaderForWebGL(fragmentCode);
+#endif
+
     const char* vShaderCode = vertexCode.c_str();
     const char* fShaderCode = fragmentCode.c_str();
 

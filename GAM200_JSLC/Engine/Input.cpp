@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/html5.h>
+#endif
 
 namespace Input
 {
@@ -17,6 +20,37 @@ namespace Input
         // Velocity low-pass toward stick target (higher = snappier, lower = smoother).
         constexpr double kGamepadAimSmoothLambda = 16.0;
         constexpr float kGamepadStickMaxMag = 1.41421356f; // sqrt(2) for per-axis ±1 pads
+
+        void GetCursorToFramebufferScale(GLFWwindow* window, int fbW, int fbH, double& outScaleX, double& outScaleY)
+        {
+            outScaleX = 1.0;
+            outScaleY = 1.0;
+            if (!window || fbW <= 0 || fbH <= 0)
+                return;
+
+#ifdef __EMSCRIPTEN__
+            // Web: cursor position tracks CSS pixels of #canvas, while rendering uses framebuffer pixels.
+            // Convert using real CSS size to avoid X-offset mismatch on scaled canvas.
+            double cssW = 0.0;
+            double cssH = 0.0;
+            if (emscripten_get_element_css_size("#canvas", &cssW, &cssH) == EMSCRIPTEN_RESULT_SUCCESS
+                && cssW > 0.0 && cssH > 0.0)
+            {
+                outScaleX = static_cast<double>(fbW) / cssW;
+                outScaleY = static_cast<double>(fbH) / cssH;
+                return;
+            }
+#endif
+
+            int winW = 0;
+            int winH = 0;
+            glfwGetWindowSize(window, &winW, &winH);
+            if (winW > 0 && winH > 0)
+            {
+                outScaleX = static_cast<double>(fbW) / static_cast<double>(winW);
+                outScaleY = static_cast<double>(fbH) / static_cast<double>(winH);
+            }
+        }
     }
 
     void Input::SetGamepadAimSensitivity(float sensitivity)
@@ -28,18 +62,16 @@ namespace Input
     {
         if (!m_window)
             return;
-        int winW = 0;
-        int winH = 0;
         int fbW = 0;
         int fbH = 0;
-        glfwGetWindowSize(m_window, &winW, &winH);
         glfwGetFramebufferSize(m_window, &fbW, &fbH);
-        if (winW <= 0 || winH <= 0 || fbW <= 0 || fbH <= 0)
+        if (fbW <= 0 || fbH <= 0)
             return;
         m_mouseX = (std::max)(0.0, (std::min)(static_cast<double>(fbW - 1), framebufferX));
         m_mouseY = (std::max)(0.0, (std::min)(static_cast<double>(fbH - 1), framebufferY));
-        const double scaleX = static_cast<double>(fbW) / static_cast<double>(winW);
-        const double scaleY = static_cast<double>(fbH) / static_cast<double>(winH);
+        double scaleX = 1.0;
+        double scaleY = 1.0;
+        GetCursorToFramebufferScale(m_window, fbW, fbH, scaleX, scaleY);
         glfwSetCursorPos(m_window, m_mouseX / scaleX, m_mouseY / scaleY);
     }
 
@@ -94,26 +126,14 @@ namespace Input
         double windowMouseY = 0.0;
         glfwGetCursorPos(m_window, &windowMouseX, &windowMouseY);
 
-        int windowWidth = 0;
-        int windowHeight = 0;
-        glfwGetWindowSize(m_window, &windowWidth, &windowHeight);
-
         int framebufferWidth = 0;
         int framebufferHeight = 0;
         glfwGetFramebufferSize(m_window, &framebufferWidth, &framebufferHeight);
-
-        if (windowWidth > 0 && windowHeight > 0)
-        {
-            const double scaleX = static_cast<double>(framebufferWidth) / static_cast<double>(windowWidth);
-            const double scaleY = static_cast<double>(framebufferHeight) / static_cast<double>(windowHeight);
-            m_mouseX = windowMouseX * scaleX;
-            m_mouseY = windowMouseY * scaleY;
-        }
-        else
-        {
-            m_mouseX = windowMouseX;
-            m_mouseY = windowMouseY;
-        }
+        double scaleX = 1.0;
+        double scaleY = 1.0;
+        GetCursorToFramebufferScale(m_window, framebufferWidth, framebufferHeight, scaleX, scaleY);
+        m_mouseX = windowMouseX * scaleX;
+        m_mouseY = windowMouseY * scaleY;
 
         m_gamepadConnected = glfwJoystickPresent(GLFW_JOYSTICK_1) != 0
             && glfwJoystickIsGamepad(GLFW_JOYSTICK_1) != 0;
@@ -163,8 +183,9 @@ namespace Input
                 m_mouseX = (std::max)(0.0, (std::min)(static_cast<double>(framebufferWidth - 1), m_mouseX));
                 m_mouseY = (std::max)(0.0, (std::min)(static_cast<double>(framebufferHeight - 1), m_mouseY));
 
-                const double scaleX = static_cast<double>(framebufferWidth) / static_cast<double>(windowWidth);
-                const double scaleY = static_cast<double>(framebufferHeight) / static_cast<double>(windowHeight);
+                double scaleX = 1.0;
+                double scaleY = 1.0;
+                GetCursorToFramebufferScale(m_window, framebufferWidth, framebufferHeight, scaleX, scaleY);
                 glfwSetCursorPos(m_window, m_mouseX / scaleX, m_mouseY / scaleY);
             }
         }

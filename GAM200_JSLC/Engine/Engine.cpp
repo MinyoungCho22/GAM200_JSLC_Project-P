@@ -13,6 +13,20 @@
 #include <chrono>
 #include <thread>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+static Engine* g_emscripten_engine = nullptr;
+static void EmscriptenStep() { g_emscripten_engine->Step(); }
+
+// JS에서 호출: 캔버스 버퍼 크기를 변경하고 GLFW framebuffer resize 이벤트 발생시킴
+extern "C" EMSCRIPTEN_KEEPALIVE
+void game_resize_canvas(int w, int h)
+{
+    emscripten_set_canvas_element_size("#canvas", w, h);
+}
+#endif
+
 #if defined(__linux__) && defined(GAM200_HAVE_XFIXES)
 #define GLFW_EXPOSE_NATIVE_X11
 #include <GLFW/glfw3native.h>
@@ -68,6 +82,10 @@ bool Engine::Initialize(const std::string& windowTitle)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#elif defined(__EMSCRIPTEN__)
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 #else
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -97,7 +115,10 @@ bool Engine::Initialize(const std::string& windowTitle)
     glfwSetWindowUserPointer(m_window, this);
 
     // Disable VSync on the main game context.
+    // Emscripten: glfwSwapInterval before emscripten_set_main_loop triggers a harmless warning; skip it.
+#ifndef __EMSCRIPTEN__
     glfwSwapInterval(0);
+#endif
 
     glfwSetKeyCallback(m_window, Engine::KeyCallback);
     glfwSetFramebufferSizeCallback(m_window, Engine::FramebufferSizeCallback);
@@ -160,81 +181,31 @@ bool Engine::Initialize(const std::string& windowTitle)
 void Engine::GameLoop()
 {
     m_lastFrameTime = glfwGetTime();
+
+#ifdef __EMSCRIPTEN__
+    g_emscripten_engine = this;
+    emscripten_set_main_loop(EmscriptenStep, 0, 0);
+    // simulate_infinite_loop=0: main()이 정상 반환, 루프는 requestAnimationFrame으로 실행
+    // Engine은 main.cpp의 static s_engine으로 살아있음 (-sEXIT_RUNTIME=0 필수)
+#else
     double nextFrameDeadline = m_lastFrameTime;
 
     while (!glfwWindowShouldClose(m_window) && m_gameStateManager->HasState())
     {
-        double currentFrameTime = glfwGetTime();
-        m_deltaTime = currentFrameTime - m_lastFrameTime;
-        m_lastFrameTime = currentFrameTime;
-
-        glfwPollEvents();
-        m_input->Update(m_deltaTime);
-        if (m_controlBindings)
-            m_controlBindings->TickRebindCapture(m_window, *m_input);
-        Update();
-
-#ifdef __APPLE__
-        // Monitor/fullscreen transitions often commit after the first poll; reading FB size
-        // immediately after Update() can still see the previous drawable (wrong letterbox).
-        glfwPollEvents();
-        // AppKit can restore the arrow cursor after Cmd+Tab even when focus callbacks ran.
-        if (glfwGetWindowAttrib(m_window, GLFW_FOCUSED) &&
-            glfwGetInputMode(m_window, GLFW_CURSOR) != GLFW_CURSOR_HIDDEN)
-        {
-            ApplyCustomCursorHidden();
-        }
-#endif
-
-        SyncPostProcessDisplaySize();
-
-        // When the top state bypasses post-processing (e.g. settings UI),
-        // render everything to the FBO normally but present with exposure=1.0
-        // so the UI is not affected by scene darkening effects.
-        const bool bypass = m_gameStateManager->TopBypassesPostProcess();
-        m_postProcess->SetPassthrough(bypass);
-
-        m_postProcess->BeginScene();
-        m_gameStateManager->Draw();
-        m_postProcess->EndScene();
-        m_postProcess->ApplyAndPresent();
-        m_gameStateManager->DrawForegroundAfterPostProcess();
-
-        m_postProcess->SetPassthrough(false);
-
-        if (m_imguiManager)
-        {
-            m_imguiManager->BeginFrame(m_deltaTime);
-            m_imguiManager->DrawDebugWindow();
-            m_imguiManager->EndFrame();
-        }
-
-#if defined(__linux__)
-        if (m_window && glfwGetWindowAttrib(m_window, GLFW_FOCUSED))
-            ApplyCustomCursorHidden();
-#endif
-
-        // WSL/Wayland/X11 sometimes reset swap interval after other contexts; re-apply on the main window.
-        glfwMakeContextCurrent(m_window);
-        glfwSwapInterval(m_vsyncEnabled ? 1 : 0);
-        glfwSwapBuffers(m_window);
+        Step();
 
         // FPS cap: sleep to maintain target frame rate when VSync is off
         if (!m_vsyncEnabled && m_fpsCap > 0)
         {
             double targetFrameTime = 1.0 / static_cast<double>(m_fpsCap);
-            // Use absolute deadline scheduling to reduce jitter/drift at 60/144 caps.
-            if (nextFrameDeadline < currentFrameTime)
-            {
-                nextFrameDeadline = currentFrameTime;
-            }
+            if (nextFrameDeadline < m_lastFrameTime)
+                nextFrameDeadline = m_lastFrameTime;
             nextFrameDeadline += targetFrameTime;
 
             double remaining = nextFrameDeadline - glfwGetTime();
             if (remaining > 0.0)
             {
 #if defined(__linux__)
-                // Pure busy-wait can starve WSLg/Wayland scheduling and cap apparent FPS (~80Hz).
                 constexpr double kSpinReserveSec = 0.0015;
                 if (remaining > kSpinReserveSec)
                 {
@@ -244,21 +215,101 @@ void Engine::GameLoop()
 #endif
                 while (glfwGetTime() < nextFrameDeadline)
                 {
-                    // Short spin tail for accuracy (Windows keeps full spin; Linux uses sleep above).
+                    // Short spin tail for accuracy
                 }
             }
             else if (remaining < -targetFrameTime * 2.0)
             {
-                // If we fall far behind, resync to avoid long-term phase error.
                 nextFrameDeadline = glfwGetTime();
             }
         }
         else
         {
-            // Keep deadline aligned when cap is disabled or vsync is enabled.
             nextFrameDeadline = glfwGetTime();
         }
     }
+#endif
+}
+
+void Engine::Step()
+{
+#ifdef __EMSCRIPTEN__
+    if (glfwWindowShouldClose(m_window) || !m_gameStateManager->HasState())
+    {
+        emscripten_cancel_main_loop();
+        return;
+    }
+#endif
+
+    double currentFrameTime = glfwGetTime();
+    m_deltaTime = currentFrameTime - m_lastFrameTime;
+    m_lastFrameTime = currentFrameTime;
+
+    glfwPollEvents();
+    m_input->Update(m_deltaTime);
+    if (m_controlBindings)
+        m_controlBindings->TickRebindCapture(m_window, *m_input);
+    Update();
+
+    if (m_returnToSplashRequested)
+    {
+        m_returnToSplashRequested = false;
+        if (m_postProcess)
+        {
+            m_postProcess->Settings() = PostProcessSettings{};
+            m_postProcess->SetPassthrough(false);
+        }
+        if (m_gameStateManager)
+        {
+            m_gameStateManager->Clear();
+            m_gameStateManager->PushState(std::make_unique<SplashState>(*m_gameStateManager));
+        }
+    }
+
+#ifdef __APPLE__
+    // Monitor/fullscreen transitions often commit after the first poll; reading FB size
+    // immediately after Update() can still see the previous drawable (wrong letterbox).
+    glfwPollEvents();
+    // AppKit can restore the arrow cursor after Cmd+Tab even when focus callbacks ran.
+    if (glfwGetWindowAttrib(m_window, GLFW_FOCUSED) &&
+        glfwGetInputMode(m_window, GLFW_CURSOR) != GLFW_CURSOR_HIDDEN)
+    {
+        ApplyCustomCursorHidden();
+    }
+#endif
+
+    SyncPostProcessDisplaySize();
+
+    // When the top state bypasses post-processing (e.g. settings UI),
+    // render everything to the FBO normally but present with exposure=1.0
+    // so the UI is not affected by scene darkening effects.
+    const bool bypass = m_gameStateManager->TopBypassesPostProcess();
+    m_postProcess->SetPassthrough(bypass);
+
+    m_postProcess->BeginScene();
+    m_gameStateManager->Draw();
+    m_postProcess->EndScene();
+    m_postProcess->ApplyAndPresent();
+    m_gameStateManager->DrawForegroundAfterPostProcess();
+
+    m_postProcess->SetPassthrough(false);
+
+    if (m_imguiManager)
+    {
+        m_imguiManager->BeginFrame(m_deltaTime);
+        m_imguiManager->DrawDebugWindow();
+        m_imguiManager->EndFrame();
+    }
+
+#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+    if (m_window && glfwGetWindowAttrib(m_window, GLFW_FOCUSED))
+        ApplyCustomCursorHidden();
+#endif
+
+    // WSL/Wayland/X11 sometimes reset swap interval after other contexts; re-apply on the main window.
+    glfwMakeContextCurrent(m_window);
+    glfwSwapInterval(m_vsyncEnabled ? 1 : 0);
+    glfwSwapBuffers(m_window);
 }
 
 void Engine::Update()
@@ -454,6 +505,10 @@ void Engine::SetVSync(bool enabled)
 {
     m_vsyncEnabled = enabled;
     glfwMakeContextCurrent(m_window);
+#ifdef __EMSCRIPTEN__
+    // Browser rendering is tied to requestAnimationFrame; swap interval control is limited.
+    // Keep this call for parity, but cap behavior is effectively controlled by FPS timing.
+#endif
     glfwSwapInterval(enabled ? 1 : 0);
 
     // Ensure debug window never adds an extra vsync wait.
@@ -467,6 +522,24 @@ void Engine::SetVSync(bool enabled)
 void Engine::SetFpsCap(int cap)
 {
     m_fpsCap = cap;
+#ifdef __EMSCRIPTEN__
+    // Web: apply cap using Emscripten main-loop timing.
+    if (m_fpsCap > 0)
+    {
+        const int frameMs = (1000 + (m_fpsCap / 2)) / m_fpsCap;
+        emscripten_set_main_loop_timing(EM_TIMING_SETTIMEOUT, frameMs > 0 ? frameMs : 1);
+    }
+    else
+    {
+        // "No Limit" on web maps to display refresh cadence (requestAnimationFrame).
+        emscripten_set_main_loop_timing(EM_TIMING_RAF, 1);
+    }
+#endif
+}
+
+void Engine::RequestReturnToSplash()
+{
+    m_returnToSplashRequested = true;
 }
 
 void Engine::RequestShutdown()
@@ -475,6 +548,26 @@ void Engine::RequestShutdown()
     {
         glfwSetWindowShouldClose(m_window, true);
     }
+#ifdef __EMSCRIPTEN__
+    // Web builds do not actually "close a native window".
+    // Stop the main loop, then try to close the tab; if blocked by browser policy,
+    // clear the page to avoid a frozen last frame looking like a hang.
+    emscripten_cancel_main_loop();
+    EM_ASM({
+        try {
+            window.open("", "_self");
+            window.close();
+        } catch (e) {}
+        setTimeout(function() {
+            try {
+                if (!window.closed) {
+                    document.documentElement.style.background = "#000";
+                    if (document.body) document.body.innerHTML = "";
+                }
+            } catch (e) {}
+        }, 0);
+    });
+#endif
 }
 
 void Engine::Shutdown()

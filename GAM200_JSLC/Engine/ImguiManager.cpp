@@ -21,6 +21,12 @@
 
 bool ImguiManager::Initialize()
 {
+#ifdef __EMSCRIPTEN__
+    // 웹 빌드에서는 두 번째 GLFW 창이 지원되지 않아 ImGui 디버그 창을 비활성화한다.
+    m_initialized = false;
+    return true;
+#endif
+
     // Save the main window (current context)
     m_mainWindow = glfwGetCurrentContext();
     if (!m_mainWindow)
@@ -67,7 +73,11 @@ bool ImguiManager::Initialize()
     ImGui::StyleColorsDark();
 
     // For OpenGL 3.3 core profile in this project.
+#ifdef __EMSCRIPTEN__
+    const char* glsl_version = "#version 300 es";
+#else
     const char* glsl_version = "#version 330";
+#endif
 
     if (!ImGui_ImplGlfw_InitForOpenGL(m_debugWindow, true))
     {

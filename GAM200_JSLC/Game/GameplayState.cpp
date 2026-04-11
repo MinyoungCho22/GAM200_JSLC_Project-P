@@ -1246,29 +1246,24 @@ void GameplayState::HandleUndergroundToSubwayTransition()
 Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screenY) const
 {
     Engine& engine = gsm.GetEngine();
-    int windowWidth, windowHeight;
-    glfwGetWindowSize(engine.GetWindow(), &windowWidth, &windowHeight);
-
-    float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
-    float gameAspect = GAME_WIDTH / GAME_HEIGHT;
     int viewportX = 0;
     int viewportY = 0;
-    int viewportWidth = windowWidth;
-    int viewportHeight = windowHeight;
-
-    if (windowAspect > gameAspect)
+    int viewportWidth = 0;
+    int viewportHeight = 0;
+    engine.GetPostProcess().GetLetterboxViewport(viewportX, viewportY, viewportWidth, viewportHeight);
+    if (viewportWidth <= 0 || viewportHeight <= 0)
     {
-        viewportWidth = static_cast<int>(windowHeight * gameAspect);
-        viewportX = (windowWidth - viewportWidth) / 2;
+        glfwGetFramebufferSize(engine.GetWindow(), &viewportWidth, &viewportHeight);
+        viewportX = 0;
+        viewportY = 0;
     }
-    else if (windowAspect < gameAspect)
-    {
-        viewportHeight = static_cast<int>(windowWidth / gameAspect);
-        viewportY = (windowHeight - viewportHeight) / 2;
-    }
+    if (viewportWidth <= 0 || viewportHeight <= 0)
+        return m_camera.GetPosition();
 
     float mouseViewportX = static_cast<float>(screenX - viewportX);
     float mouseViewportY = static_cast<float>(screenY - viewportY);
+    mouseViewportX = std::clamp(mouseViewportX, 0.0f, static_cast<float>(viewportWidth));
+    mouseViewportY = std::clamp(mouseViewportY, 0.0f, static_cast<float>(viewportHeight));
 
     float mouseNDCX = mouseViewportX / static_cast<float>(viewportWidth);
     float mouseNDCY = mouseViewportY / static_cast<float>(viewportHeight);
@@ -1292,43 +1287,29 @@ void GameplayState::WorldToFramebuffer(Math::Vec2 world, double& outFbX, double&
     const float mouseNDCX = mouseGameX / GAME_WIDTH;
     const float mouseNDCY = 1.0f - mouseGameY / GAME_HEIGHT;
 
-    GLFWwindow* w = gsm.GetEngine().GetWindow();
-    int winW = 0;
-    int winH = 0;
-    glfwGetWindowSize(w, &winW, &winH);
-    int fbW = 0;
-    int fbH = 0;
-    glfwGetFramebufferSize(w, &fbW, &fbH);
-    if (winW <= 0 || winH <= 0 || fbW <= 0 || fbH <= 0)
+    Engine& engine = gsm.GetEngine();
+    int vx = 0;
+    int vy = 0;
+    int vw = 0;
+    int vh = 0;
+    engine.GetPostProcess().GetLetterboxViewport(vx, vy, vw, vh);
+    if (vw <= 0 || vh <= 0)
+    {
+        glfwGetFramebufferSize(engine.GetWindow(), &vw, &vh);
+        vx = 0;
+        vy = 0;
+    }
+    if (vw <= 0 || vh <= 0)
     {
         outFbX = 0.0;
         outFbY = 0.0;
         return;
     }
 
-    const float wa = static_cast<float>(winW) / static_cast<float>(winH);
-    const float ga = GAME_WIDTH / GAME_HEIGHT;
-    int vx = 0;
-    int vy = 0;
-    int vw = winW;
-    int vh = winH;
-    if (wa > ga)
-    {
-        vw = static_cast<int>(static_cast<float>(winH) * ga);
-        vx = (winW - vw) / 2;
-    }
-    else if (wa < ga)
-    {
-        vh = static_cast<int>(static_cast<float>(winW) / ga);
-        vy = (winH - vh) / 2;
-    }
-
     const float mvx = mouseNDCX * static_cast<float>(vw);
     const float mvy = mouseNDCY * static_cast<float>(vh);
-    const double winX = static_cast<double>(vx) + static_cast<double>(mvx);
-    const double winY = static_cast<double>(vy) + static_cast<double>(mvy);
-    outFbX = winX * static_cast<double>(fbW) / static_cast<double>(winW);
-    outFbY = winY * static_cast<double>(fbH) / static_cast<double>(winH);
+    outFbX = static_cast<double>(vx) + static_cast<double>(mvx);
+    outFbY = static_cast<double>(vy) + static_cast<double>(mvy);
 }
 
 void GameplayState::ApplyGamepadDroneTargetingAssist(double dt, Input::Input& input, Math::Vec2& inOutMouseWorldPos)
@@ -1780,29 +1761,26 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     double mouseScreenX, mouseScreenY;
     inputForCursor.GetMousePosition(mouseScreenX, mouseScreenY);
 
-    int windowWidthForCursor, windowHeightForCursor;
-    glfwGetWindowSize(engineForCursor.GetWindow(), &windowWidthForCursor, &windowHeightForCursor);
-
-    float windowAspectForCursor = static_cast<float>(windowWidthForCursor) / static_cast<float>(windowHeightForCursor);
-    float gameAspectForCursor = GAME_WIDTH / GAME_HEIGHT;
     int viewportXForCursor = 0;
     int viewportYForCursor = 0;
-    int viewportWidthForCursor = windowWidthForCursor;
-    int viewportHeightForCursor = windowHeightForCursor;
-
-    if (windowAspectForCursor > gameAspectForCursor)
+    int viewportWidthForCursor = 0;
+    int viewportHeightForCursor = 0;
+    engineForCursor.GetPostProcess().GetLetterboxViewport(
+        viewportXForCursor, viewportYForCursor, viewportWidthForCursor, viewportHeightForCursor);
+    if (viewportWidthForCursor <= 0 || viewportHeightForCursor <= 0)
     {
-        viewportWidthForCursor = static_cast<int>(windowHeightForCursor * gameAspectForCursor);
-        viewportXForCursor = (windowWidthForCursor - viewportWidthForCursor) / 2;
+        glfwGetFramebufferSize(
+            engineForCursor.GetWindow(), &viewportWidthForCursor, &viewportHeightForCursor);
+        viewportXForCursor = 0;
+        viewportYForCursor = 0;
     }
-    else if (windowAspectForCursor < gameAspectForCursor)
-    {
-        viewportHeightForCursor = static_cast<int>(windowWidthForCursor / gameAspectForCursor);
-        viewportYForCursor = (windowHeightForCursor - viewportHeightForCursor) / 2;
-    }
+    if (viewportWidthForCursor <= 0 || viewportHeightForCursor <= 0)
+        return;
 
     float mouseViewportX = static_cast<float>(mouseScreenX - viewportXForCursor);
     float mouseViewportY = static_cast<float>(mouseScreenY - viewportYForCursor);
+    mouseViewportX = std::clamp(mouseViewportX, 0.0f, static_cast<float>(viewportWidthForCursor));
+    mouseViewportY = std::clamp(mouseViewportY, 0.0f, static_cast<float>(viewportHeightForCursor));
 
     float mouseNDCX = mouseViewportX / static_cast<float>(viewportWidthForCursor);
     float mouseNDCY = mouseViewportY / static_cast<float>(viewportHeightForCursor);
@@ -2052,6 +2030,10 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
 void GameplayState::Shutdown()
 {
+    auto& pp = gsm.GetEngine().GetPostProcess();
+    pp.Settings() = PostProcessSettings{};
+    pp.SetPassthrough(false);
+
     if (auto* imguiManager = gsm.GetEngine().GetImguiManager())
     {
         imguiManager->ClearGameplayBindings();

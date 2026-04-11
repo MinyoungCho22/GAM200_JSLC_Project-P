@@ -6,6 +6,8 @@ x86/
 Debug/
 Release/
 build/
+build-web/
+GAM200_JSLC/build/build-web/
 
 # ===========================
 # 2. Visual Studio 임시/설정 파일 (User Request)

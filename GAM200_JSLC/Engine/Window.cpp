@@ -18,6 +18,8 @@
 #include <GL/glew.h> // Required for glewInit()
 #elif defined(__APPLE__)
 #include <OpenGL/gl3.h>
+#elif defined(__EMSCRIPTEN__)
+#include <GLES3/gl3.h>
 #else
 #include <GL/gl.h>
 #endif

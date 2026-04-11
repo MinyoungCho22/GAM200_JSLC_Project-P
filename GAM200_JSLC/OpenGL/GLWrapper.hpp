@@ -4,6 +4,8 @@
 
 #if defined(__APPLE__)
 #include <OpenGL/gl3.h>
+#elif defined(__EMSCRIPTEN__)
+#include <GLES3/gl3.h>
 #elif defined(USE_GLEW) || defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
 #if defined(__linux__)
 #include <GL/glew.h>

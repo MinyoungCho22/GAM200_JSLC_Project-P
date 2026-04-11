@@ -1,0 +1,25 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "web-release",
+      "displayName": "Web Release (Emscripten)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/build-web",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "web-release",
+      "configurePreset": "web-release"
+    }
+  ]
+}

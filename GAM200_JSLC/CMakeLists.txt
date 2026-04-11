@@ -8,6 +8,16 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Emscripten detection (must come before platform-specific options)
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten" OR EMSCRIPTEN)
+    set(EMSCRIPTEN TRUE)
+endif()
+
+# SoLoud ships stb_vorbis.c (C); must enable C before add_executable for wasm link.
+if(EMSCRIPTEN)
+    enable_language(C)
+endif()
+
 option(ENABLE_FMOD "Enable FMOD audio if platform libraries are available" ON)
 
 # ==========================================================
@@ -23,6 +33,11 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     "ThirdParty/imgui/*.cpp"
     "ThirdParty/imgui/backends/*.cpp"
 )
+# When binary dir lives inside source tree (e.g. build/build-web),
+# exclude generated/dependency sources from recursive glob results.
+list(FILTER SOURCES EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/build/")
+list(FILTER SOURCES EXCLUDE REGEX "^${CMAKE_CURRENT_BINARY_DIR}/")
+list(FILTER SOURCES EXCLUDE REGEX "/_deps/")
 
 # Header files (.hpp, .h)
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
@@ -74,7 +89,10 @@ if(WIN32)
 endif()
 
 # 4. Compiler/Platform Options
-if(MSVC)
+if(EMSCRIPTEN)
+    # Emscripten: use its own flags; silence unused warnings
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wno-unused-parameter)
+elseif(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
     target_compile_definitions(${PROJECT_NAME} PRIVATE _CONSOLE USE_GLEW)
 else()
@@ -110,13 +128,19 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 # Dear ImGui OpenGL backend needs to know which GL loader is used by the application.
-# This project uses GLEW on Windows (see USE_GLEW).
-target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLEW SDL_MAIN_HANDLED)
+# Web (Emscripten): no loader needed (WebGL2 is accessed directly via GLES3 headers).
+# Native Windows: GLEW is the loader.
+if(EMSCRIPTEN)
+    # Bundled glfw3.h otherwise pulls include/GL/gl.h (Windows + winapifamily.h); GLES comes from GLWrapper.hpp.
+    target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_IMPL_OPENGL_ES3 SDL_MAIN_HANDLED GLFW_INCLUDE_NONE)
+else()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLEW SDL_MAIN_HANDLED)
+endif()
 
 find_package(OpenGL REQUIRED)
 find_package(PkgConfig QUIET)
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     message(STATUS "Linux/WSL build: install dev packages if configure fails, e.g. "
         "sudo apt install build-essential cmake ninja-build libglew-dev libglfw3-dev libsdl2-dev libgl1-mesa-dev libxfixes-dev pkg-config")
     # Bundled include/GL/*.h are MSVC/Windows-oriented; skip GLFW's GL include and use GLEW + system GL only.
@@ -124,6 +148,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # SDL2
+if(NOT EMSCRIPTEN)
 find_package(SDL2 CONFIG QUIET)
 if(NOT SDL2_FOUND AND PKG_CONFIG_FOUND AND NOT WIN32)
     pkg_check_modules(SDL2 sdl2)
@@ -135,11 +160,12 @@ elseif(SDL2_LIBRARIES)
     target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} PRIVATE ${SDL2_LIBRARIES})
 endif()
+endif() # NOT EMSCRIPTEN
 
 # GLEW: Windows uses bundled DLL; Linux/*BSD need system GLEW for core GL entry points.
 if(WIN32)
     target_compile_definitions(${PROJECT_NAME} PRIVATE USE_GLEW)
-elseif(UNIX AND NOT APPLE)
+elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     find_package(GLEW QUIET)
     if(NOT GLEW_FOUND AND PKG_CONFIG_FOUND)
         pkg_check_modules(PC_GLEW QUIET glew)
@@ -162,9 +188,11 @@ elseif(UNIX AND NOT APPLE)
     endif()
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
+if(NOT EMSCRIPTEN)
+    target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
+endif()
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
     find_package(Threads REQUIRED)
     target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
     if(CMAKE_DL_LIBS)
@@ -183,8 +211,8 @@ if(UNIX AND NOT APPLE)
     endif()
 endif()
 
-# GLFW
-if(NOT WIN32)
+# GLFW (native only — Emscripten provides its own GLFW port via link flags)
+if(NOT WIN32 AND NOT EMSCRIPTEN)
     find_package(glfw3 CONFIG QUIET)
     if(NOT glfw3_FOUND AND PKG_CONFIG_FOUND)
         pkg_check_modules(GLFW glfw3)
@@ -197,7 +225,7 @@ if(NOT WIN32)
         target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARIES})
     endif()
 
-    if(UNIX AND NOT APPLE)
+    if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
         if(NOT glfw3_FOUND AND NOT GLFW_FOUND)
             message(FATAL_ERROR "Linux/Unix: GLFW not found. Install libglfw3-dev (Debian/Ubuntu) or equivalent.")
         endif()
@@ -229,7 +257,11 @@ if(WIN32)
 endif()
 
 if(ENABLE_FMOD)
-    if(WIN32)
+    if(EMSCRIPTEN)
+        # Emscripten: SoLoud is used instead; FMOD not available for web
+        target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_FMOD)
+        message(STATUS "FMOD: disabled for Emscripten/web build (using SoLoud instead)")
+    elseif(WIN32)
         file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/Engine/fmod_vc.lib"
              DESTINATION "${CMAKE_BINARY_DIR}")
         target_link_libraries(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/fmod_vc.lib")
@@ -374,6 +406,84 @@ if(NOT WIN32 AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Config")
             "${CMAKE_CURRENT_SOURCE_DIR}/Config"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Config"
         COMMENT "Copying Config folder next to executable..."
+    )
+endif()
+
+# ==========================================================
+# [Emscripten / Web Build]
+# ==========================================================
+if(EMSCRIPTEN)
+    include(FetchContent)
+
+    # SoLoud: audio library for web (replaces FMOD)
+    FetchContent_Declare(
+        soloud
+        GIT_REPOSITORY https://github.com/jarikomppa/soloud.git
+        GIT_TAG        RELEASE_20200207
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(soloud)
+
+    target_sources(${PROJECT_NAME} PRIVATE
+        # Core
+        "${soloud_SOURCE_DIR}/src/core/soloud.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_audiosource.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_bus.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_core_3d.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_core_basicops.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_core_faderops.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_core_filterops.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_core_getters.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_core_setters.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_core_voicegroup.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_core_voiceops.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_file.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_fader.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_fft.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_filter.cpp"
+        "${soloud_SOURCE_DIR}/src/core/soloud_thread.cpp"
+        # SDL2 static backend (Emscripten provides SDL2 via USE_SDL=2)
+        "${soloud_SOURCE_DIR}/src/backend/sdl2_static/soloud_sdl2_static.cpp"
+        # WAV / OGG loader
+        "${soloud_SOURCE_DIR}/src/audiosource/wav/dr_impl.cpp"
+        "${soloud_SOURCE_DIR}/src/audiosource/wav/soloud_wav.cpp"
+        "${soloud_SOURCE_DIR}/src/audiosource/wav/soloud_wavstream.cpp"
+        "${soloud_SOURCE_DIR}/src/audiosource/wav/stb_vorbis.c"
+    )
+    target_include_directories(${PROJECT_NAME} PRIVATE "${soloud_SOURCE_DIR}/include")
+    target_compile_definitions(${PROJECT_NAME} PRIVATE WITH_SDL2_STATIC)
+    # SoLoud SDL2 backend includes SDL.h — Emscripten only exposes real SDL2 when this is set at compile time too.
+    # contrib.glfw3: full GLFW 3.4 (gamepad via glfwGetGamepadState); built-in -sUSE_GLFW=3 lacks these symbols.
+    target_compile_options(${PROJECT_NAME} PRIVATE "SHELL:-sUSE_SDL=2" "SHELL:--use-port=contrib.glfw3" -fexceptions)
+
+    # Emscripten link flags:
+    #   contrib.glfw3 — GLFW 3.4 port (gamepad, vs legacy -sUSE_GLFW=3)
+    #   USE_WEBGL2=1 — WebGL 2.0 (≈ OpenGL ES 3.0)
+    #   FULL_ES3=1   — expose full ES3 API surface
+    #   USE_SDL=2    — SDL2 for SoLoud backend audio
+    #   preload-file — bundle assets into .data file
+    set(WEB_LINK_FLAGS
+        "--use-port=contrib.glfw3"
+        "-s USE_WEBGL2=1"
+        "-s FULL_ES3=1"
+        "-s ALLOW_MEMORY_GROWTH=1"
+        "-s INITIAL_MEMORY=134217728"
+        "-s STACK_SIZE=4194304"
+        "-s ASSERTIONS=1"
+        "-s EXIT_RUNTIME=0"
+        "-fexceptions"
+        "-s USE_SDL=2"
+        "--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/Asset@/Asset"
+        "--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/Config@/Config"
+        "--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/OpenGL/Shaders@/OpenGL/Shaders"
+        "--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/shell.html"
+    )
+    string(JOIN " " WEB_LINK_FLAGS_STR ${WEB_LINK_FLAGS})
+
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        OUTPUT_NAME  "index"
+        SUFFIX       ".html"
+        LINK_FLAGS   "${WEB_LINK_FLAGS_STR}"
     )
 endif()
 

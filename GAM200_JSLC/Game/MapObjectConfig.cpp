@@ -246,7 +246,7 @@ MapObjectConfigData MapObjectConfig::DefaultData()
     };
     data.underground.obstacles = {
         { {939.0f, 834.0f}, {561.0f, 162.0f}, "", {} },
-        { {1584.0f, 627.0f}, {288.0f, 369.0f}, "Asset/pannel1.png", {} },
+        { {1584.0f, 627.0f}, {288.0f, 369.0f}, "Asset/Pannel1.png", {} },
         { {3471.0f, 834.0f}, {561.0f, 162.0f}, "", {} },
         { {4116.0f, 627.0f}, {288.0f, 369.0f}, "Asset/pannel2.png", {} },
         { {5235.0f, 834.0f}, {561.0f, 162.0f}, "", {} },

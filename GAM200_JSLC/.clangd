@@ -1,9 +1,12 @@
 CompileFlags:
-  CompilationDatabase: build
+  CompilationDatabase: build/build-web
   Add:
-    - -DWIN32
-    - -D_WIN32
-    - -DIMGUI_IMPL_OPENGL_LOADER_GLEW
-    - -IC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/include
-    - -IC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/ThirdParty/imgui
-    - -IC:/Users/MinyoungCho/Documents/DigiPen/GAM250/GAM200_JSLC_Project-P/GAM200_JSLC/ThirdParty/imgui/backends
+    - -DGLFW_INCLUDE_NONE
+    - -I.
+    - -Iinclude
+    - -IEngine
+    - -IGame
+    - -IOpenGL
+    - -IThirdParty/imgui
+    - -IThirdParty/imgui/backends
+    - -IThirdParty/json

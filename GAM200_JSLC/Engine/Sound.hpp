@@ -4,15 +4,13 @@
 #include <string>
 #include <map>
 
-#ifdef DISABLE_FMOD
-namespace FMOD
-{
-    class System;
-    class Sound;
-    class Channel;
-}
+#if defined(__EMSCRIPTEN__)
+    // SoLoud: forward declarations only (pointers in private members)
+    namespace SoLoud { class Soloud; class Wav; }
+#elif defined(DISABLE_FMOD)
+    namespace FMOD { class System; class Sound; class Channel; }
 #else
-#include "fmod.hpp"
+    #include "fmod.hpp"
 #endif
 
 class SoundSystem
@@ -23,17 +21,25 @@ public:
     void Update();
     void Shutdown();
 
-    FMOD::System* GetSystem() const { return m_system; }
-
     void SetMasterVolume(float volume);
     float GetMasterVolume() const { return m_masterVolume; }
+
+#if defined(__EMSCRIPTEN__)
+    SoLoud::Soloud* GetSoLoud() const { return m_soloud; }
+#else
+    FMOD::System* GetSystem() const { return m_system; }
+#endif
 
 private:
     SoundSystem() = default;
     ~SoundSystem() = default;
 
-    FMOD::System* m_system = nullptr;
-    void* m_extraDriverData = nullptr;
+#if defined(__EMSCRIPTEN__)
+    SoLoud::Soloud* m_soloud = nullptr;
+#else
+    FMOD::System* m_system         = nullptr;
+    void*         m_extraDriverData = nullptr;
+#endif
     float m_masterVolume = 0.8f;
 };
 
@@ -51,7 +57,6 @@ public:
 
     bool Load(const std::string& filepath, bool loop = false);
 
- 
     void Play();
     void Stop();
     void SetPaused(bool paused);
@@ -60,8 +65,15 @@ public:
     bool IsPlaying() const;
 
 private:
-    FMOD::Sound* m_sound = nullptr;
+#if defined(__EMSCRIPTEN__)
+    SoLoud::Wav* m_wav    = nullptr;
+    unsigned int m_handle = 0;
+    float        m_volume = 1.0f;
+    float        m_pitch  = 1.0f;
+#else
+    FMOD::Sound*   m_sound   = nullptr;
     FMOD::Channel* m_channel = nullptr;
-    bool m_isLoaded = false;
+#endif
+    bool m_isLoaded  = false;
     bool m_isLooping = false;
 };

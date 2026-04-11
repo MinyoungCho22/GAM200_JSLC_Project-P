@@ -135,6 +135,8 @@ void Background::Shutdown()
 
 void Background::Draw(Shader& shader, const Math::Matrix& model)
 {
+    if (!VAO || !m_textureID) return;
+
     shader.setMat4("model", model);
 
     shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);

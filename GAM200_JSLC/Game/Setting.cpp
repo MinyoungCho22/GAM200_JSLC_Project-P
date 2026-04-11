@@ -12,8 +12,8 @@
 #include <cmath>
 
 // Fixed logical resolution for the UI system
-constexpr float GAME_WIDTH  = 1920.0f;
-constexpr float GAME_HEIGHT = 1080.0f;
+constexpr float GAME_WIDTH  = static_cast<float>(VIRTUAL_WIDTH);
+constexpr float GAME_HEIGHT = static_cast<float>(VIRTUAL_HEIGHT);
 
 // ---- Layout constants -------------------------------------------------------
 constexpr float COL_LABEL  = 560.0f;   // x: label column (right-edge aligned)
@@ -286,7 +286,13 @@ void SettingState::Update(double /*dt*/)
     {
         if (input.IsKeyTriggered(Input::Key::Enter) || input.IsKeyTriggered(Input::Key::Space))
         {
+#ifdef __EMSCRIPTEN__
+            // Web: request a full state reset and restart from No.99 splash.
+            engine.RequestReturnToSplash();
+            return;
+#else
             engine.RequestShutdown();
+#endif
         }
     }
 }
@@ -314,8 +320,6 @@ void SettingState::DrawRect(const Math::Matrix& proj, float cx, float cy,
 // -----------------------------------------------------------------------------
 void SettingState::Draw()
 {
-    Engine& engine = gsm.GetEngine();
-
     // Viewport is already set to FBO size (GAME_WIDTH x GAME_HEIGHT) by PostProcessManager::BeginScene().
     // Do NOT call glfwGetFramebufferSize here — on Retina displays the physical framebuffer is larger
     // than the FBO, which would cause only the bottom-left portion to be rendered.

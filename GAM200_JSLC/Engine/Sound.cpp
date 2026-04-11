@@ -4,7 +4,193 @@
 #include "Logger.hpp"
 #include <iostream>
 
-#ifndef DISABLE_FMOD
+// ==========================================================
+// [Web / Emscripten] — SoLoud backend
+// ==========================================================
+#if defined(__EMSCRIPTEN__)
+
+#include "soloud.h"
+#include "soloud_wav.h"
+
+SoundSystem& SoundSystem::Instance()
+{
+    static SoundSystem instance;
+    return instance;
+}
+
+bool SoundSystem::Initialize()
+{
+    if (m_soloud) return true;
+
+    m_soloud = new SoLoud::Soloud();
+    SoLoud::result r = m_soloud->init();
+    if (r != SoLoud::SO_NO_ERROR)
+    {
+        Logger::Instance().Log(Logger::Severity::Error, "SoLoud init failed: %d", r);
+        delete m_soloud;
+        m_soloud = nullptr;
+        return false;
+    }
+
+    m_soloud->setGlobalVolume(m_masterVolume);
+    Logger::Instance().Log(Logger::Severity::Info, "SoLoud Audio System Initialized (Web).");
+    return true;
+}
+
+void SoundSystem::Update()
+{
+    // SoLoud runs on its own thread; nothing to do here.
+}
+
+void SoundSystem::Shutdown()
+{
+    if (m_soloud)
+    {
+        m_soloud->deinit();
+        delete m_soloud;
+        m_soloud = nullptr;
+    }
+}
+
+void SoundSystem::SetMasterVolume(float volume)
+{
+    m_masterVolume = volume;
+    if (m_soloud)
+        m_soloud->setGlobalVolume(volume);
+}
+
+// ---- Sound ----
+
+Sound::Sound() : m_wav(nullptr), m_handle(0), m_isLoaded(false), m_isLooping(false) {}
+
+Sound::~Sound()
+{
+    Stop();
+    delete m_wav;
+    m_wav = nullptr;
+}
+
+Sound::Sound(Sound&& other) noexcept
+    : m_wav(other.m_wav)
+    , m_handle(other.m_handle)
+    , m_volume(other.m_volume)
+    , m_pitch(other.m_pitch)
+    , m_isLoaded(other.m_isLoaded)
+    , m_isLooping(other.m_isLooping)
+{
+    other.m_wav     = nullptr;
+    other.m_handle  = 0;
+    other.m_isLoaded  = false;
+    other.m_isLooping = false;
+}
+
+Sound& Sound::operator=(Sound&& other) noexcept
+{
+    if (this == &other) return *this;
+
+    Stop();
+    delete m_wav;
+
+    m_wav      = other.m_wav;
+    m_handle   = other.m_handle;
+    m_volume   = other.m_volume;
+    m_pitch    = other.m_pitch;
+    m_isLoaded  = other.m_isLoaded;
+    m_isLooping = other.m_isLooping;
+
+    other.m_wav     = nullptr;
+    other.m_handle  = 0;
+    other.m_isLoaded  = false;
+    other.m_isLooping = false;
+    return *this;
+}
+
+bool Sound::Load(const std::string& filepath, bool loop)
+{
+    if (!SoundSystem::Instance().GetSoLoud())
+    {
+        if (!SoundSystem::Instance().Initialize())
+        {
+            Logger::Instance().Log(Logger::Severity::Error, "SoLoud init failed; cannot load: %s", filepath.c_str());
+            return false;
+        }
+    }
+
+    delete m_wav;
+    m_wav = new SoLoud::Wav();
+    SoLoud::result r = m_wav->load(filepath.c_str());
+    if (r != SoLoud::SO_NO_ERROR)
+    {
+        Logger::Instance().Log(Logger::Severity::Error, "SoLoud Wav::load failed (%s): %d", filepath.c_str(), r);
+        delete m_wav;
+        m_wav = nullptr;
+        return false;
+    }
+
+    m_wav->setLooping(loop);
+    m_isLooping = loop;
+    m_isLoaded  = true;
+    return true;
+}
+
+void Sound::Play()
+{
+    if (!m_isLoaded || !m_wav) return;
+
+    SoLoud::Soloud* sl = SoundSystem::Instance().GetSoLoud();
+    if (!sl) return;
+
+    // 루프 사운드가 이미 재생 중이면 다시 시작하지 않는다.
+    if (m_isLooping && m_handle && sl->isValidVoiceHandle(m_handle)) return;
+
+    m_handle = sl->play(*m_wav, m_volume);
+    sl->setRelativePlaySpeed(m_handle, m_pitch);
+}
+
+void Sound::Stop()
+{
+    SoLoud::Soloud* sl = SoundSystem::Instance().GetSoLoud();
+    if (sl && m_handle)
+    {
+        sl->stop(m_handle);
+        m_handle = 0;
+    }
+}
+
+void Sound::SetPaused(bool paused)
+{
+    SoLoud::Soloud* sl = SoundSystem::Instance().GetSoLoud();
+    if (sl && m_handle)
+        sl->setPause(m_handle, paused);
+}
+
+void Sound::SetVolume(float volume)
+{
+    m_volume = volume;
+    SoLoud::Soloud* sl = SoundSystem::Instance().GetSoLoud();
+    if (sl && m_handle)
+        sl->setVolume(m_handle, volume);
+}
+
+void Sound::SetPitch(float pitch)
+{
+    m_pitch = pitch;
+    SoLoud::Soloud* sl = SoundSystem::Instance().GetSoLoud();
+    if (sl && m_handle)
+        sl->setRelativePlaySpeed(m_handle, pitch);
+}
+
+bool Sound::IsPlaying() const
+{
+    SoLoud::Soloud* sl = SoundSystem::Instance().GetSoLoud();
+    if (!sl || !m_handle) return false;
+    return sl->isValidVoiceHandle(m_handle);
+}
+
+// ==========================================================
+// [Native] — FMOD backend
+// ==========================================================
+#elif !defined(DISABLE_FMOD)
 #include "fmod_errors.h"
 
 SoundSystem& SoundSystem::Instance()

@@ -18,6 +18,7 @@
 
 int main(void)
 {
+#if !defined(__EMSCRIPTEN__)
 #if defined(__linux__)
     // Match Windows behaviour: Asset/, Config/, OpenGL/Shaders/ resolve from the executable directory.
     char exePath[PATH_MAX];
@@ -40,20 +41,31 @@ int main(void)
             SetDllDirectoryW(binDir.c_str());
     }
 #endif
+#endif // !__EMSCRIPTEN__
     // Initialize the logger before anything else
     // Set to output logs of Debug severity or higher to the console
     Logger::Instance().Initialize(Logger::Severity::Debug, true);
 
-    Engine engine;
-    if (!engine.Initialize("Project P"))
+#ifdef __EMSCRIPTEN__
+    // 웹 빌드: Engine을 힙에 할당해서 main()이 반환된 후에도 살아있게 한다.
+    // simulate_infinite_loop=1로 stack unwind 시 dangling pointer 방지.
+    static Engine s_engine;
+    if (!s_engine.Initialize("Project P"))
     {
-        // Log an error message and terminate if engine initialization fails
         Logger::Instance().Log(Logger::Severity::Error, "Engine initialization failed!");
         return -1;
     }
-
+    s_engine.GameLoop();
+    return 0;
+#else
+    Engine engine;
+    if (!engine.Initialize("Project P"))
+    {
+        Logger::Instance().Log(Logger::Severity::Error, "Engine initialization failed!");
+        return -1;
+    }
     engine.GameLoop();
     engine.Shutdown();
-
     return 0;
+#endif
 }
