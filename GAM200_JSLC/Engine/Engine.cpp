@@ -307,10 +307,10 @@ void Engine::Step()
 #endif
 
     // WSL/Wayland/X11 sometimes reset swap interval after other contexts; re-apply on the main window.
-    // In exclusive fullscreen, keep VSync on even if the menu option is off:
-    // otherwise the moving tear line is very visible at QHD/144Hz+.
+    // Keep this tied only to the VSync option. FPS Cap = No Limit relies on
+    // swap interval 0 so the loop can run uncapped, including fullscreen.
     glfwMakeContextCurrent(m_window);
-    glfwSwapInterval((m_vsyncEnabled || m_isFullscreen) ? 1 : 0);
+    glfwSwapInterval(m_vsyncEnabled ? 1 : 0);
     glfwSwapBuffers(m_window);
 }
 
@@ -527,7 +527,7 @@ void Engine::SetVSync(bool enabled)
     // Browser rendering is tied to requestAnimationFrame; swap interval control is limited.
     // Keep this call for parity, but cap behavior is effectively controlled by FPS timing.
 #endif
-    glfwSwapInterval((enabled || m_isFullscreen) ? 1 : 0);
+    glfwSwapInterval(enabled ? 1 : 0);
 
     // Ensure debug window never adds an extra vsync wait.
     if (m_imguiManager && m_imguiManager->IsInitialized())

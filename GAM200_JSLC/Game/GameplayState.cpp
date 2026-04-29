@@ -32,6 +32,8 @@ constexpr float ATTACK_RANGE = 400.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
+constexpr float ROOM_PLAYABLE_WIDTH = 1620.0f;
+constexpr float ROOM_LEFT_BOUNDARY = (GAME_WIDTH - ROOM_PLAYABLE_WIDTH) * 0.5f;
 
 // Gamepad: wider drone “aim” box than mouse (collision unchanged elsewhere).
 constexpr float kGamepadDroneAimHitboxScale = 2.35f;
@@ -87,10 +89,13 @@ void GameplayState::Initialize()
     gsm.GetEngine().GetTextureShader().use();
     gsm.GetEngine().GetTextureShader().setInt("ourTexture", 0);
 
-    player.Init({ 200.0f, GROUND_LEVEL + 100.0f });
-    // Settle the player onto the ground immediately so they appear at the correct
-    // standing position during the fade-in, rather than floating mid-air.
-    player.SetPosition({ 200.0f, GROUND_LEVEL + player.GetSize().y * 0.5f });
+    player.Init({ ROOM_LEFT_BOUNDARY, GROUND_LEVEL + 100.0f });
+    // Start at the same position Room::Update would clamp to, so the player
+    // does not slide right during the initial fade-in.
+    player.SetPosition({
+        ROOM_LEFT_BOUNDARY + player.GetSize().x * 0.5f,
+        GROUND_LEVEL + player.GetSize().y * 0.5f
+    });
     player.SetOnGround(true);
 
     pulseManager = std::make_unique<PulseManager>();
@@ -418,9 +423,13 @@ void GameplayState::Update(double dt)
         m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
         m_cameraSmoothSpeed = 0.1f;
         player.SetCurrentGroundLevel(GROUND_LEVEL);
-        player.SetPosition({ 200.0f, GROUND_LEVEL + 100.0f });
+        player.SetPosition({
+            ROOM_LEFT_BOUNDARY + player.GetSize().x * 0.5f,
+            GROUND_LEVEL + player.GetSize().y * 0.5f
+        });
         player.ResetVelocity();
-        m_camera.SetPosition(player.GetPosition());
+        player.SetOnGround(true);
+        m_camera.Update(player.GetPosition(), 1.0f);
         engine.GetPostProcess().Settings().exposure = 1.0f;
         engine.GetPostProcess().Settings().useLightOverlay = false;
         engine.GetPostProcess().Settings().lightOverlayStrength = 0.0f;
@@ -1400,10 +1409,13 @@ void GameplayState::RespawnAtCheckpoint()
     case MapZone::Room:
     {
         player.SetCurrentGroundLevel(GROUND_LEVEL);
-        player.SetPosition({ 200.0f, GROUND_LEVEL + 100.0f });
-        player.SetOnGround(false);
+        player.SetPosition({
+            ROOM_LEFT_BOUNDARY + player.GetSize().x * 0.5f,
+            GROUND_LEVEL + player.GetSize().y * 0.5f
+        });
+        player.SetOnGround(true);
         m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
-        m_camera.SetPosition(player.GetPosition());
+        m_camera.Update(player.GetPosition(), 1.0f);
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Room");
         break;
     }
