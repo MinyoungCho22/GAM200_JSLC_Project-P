@@ -294,7 +294,7 @@ void Engine::Step()
 
     m_postProcess->SetPassthrough(false);
 
-    if (m_imguiManager)
+    if (m_imguiManager && !m_isFullscreen)
     {
         m_imguiManager->BeginFrame(m_deltaTime);
         m_imguiManager->DrawDebugWindow();
@@ -307,8 +307,10 @@ void Engine::Step()
 #endif
 
     // WSL/Wayland/X11 sometimes reset swap interval after other contexts; re-apply on the main window.
+    // In exclusive fullscreen, keep VSync on even if the menu option is off:
+    // otherwise the moving tear line is very visible at QHD/144Hz+.
     glfwMakeContextCurrent(m_window);
-    glfwSwapInterval(m_vsyncEnabled ? 1 : 0);
+    glfwSwapInterval((m_vsyncEnabled || m_isFullscreen) ? 1 : 0);
     glfwSwapBuffers(m_window);
 }
 
@@ -339,9 +341,10 @@ void Engine::SetResolution(int width, int height)
 
     if (m_isFullscreen)
     {
-        GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
-        const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
-        glfwSetWindowMonitor(m_window, primaryMonitor, 0, 0, width, height, mode->refreshRate);
+        // Borderless fullscreen always matches the monitor. Store the requested
+        // size for the next windowed restore instead of switching video modes.
+        SyncPostProcessDisplaySize();
+        return;
     }
     else
     {
@@ -458,11 +461,23 @@ void Engine::ToggleFullscreen()
     if (m_isFullscreen)
     {
         glfwGetWindowPos(m_window, &m_windowedX, &m_windowedY);
+        glfwGetWindowSize(m_window, &m_windowedWidth, &m_windowedHeight);
         GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+        if (!mode)
+            return;
 
-        glfwSetWindowMonitor(m_window, primaryMonitor, 0, 0, mode->width, mode->height, mode->refreshRate);
-        Logger::Instance().Log(Logger::Severity::Event, "Switched to Fullscreen mode");
+        int monitorX = 0;
+        int monitorY = 0;
+        glfwGetMonitorPos(primaryMonitor, &monitorX, &monitorY);
+
+        // Use borderless fullscreen instead of exclusive fullscreen. Exclusive
+        // mode can flicker horizontal black lines on some Windows/QHD drivers.
+        glfwSetWindowAttrib(m_window, GLFW_DECORATED, GLFW_FALSE);
+        glfwSetWindowMonitor(m_window, nullptr, monitorX, monitorY, mode->width, mode->height, 0);
+        if (m_imguiManager)
+            m_imguiManager->SetDebugWindowVisible(false);
+        Logger::Instance().Log(Logger::Severity::Event, "Switched to Borderless Fullscreen mode");
     }
     else
     {
@@ -482,7 +497,10 @@ void Engine::ToggleFullscreen()
             restoreH = mode->height;
         }
 
+        glfwSetWindowAttrib(m_window, GLFW_DECORATED, GLFW_TRUE);
         glfwSetWindowMonitor(m_window, nullptr, m_windowedX, m_windowedY, restoreW, restoreH, 0);
+        if (m_imguiManager)
+            m_imguiManager->SetDebugWindowVisible(true);
         if (shouldMaximizeWindowed)
         {
             glfwMaximizeWindow(m_window);
@@ -509,7 +527,7 @@ void Engine::SetVSync(bool enabled)
     // Browser rendering is tied to requestAnimationFrame; swap interval control is limited.
     // Keep this call for parity, but cap behavior is effectively controlled by FPS timing.
 #endif
-    glfwSwapInterval(enabled ? 1 : 0);
+    glfwSwapInterval((enabled || m_isFullscreen) ? 1 : 0);
 
     // Ensure debug window never adds an extra vsync wait.
     if (m_imguiManager && m_imguiManager->IsInitialized())

@@ -2,6 +2,7 @@
 
 #include "GameOver.hpp"
 #include "MainMenu.hpp"
+#include <functional>
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../OpenGL/Shader.hpp"
@@ -16,8 +17,9 @@
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
 
-GameOver::GameOver(GameStateManager& gsm_ref, bool& isGameOverFlag)
-    : gsm(gsm_ref), m_isGameOverFlag(isGameOverFlag) {
+GameOver::GameOver(GameStateManager& gsm_ref, bool& isGameOverFlag,
+                   std::function<void()> onRespawn)
+    : gsm(gsm_ref), m_isGameOverFlag(isGameOverFlag), m_onRespawn(std::move(onRespawn)) {
     m_glitchTimer = 0.0;
 }
 
@@ -31,7 +33,10 @@ void GameOver::Initialize()
     m_font->Initialize("Asset/fonts/Font_Outlined.png");
 
     // Pre-bake the prompt text to an OpenGL texture
-    m_promptText = m_font->PrintToTexture(*m_fontShader, "Press ENTER to return to Main Menu");
+    const char* promptStr = m_onRespawn
+        ? "Press ENTER to respawn at checkpoint"
+        : "Press ENTER to return to Main Menu";
+    m_promptText = m_font->PrintToTexture(*m_fontShader, promptStr);
 
     // Vertex data for a simple unit quad (Triangle strip)
     std::vector<float> vertices = {
@@ -57,12 +62,23 @@ void GameOver::Update(double dt)
 
     m_glitchTimer += dt;
 
-    // Return to main menu on Enter key
+    // ENTER: respawn at checkpoint or return to main menu
     if (gsm.GetEngine().GetInput().IsKeyTriggered(Input::Key::Enter))
     {
         m_isExiting = true;
-        m_isGameOverFlag = true; // Signal the engine that the game session is over
-        gsm.PopState();
+        if (m_onRespawn)
+        {
+            // PopState destroys this object immediately, so copy the callback
+            // to a local variable first to avoid use-after-free.
+            auto respawn = m_onRespawn;
+            gsm.PopState();  // GameOver destroyed here
+            respawn();       // safe: local copy survives PopState
+        }
+        else
+        {
+            m_isGameOverFlag = true;
+            gsm.PopState();
+        }
         return;
     }
 }

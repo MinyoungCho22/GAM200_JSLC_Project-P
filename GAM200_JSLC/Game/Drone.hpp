@@ -12,6 +12,7 @@ class Drone
 {
 public:
     void Init(Math::Vec2 startPos, const char* texturePath, bool isTracer = false);
+    void Reset();
     void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding);
     void Draw(const Shader& shader) const;
     void DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) const;
@@ -80,6 +81,7 @@ public:
 private:
     void StartDeathSequence();
 
+    Math::Vec2 m_spawnPos;
     Math::Vec2 m_position;
     Math::Vec2 m_velocity;
     Math::Vec2 m_direction;

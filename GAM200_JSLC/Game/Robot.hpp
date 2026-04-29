@@ -35,6 +35,7 @@ class Robot
 {
 public:
     void Init(Math::Vec2 startPos);
+    void Reset();
     /// Scales HP, patrol/chase speed, and shortens pre-attack windup (Underground map only).
     void ApplyUndergroundDifficultyBoost();
     void Update(double dt, Player& player, const std::vector<ObstacleInfo>& obstacles, float mapMinX, float mapMaxX);
@@ -101,6 +102,7 @@ private:
     bool m_hasDealtDamage = false;
 
     float m_spawnX = 0.0f;
+    Math::Vec2 m_spawnPos{};
     const float PATROL_RANGE = 1000.0f;
 
     const float GRAVITY = -2200.0f;

@@ -8,6 +8,8 @@
 #include "../OpenGL/Shader.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 
+bool StoryDialogue::s_dialogueEnabled = true;
+
 namespace
 {
 constexpr float GAME_WIDTH = 1920.0f;
@@ -115,7 +117,7 @@ void StoryDialogue::FinishSequence(Font& font, Shader& fontShader)
 void StoryDialogue::EnqueueLines(const std::vector<std::string>& lines, Font& font, Shader& fontShader,
     std::function<void()> onSequenceComplete)
 {
-    if (lines.empty())
+    if (lines.empty() || !s_dialogueEnabled)
         return;
     if (m_active)
     {
@@ -147,6 +149,12 @@ void StoryDialogue::EnqueueOpening(Font& font, Shader& fontShader)
 
 void StoryDialogue::Update(float dt, const Input::Input& input, const ControlBindings& controls, Font& font, Shader& fontShader)
 {
+    if (!s_dialogueEnabled)
+    {
+        if (m_active)
+            ResetForNewRun();
+        return;
+    }
     if (!m_active || m_lines.empty())
         return;
 
@@ -202,7 +210,7 @@ void StoryDialogue::Update(float dt, const Input::Input& input, const ControlBin
 
 void StoryDialogue::Draw(Font& font, Shader& textureShader, Shader& fontShader, const Math::Matrix& screenProjection)
 {
-    if (!m_active || !m_boxImage || m_boxImage->GetWidth() <= 0)
+    if (!s_dialogueEnabled || !m_active || !m_boxImage || m_boxImage->GetWidth() <= 0)
         return;
 
     GL::Enable(GL_BLEND);

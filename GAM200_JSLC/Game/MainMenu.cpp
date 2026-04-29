@@ -25,6 +25,24 @@ void MainMenu::Initialize()
 {
     m_enterPressed = false;
     m_waitForEnterRelease = gsm.GetEngine().GetInput().IsKeyPressed(Input::Key::Enter);
+    m_isFadingOut = false;
+    m_fadeAlpha   = 0.0f;
+
+    if (m_fadeVAO == 0)
+    {
+        float fadeVerts[] = {
+            -0.5f,  0.5f,   0.5f,  0.5f,  -0.5f, -0.5f,
+             0.5f,  0.5f,   0.5f, -0.5f,  -0.5f, -0.5f
+        };
+        GL::GenVertexArrays(1, &m_fadeVAO);
+        GL::GenBuffers(1, &m_fadeVBO);
+        GL::BindVertexArray(m_fadeVAO);
+        GL::BindBuffer(GL_ARRAY_BUFFER, m_fadeVBO);
+        GL::BufferData(GL_ARRAY_BUFFER, sizeof(fadeVerts), fadeVerts, GL_STATIC_DRAW);
+        GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+        GL::EnableVertexAttribArray(0);
+        GL::BindVertexArray(0);
+    }
 
     m_fontShader = std::make_unique<Shader>("OpenGL/Shaders/simple.vert", "OpenGL/Shaders/simple.frag");
     m_font = std::make_unique<Font>();
@@ -59,8 +77,6 @@ void MainMenu::Update(double dt)
 {
     m_glitchTimer += dt;
 
-    // If Enter is still held from the previous state (e.g. GameOver),
-    // force a release first so starting the game always needs one fresh press on No.99.
     if (m_waitForEnterRelease)
     {
         if (!gsm.GetEngine().GetInput().IsKeyPressed(Input::Key::Enter))
@@ -68,11 +84,23 @@ void MainMenu::Update(double dt)
         return;
     }
 
+    // Fade-out in progress: advance alpha then launch gameplay
+    if (m_isFadingOut)
+    {
+        m_fadeAlpha = std::min(1.0f, m_fadeAlpha + static_cast<float>(dt) / FADE_OUT_DURATION);
+        if (m_fadeAlpha >= 1.0f)
+        {
+            Logger::Instance().Log(Logger::Severity::Event, "MainMenu: fade done - starting game!");
+            gsm.ChangeState(std::make_unique<GameplayState>(gsm));
+        }
+        return;
+    }
+
     if (!m_enterPressed && gsm.GetEngine().GetInput().IsKeyTriggered(Input::Key::Enter))
     {
         m_enterPressed = true;
-        Logger::Instance().Log(Logger::Severity::Event, "MainMenu: Enter key pressed - starting game!");
-        gsm.ChangeState(std::make_unique<GameplayState>(gsm));
+        m_isFadingOut  = true;
+        Logger::Instance().Log(Logger::Severity::Event, "MainMenu: Enter pressed - fading out.");
     }
 }
 
@@ -196,6 +224,23 @@ void MainMenu::Draw()
         m_font->DrawBakedText(*m_fontShader, m_promptText, promptPos, promptHeight);
     }
 
+    // Fade-out overlay
+    if (m_fadeAlpha > 0.0f && m_fadeVAO != 0)
+    {
+        GL::Enable(GL_BLEND);
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        Math::Matrix fadeModel = Math::Matrix::CreateTranslation({ GAME_WIDTH * 0.5f, GAME_HEIGHT * 0.5f })
+                               * Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
+        m_shapeShader->use();
+        m_shapeShader->setMat4("projection", projection);
+        m_shapeShader->setMat4("model", fadeModel);
+        m_shapeShader->setVec3("objectColor", 0.0f, 0.0f, 0.0f);
+        m_shapeShader->setFloat("uAlpha", m_fadeAlpha);
+        GL::BindVertexArray(m_fadeVAO);
+        GL::DrawArrays(GL_TRIANGLES, 0, 6);
+        GL::BindVertexArray(0);
+    }
+
     GL::Disable(GL_BLEND);
 }
 
@@ -207,4 +252,12 @@ void MainMenu::Shutdown()
     if (m_shapeShader) m_shapeShader.reset();
     GL::DeleteVertexArrays(1, &m_shapeVAO);
     GL::DeleteBuffers(1, &m_shapeVBO);
+
+    if (m_fadeVAO != 0)
+    {
+        GL::DeleteVertexArrays(1, &m_fadeVAO);
+        GL::DeleteBuffers(1, &m_fadeVBO);
+        m_fadeVAO = 0;
+        m_fadeVBO = 0;
+    }
 }

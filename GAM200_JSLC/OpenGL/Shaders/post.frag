@@ -34,38 +34,10 @@ vec3 OverlayBlend(vec3 base, vec3 blend)
 
 void main()
 {
-    vec2 uv = vUV;
-    float screenAspect = uFramebufferSize.x / max(uFramebufferSize.y, 1.0);
-    float gameAspect = uGameSize.x / max(uGameSize.y, 1.0);
-
-    // Avoid flickering between letterbox branches when aspects match in float (e.g. 2560/1440 vs 1920/1080).
-    const float kAspectEps = 1.0e-4;
-    float aspectDiff = screenAspect - gameAspect;
-
-    vec2 sceneUV = uv;
-    if (aspectDiff > kAspectEps)
-    {
-        float w = gameAspect / screenAspect;
-        float left = (1.0 - w) * 0.5;
-        sceneUV.x = (uv.x - left) / w;
-    }
-    else if (aspectDiff < -kAspectEps)
-    {
-        float h = screenAspect / gameAspect;
-        float bottom = (1.0 - h) * 0.5;
-        sceneUV.y = (uv.y - bottom) / h;
-    }
-
-    // Strict 0..1 tests cause occasional full rows/columns of black (FP error at letterbox edges).
-    const float kUvEps = 1.0e-3;
-    if (sceneUV.x < -kUvEps || sceneUV.x > 1.0 + kUvEps ||
-        sceneUV.y < -kUvEps || sceneUV.y > 1.0 + kUvEps)
-    {
-        FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
-    }
-
-    vec3 color = texture(uSceneTex, clamp(sceneUV, vec2(0.0), vec2(1.0))).rgb;
+    // Letterboxing is handled by the OpenGL viewport before this shader runs.
+    // Keeping UVs direct avoids per-fragment aspect-ratio branch jitter on QHD fullscreen.
+    vec2 sceneUV = vUV;
+    vec3 color = texture(uSceneTex, sceneUV).rgb;
 
     color *= uExposure;
 

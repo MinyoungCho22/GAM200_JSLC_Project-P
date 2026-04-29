@@ -63,6 +63,7 @@ public:
     void ResetVelocity();
     void SetOnGround(bool onGround);
 
+    void Revive(float newPulse);
     void SetHiding(bool hiding) { m_isHiding = hiding; }
     void SetGodMode(bool godMode) { m_godMode = godMode; }
     bool IsGodMode() const { return m_godMode; }

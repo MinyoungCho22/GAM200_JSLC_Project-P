@@ -88,6 +88,10 @@ void GameplayState::Initialize()
     gsm.GetEngine().GetTextureShader().setInt("ourTexture", 0);
 
     player.Init({ 200.0f, GROUND_LEVEL + 100.0f });
+    // Settle the player onto the ground immediately so they appear at the correct
+    // standing position during the fade-in, rather than floating mid-air.
+    player.SetPosition({ 200.0f, GROUND_LEVEL + player.GetSize().y * 0.5f });
+    player.SetOnGround(true);
 
     pulseManager = std::make_unique<PulseManager>();
     pulseManager->Initialize();
@@ -200,6 +204,32 @@ void GameplayState::Initialize()
     m_isGameOver = false;
     m_blockAmbientStoryForSession = false;
     m_doorOpened = false;
+    m_currentCheckpoint = MapZone::Room;
+    m_pendingTransition = PendingTransition::None;
+    m_fadeAlpha = 1.0f;                // start fully black
+    m_fadeState = FadeState::FadingIn; // fade in from black on game start
+
+    // Scene must be dark from the very first Draw (before Update sets exposure).
+    gsm.GetEngine().GetPostProcess().Settings().exposure = 0.0f;
+    // Snap camera to the bounded position so it doesn't lerp during fade-in.
+    m_camera.Update(player.GetPosition(), 1.0f);
+
+    // Fade overlay: centered unit quad (-0.5..0.5)
+    if (m_fadeVAO == 0)
+    {
+        float fadeVerts[] = {
+            -0.5f,  0.5f,   0.5f,  0.5f,  -0.5f, -0.5f,
+             0.5f,  0.5f,   0.5f, -0.5f,  -0.5f, -0.5f
+        };
+        GL::GenVertexArrays(1, &m_fadeVAO);
+        GL::GenBuffers(1, &m_fadeVBO);
+        GL::BindVertexArray(m_fadeVAO);
+        GL::BindBuffer(GL_ARRAY_BUFFER, m_fadeVBO);
+        GL::BufferData(GL_ARRAY_BUFFER, sizeof(fadeVerts), fadeVerts, GL_STATIC_DRAW);
+        GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+        GL::EnableVertexAttribArray(0);
+        GL::BindVertexArray(0);
+    }
 
     if (m_bgm.Load("Asset/BackgroundMusic.mp3", true))
     {
@@ -306,6 +336,62 @@ void GameplayState::Update(double dt)
     if (input.IsKeyTriggered(Input::Key::Escape))
     {
         gsm.PushState(std::make_unique<SettingState>(gsm));
+        return;
+    }
+
+    // Map transition fade update: freeze player input but keep camera alive
+    if (m_fadeState != FadeState::None)
+    {
+        // Cap fdt so a large dt spike (e.g. from blocking Initialize()) doesn't
+        // consume the entire fade-in in a single frame and make it look like a pop.
+        const float fdt = std::min(static_cast<float>(dt), 1.0f / 30.0f);
+
+        // Apply hallway post-process during Room→Hallway fade so the shader
+        // is visible before the fade-in, not after it.
+        {
+            bool isHallwayFade = (m_pendingTransition == PendingTransition::RoomToHallway)
+                              || (m_doorOpened && !m_rooftopAccessed);
+            if (isHallwayFade)
+            {
+                auto& pp = gsm.GetEngine().GetPostProcess();
+                pp.Settings().exposure             = 0.4f;
+                pp.Settings().useLightOverlay      = true;
+                pp.Settings().lightOverlayStrength = 0.6f;
+                pp.Settings().cameraPos            = m_camera.GetPosition();
+            }
+        }
+
+        if (m_fadeState == FadeState::FadingOut)
+        {
+            m_fadeAlpha = std::min(1.0f, m_fadeAlpha + fdt / FADE_OUT_DURATION);
+            if (m_fadeAlpha >= 1.0f)
+                ExecutePendingTransition(); // teleports player, resets camera pos
+        }
+        else if (m_fadeState == FadeState::FadingIn)
+        {
+            m_fadeAlpha = std::max(0.0f, m_fadeAlpha - fdt / FADE_IN_DURATION);
+            if (m_fadeAlpha <= 0.0f)
+            {
+                m_fadeAlpha = 0.0f;
+                m_fadeState = FadeState::None;
+            }
+
+            // Belt-and-suspenders: also drive PostProcess exposure so the scene
+            // itself darkens inside the FBO, not just the foreground overlay.
+            // Only for game-start fade (no map transition pending, room only).
+            // Skip when hallway PP (useLightOverlay) is active to avoid conflict.
+            {
+                auto& pp = gsm.GetEngine().GetPostProcess();
+                if (!pp.Settings().useLightOverlay)
+                    pp.Settings().exposure = 1.0f - m_fadeAlpha;
+            }
+        }
+        // Keep camera smoothly tracking even while screen is fading
+        if (m_camera.IsAnimating())
+            m_camera.UpdateAnimation(fdt);
+        else
+            m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
+        SoundSystem::Instance().Update();
         return;
     }
 
@@ -701,6 +787,8 @@ void GameplayState::Update(double dt)
 
         Math::Vec2 targetPos;
 
+        constexpr float KILL_PULSE_REWARD = 10.0f;
+
         if (targetDrone != nullptr)
         {
             // Cache position before potential reinforcement spawn.
@@ -710,6 +798,7 @@ void GameplayState::Update(double dt)
             if (didDroneDie)
             {
                 m_traceSystem->OnDroneKilled(*droneManager, player.GetPosition());
+                player.GetPulseCore().getPulse().add(KILL_PULSE_REWARD);
             }
         }
         else if (targetRobot != nullptr)
@@ -721,8 +810,14 @@ void GameplayState::Update(double dt)
                 damagePerSecond = 50.0f;
             }
 
+            bool wasAlive = !targetRobot->IsDead();
             targetRobot->TakeDamage(damagePerSecond * static_cast<float>(dt));
             targetPos = targetRobot->GetPosition();
+
+            if (wasAlive && targetRobot->IsDead())
+            {
+                player.GetPulseCore().getPulse().add(KILL_PULSE_REWARD);
+            }
         }
 
         Math::Vec2 vfxStartPos = { playerCenter.x + (player.IsFacingRight() ? 1 : -1) * (playerHitboxSize.x / 2.0f), playerCenter.y };
@@ -757,16 +852,12 @@ void GameplayState::Update(double dt)
 
     if (m_door->ShouldLoadNextMap() && !m_doorOpened)
     {
-        HandleRoomToHallwayTransition();
-        const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
-        player.SetPosition({ hallwaySpawnX, HALLWAY_ENTRY_POS_Y });
-        player.ResetVelocity();
-        m_camera.SetPosition(player.GetPosition());
+        StartTransition(PendingTransition::RoomToHallway);
     }
 
     if (m_rooftopDoor->ShouldLoadNextMap() && !m_rooftopAccessed)
     {
-        HandleHallwayToRooftopTransition();
+        StartTransition(PendingTransition::HallwayToRooftop);
     }
 
     if (m_rooftopAccessed && !m_undergroundAccessed)
@@ -775,7 +866,7 @@ void GameplayState::Update(double dt)
         float transitionX = Rooftop::MIN_X + Rooftop::WIDTH - 1.0f;
         if (playerRight >= transitionX)
         {
-            HandleRooftopToUndergroundTransition();
+            StartTransition(PendingTransition::RooftopToUnderground);
         }
     }
 
@@ -784,7 +875,7 @@ void GameplayState::Update(double dt)
         float transitionX = Underground::MIN_X + Underground::WIDTH - 50.0f;
         if (player.GetPosition().x > transitionX)
         {
-            HandleUndergroundToSubwayTransition();
+            StartTransition(PendingTransition::UndergroundToSubway);
         }
     }
 
@@ -1108,9 +1199,9 @@ void GameplayState::Update(double dt)
 
     if (player.IsDead())
     {
-        // Ensure hall exposure does not leak into GameOver rendering.
         engine.GetPostProcess().Settings().exposure = 1.0f;
-        gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver));
+        gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver,
+            [this]() { RespawnAtCheckpoint(); }));
         return;
     }
 
@@ -1143,12 +1234,14 @@ void GameplayState::HandleRoomToHallwayTransition()
     OpenHallwayDoorLayoutOnly();
     m_hallwayEntryStoryPending = true;
     m_hallwayEntryStoryDelayRemaining = HALLWAY_ENTRY_STORY_DELAY_SEC;
+    m_currentCheckpoint = MapZone::Hallway;
 }
 
 void GameplayState::HandleHallwayToRooftopTransition()
 {
     m_rooftopDoor->ResetMapTransition();
     m_rooftopAccessed = true;
+    m_currentCheckpoint = MapZone::Rooftop;
 
     float newGroundLevel = Rooftop::FLOOR_SURFACE_Y;
     player.SetCurrentGroundLevel(newGroundLevel);
@@ -1178,6 +1271,7 @@ void GameplayState::HandleRooftopToUndergroundTransition()
 {
     m_rooftopAccessed = true;
     m_undergroundAccessed = true;
+    m_currentCheckpoint = MapZone::Underground;
 
     m_rooftop->ClearAllDrones();
 
@@ -1211,6 +1305,7 @@ void GameplayState::HandleUndergroundToSubwayTransition()
 
     m_undergroundAccessed = true;
     m_subwayAccessed = true;
+    m_currentCheckpoint = MapZone::Subway;
 
     m_underground->ClearAllDrones();
 
@@ -1241,6 +1336,129 @@ void GameplayState::HandleUndergroundToSubwayTransition()
         "Subway Transition! Camera: (%.1f, %.1f) -> (%.1f, %.1f), Player: (%.1f, %.1f)",
         cameraStartPos.x, cameraStartPos.y, cameraEndPos.x, cameraEndPos.y,
         playerStartX, playerStartY);
+}
+
+void GameplayState::StartTransition(PendingTransition t)
+{
+    if (m_fadeState != FadeState::None) return;
+    m_pendingTransition = t;
+    m_fadeAlpha = 0.0f;
+    m_fadeState = FadeState::FadingOut;
+}
+
+void GameplayState::ExecutePendingTransition()
+{
+    switch (m_pendingTransition)
+    {
+    case PendingTransition::RoomToHallway:
+        HandleRoomToHallwayTransition();
+        {
+            const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
+            player.SetPosition({ hallwaySpawnX, HALLWAY_ENTRY_POS_Y });
+            player.ResetVelocity();
+            m_camera.SetPosition(player.GetPosition());
+        }
+        break;
+    case PendingTransition::HallwayToRooftop:
+        HandleHallwayToRooftopTransition();
+        break;
+    case PendingTransition::RooftopToUnderground:
+        HandleRooftopToUndergroundTransition();
+        break;
+    case PendingTransition::UndergroundToSubway:
+        HandleUndergroundToSubwayTransition();
+        break;
+    default:
+        break;
+    }
+    m_pendingTransition = PendingTransition::None;
+    m_fadeState = FadeState::FadingIn;
+}
+
+void GameplayState::RespawnAtCheckpoint()
+{
+    player.Revive(50.0f);
+    m_storyDialogue->ResetForNewRun();
+
+    // Reset all enemies
+    droneManager->ResetAllDrones();
+    if (m_hallway)    m_hallway->GetDroneManager()->ResetAllDrones();
+    if (m_rooftop)    m_rooftop->GetDroneManager()->ResetAllDrones();
+    if (m_underground)
+    {
+        m_underground->GetDroneManager()->ResetAllDrones();
+        for (auto& robot : m_underground->GetRobots()) robot.Reset();
+    }
+    if (m_subway)
+    {
+        m_subway->GetDroneManager()->ResetAllDrones();
+        for (auto& robot : m_subway->GetRobots()) robot.Reset();
+    }
+
+    switch (m_currentCheckpoint)
+    {
+    case MapZone::Room:
+    {
+        player.SetCurrentGroundLevel(GROUND_LEVEL);
+        player.SetPosition({ 200.0f, GROUND_LEVEL + 100.0f });
+        player.SetOnGround(false);
+        m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
+        m_camera.SetPosition(player.GetPosition());
+        Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Room");
+        break;
+    }
+    case MapZone::Hallway:
+    {
+        const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
+        const float hallwaySpawnY = HALLWAY_GROUND_LEVEL + player.GetSize().y * 0.5f;
+        player.SetCurrentGroundLevel(HALLWAY_GROUND_LEVEL);
+        player.SetPosition({ hallwaySpawnX, hallwaySpawnY });
+        player.SetOnGround(false);
+        ApplyHallwayCameraBounds();
+        m_camera.SetPosition(player.GetPosition());
+        Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Hallway");
+        break;
+    }
+    case MapZone::Rooftop:
+    {
+        float playerStartX = Rooftop::MIN_X + 1550.0f;
+        float playerStartY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f + 200.0f) + 50.0f;
+        player.SetCurrentGroundLevel(Rooftop::FLOOR_SURFACE_Y);
+        player.SetPosition({ playerStartX, playerStartY });
+        player.SetOnGround(false);
+        m_camera.SetBounds({ Rooftop::MIN_X, Rooftop::MIN_Y },
+                           { Rooftop::MIN_X + Rooftop::WIDTH, Rooftop::MIN_Y + Rooftop::HEIGHT });
+        m_camera.SetPosition(player.GetPosition());
+        Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Rooftop");
+        break;
+    }
+    case MapZone::Underground:
+    {
+        float playerStartX = Underground::MIN_X + 100.0f;
+        float playerStartY = Underground::MIN_Y + 270.0f;
+        player.SetCurrentGroundLevel(Underground::MIN_Y + 75.0f);
+        player.SetPosition({ playerStartX, playerStartY });
+        player.SetOnGround(false);
+        m_camera.SetBounds({ Underground::MIN_X, Underground::MIN_Y },
+                           { Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y + Underground::HEIGHT });
+        m_camera.SetPosition(player.GetPosition());
+        Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Underground");
+        break;
+    }
+    case MapZone::Subway:
+    {
+        float playerStartX = Subway::MIN_X + 300.0f;
+        float playerStartY = Subway::MIN_Y + 540.0f;
+        player.SetCurrentGroundLevel(Subway::MIN_Y + 90.0f);
+        player.SetPosition({ playerStartX, playerStartY });
+        player.SetOnGround(false);
+        m_camera.SetBounds({ Subway::MIN_X, Subway::MIN_Y },
+                           { Subway::MIN_X + Subway::WIDTH, Subway::MIN_Y + Subway::HEIGHT });
+        m_camera.SetPosition(player.GetPosition());
+        Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Subway");
+        break;
+    }
+    }
 }
 
 Math::Vec2 GameplayState::ScreenToWorldCoordinates(double screenX, double screenY) const
@@ -2025,6 +2243,24 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_rooftopDoor->DrawDebug(*colorShader);
     }
 
+    // Black fade overlay for map transitions
+    if (m_fadeAlpha > 0.0f && m_fadeVAO != 0)
+    {
+        GL::Enable(GL_BLEND);
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        Math::Matrix fadeProj = Math::Matrix::CreateOrtho(0.0f, GAME_WIDTH, 0.0f, GAME_HEIGHT, -1.0f, 1.0f);
+        Math::Matrix fadeModel = Math::Matrix::CreateTranslation({ GAME_WIDTH * 0.5f, GAME_HEIGHT * 0.5f })
+                               * Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
+        colorShader->use();
+        colorShader->setMat4("projection", fadeProj);
+        colorShader->setMat4("model", fadeModel);
+        colorShader->setVec3("objectColor", 0.0f, 0.0f, 0.0f);
+        colorShader->setFloat("uAlpha", m_fadeAlpha);
+        GL::BindVertexArray(m_fadeVAO);
+        GL::DrawArrays(GL_TRIANGLES, 0, 6);
+        GL::BindVertexArray(0);
+    }
+
     GL::Disable(GL_BLEND);
 }
 
@@ -2058,6 +2294,14 @@ void GameplayState::Shutdown()
     if (m_hallwayHidingPromptS) m_hallwayHidingPromptS->Shutdown();
 
     if (m_storyDialogue) m_storyDialogue->Shutdown();
+
+    if (m_fadeVAO != 0)
+    {
+        GL::DeleteVertexArrays(1, &m_fadeVAO);
+        GL::DeleteBuffers(1, &m_fadeVBO);
+        m_fadeVAO = 0;
+        m_fadeVBO = 0;
+    }
 
     m_bgm.Stop();
 

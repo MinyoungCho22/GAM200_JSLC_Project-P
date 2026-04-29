@@ -56,6 +56,7 @@ unsigned int Robot::LoadTexture(const char* path)
 
 void Robot::Init(Math::Vec2 startPos)
 {
+    m_spawnPos = startPos;
     m_position = startPos;
     m_spawnX = startPos.x;
     m_velocity = { 0.0f, 0.0f };
@@ -552,6 +553,23 @@ void Robot::TakeDamage(float amount)
         m_state = RobotState::Dead;
         Logger::Instance().Log(Logger::Severity::Event, "Sweep Stalker Destroyed!");
     }
+}
+
+void Robot::Reset()
+{
+    m_position              = m_spawnPos;
+    m_velocity              = { 0.0f, 0.0f };
+    m_hp                    = m_maxHp;  // preserves difficulty boost
+    m_state                 = RobotState::Patrol;
+    m_directionX            = 1.0f;
+    m_stateTimer            = 0.0f;
+    m_currentAttack         = AttackType::None;
+    m_lastAttack            = AttackType::None;
+    m_consecutiveAttackCount = 0;
+    m_attackCooldownTimer   = 0.0f;
+    m_staggerCooldown       = 0.0f;
+    m_hasDealtDamage        = false;
+    m_isOnGround            = false;
 }
 
 void Robot::Shutdown()

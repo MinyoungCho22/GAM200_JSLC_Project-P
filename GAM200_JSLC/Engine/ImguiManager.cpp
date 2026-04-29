@@ -141,6 +141,15 @@ void ImguiManager::ForceDebugSwapIntervalOff()
     glfwMakeContextCurrent(prev);
 }
 
+void ImguiManager::SetDebugWindowVisible(bool visible)
+{
+    if (!m_initialized || !m_debugWindow) return;
+    if (visible)
+        glfwShowWindow(m_debugWindow);
+    else
+        glfwHideWindow(m_debugWindow);
+}
+
 void ImguiManager::UpdateFps(double dt)
 {
     m_fpsTimer += dt;

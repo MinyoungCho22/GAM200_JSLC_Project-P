@@ -29,6 +29,7 @@ std::uniform_real_distribution<float> drone_angle_distribution(25.0f, 45.0f);
 
 void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
 {
+    m_spawnPos = startPos;
     m_position = startPos;
     m_baseY = startPos.y;
     m_velocity = { 0.0f, 0.0f };
@@ -477,6 +478,34 @@ void Drone::DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) c
         debugRenderer.DrawLine(colorShader, m_position, lineEnd, brightness, 0.0f, 0.0f);
 
     }
+}
+
+void Drone::Reset()
+{
+    m_position      = m_spawnPos;
+    m_baseY         = m_spawnPos.y;
+    m_velocity      = { 0.0f, 0.0f };
+    m_direction     = { 1.0f, 0.0f };
+    m_isChasing     = false;
+    m_lostTimer     = 0.0f;
+    m_currentSpeed  = m_baseSpeed;
+    m_isDead        = false;
+    m_isHit         = false;
+    m_hitTimer      = 0.0f;
+    m_hitRotation   = 0.0f;
+    m_fallSpeed     = 0.0f;
+    m_hp            = m_maxHP;
+    m_searchRotation = 0.0f;
+    m_searchDir     = 1;
+    m_isAttacking   = false;
+    m_shouldDealDamage = false;
+    m_attackCooldown = 0.0f;
+    m_attackTimer   = 0.0f;
+    m_radarAngle    = 0.0f;
+    m_moveTimer     = 0.0f;
+    m_bobTimer      = 0.0f;
+    m_debugMode     = false;
+    m_debugExitTimer = 0.0f;
 }
 
 void Drone::Shutdown()

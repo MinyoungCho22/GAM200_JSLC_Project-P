@@ -29,7 +29,10 @@ public:
     /// Drop active line, queue, and UI state (e.g. new run after game over).
     void ResetForNewRun();
 
-    bool IsBlocking() const { return m_active; }
+    static void SetDialogueEnabled(bool enabled) { s_dialogueEnabled = enabled; }
+    static bool IsDialogueEnabled() { return s_dialogueEnabled; }
+
+    bool IsBlocking() const { return m_active && s_dialogueEnabled; }
 
     void EnqueueLines(const std::vector<std::string>& lines, Font& font, Shader& fontShader,
         std::function<void()> onSequenceComplete = nullptr);
@@ -50,6 +53,8 @@ private:
 
     void BeginSequence(std::vector<std::string> lines, std::function<void()> onComplete, float preTypeDelay);
     void FinishSequence(Font& font, Shader& fontShader);
+
+    static bool s_dialogueEnabled;
 
     std::unique_ptr<Background> m_boxImage;
     std::vector<std::string> m_lines;

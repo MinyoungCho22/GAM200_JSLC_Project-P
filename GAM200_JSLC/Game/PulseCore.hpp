@@ -28,6 +28,10 @@ public:
         }
     }
 
+    void set(float value) {
+        pulse_value = std::max(0.0f, std::min(pulse_max, value));
+    }
+
 private:
     float pulse_max;
     float pulse_value;

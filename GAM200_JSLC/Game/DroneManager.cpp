@@ -60,6 +60,12 @@ void DroneManager::ClearAllDrones()
     drones.clear();
 }
 
+void DroneManager::ResetAllDrones()
+{
+    for (auto& drone : drones)
+        drone.Reset();
+}
+
 const std::vector<Drone>& DroneManager::GetDrones() const
 {
     return drones;

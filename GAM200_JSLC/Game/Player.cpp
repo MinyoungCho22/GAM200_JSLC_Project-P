@@ -276,7 +276,9 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
             m_animations[static_cast<int>(m_currentAnimState)].Reset();
             m_currentAnimState = newState;
         }
-        m_animations[static_cast<int>(m_currentAnimState)].Update(fdt);
+        // Speed up walking animation 3x during dash
+        const float animDt = fdt * (is_dashing ? 3.0f : 1.0f);
+        m_animations[static_cast<int>(m_currentAnimState)].Update(animDt);
     }
 
     // Spawn Sandevistan afterimage ghosts at fixed intervals.
@@ -575,12 +577,25 @@ void Player::Dash()
     const float currentPulse = m_pulseCore.getPulse().Value();
     const float dashCost = m_pulseCore.getConfig().dashCost;
 
-    if (!is_dashing && currentPulse > MIN_PULSE_TO_ALLOW_DASH && currentPulse >= dashCost)
+    if (!is_dashing && !is_crouching && currentPulse > MIN_PULSE_TO_ALLOW_DASH && currentPulse >= dashCost)
     {
         m_pulseCore.getPulse().spend(dashCost);
         is_dashing = true;
         dash_timer = dash_duration;
     }
+}
+
+void Player::Revive(float newPulse)
+{
+    m_pulseCore.getPulse().set(newPulse);
+    velocity = { 0.0f, 0.0f };
+    m_currentHorizontalSpeed = 0.0f;
+    is_dashing = false;
+    dash_timer = 0.0f;
+    is_crouching = false;
+    m_crouchAnimationFinished = false;
+    m_isInvincible = true;
+    m_invincibilityTimer = 2.0f;
 }
 
 void Player::SetPosition(Math::Vec2 new_pos)

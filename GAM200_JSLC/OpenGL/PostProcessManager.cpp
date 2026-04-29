@@ -149,6 +149,9 @@ void PostProcessManager::BeginScene()
     GL::Viewport(0, 0, m_width, m_height);
 
     GL::Disable(GL_DEPTH_TEST);
+    GL::Disable(GL_SCISSOR_TEST);
+    GL::Disable(GL_BLEND);
+    GL::Disable(GL_STENCIL_TEST);
 
     GL::ClearColor(0.f, 0.f, 0.f, 1.f);
     GL::Clear(GL_COLOR_BUFFER_BIT); 
@@ -181,6 +184,8 @@ void PostProcessManager::GetLetterboxViewport(int& outX, int& outY, int& outW, i
 void PostProcessManager::ApplyAndPresent()
 {
     GL::Disable(GL_DEPTH_TEST);
+    GL::Disable(GL_BLEND);
+    GL::Disable(GL_STENCIL_TEST);
 
     int fbW = 0;
     int fbH = 0;
@@ -202,9 +207,17 @@ void PostProcessManager::ApplyAndPresent()
     m_displayWidth = fbW;
     m_displayHeight = fbH;
 
+    GL::Disable(GL_SCISSOR_TEST);
     GL::Viewport(0, 0, fbW, fbH);
     GL::ClearColor(0.f, 0.f, 0.f, 1.f);
     GL::Clear(GL_COLOR_BUFFER_BIT);
+
+    int vpX = 0;
+    int vpY = 0;
+    int vpW = fbW;
+    int vpH = fbH;
+    ComputeLetterboxViewport(fbW, fbH, vpX, vpY, vpW, vpH);
+    GL::Viewport(vpX, vpY, vpW, vpH);
 
     m_postShader->use();
     m_postShader->setFloat("uExposure", m_passthrough ? 1.0f : m_settings.exposure);
@@ -213,7 +226,7 @@ void PostProcessManager::ApplyAndPresent()
 
     m_postShader->setVec2("uCameraPos", m_settings.cameraPos.x, m_settings.cameraPos.y);
     m_postShader->setVec2("uGameSize", static_cast<float>(m_width), static_cast<float>(m_height));
-    m_postShader->setVec2("uFramebufferSize", static_cast<float>(fbW), static_cast<float>(fbH));
+    m_postShader->setVec2("uFramebufferSize", static_cast<float>(vpW), static_cast<float>(vpH));
 
     m_postShader->setVec2("uHallwayMin", 1920.0f, 0.0f);
     m_postShader->setVec2("uHallwaySize", 5940.0f, 1080.0f);
@@ -291,8 +304,11 @@ void PostProcessManager::CreateSceneFBO()
         nullptr
     );
 
-    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Present the scene FBO without cross-row filtering. On QHD fullscreen,
+    // linear filtering while scaling 1920x1080 -> 2560x1440 can blend against
+    // cleared rows on some drivers and show as a fast-moving black horizontal line.
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 

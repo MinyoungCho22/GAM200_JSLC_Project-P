@@ -30,8 +30,8 @@ public:
     bool BypassPostProcess() const override { return true; }
 
 private:
-    enum class MenuItem { FPS, VSync, Fullscreen, Volume, PadAim, Exit };
-    static constexpr int MENU_ITEM_COUNT = 6;
+    enum class MenuItem { FPS, VSync, Fullscreen, Volume, PadAim, Dialogue, Exit };
+    static constexpr int MENU_ITEM_COUNT = 7;
 
     static constexpr int FPS_COUNT = 5;
     static constexpr int FPS_VALUES[FPS_COUNT] = { 30, 60, 144, 240, 0 };
@@ -52,6 +52,7 @@ private:
     bool  m_fullscreenEnabled = false;
     float m_masterVolume = 0.8f;   // 0.0 to 1.0
     float m_padAimSensitivity = 1.0f;
+    bool  m_dialogueEnabled = true;
 
     // OpenGL objects
     unsigned int m_overlayVAO = 0;
@@ -66,6 +67,7 @@ private:
     CachedTextureInfo m_fullscreenLabelText;
     CachedTextureInfo m_volumeLabelText;
     CachedTextureInfo m_padAimLabelText;
+    CachedTextureInfo m_dialogueLabelText;
     CachedTextureInfo m_exitText;
     CachedTextureInfo m_wasdHintText;
     CachedTextureInfo m_escHintText;
@@ -76,6 +78,7 @@ private:
     CachedTextureInfo m_fullscreenValueText;
     CachedTextureInfo m_volumePctText;
     CachedTextureInfo m_padAimValueText;
+    CachedTextureInfo m_dialogueValueText;
 
     // Rebuild dynamic text strings after a value changes
     void RebuildValueTexts();
@@ -90,6 +93,7 @@ private:
     void ApplyFullscreen();
     void ApplyVolume();
     void ApplyPadAim();
+    void ApplyDialogue();
 
     const char* GetFpsLabel(int index) const;
 };

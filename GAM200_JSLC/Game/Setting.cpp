@@ -1,6 +1,7 @@
 // Setting.cpp
 
 #include "Setting.hpp"
+#include "StoryDialogue.hpp"
 #include "../Engine/GameStateManager.hpp"
 #include "../Engine/Engine.hpp"
 #include "../Engine/Sound.hpp"
@@ -18,13 +19,14 @@ constexpr float GAME_HEIGHT = static_cast<float>(VIRTUAL_HEIGHT);
 // ---- Layout constants -------------------------------------------------------
 constexpr float COL_LABEL  = 560.0f;   // x: label column (right-edge aligned)
 constexpr float COL_VALUE  = 980.0f;   // x: value column (left-edge)
-constexpr float ROW_TITLE  = 800.0f;
-constexpr float ROW_FPS    = 640.0f;
-constexpr float ROW_VSYNC  = 520.0f;
-constexpr float ROW_FULLSCREEN = 400.0f;
-constexpr float ROW_VOLUME = 280.0f;
-constexpr float ROW_PAD_AIM = 220.0f;
-constexpr float ROW_EXIT   = 168.0f;
+constexpr float ROW_TITLE      = 870.0f;
+constexpr float ROW_FPS        = 730.0f;
+constexpr float ROW_VSYNC      = 630.0f;
+constexpr float ROW_FULLSCREEN = 530.0f;
+constexpr float ROW_VOLUME     = 430.0f;
+constexpr float ROW_PAD_AIM    = 330.0f;
+constexpr float ROW_DIALOGUE   = 230.0f;
+constexpr float ROW_EXIT       = 130.0f;
 // Hints at bottom (ortho y-up): keep clear gap below Exit row + highlight bar.
 constexpr float ROW_HINT_WASD = 95.0f;
 constexpr float ROW_HINT_ESC  = 42.0f;
@@ -90,6 +92,11 @@ void SettingState::ApplyPadAim()
     gsm.GetEngine().GetInput().SetGamepadAimSensitivity(m_padAimSensitivity);
 }
 
+void SettingState::ApplyDialogue()
+{
+    StoryDialogue::SetDialogueEnabled(m_dialogueEnabled);
+}
+
 // -----------------------------------------------------------------------------
 // Dynamic text rebuild
 // -----------------------------------------------------------------------------
@@ -124,6 +131,12 @@ void SettingState::RebuildValueTexts()
         int pct = static_cast<int>(std::round(m_padAimSensitivity * 100.0f));
         std::string s = std::string("< ") + std::to_string(pct) + "% >";
         m_padAimValueText = m_font->PrintToTexture(*m_fontShader, s);
+    }
+
+    // Dialogue text on/off
+    {
+        std::string s = std::string("< ") + (m_dialogueEnabled ? "On" : "Off") + " >";
+        m_dialogueValueText = m_font->PrintToTexture(*m_fontShader, s);
     }
 }
 
@@ -165,10 +178,13 @@ void SettingState::Initialize()
     m_vsyncLabelText  = m_font->PrintToTexture(*m_fontShader, "VSync");
     m_fullscreenLabelText = m_font->PrintToTexture(*m_fontShader, "Fullscreen");
     m_volumeLabelText = m_font->PrintToTexture(*m_fontShader, "Volume");
-    m_padAimLabelText = m_font->PrintToTexture(*m_fontShader, "Pad Aim");
-    m_exitText        = m_font->PrintToTexture(*m_fontShader, "Exit");
+    m_padAimLabelText    = m_font->PrintToTexture(*m_fontShader, "Pad Aim");
+    m_dialogueLabelText  = m_font->PrintToTexture(*m_fontShader, "Dialogue Text");
+    m_exitText           = m_font->PrintToTexture(*m_fontShader, "Exit");
     m_wasdHintText    = m_font->PrintToTexture(*m_fontShader, "W: Up   S: Down   A: Left   D: Right");
     m_escHintText     = m_font->PrintToTexture(*m_fontShader, "[ESC] Back");
+
+    m_dialogueEnabled = StoryDialogue::IsDialogueEnabled();
 
     ApplyPadAim();
     RebuildValueTexts();
@@ -282,6 +298,12 @@ void SettingState::Update(double /*dt*/)
         ApplyPadAim();
         RebuildValueTexts();
     }
+    else if (m_selectedItem == MenuItem::Dialogue && (goLeft || goRight))
+    {
+        m_dialogueEnabled = !m_dialogueEnabled;
+        ApplyDialogue();
+        RebuildValueTexts();
+    }
     else if (m_selectedItem == MenuItem::Exit)
     {
         if (input.IsKeyTriggered(Input::Key::Enter) || input.IsKeyTriggered(Input::Key::Space))
@@ -378,6 +400,11 @@ void SettingState::Draw()
         selRowLeft = COL_LABEL - static_cast<float>(m_padAimLabelText.width) * (LABEL_SIZE / m_padAimLabelText.height);
         selRowRight = COL_VALUE + static_cast<float>(m_padAimValueText.width) * (VALUE_SIZE / m_padAimValueText.height);
         break;
+    case MenuItem::Dialogue:
+        selRowY = ROW_DIALOGUE;
+        selRowLeft = COL_LABEL - static_cast<float>(m_dialogueLabelText.width) * (LABEL_SIZE / m_dialogueLabelText.height);
+        selRowRight = COL_VALUE + static_cast<float>(m_dialogueValueText.width) * (VALUE_SIZE / m_dialogueValueText.height);
+        break;
     case MenuItem::Exit:
         selRowY = ROW_EXIT;
         selRowLeft = GAME_WIDTH * 0.5f - static_cast<float>(m_exitText.width) * (VALUE_SIZE / m_exitText.height) * 0.5f;
@@ -449,6 +476,10 @@ void SettingState::Draw()
     // Gamepad aim sensitivity
     drawLabel(m_padAimLabelText, ROW_PAD_AIM);
     drawValue(m_padAimValueText, ROW_PAD_AIM);
+
+    // Dialogue text on/off
+    drawLabel(m_dialogueLabelText, ROW_DIALOGUE);
+    drawValue(m_dialogueValueText, ROW_DIALOGUE);
 
     // Exit row
     if (m_selectedItem == MenuItem::Exit)

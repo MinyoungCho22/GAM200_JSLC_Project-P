@@ -31,6 +31,11 @@ class Background;
 class Shader;
 class GameStateManager;
 
+enum class MapZone { Room, Hallway, Rooftop, Underground, Subway };
+
+enum class FadeState { None, FadingOut, FadingIn };
+enum class PendingTransition { None, RoomToHallway, HallwayToRooftop, RooftopToUnderground, UndergroundToSubway };
+
 class GameplayState : public GameState
 {
 public:
@@ -47,6 +52,9 @@ public:
 private:
     void OpenHallwayDoorLayoutOnly();
     void HandleRoomToHallwayTransition();
+    void RespawnAtCheckpoint();
+    void StartTransition(PendingTransition t);
+    void ExecutePendingTransition();
     void ApplyHallwayCameraBounds();
     void HandleHallwayToRooftopTransition();
     void HandleRooftopToUndergroundTransition();
@@ -106,6 +114,14 @@ private:
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;
+    MapZone m_currentCheckpoint = MapZone::Room;
+    FadeState m_fadeState = FadeState::None;
+    float m_fadeAlpha = 0.0f;
+    PendingTransition m_pendingTransition = PendingTransition::None;
+    unsigned int m_fadeVAO = 0;
+    unsigned int m_fadeVBO = 0;
+    static constexpr float FADE_OUT_DURATION = 0.1f;  // black until fully dark
+    static constexpr float FADE_IN_DURATION  = 0.7f;   // slowly brightens back
     /// After any Ctrl+1..5 map cheat, ambient story lines stay off until a new game (Initialize).
     bool m_blockAmbientStoryForSession = false;
     float m_cameraSmoothSpeed = 0.1f;

@@ -18,6 +18,7 @@ public:
     void DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void Shutdown();
     void ClearAllDrones();
+    void ResetAllDrones();
 
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
