@@ -139,8 +139,7 @@ void GameplayState::Initialize()
     m_subway->Initialize();
     m_subwayAccessed = false;
     m_rooftopAccessed = false;
-    m_pulseDetonateUnlocked = false;
-    m_pulseDetonateCD = 0.0f;
+    m_pulseDetonateSkill.Initialize();
 
     // Apply JSON config once at startup (the same path used by hot-reload).
     {
@@ -1072,54 +1071,16 @@ void GameplayState::Update(double dt)
     m_rooftop->Update(dt, player, playerHitboxSize, input, mouseWorldPos,
                       ctl.IsActionTriggered(ControlAction::Attack, input));
 
-    // Q-skill: Pulse Resonance Burst — unlocked when rooftop is first accessed
-    if (m_rooftopAccessed && !m_pulseDetonateUnlocked)
-        m_pulseDetonateUnlocked = true;
-
-    if (m_pulseDetonateCD > 0.f)
-        m_pulseDetonateCD -= static_cast<float>(dt);
-
-    if (m_pulseDetonateUnlocked && !m_isGameOver
-        && ctl.IsActionTriggered(ControlAction::PulseDetonate, input)
-        && m_pulseDetonateCD <= 0.f)
+    // Q-skill: Pulse Resonance Burst
     {
-        constexpr float SKILL_COST     = 8.f;
-        constexpr float SKILL_RADIUS   = 600.f;
-        constexpr float SKILL_COOLDOWN = 6.f;
-        constexpr float STUN_DURATION  = 2.0f;
-
-        Pulse& pulse = player.GetPulseCore().getPulse();
         const bool isGodMode = [&]() -> bool {
             auto* im = gsm.GetEngine().GetImguiManager();
             return im && im->IsPlayerGodMode();
         }();
-
-        if (isGodMode || pulse.Value() >= SKILL_COST)
-        {
-            if (!isGodMode)
-                pulse.spend(SKILL_COST);
-
-            m_pulseDetonateCD = SKILL_COOLDOWN;
-
-            // Rooftop 드론 + 추적 드론(main droneManager) 모두에 체인 적용
-            std::vector<std::pair<Math::Vec2, Math::Vec2>> allArcs;
-
-            DroneManager* rooftopDM = m_rooftop->GetDroneManager();
-            if (rooftopDM)
-            {
-                auto rooftopArcs = rooftopDM->ApplyDetonation(playerCenter, SKILL_RADIUS, STUN_DURATION);
-                allArcs.insert(allArcs.end(), rooftopArcs.begin(), rooftopArcs.end());
-            }
-            {
-                auto tracerArcs = droneManager->ApplyDetonation(playerCenter, SKILL_RADIUS, STUN_DURATION);
-                allArcs.insert(allArcs.end(), tracerArcs.begin(), tracerArcs.end());
-            }
-
-            pulseManager->StartDetonationVFX(playerCenter, SKILL_RADIUS, allArcs);
-
-            Logger::Instance().Log(Logger::Severity::Info,
-                "Pulse Resonance Burst activated at (%.1f, %.1f)", playerCenter.x, playerCenter.y);
-        }
+        m_pulseDetonateSkill.Update(dt, player, playerCenter,
+            m_rooftop->GetDroneManager(), droneManager.get(),
+            *pulseManager, ctl, input,
+            m_isGameOver, m_rooftopAccessed, isGodMode);
     }
 
     if (m_storyDialogue && m_rooftopAccessed && !m_undergroundAccessed && m_rooftop && !m_blockAmbientStoryForSession
@@ -1284,17 +1245,7 @@ void GameplayState::Update(double dt)
     ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
 
-    if (m_pulseDetonateUnlocked && m_pulseDetonateCD > 0.f)
-    {
-        std::stringstream ss_cd;
-        ss_cd.precision(1);
-        ss_cd << std::fixed << "[Q] " << m_pulseDetonateCD << "s";
-        m_pulseDetonateText = m_font->PrintToTexture(*m_fontShader, ss_cd.str());
-    }
-    else
-    {
-        m_pulseDetonateText = {};
-    }
+    m_pulseDetonateSkill.UpdateCooldownText(*m_font, *m_fontShader);
 
     std::stringstream ss_warning;
     ss_warning << "Warning Level: " << m_traceSystem->GetWarningLevel();
@@ -1507,7 +1458,7 @@ void GameplayState::RespawnAtCheckpoint()
         for (auto& robot : m_subway->GetRobots()) robot.Reset();
     }
 
-    m_pulseDetonateCD = 0.0f; // Cooldown resets on respawn; unlock persists
+    m_pulseDetonateSkill.ResetCooldown(); // unlock persists
 
     // Reset camera zoom and player scale (will be set per-zone below)
     m_cameraZoom = 1.0f;
@@ -2077,8 +2028,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
 
-    if (m_pulseDetonateUnlocked && m_pulseDetonateText.textureID != 0)
-        m_font->DrawBakedText(*m_fontShader, m_pulseDetonateText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
+    m_pulseDetonateSkill.DrawCooldownUI(*m_font, *m_fontShader, GAME_HEIGHT - 80.f);
 
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())

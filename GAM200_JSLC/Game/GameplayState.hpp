@@ -22,6 +22,7 @@
 #include "StoryDialogue.hpp"
 #include "Underground.hpp"
 #include "Subway.hpp"
+#include "Skill.hpp"
 #include <memory>
 #include <vector>
 
@@ -128,9 +129,7 @@ private:
     Sound m_bgm;
 
     // Q-skill: Pulse Resonance Burst (unlocked on Rooftop)
-    float m_pulseDetonateCD = 0.0f;
-    bool  m_pulseDetonateUnlocked = false;
-    CachedTextureInfo m_pulseDetonateText{};
+    PulseDetonateSkill m_pulseDetonateSkill;
 
     // Subway zoom transition: camera zooms in when entering subway, then eases out
     float m_cameraZoom = 1.0f;
