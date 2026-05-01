@@ -139,6 +139,8 @@ void GameplayState::Initialize()
     m_subway->Initialize();
     m_subwayAccessed = false;
     m_rooftopAccessed = false;
+    m_pulseDetonateUnlocked = false;
+    m_pulseDetonateCD = 0.0f;
 
     // Apply JSON config once at startup (the same path used by hot-reload).
     {
@@ -344,6 +346,26 @@ void GameplayState::Update(double dt)
         return;
     }
 
+    // Subway zoom-out + player shrink transition (runs every frame, including during fade)
+    if (m_subwayZoomTransition)
+    {
+        const float zoomFdt = std::min(static_cast<float>(dt), 1.0f / 30.0f);
+        m_subwayZoomTimer += zoomFdt;
+        float t = std::min(m_subwayZoomTimer / SUBWAY_ZOOM_DURATION, 1.0f);
+        // Ease-in-out
+        float easedT = t < 0.5f
+            ? 2.0f * t * t
+            : 1.0f - std::pow(-2.0f * t + 2.0f, 2.0f) / 2.0f;
+        m_cameraZoom = SUBWAY_ZOOM_START + (1.0f - SUBWAY_ZOOM_START) * easedT;
+        player.SetSizeScale(1.0f + (0.6f - 1.0f) * easedT);
+        if (m_subwayZoomTimer >= SUBWAY_ZOOM_DURATION)
+        {
+            m_subwayZoomTransition = false;
+            m_cameraZoom = 1.0f;
+            player.SetSizeScale(0.6f);
+        }
+    }
+
     // Map transition fade update: freeze player input but keep camera alive
     if (m_fadeState != FadeState::None)
     {
@@ -422,6 +444,9 @@ void GameplayState::Update(double dt)
         m_camera.StopAnimation();
         m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
         m_cameraSmoothSpeed = 0.1f;
+        m_cameraZoom = 1.0f;
+        m_subwayZoomTransition = false;
+        player.SetSizeScale(1.0f);
         player.SetCurrentGroundLevel(GROUND_LEVEL);
         player.SetPosition({
             ROOM_LEFT_BOUNDARY + player.GetSize().x * 0.5f,
@@ -449,6 +474,9 @@ void GameplayState::Update(double dt)
         silenceStoryForMapCheat();
         m_hallwayEntryStoryPending = false;
         m_hallwayEntryStoryDelayRemaining = 0.0f;
+        m_cameraZoom = 1.0f;
+        m_subwayZoomTransition = false;
+        player.SetSizeScale(1.0f);
 
         const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
         const float hallwaySpawnY = HALLWAY_GROUND_LEVEL + player.GetSize().y * 0.5f;
@@ -501,6 +529,9 @@ void GameplayState::Update(double dt)
         m_camera.StopAnimation();
         m_undergroundAccessed = false;
         m_subwayAccessed = false;
+        m_cameraZoom = 1.0f;
+        m_subwayZoomTransition = false;
+        player.SetSizeScale(1.0f);
         HandleHallwayToRooftopTransition();
         m_camera.SetPosition(player.GetPosition());
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Rooftop (Ctrl+3)");
@@ -511,6 +542,9 @@ void GameplayState::Update(double dt)
         silenceStoryForMapCheat();
         m_tutorial->DisableAll();
         m_camera.StopAnimation();
+        m_cameraZoom = 1.0f;
+        m_subwayZoomTransition = false;
+        player.SetSizeScale(1.0f);
         if (m_subwayAccessed)
         {
             m_subwayAccessed = false;
@@ -548,6 +582,9 @@ void GameplayState::Update(double dt)
         m_rooftopAccessed = true;
         m_undergroundAccessed = true;
         m_subwayAccessed = true;
+        m_cameraZoom = 1.0f;
+        m_subwayZoomTransition = false;
+        player.SetSizeScale(0.6f);
 
         m_underground->ClearAllDrones();
 
@@ -1035,6 +1072,56 @@ void GameplayState::Update(double dt)
     m_rooftop->Update(dt, player, playerHitboxSize, input, mouseWorldPos,
                       ctl.IsActionTriggered(ControlAction::Attack, input));
 
+    // Q-skill: Pulse Resonance Burst — unlocked when rooftop is first accessed
+    if (m_rooftopAccessed && !m_pulseDetonateUnlocked)
+        m_pulseDetonateUnlocked = true;
+
+    if (m_pulseDetonateCD > 0.f)
+        m_pulseDetonateCD -= static_cast<float>(dt);
+
+    if (m_pulseDetonateUnlocked && !m_isGameOver
+        && ctl.IsActionTriggered(ControlAction::PulseDetonate, input)
+        && m_pulseDetonateCD <= 0.f)
+    {
+        constexpr float SKILL_COST     = 8.f;
+        constexpr float SKILL_RADIUS   = 600.f;
+        constexpr float SKILL_COOLDOWN = 6.f;
+        constexpr float STUN_DURATION  = 2.0f;
+
+        Pulse& pulse = player.GetPulseCore().getPulse();
+        const bool isGodMode = [&]() -> bool {
+            auto* im = gsm.GetEngine().GetImguiManager();
+            return im && im->IsPlayerGodMode();
+        }();
+
+        if (isGodMode || pulse.Value() >= SKILL_COST)
+        {
+            if (!isGodMode)
+                pulse.spend(SKILL_COST);
+
+            m_pulseDetonateCD = SKILL_COOLDOWN;
+
+            // Rooftop 드론 + 추적 드론(main droneManager) 모두에 체인 적용
+            std::vector<std::pair<Math::Vec2, Math::Vec2>> allArcs;
+
+            DroneManager* rooftopDM = m_rooftop->GetDroneManager();
+            if (rooftopDM)
+            {
+                auto rooftopArcs = rooftopDM->ApplyDetonation(playerCenter, SKILL_RADIUS, STUN_DURATION);
+                allArcs.insert(allArcs.end(), rooftopArcs.begin(), rooftopArcs.end());
+            }
+            {
+                auto tracerArcs = droneManager->ApplyDetonation(playerCenter, SKILL_RADIUS, STUN_DURATION);
+                allArcs.insert(allArcs.end(), tracerArcs.begin(), tracerArcs.end());
+            }
+
+            pulseManager->StartDetonationVFX(playerCenter, SKILL_RADIUS, allArcs);
+
+            Logger::Instance().Log(Logger::Severity::Info,
+                "Pulse Resonance Burst activated at (%.1f, %.1f)", playerCenter.x, playerCenter.y);
+        }
+    }
+
     if (m_storyDialogue && m_rooftopAccessed && !m_undergroundAccessed && m_rooftop && !m_blockAmbientStoryForSession
         && !suppressAmbientStoryThisFrame)
     {
@@ -1197,6 +1284,18 @@ void GameplayState::Update(double dt)
     ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
 
+    if (m_pulseDetonateUnlocked && m_pulseDetonateCD > 0.f)
+    {
+        std::stringstream ss_cd;
+        ss_cd.precision(1);
+        ss_cd << std::fixed << "[Q] " << m_pulseDetonateCD << "s";
+        m_pulseDetonateText = m_font->PrintToTexture(*m_fontShader, ss_cd.str());
+    }
+    else
+    {
+        m_pulseDetonateText = {};
+    }
+
     std::stringstream ss_warning;
     ss_warning << "Warning Level: " << m_traceSystem->GetWarningLevel();
     m_warningLevelText = m_font->PrintToTexture(*m_fontShader, ss_warning.str());
@@ -1334,17 +1433,21 @@ void GameplayState::HandleUndergroundToSubwayTransition()
 
     m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
 
-    Math::Vec2 cameraStartPos = m_camera.GetPosition();
-    Math::Vec2 cameraEndPos = { Subway::MIN_X + GAME_WIDTH / 2.0f, Subway::MIN_Y + GAME_HEIGHT / 2.0f };
+    // Snap camera directly to subway center — no pan animation, only zoom effect
+    Math::Vec2 cameraTargetPos = { Subway::MIN_X + GAME_WIDTH / 2.0f, Subway::MIN_Y + GAME_HEIGHT / 2.0f };
+    m_camera.SetPosition(cameraTargetPos);
 
-    m_camera.StartAnimation(cameraStartPos, cameraEndPos, 2.0f);
+    // Start zoom-out + player shrink transition: begins zoomed in, eases out to normal
+    m_cameraZoom            = SUBWAY_ZOOM_START;
+    m_subwayZoomTransition  = true;
+    m_subwayZoomTimer       = 0.0f;
+    player.SetSizeScale(1.0f); // will animate toward 0.6 over SUBWAY_ZOOM_DURATION
 
     m_cameraSmoothSpeed = 0.05f;
 
     Logger::Instance().Log(Logger::Severity::Event,
-        "Subway Transition! Camera: (%.1f, %.1f) -> (%.1f, %.1f), Player: (%.1f, %.1f)",
-        cameraStartPos.x, cameraStartPos.y, cameraEndPos.x, cameraEndPos.y,
-        playerStartX, playerStartY);
+        "Subway Transition! Camera snapped to (%.1f, %.1f), Player: (%.1f, %.1f)",
+        cameraTargetPos.x, cameraTargetPos.y, playerStartX, playerStartY);
 }
 
 void GameplayState::StartTransition(PendingTransition t)
@@ -1404,10 +1507,18 @@ void GameplayState::RespawnAtCheckpoint()
         for (auto& robot : m_subway->GetRobots()) robot.Reset();
     }
 
+    m_pulseDetonateCD = 0.0f; // Cooldown resets on respawn; unlock persists
+
+    // Reset camera zoom and player scale (will be set per-zone below)
+    m_cameraZoom = 1.0f;
+    m_subwayZoomTransition = false;
+    m_camera.StopAnimation();
+
     switch (m_currentCheckpoint)
     {
     case MapZone::Room:
     {
+        player.SetSizeScale(1.0f);
         player.SetCurrentGroundLevel(GROUND_LEVEL);
         player.SetPosition({
             ROOM_LEFT_BOUNDARY + player.GetSize().x * 0.5f,
@@ -1421,6 +1532,7 @@ void GameplayState::RespawnAtCheckpoint()
     }
     case MapZone::Hallway:
     {
+        player.SetSizeScale(1.0f);
         const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
         const float hallwaySpawnY = HALLWAY_GROUND_LEVEL + player.GetSize().y * 0.5f;
         player.SetCurrentGroundLevel(HALLWAY_GROUND_LEVEL);
@@ -1433,6 +1545,7 @@ void GameplayState::RespawnAtCheckpoint()
     }
     case MapZone::Rooftop:
     {
+        player.SetSizeScale(1.0f);
         float playerStartX = Rooftop::MIN_X + 1550.0f;
         float playerStartY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f + 200.0f) + 50.0f;
         player.SetCurrentGroundLevel(Rooftop::FLOOR_SURFACE_Y);
@@ -1446,6 +1559,7 @@ void GameplayState::RespawnAtCheckpoint()
     }
     case MapZone::Underground:
     {
+        player.SetSizeScale(1.0f);
         float playerStartX = Underground::MIN_X + 100.0f;
         float playerStartY = Underground::MIN_Y + 270.0f;
         player.SetCurrentGroundLevel(Underground::MIN_Y + 75.0f);
@@ -1459,6 +1573,7 @@ void GameplayState::RespawnAtCheckpoint()
     }
     case MapZone::Subway:
     {
+        player.SetSizeScale(0.6f);
         float playerStartX = Subway::MIN_X + 300.0f;
         float playerStartY = Subway::MIN_Y + 540.0f;
         player.SetCurrentGroundLevel(Subway::MIN_Y + 90.0f);
@@ -1721,16 +1836,21 @@ void GameplayState::DrawMainLayer()
 
     Shader& textureShader = engine.GetTextureShader();
 
-    Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
-        0.0f, GAME_WIDTH,
-        0.0f, GAME_HEIGHT,
-        -1.0f, 1.0f
-    );
-    Math::Matrix view = m_camera.GetViewMatrix();
-    Math::Matrix projection = baseProjection * view;
+    // Zoom-aware world projection: effectiveWidth/Height shrink as zoom increases (zoom-in effect)
+    const float effectiveWidth  = GAME_WIDTH  / m_cameraZoom;
+    const float effectiveHeight = GAME_HEIGHT / m_cameraZoom;
+    {
+        Math::Vec2 camPos = m_camera.GetPosition();
+        float offsetX = std::round(effectiveWidth  * 0.5f - camPos.x);
+        float offsetY = std::round(effectiveHeight * 0.5f - camPos.y);
+        Math::Matrix zoomedOrtho = Math::Matrix::CreateOrtho(
+            0.0f, effectiveWidth, 0.0f, effectiveHeight, -1.0f, 1.0f);
+        Math::Matrix zoomedView = Math::Matrix::CreateTranslation({ offsetX, offsetY });
+        Math::Matrix projection = zoomedOrtho * zoomedView;
 
-    textureShader.use();
-    textureShader.setMat4("projection", projection);
+        textureShader.use();
+        textureShader.setMat4("projection", projection);
+    }
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
 
@@ -1767,13 +1887,22 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
     GL::Disable(GL_DEPTH_TEST);
 
+    // Screen-space projection (for HUD, fonts, pulse gauge — not zoom-affected)
     Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
         0.0f, GAME_WIDTH,
         0.0f, GAME_HEIGHT,
         -1.0f, 1.0f
     );
-    Math::Matrix view = m_camera.GetViewMatrix();
-    Math::Matrix projection = baseProjection * view;
+    // Zoom-aware world projection
+    const float fgEffectiveWidth  = GAME_WIDTH  / m_cameraZoom;
+    const float fgEffectiveHeight = GAME_HEIGHT / m_cameraZoom;
+    Math::Vec2 fgCamPos = m_camera.GetPosition();
+    float fgOffsetX = std::round(fgEffectiveWidth  * 0.5f - fgCamPos.x);
+    float fgOffsetY = std::round(fgEffectiveHeight * 0.5f - fgCamPos.y);
+    Math::Matrix fgZoomedOrtho = Math::Matrix::CreateOrtho(
+        0.0f, fgEffectiveWidth, 0.0f, fgEffectiveHeight, -1.0f, 1.0f);
+    Math::Matrix fgZoomedView = Math::Matrix::CreateTranslation({ fgOffsetX, fgOffsetY });
+    Math::Matrix projection = fgZoomedOrtho * fgZoomedView;
 
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1909,6 +2038,8 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     m_underground->DrawGauges(*colorShader, *m_debugRenderer);
     m_subway->DrawGauges(*colorShader, *m_debugRenderer);
 
+    pulseManager->DrawDetonationVFX(*colorShader, *m_debugRenderer);
+
     // 7) Fullscreen frame overlay (1920x1080), camera-locked in world space
     if (m_hudFrame && m_hudFrame->GetWidth() > 0)
     {
@@ -1924,8 +2055,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         textureShader.setFloat("tintStrength", 0.0f);
 
         Math::Vec2 camCenter = m_camera.GetPosition();
+        // Scale HUD frame to effective view size so it always fills the screen regardless of zoom
         Math::Matrix hudModel = Math::Matrix::CreateTranslation(camCenter)
-            * Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
+            * Math::Matrix::CreateScale({ fgEffectiveWidth, fgEffectiveHeight });
         m_hudFrame->Draw(textureShader, hudModel);
 
         GL::Disable(GL_BLEND);
@@ -1944,6 +2076,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     m_fontShader->setMat4("projection", baseProjection);
 
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
+
+    if (m_pulseDetonateUnlocked && m_pulseDetonateText.textureID != 0)
+        m_font->DrawBakedText(*m_fontShader, m_pulseDetonateText, { 20.f, GAME_HEIGHT - 80.f }, 32.0f);
 
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())

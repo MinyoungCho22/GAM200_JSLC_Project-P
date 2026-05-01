@@ -67,6 +67,8 @@ public:
     void SetHiding(bool hiding) { m_isHiding = hiding; }
     void SetGodMode(bool godMode) { m_godMode = godMode; }
     bool IsGodMode() const { return m_godMode; }
+    void SetSizeScale(float scale) { m_sizeScale = scale; }
+    float GetSizeScale() const { return m_sizeScale; }
 
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
@@ -117,6 +119,7 @@ private:
     bool is_double_jumping = false;
     bool m_isHiding = false;
     bool m_godMode = false;
+    float m_sizeScale = 1.0f;
 
     // Sandevistan afterimage effect
     std::vector<AfterimageGhost> m_afterimageGhosts;

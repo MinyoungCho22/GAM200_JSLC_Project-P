@@ -16,6 +16,7 @@ enum class ControlAction : uint8_t
     Dash,
     Attack,
     PulseAbsorb,
+    PulseDetonate,
     Count
 };
 

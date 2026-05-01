@@ -20,6 +20,7 @@ const char* ActionJsonKey(ControlAction a)
     case ControlAction::Dash: return "dash";
     case ControlAction::Attack: return "attack";
     case ControlAction::PulseAbsorb: return "pulse_absorb";
+    case ControlAction::PulseDetonate: return "pulse_detonate";
     default: return "";
     }
 }
@@ -163,6 +164,10 @@ void ControlBindings::ApplyDefaults()
         { BindKind::MouseButton, 1, 0 },
         { BindKind::GamepadButton, GLFW_GAMEPAD_BUTTON_LEFT_BUMPER, 0 },
     };
+    m_slots[static_cast<size_t>(ControlAction::PulseDetonate)] = {
+        { BindKind::Key, GLFW_KEY_Q, 0 },
+        { BindKind::GamepadButton, GLFW_GAMEPAD_BUTTON_Y, 0 },
+    };
 }
 
 bool ControlBindings::LoadFromJsonFile(const std::string& path)
@@ -230,7 +235,20 @@ void ControlBindings::LoadOrDefaults(const std::string& path)
 {
     m_path = path;
     if (!LoadFromJsonFile(path))
+    {
         ApplyDefaults();
+        return;
+    }
+
+    // Fill in defaults for any newly added actions that are missing from the JSON.
+    // This prevents new keybindings from silently failing when an old save file exists.
+    ControlBindings defaults;
+    defaults.ApplyDefaults();
+    for (size_t i = 0; i < static_cast<size_t>(ControlAction::Count); ++i)
+    {
+        if (m_slots[i].empty())
+            m_slots[i] = defaults.m_slots[i];
+    }
 }
 
 bool ControlBindings::Save() const
@@ -365,6 +383,7 @@ std::string ControlBindings::FormatActionLabel(ControlAction a) const
     case ControlAction::Dash: return "Dash";
     case ControlAction::Attack: return "Attack / Interact";
     case ControlAction::PulseAbsorb: return "Pulse Absorb";
+    case ControlAction::PulseDetonate: return "Pulse Detonate";
     default: return "?";
     }
 }

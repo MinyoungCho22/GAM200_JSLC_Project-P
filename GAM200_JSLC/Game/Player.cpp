@@ -314,8 +314,8 @@ void Player::Draw(const Shader& shader) const
     // Draw Sandevistan afterimage ghosts before the player (they appear behind)
     if (!m_afterimageGhosts.empty())
     {
-        // Cyberpunk electric cyan tint
-        shader.setVec3("colorTint", 0.0f, 0.85f, 1.0f);
+        // Purple tint
+        shader.setVec3("colorTint", 0.6f, 0.0f, 1.0f);
 
         for (const auto& ghost : m_afterimageGhosts)
         {
@@ -339,6 +339,15 @@ void Player::Draw(const Shader& shader) const
             else if (ghostState == AnimationState::Idle)
             {
                 ghostSize.x *= 0.7f;
+            }
+
+            // Apply subway size scale with bottom-align
+            if (m_sizeScale != 1.0f)
+            {
+                float oldHeight = ghostSize.y;
+                ghostSize.x *= m_sizeScale;
+                ghostSize.y *= m_sizeScale;
+                ghostPos.y -= (oldHeight - ghostSize.y) * 0.5f;
             }
 
             Math::Matrix ghostModel = Math::Matrix::CreateTranslation(ghostPos) *
@@ -371,6 +380,15 @@ void Player::Draw(const Shader& shader) const
     Math::Vec2 drawSize{};
     Math::Vec2 drawPosition{};
     GetCurrentDrawTransform(drawPosition, drawSize);
+
+    // Apply subway size scale with bottom-align
+    if (m_sizeScale != 1.0f)
+    {
+        float oldHeight = drawSize.y;
+        drawSize.x *= m_sizeScale;
+        drawSize.y *= m_sizeScale;
+        drawPosition.y -= (oldHeight - drawSize.y) * 0.5f;
+    }
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(drawSize);
     Math::Matrix transMatrix = Math::Matrix::CreateTranslation(drawPosition);
@@ -422,6 +440,15 @@ void Player::DrawOutline(const Shader& outlineShader) const
     Math::Vec2 drawSize{};
     Math::Vec2 drawPosition{};
     GetCurrentDrawTransform(drawPosition, drawSize);
+
+    // Apply subway size scale with bottom-align
+    if (m_sizeScale != 1.0f)
+    {
+        float oldHeight = drawSize.y;
+        drawSize.x *= m_sizeScale;
+        drawSize.y *= m_sizeScale;
+        drawPosition.y -= (oldHeight - drawSize.y) * 0.5f;
+    }
 
     Math::Matrix model = Math::Matrix::CreateTranslation(drawPosition) * Math::Matrix::CreateScale(drawSize);
 

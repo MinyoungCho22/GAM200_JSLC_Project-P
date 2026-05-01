@@ -126,4 +126,16 @@ private:
     bool m_blockAmbientStoryForSession = false;
     float m_cameraSmoothSpeed = 0.1f;
     Sound m_bgm;
+
+    // Q-skill: Pulse Resonance Burst (unlocked on Rooftop)
+    float m_pulseDetonateCD = 0.0f;
+    bool  m_pulseDetonateUnlocked = false;
+    CachedTextureInfo m_pulseDetonateText{};
+
+    // Subway zoom transition: camera zooms in when entering subway, then eases out
+    float m_cameraZoom = 1.0f;
+    bool m_subwayZoomTransition = false;
+    float m_subwayZoomTimer = 0.0f;
+    static constexpr float SUBWAY_ZOOM_DURATION = 3.0f;
+    static constexpr float SUBWAY_ZOOM_START    = 2.8f; // strong zoom-in; eases out as player shrinks to 0.6
 };

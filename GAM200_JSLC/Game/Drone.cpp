@@ -128,6 +128,69 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         return;
     }
 
+    // Queued skill damage: counts down independently of stun state
+    // Applied after the knockback slide finishes so HP bar drops at the right moment
+    if (m_pendingDamage > 0.f)
+    {
+        m_damageDelay -= static_cast<float>(dt);
+        if (m_damageDelay <= 0.f)
+        {
+            SetHP(m_hp - m_pendingDamage);
+            m_pendingDamage = 0.f;
+            m_damageDelay   = 0.f;
+        }
+    }
+
+    // Stun from Pulse Resonance Burst: freeze AI, allow ice-slide knockback
+    if (m_stunTimer > 0.f)
+    {
+        const float fdt = static_cast<float>(dt);
+        m_stunTimer -= fdt;
+
+        if (m_knockbackDelay > 0.f)
+        {
+            // Waiting for the domino wave to reach this drone
+            m_knockbackDelay -= fdt;
+            if (m_knockbackDelay <= 0.f)
+            {
+                m_knockbackDelay = 0.f;
+                m_velocity       = m_knockbackVelocity;
+                m_knockbackTimer = 0.75f;   // total slide window
+            }
+        }
+        else if (m_knockbackTimer > 0.f)
+        {
+            m_knockbackTimer -= fdt;
+            // Ice-slide: time-consistent exponential drag (very low friction)
+            // Velocity decays to ~20% after 0.75s
+            const float drag = std::pow(0.20f, fdt);
+            m_velocity.x *= drag;
+            m_velocity.y *= drag;
+            m_position   += m_velocity * fdt;
+            m_baseY       = m_position.y; // keep bob base in sync → no snap on stun end
+        }
+        else
+        {
+            m_velocity = { 0.f, 0.f };
+        }
+
+        m_isAttacking      = false;
+        m_shouldDealDamage = false;
+        m_moveSound.SetVolume(0.0f);
+
+        // If another system set m_isHit while stunned, let the death animation
+        // take over immediately so the drone doesn't freeze in place
+        if (m_isHit)
+        {
+            m_stunTimer      = 0.f;
+            m_knockbackDelay = 0.f;
+            m_knockbackTimer = 0.f;
+            m_velocity       = { 0.f, 0.f };
+            // Fall through to m_isHit block next frame
+        }
+        return;
+    }
+
     // Debug mode: COMPLETE FREEZE - No AI, no movement, no updates
     if (m_debugMode)
     {
@@ -376,6 +439,9 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
 
 void Drone::Draw(const Shader& shader) const
 {
+    // Dead without the hit/fall animation → don't render (prevents frozen-in-air ghost)
+    if (m_isDead && !m_isHit) return;
+
     Math::Matrix rotationMatrix = Math::Matrix::CreateIdentity();
     bool flipX = false;
 
@@ -492,6 +558,12 @@ void Drone::Reset()
     m_isDead        = false;
     m_isHit         = false;
     m_hitTimer      = 0.0f;
+    m_stunTimer          = 0.0f;
+    m_knockbackVelocity  = { 0.f, 0.f };
+    m_knockbackDelay     = 0.0f;
+    m_knockbackTimer     = 0.0f;
+    m_pendingDamage      = 0.0f;
+    m_damageDelay        = 0.0f;
     m_hitRotation   = 0.0f;
     m_fallSpeed     = 0.0f;
     m_hp            = m_maxHP;

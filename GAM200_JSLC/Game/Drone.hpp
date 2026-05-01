@@ -32,6 +32,24 @@ public:
     void ResetDamageFlag() { m_shouldDealDamage = false; }
     bool IsHit() const { return m_isHit; }
 
+    bool IsStunned() const { return m_stunTimer > 0.f; }
+    void ApplyStun(float duration) { if (!m_isDead) m_stunTimer = duration; }
+    // velocity: initial impulse direction×speed; delay: seconds before slide starts (domino wave)
+    void ApplyKnockback(Math::Vec2 velocity, float delay)
+    {
+        if (m_isDead) return;
+        m_knockbackVelocity = velocity;
+        m_knockbackDelay    = delay;
+        m_knockbackTimer    = 0.f;
+    }
+    // Queue damage to be applied after the slide animation (delay = knockback delay + slide time)
+    void QueueDamage(float damage, float delay)
+    {
+        if (m_isDead) return;
+        m_pendingDamage = damage;
+        m_damageDelay   = delay;
+    }
+
     static constexpr float DETECTION_RANGE = 150.0f;
     static constexpr float DETECTION_RANGE_SQ = DETECTION_RANGE * DETECTION_RANGE;
     static constexpr float TIME_TO_DESTROY = 1.0f;
@@ -86,6 +104,13 @@ private:
     Math::Vec2 m_velocity;
     Math::Vec2 m_direction;
     Math::Vec2 m_size;
+
+    float      m_stunTimer        = 0.f;
+    Math::Vec2 m_knockbackVelocity{ 0.f, 0.f };
+    float      m_knockbackDelay   = 0.f;   // countdown before slide kicks in
+    float      m_knockbackTimer   = 0.f;   // remaining slide duration
+    float      m_pendingDamage    = 0.f;   // damage queued to apply after knockback
+    float      m_damageDelay      = 0.f;   // countdown before pending damage applies
 
     bool m_isHit = false;
     float m_hitTimer = 0.0f;

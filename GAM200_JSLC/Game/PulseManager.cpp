@@ -7,6 +7,7 @@
 #include "../Engine/Logger.hpp"
 #include "../Engine/Vec2.hpp"
 #include "../Engine/Collision.hpp"
+#include "../Engine/DebugRenderer.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
@@ -205,6 +206,21 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
 
     m_vfxTimer += fdt;
     m_logTimer += dt;
+
+    if (m_detonationActive)
+    {
+        m_detonationTimer += fdt;
+        if (m_detonationTimer >= DETONATION_TOTAL_DURATION)
+            m_detonationActive = false;
+    }
+
+    // Chain arc timers
+    for (auto& arc : m_chainArcs)
+        arc.timer += fdt;
+    m_chainArcs.erase(
+        std::remove_if(m_chainArcs.begin(), m_chainArcs.end(),
+            [](const ChainArc& a) { return a.timer >= CHAIN_ARC_DURATION; }),
+        m_chainArcs.end());
 
     PulseSource* closest_source = nullptr;
     float closest_dist_sq = -1.0f;
@@ -541,4 +557,151 @@ void PulseManager::DrawVFX(const Shader& shader) const
 
     GL::BindVertexArray(0);
     GL::Disable(GL_BLEND);
+}
+
+void PulseManager::StartDetonationVFX(Math::Vec2 origin, float maxRadius,
+    const std::vector<std::pair<Math::Vec2, Math::Vec2>>& chainArcs)
+{
+    m_detonationActive    = true;
+    m_detonationOrigin    = origin;
+    m_detonationMaxRadius = maxRadius;
+    m_detonationTimer     = 0.f;
+
+    m_chainArcs.clear();
+    for (const auto& [from, to] : chainArcs)
+        m_chainArcs.push_back({ from, to, 0.f });
+}
+
+void PulseManager::DrawDetonationVFX(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    if (!m_detonationActive && m_chainArcs.empty())
+        return;
+
+    // ── Shockwave ────────────────────────────────────────────────────────────
+    if (m_detonationActive)
+    {
+        const float t = m_detonationTimer;
+
+        // ① Center burst flash — 4 concentric rings expanding fast (t < 0.20s)
+        {
+            const float BURST_DUR = 0.20f;
+            if (t < BURST_DUR)
+            {
+                float p = t / BURST_DUR;
+                float fade = 1.f - p;
+                for (int k = 0; k < 4; ++k)
+                {
+                    float kp = p * (1.f - k * 0.12f);
+                    float r  = kp * m_detonationMaxRadius * 0.45f;
+                    float f  = fade * (1.f - k * 0.2f);
+                    debugRenderer.DrawCircle(colorShader, m_detonationOrigin, r,
+                                             { f * 0.6f, f });
+                }
+            }
+        }
+
+        // ② Radial spike lines (t < 0.28s) — 12 spikes radiating outward
+        {
+            const float SPIKE_DUR = 0.28f;
+            if (t < SPIKE_DUR)
+            {
+                float p    = t / SPIKE_DUR;
+                float len  = p * m_detonationMaxRadius * 0.60f;
+                float fade = 1.f - p * p;  // quad fade
+
+                constexpr int SPIKE_COUNT = 12;
+                for (int j = 0; j < SPIKE_COUNT; ++j)
+                {
+                    float angle = j * (2.f * PI / SPIKE_COUNT);
+                    Math::Vec2 endPt = m_detonationOrigin
+                        + Math::Vec2{ std::cos(angle), std::sin(angle) } * len;
+                    float rS = fade * 0.3f, gS = fade, bS = fade;
+                    debugRenderer.DrawLine(colorShader, m_detonationOrigin, endPt, rS, gS, bS);
+
+                    // Secondary thinner spike at halfway angle
+                    float aHalf = angle + (PI / SPIKE_COUNT);
+                    Math::Vec2 ep2 = m_detonationOrigin
+                        + Math::Vec2{ std::cos(aHalf), std::sin(aHalf) } * (len * 0.60f);
+                    debugRenderer.DrawLine(colorShader, m_detonationOrigin, ep2,
+                                           rS * 0.5f, gS * 0.5f, bS * 0.5f);
+                }
+            }
+        }
+
+        // ③ 5 expanding shockwave rings — eased out, each with inner ghost
+        for (int i = 0; i < DETONATION_RING_COUNT; ++i)
+        {
+            float effT = t - i * DETONATION_RING_STAGGER;
+            if (effT <= 0.f || effT >= DETONATION_RING_DURATION) continue;
+
+            float progress = effT / DETONATION_RING_DURATION;
+            float easedP   = 1.f - (1.f - progress) * (1.f - progress); // ease-out quad
+            float eRadius  = easedP * m_detonationMaxRadius;
+            float fade     = 1.f - progress;
+
+            debugRenderer.DrawCircle(colorShader, m_detonationOrigin, eRadius,
+                                     { fade * 0.15f, fade });
+            if (eRadius > 8.f)
+                debugRenderer.DrawCircle(colorShader, m_detonationOrigin, eRadius * 0.88f,
+                                         { fade * 0.05f, fade * 0.55f });
+            // Extra bright leading edge (slightly larger)
+            debugRenderer.DrawCircle(colorShader, m_detonationOrigin, eRadius * 1.03f,
+                                     { fade * 0.08f, fade * 0.70f });
+        }
+    }
+
+    // ── Chain arc — 지지직 purple zigzag lightning ───────────────────────────
+    for (const auto& arc : m_chainArcs)
+    {
+        float p    = arc.timer / CHAIN_ARC_DURATION;
+        float fade = 1.f - p * p;   // quadratic — bright flash, snappy exit
+        if (fade <= 0.f) continue;
+
+        Math::Vec2 dir = arc.to - arc.from;
+        float len = dir.Length();
+        if (len < 1.f) continue;
+
+        Math::Vec2 normDir = dir / len;
+        Math::Vec2 perp    = normDir.Perpendicular();
+
+        // High-frequency flicker (mostly on, occasional blink)
+        float flicker = (std::sin(arc.timer * 180.f) > -0.35f) ? 1.f : 0.25f;
+        float ef = fade * flicker;
+
+        // Zigzag control points — oscillate rapidly to create electric "jitter"
+        float amp  = 18.f * fade;
+        float freq = 50.f;
+        Math::Vec2 q1 = arc.from + normDir * (len * 0.25f)
+                        + perp * (amp * std::sin(arc.timer * freq));
+        Math::Vec2 q2 = arc.from + normDir * (len * 0.50f)
+                        + perp * (amp * std::cos(arc.timer * freq + 1.3f));
+        Math::Vec2 q3 = arc.from + normDir * (len * 0.75f)
+                        + perp * (amp * std::sin(arc.timer * freq + 2.7f));
+
+        // Core: bright purple zigzag (4 segments)  R high, G low, B ~0.9
+        float rC = ef * 0.90f, gC = ef * 0.05f, bC = ef * 0.95f;
+        debugRenderer.DrawLine(colorShader, arc.from, q1,      rC, gC, bC);
+        debugRenderer.DrawLine(colorShader, q1,       q2,      rC, gC, bC);
+        debugRenderer.DrawLine(colorShader, q2,       q3,      rC, gC, bC);
+        debugRenderer.DrawLine(colorShader, q3,       arc.to,  rC, gC, bC);
+
+        // Glow: straight offset lines in deep purple
+        float rG = ef * 0.50f, gG = ef * 0.00f, bG = ef * 0.70f;
+        constexpr float GLOW_OFF = 3.5f;
+        Math::Vec2 off = perp * GLOW_OFF;
+        debugRenderer.DrawLine(colorShader, arc.from + off, arc.to + off, rG, gG, bG);
+        debugRenderer.DrawLine(colorShader, arc.from - off, arc.to - off, rG, gG, bG);
+
+        // Impact burst at chain target  (DrawCircle: {R, G}, B=0.8 fixed)
+        // Purple circle: R=high, G=0  → (ef*0.85, 0, 0.8)
+        float hf   = fade * 0.95f;
+        float hitR = 22.f + (1.f - fade) * 35.f;
+        debugRenderer.DrawCircle(colorShader, arc.to, hitR,          { hf * 0.85f, 0.f });
+        debugRenderer.DrawCircle(colorShader, arc.to, hitR * 0.60f,  { hf * 0.60f, 0.f });
+
+        // Source "release" circle at arc origin (dimmer purple)
+        float sf   = fade * 0.5f;
+        float srcR = 14.f + (1.f - fade) * 20.f;
+        debugRenderer.DrawCircle(colorShader, arc.from, srcR, { sf * 0.70f, 0.f });
+    }
 }

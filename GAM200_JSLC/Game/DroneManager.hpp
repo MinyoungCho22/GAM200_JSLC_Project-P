@@ -2,6 +2,7 @@
 
 #pragma once
 #include <vector>
+#include <utility>
 #include "Drone.hpp"
 
 class Shader;
@@ -19,6 +20,13 @@ public:
     void Shutdown();
     void ClearAllDrones();
     void ResetAllDrones();
+
+    // Returns list of chain arc pairs (from→to world positions) for VFX.
+    // Drones in initial radius are stunned first, then the pulse chains to
+    // nearby drones up to maxChains hops within chainRange.
+    std::vector<std::pair<Math::Vec2, Math::Vec2>> ApplyDetonation(
+        Math::Vec2 origin, float radius, float stunDuration,
+        float chainRange = 600.f, int maxChains = 10);
 
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();

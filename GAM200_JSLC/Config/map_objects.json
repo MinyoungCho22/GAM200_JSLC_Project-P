@@ -99,7 +99,7 @@
     ],
     "obstacles": [
       { "top_left": [939.0, 834.0], "size": [561.0, 162.0] },
-      { "top_left": [1584.0, 627.0], "size": [288.0, 369.0], "sprite": "Asset/pannel1.png" },
+      { "top_left": [1584.0, 627.0], "size": [288.0, 369.0], "sprite": "Asset/Pannel1.png" },
       { "top_left": [3471.0, 834.0], "size": [561.0, 162.0] },
       { "top_left": [4116.0, 627.0], "size": [288.0, 369.0], "sprite": "Asset/pannel2.png" },
       { "top_left": [5235.0, 834.0], "size": [561.0, 162.0] },
