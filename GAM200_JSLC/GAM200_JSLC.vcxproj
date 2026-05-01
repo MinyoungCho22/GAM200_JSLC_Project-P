@@ -257,9 +257,10 @@ if exist "$(OutDir)GAM200JSLC.exe" del /q "$(OutDir)GAM200JSLC.exe"</Command>
     <ClCompile Include="Game\Rooftop.cpp" />
     <ClCompile Include="Game\Room.cpp" />
     <ClCompile Include="Game\Setting.cpp" />
+    <ClCompile Include="Game\Skill.cpp" />
     <ClCompile Include="Game\SplashState.cpp" />
     <ClCompile Include="Game\StoryDialogue.cpp" />
-    <ClCompile Include="Game\Subway.cpp" />
+    <ClCompile Include="Game\Train.cpp" />
     <ClCompile Include="Game\TraceSystem.cpp" />
     <ClCompile Include="Game\Tutorial.cpp" />
     <ClCompile Include="Game\Underground.cpp" />

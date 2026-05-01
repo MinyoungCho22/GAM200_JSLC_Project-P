@@ -341,7 +341,7 @@ void Player::Draw(const Shader& shader) const
                 ghostSize.x *= 0.7f;
             }
 
-            // Apply subway size scale with bottom-align
+            // Apply train-map size scale with bottom-align
             if (m_sizeScale != 1.0f)
             {
                 float oldHeight = ghostSize.y;
@@ -381,7 +381,7 @@ void Player::Draw(const Shader& shader) const
     Math::Vec2 drawPosition{};
     GetCurrentDrawTransform(drawPosition, drawSize);
 
-    // Apply subway size scale with bottom-align
+    // Apply train-map size scale with bottom-align
     if (m_sizeScale != 1.0f)
     {
         float oldHeight = drawSize.y;
@@ -441,7 +441,7 @@ void Player::DrawOutline(const Shader& outlineShader) const
     Math::Vec2 drawPosition{};
     GetCurrentDrawTransform(drawPosition, drawSize);
 
-    // Apply subway size scale with bottom-align
+    // Apply train-map size scale with bottom-align
     if (m_sizeScale != 1.0f)
     {
         float oldHeight = drawSize.y;

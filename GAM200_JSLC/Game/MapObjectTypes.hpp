@@ -52,7 +52,7 @@ struct UndergroundObjectConfig
     std::vector<Math::Vec2> robotSpawns{};
 };
 
-struct SubwayObjectConfig
+struct TrainObjectConfig
 {
     std::vector<SpriteRectConfig> obstacles{};
     std::vector<SpriteRectConfig> pulseSources{};
@@ -64,6 +64,6 @@ struct MapObjectConfigData
     HallwayObjectConfig hallway{};
     RooftopObjectConfig rooftop{};
     UndergroundObjectConfig underground{};
-    SubwayObjectConfig subway{};
+    TrainObjectConfig train{};
 };
 

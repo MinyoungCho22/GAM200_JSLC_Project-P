@@ -185,7 +185,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     std::vector<PulseSource>& hallwaySources,
     std::vector<PulseSource>& rooftopSources,
     std::vector<PulseSource>& undergroundSources,
-    std::vector<PulseSource>& subwaySources,
+    std::vector<PulseSource>& trainSources,
     bool is_interact_key_pressed, double dt, Math::Vec2 mouseWorldPos)
 {
     float fdt = static_cast<float>(dt);
@@ -247,7 +247,7 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     for (auto& source : hallwaySources)    checkSource(source);
     for (auto& source : rooftopSources)    checkSource(source);
     for (auto& source : undergroundSources) checkSource(source);
-    for (auto& source : subwaySources)     checkSource(source);
+    for (auto& source : trainSources)      checkSource(source);
 
     // Charging is allowed only when:
     // 1) player overlaps a pulse source and
