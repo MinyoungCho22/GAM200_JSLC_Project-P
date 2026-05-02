@@ -5,6 +5,7 @@
 #include "PulseSource.hpp"
 #include "DroneManager.hpp"
 #include "Robot.hpp"
+#include "../Engine/Sound.hpp"
 #include "../Engine/Vec2.hpp"
 #include <array>
 #include <memory>
@@ -34,7 +35,8 @@ public:
     static constexpr float MIN_Y  = -3500.0f;
 
     // Train constants
-    static constexpr float TRAIN_SPEED        = 280.0f; // world units per second
+    static constexpr float TRAIN_SPEED        = 280.0f; // max speed (world units per second)
+    static constexpr float TRAIN_ACCEL        = 90.0f;  // acceleration (world units per second^2)
     static constexpr float TRAIN_DEPART_DELAY = 3.0f;   // seconds after map entry before departure
 
     struct Obstacle
@@ -85,6 +87,8 @@ public:
 
     // Call once when the Train map becomes active to begin the departure countdown
     void StartEntryTimer();
+    // Force reset to "first entered train" state (for checkpoint respawn on Train).
+    void RestartEntryTimer();
 
     // Returns UI text for the departure countdown (empty string when not needed)
     std::string GetDepartureAnnouncementText() const;
@@ -172,7 +176,10 @@ private:
     // Train movement state
     TrainState m_trainState   = TrainState::Stationary;
     float      m_trainOffset  = 0.0f;
+    float      m_trainCurrentSpeed = 0.0f;
     bool       m_playerOnTrain = false;
+    Sound      m_trainStartSound;
+    Sound      m_trainRunLoopSound;
 
     // Riding momentum: carry player X with moving train while grounded, jumping above cars, or crouching on deck
     bool       m_prevPlayerOnTrain = false;

@@ -468,6 +468,7 @@ void GameplayState::Update(double dt)
         m_hallwayEntryStoryPending = false;
         m_hallwayEntryStoryDelayRemaining = 0.0f;
         m_openingStoryDelayRemaining = 0.0f;
+        m_currentCheckpoint = MapZone::Room;
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleported to Room (Ctrl+1)");
     }
 
@@ -479,6 +480,7 @@ void GameplayState::Update(double dt)
         m_cameraZoom = 1.0f;
         m_trainZoomTransition = false;
         player.SetSizeScale(1.0f);
+        m_currentCheckpoint = MapZone::Hallway;
 
         const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
         const float hallwaySpawnY = HALLWAY_GROUND_LEVEL + player.GetSize().y * 0.5f;
@@ -604,6 +606,7 @@ void GameplayState::Update(double dt)
         m_cameraSmoothSpeed = 0.05f;
         m_camera.SetPosition({ Train::MIN_X + GAME_WIDTH / 2.0f, Train::MIN_Y + GAME_HEIGHT / 2.0f });
         if (m_train) m_train->StartEntryTimer();
+        m_currentCheckpoint = MapZone::Train;
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Train (Ctrl+5)");
     }
 
@@ -1332,6 +1335,18 @@ void GameplayState::Update(double dt)
 
     if (player.IsDead())
     {
+        // Sync checkpoint with the currently active map before opening GameOver.
+        if (m_trainAccessed)
+            m_currentCheckpoint = MapZone::Train;
+        else if (m_undergroundAccessed)
+            m_currentCheckpoint = MapZone::Underground;
+        else if (m_rooftopAccessed)
+            m_currentCheckpoint = MapZone::Rooftop;
+        else if (m_doorOpened)
+            m_currentCheckpoint = MapZone::Hallway;
+        else
+            m_currentCheckpoint = MapZone::Room;
+
         engine.GetPostProcess().Settings().exposure = 1.0f;
         gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver,
             [this]() { RespawnAtCheckpoint(); }));
@@ -1601,6 +1616,11 @@ void GameplayState::RespawnAtCheckpoint()
     }
     case MapZone::Train:
     {
+        // Keep zone flags consistent after returning from GameOver stack.
+        m_rooftopAccessed = true;
+        m_undergroundAccessed = true;
+        m_trainAccessed = true;
+
         player.SetSizeScale(0.6f);
         float playerStartX = Train::MIN_X + 300.0f;
         float playerStartY = Train::MIN_Y + 540.0f;
@@ -1609,7 +1629,10 @@ void GameplayState::RespawnAtCheckpoint()
         player.SetOnGround(false);
         m_camera.SetBounds({ Train::MIN_X, Train::MIN_Y },
                            { Train::MIN_X + m_train->GetMapWidth(), Train::MIN_Y + Train::HEIGHT });
-        m_camera.SetPosition(player.GetPosition());
+        // Force immediate camera snap to player so respawn frame never renders off-screen.
+        m_camera.Update(player.GetPosition(), 1.0f);
+        if (m_train)
+            m_train->RestartEntryTimer(); // reset offset/speed/countdown/sounds to first-entry state
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Train");
         break;
     }

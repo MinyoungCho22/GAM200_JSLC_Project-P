@@ -427,9 +427,21 @@ void Train::Initialize()
     // --- Train state ---
     m_trainState      = TrainState::Stationary;
     m_trainOffset     = 0.0f;
+    m_trainCurrentSpeed = 0.0f;
     m_entryTimer      = -1.0f; // not started until StartEntryTimer() is called
     m_departedMsgTimer = 0.0f;
     m_playerOnTrain   = false;
+
+    // Train departure / running sounds.
+    // User requested "TrainStart.mpe" and "TrainSound.mp3". Keep .mpe first, then fallback to .mp3.
+    bool startLoaded = m_trainStartSound.Load("Asset/TrainStart.mpe", false);
+    if (!startLoaded)
+        startLoaded = m_trainStartSound.Load("Asset/TrainStart.mp3", false);
+    bool runLoaded = m_trainRunLoopSound.Load("Asset/TrainSound.mp3", true);
+    if (!runLoaded)
+        runLoaded = m_trainRunLoopSound.Load("Asset/TrainSound.mpe", true);
+    if (runLoaded)
+        m_trainRunLoopSound.SetVolume(0.0f);
 
     ApplyConfig(MapObjectConfig::Instance().GetData().train);
 
@@ -1038,7 +1050,11 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         if (m_entryTimer >= TRAIN_DEPART_DELAY)
         {
             m_trainState     = TrainState::Moving;
+            m_trainCurrentSpeed = 0.0f;
             m_departedMsgTimer = 2.0f; // show "Train is moving!" for 2 seconds
+            m_trainStartSound.Play();
+            m_trainRunLoopSound.Play();
+            m_trainRunLoopSound.SetVolume(0.08f); // start quietly at departure
             Logger::Instance().Log(Logger::Severity::Info, "Train: Train is now moving!");
         }
     }
@@ -1050,8 +1066,15 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     // --- Train movement ---
     if (m_trainState == TrainState::Moving)
     {
-        const float move = TRAIN_SPEED * fdt;
+        m_trainCurrentSpeed = std::min(TRAIN_SPEED, m_trainCurrentSpeed + TRAIN_ACCEL * fdt);
+        const float move = m_trainCurrentSpeed * fdt;
         m_trainOffset += move;
+
+        // Running loop volume scales with speed ratio.
+        // Quiet right after departure, louder as acceleration approaches max speed.
+        const float speedRatio = (TRAIN_SPEED > 0.0f) ? (m_trainCurrentSpeed / TRAIN_SPEED) : 1.0f;
+        const float runVol = 0.08f + speedRatio * 0.52f; // 0.08 -> 0.60
+        m_trainRunLoopSound.SetVolume(runVol);
 
         const Math::Vec2 hc = player.GetHitboxCenter();
         const Math::Vec2 hh = playerHitboxSize * 0.5f;
@@ -1082,16 +1105,26 @@ void Train::StartEntryTimer()
         m_entryTimer  = 0.0f;
         m_trainState  = TrainState::Stationary;
         m_trainOffset = 0.0f;
+        m_trainCurrentSpeed = 0.0f;
         m_prevPlayerOnTrain  = false;
         m_airborneFromTrain  = false;
         m_crouchCarryLatched = false;
         m_prevOnJumpThroughSurface = false;
         m_prevCrouchHeld = false;
         m_pipeDropCooldown = 0.0f;
+        m_trainStartSound.Stop();
+        m_trainRunLoopSound.Stop();
         ResetCarTransportSlotsToInitialState();
         Logger::Instance().Log(Logger::Severity::Info,
             "Train: Entry timer started – train departs in %.1f s", TRAIN_DEPART_DELAY);
     }
+}
+
+void Train::RestartEntryTimer()
+{
+    // Drop guard so checkpoint respawn can restore true initial-train state.
+    m_entryTimer = -1.0f;
+    StartEntryTimer();
 }
 
 
@@ -1443,6 +1476,9 @@ void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 // ---------------------------------------------------------------------------
 void Train::Shutdown()
 {
+    m_trainStartSound.Stop();
+    m_trainRunLoopSound.Stop();
+
     if (m_firstTrain)      m_firstTrain->Shutdown();
     if (m_secondTrain)     m_secondTrain->Shutdown();
     if (m_thirdTrain)      m_thirdTrain->Shutdown();

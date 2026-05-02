@@ -8,6 +8,7 @@
 #include "../OpenGL/Shader.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../Engine/Matrix.hpp"
+#include "../Engine/Sound.hpp"
 #include <vector>
 #include <cmath>
 #include <string>
@@ -25,6 +26,11 @@ GameOver::GameOver(GameStateManager& gsm_ref, bool& isGameOverFlag,
 
 void GameOver::Initialize()
 {
+    // Mute all audio while GameOver screen is active.
+    m_prevMasterVolume = SoundSystem::Instance().GetMasterVolume();
+    SoundSystem::Instance().SetMasterVolume(0.0f);
+    m_mutedOnEnter = true;
+
     // Initialize shaders and font system
     m_fontShader = std::make_unique<Shader>("OpenGL/Shaders/simple.vert", "OpenGL/Shaders/simple.frag");
     m_colorShader = std::make_unique<Shader>("OpenGL/Shaders/solid_color.vert", "OpenGL/Shaders/solid_color.frag");
@@ -217,6 +223,12 @@ void GameOver::Draw()
 
 void GameOver::Shutdown()
 {
+    if (m_mutedOnEnter)
+    {
+        SoundSystem::Instance().SetMasterVolume(m_prevMasterVolume);
+        m_mutedOnEnter = false;
+    }
+
     if (m_font) m_font->Shutdown();
     if (m_fontShader) m_fontShader.reset();
     if (m_colorShader) m_colorShader.reset();
