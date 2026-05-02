@@ -128,12 +128,46 @@ void Drone::SetBaseSpeed(float speed)
     m_currentSpeed = speed;
 }
 
-void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerUndetectable,
-                    bool sirenTracerJamEvade, float sirenTracerSpeedMul)
+void Drone::ApplyStun(float duration)
 {
+    if (m_isDead)
+        return;
+    m_stunTimer = duration;
+    // Third_Third 호버 드론: 한 번 감전·넉백당하면 들킨 것으로 보고 이후 고정 위치로 복귀하지 않음
+    if (m_carTransportPersistHover)
+    {
+        m_carTransportAggroChase = true;
+        m_carTransportHover      = false;
+    }
+    if (m_sirenMapDrone)
+    {
+        m_jamFleeTimer               = 0.f;
+        m_jamScheduleFleeAfterWobble = false;
+        m_sirenPulseRevealTimer      = 5.0f;
+        m_sirenPulseAggroTimer       = 2.85f;
+    }
+}
+
+void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerUndetectable,
+                    bool sirenTracerJamEvade, float sirenTracerSpeedMul, float sirenTracerTrainAssistMul)
+{
+    const float fdt = static_cast<float>(dt);
+
     if (m_isDead)
     {
         m_moveSound.Stop();
+        if (m_corpseRestTimer > 0.f)
+        {
+            m_corpseRestTimer -= fdt;
+            return;
+        }
+        if (m_corpseFadeAlpha > 0.f)
+        {
+            // 착지 후 휴지 끝난 뒤 서서히 사라짐 (대략 1.25초에 0까지)
+            m_corpseFadeAlpha -= fdt * 0.8f;
+            if (m_corpseFadeAlpha < 0.f)
+                m_corpseFadeAlpha = 0.f;
+        }
         return;
     }
 
@@ -150,11 +184,16 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         }
     }
 
+    if (m_stunTimer < 0.f)
+        m_stunTimer = 0.f;
+
     // Stun from Pulse Resonance Burst: freeze AI, allow ice-slide knockback
     if (m_stunTimer > 0.f)
     {
         const float fdt = static_cast<float>(dt);
         m_stunTimer -= fdt;
+        if (m_stunTimer < 0.f)
+            m_stunTimer = 0.f;
 
         if (m_knockbackDelay > 0.f)
         {
@@ -197,6 +236,119 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
             m_velocity       = { 0.f, 0.f };
             // Fall through to m_isHit block next frame
         }
+        else if (m_stunTimer <= 0.f && m_isTracer)
+        {
+            m_lostTimer                  = 0.f;
+            m_isChasing                  = true;
+            m_jamScheduleFleeAfterWobble = false;
+        }
+        return;
+    }
+
+    if (m_sirenMapDrone && m_sirenPulseRevealTimer > 0.f)
+        m_sirenPulseRevealTimer -= fdt;
+
+    // Car4 호버 드론 — 들킨 뒤: 파이프 앵커로 스냅하지 않고 플레이어 쪽으로 천천히 접근
+    if (m_carTransportAggroChase && !m_isHit && !m_isDead)
+    {
+        constexpr float kBobAmp = 6.5f;
+        m_carTransportBobPhase += fdt * 2.05f;
+
+        Math::Vec2 center{ m_position.x, m_baseY };
+        Math::Vec2 toP    = player.GetHitboxCenter() - center;
+        float      distSq = toP.LengthSq();
+        float      dist   = std::sqrt(distSq);
+
+        constexpr float kAggroChaseSpeed = 90.f;
+        constexpr float kSlowWhenHidden  = 38.f;
+
+        if (dist > 12.f)
+        {
+            if (!isPlayerUndetectable)
+            {
+                Math::Vec2 dir = toP / dist;
+                center += dir * kAggroChaseSpeed * fdt;
+            }
+            else
+            {
+                // 히딩 중에는 정확한 위치를 모르므로 수평으로만 매우 느리게 압박
+                const float sx = (toP.x >= 0.f) ? 1.f : -1.f;
+                center.x += sx * kSlowWhenHidden * fdt;
+            }
+        }
+
+        m_position.x = center.x;
+        m_baseY      = center.y;
+        m_position.y = m_baseY + std::sin(m_carTransportBobPhase) * kBobAmp;
+        m_velocity   = { 0.f, 0.f };
+        m_isChasing  = true;
+
+        if (m_velocity.LengthSq() > 10.0f || m_isChasing)
+        {
+            if (!m_moveSound.IsPlaying())
+                m_moveSound.Play();
+            const float dP = (player.GetPosition() - m_position).Length();
+            float       vol = 1.0f - (dP / 800.0f);
+            if (vol < 0.f) vol = 0.f;
+            m_moveSound.SetVolume(vol * 0.38f);
+        }
+
+        m_radarAngle += m_radarRotationSpeed * fdt;
+        if (m_radarAngle >= 360.0f) m_radarAngle -= 360.0f;
+
+        if (m_attackCooldown > 0.0f)
+            m_attackCooldown -= fdt;
+
+        distSq = (player.GetHitboxCenter() - m_position).LengthSq();
+        if (distSq < (600.0f * 600.0f))
+            m_currentSpeed = m_baseSpeed * 1.35f;
+        else
+            m_currentSpeed = m_baseSpeed;
+
+        const float       playerHitboxRadius = (playerHitboxSize.x + playerHitboxSize.y) * 0.15f;
+        const float       effectiveRangeSq =
+            (Drone::DETECTION_RANGE + playerHitboxRadius) * (Drone::DETECTION_RANGE + playerHitboxRadius);
+        const bool        canDetectPlayer = !isPlayerUndetectable;
+
+        if (m_isAttacking)
+        {
+            m_attackTimer += fdt;
+            const float progress = m_attackTimer / m_attackDuration;
+            if (progress >= 1.0f)
+            {
+                m_isAttacking = false;
+                m_position    = m_attackStartPos;
+                m_attackTimer = 0.0f;
+            }
+            else
+            {
+                m_attackAngle +=
+                    (360.0f / m_attackDuration) * fdt * static_cast<float>(m_attackDirection);
+                const float      rad = m_attackAngle * (PI / 180.0f);
+                m_position.x = m_attackCenter.x + std::cos(rad) * m_attackRadius;
+                m_position.y = m_attackCenter.y + std::sin(rad) * m_attackRadius;
+            }
+            if (!canDetectPlayer)
+            {
+                m_isAttacking      = false;
+                m_position         = m_attackStartPos;
+                m_attackTimer      = 0.0f;
+                m_shouldDealDamage = false;
+            }
+        }
+        else if (canDetectPlayer && distSq < effectiveRangeSq && m_attackCooldown <= 0.0f)
+        {
+            m_isAttacking      = true;
+            m_shouldDealDamage = true;
+            m_attackTimer      = 0.0f;
+            m_attackStartPos   = m_position;
+            m_attackCooldown   = m_attackCooldownDuration;
+            m_attackCenter     = (m_position + player.GetPosition()) * 0.5f;
+            Math::Vec2 toC = m_attackCenter - m_position;
+            m_attackAngle    = std::atan2(toC.y, toC.x) * (180.0f / PI);
+            m_attackDirection = (player.GetPosition().x > m_position.x) ? 1 : -1;
+        }
+
         return;
     }
 
@@ -212,7 +364,24 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         return;
     }
 
-    // Delay AI restart after exiting debug mode
+    // Third_Third 자동차 칸 호버 드론: 파이프 부근 위아래만 (Train이 앵커 world 제공)
+    if (m_carTransportHover && !m_carTransportAggroChase && !m_isHit)
+    {
+        m_carTransportBobPhase += fdt * (m_carTransportJamConfused ? 3.15f : 2.55f);
+        const float yAmp  = m_carTransportJamConfused ? 26.f : 15.f;
+        const float xJitt = m_carTransportJamConfused ? 19.f : 4.5f;
+        m_position = m_carTransportAnchorWorld;
+        m_position.y += std::sin(m_carTransportBobPhase) * yAmp;
+        m_position.x += std::sin(m_carTransportBobPhase * 0.71f) * xJitt;
+        m_velocity      = { 0.f, 0.f };
+        m_baseY         = m_position.y;
+        m_isAttacking   = false;
+        m_shouldDealDamage = false;
+        m_moveSound.SetVolume(0.0f);
+        m_radarAngle += m_radarRotationSpeed * fdt;
+        if (m_radarAngle >= 360.0f) m_radarAngle -= 360.0f;
+        return;
+    }
     if (m_debugExitTimer > 0.0f)
     {
         m_debugExitTimer -= static_cast<float>(dt);
@@ -277,7 +446,11 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         if (m_position.y < m_groundLevel + m_size.y / 2.0f)
         {
             m_position.y = m_groundLevel + m_size.y / 2.0f;
-            m_isDead = true;
+            m_isHit              = false;
+            m_isDead             = true;
+            m_hitRotation        = 0.f;
+            m_corpseRestTimer    = 3.0f;
+            m_corpseFadeAlpha    = 1.0f;
             Logger::Instance().Log(Logger::Severity::Event, "Drone destroyed and landed on ground!");
         }
         return;
@@ -288,7 +461,18 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         m_attackCooldown -= static_cast<float>(dt);
     }
 
-    Math::Vec2 toPlayer = player.GetPosition() - m_position;
+    Math::Vec2 toPlayer;
+    if (m_isTracer)
+    {
+        Math::Vec2 target = player.GetHitboxCenter();
+        target.x += std::sin(m_spawnPos.x * 0.031f + m_spawnPos.y * 0.019f) * 44.f;
+        target.y += std::cos(m_spawnPos.x * 0.029f) * 32.f;
+        toPlayer = target - m_position;
+    }
+    else
+    {
+        toPlayer = player.GetPosition() - m_position;
+    }
     float distSq = toPlayer.LengthSq();
 
     if (distSq < (600.0f * 600.0f))
@@ -305,8 +489,19 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     float effectiveDetectionRangeSq = effectiveDetectionRange * effectiveDetectionRange;
 
     bool canDetectPlayer = !isPlayerUndetectable;
+    if (m_sirenMapDrone && m_sirenPulseRevealTimer > 0.f)
+        canDetectPlayer = true;
 
-    const float chaseMul = std::max(0.08f, sirenTracerSpeedMul);
+    float pulseAggroMul = 1.f;
+    if (m_sirenMapDrone && m_sirenPulseAggroTimer > 0.f)
+    {
+        pulseAggroMul = 1.55f;
+        m_sirenPulseAggroTimer -= fdt;
+        if (m_sirenPulseAggroTimer < 0.f)
+            m_sirenPulseAggroTimer = 0.f;
+    }
+    const float chaseMul =
+        std::max(0.08f, sirenTracerSpeedMul) * sirenTracerTrainAssistMul * pulseAggroMul;
     if (m_isAttacking)
     {
         m_attackTimer += static_cast<float>(dt);
@@ -364,8 +559,11 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
                 m_jamScheduleFleeAfterWobble = false;
                 m_isChasing                 = true;
                 m_lostTimer                 = 0.0f;
-                m_direction                 = toPlayer.GetNormalized();
-                targetVelocity              = m_direction * m_currentSpeed * chaseMul;
+                const float dist      = std::sqrt(std::max(1.f, distSq));
+                const float distBoost = 1.f + std::clamp((dist - 40.f) / 400.f, 0.f, 2.35f);
+                const float heatBoost = 1.f + 0.30f * static_cast<float>(m_tracerHeatLevel);
+                m_direction           = toPlayer.GetNormalized();
+                targetVelocity        = m_direction * m_currentSpeed * chaseMul * distBoost * heatBoost;
 
                 m_searchRotation = 0.0f;
                 m_searchDir      = 1;
@@ -477,8 +675,8 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
 
 void Drone::Draw(const Shader& shader) const
 {
-    // Dead without the hit/fall animation → don't render (prevents frozen-in-air ghost)
-    if (m_isDead && !m_isHit) return;
+    // 즉사(시체 페이드 없음)는 표시 안 함. 착지 시체는 알파로 페이드.
+    if (m_isDead && m_corpseFadeAlpha <= 0.f && !m_isHit) return;
 
     Math::Matrix rotationMatrix = Math::Matrix::CreateIdentity();
     bool flipX = false;
@@ -547,13 +745,34 @@ void Drone::Draw(const Shader& shader) const
     }
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(m_size);
-    Math::Matrix transMatrix = Math::Matrix::CreateTranslation(m_position);
-    Math::Matrix model = transMatrix * rotationMatrix * scaleMatrix;
+    Math::Vec2 drawPos       = m_position;
+    if (!m_isHit && m_stunTimer > 0.f)
+    {
+        // 감전: 고주파 sine 제거 — 저주파 + 약한 배음 + 스턴 남은 시간에 따른 감쇠
+        const float env = std::clamp(m_stunTimer * 0.48f, 0.22f, 1.f);
+        const float ph  = m_stunTimer * 5.0f;
+        const float shakeX =
+            std::sin(ph) * 8.0f * env + std::sin(ph * 2.03f + 1.1f) * 2.8f * env;
+        const float trem = std::sin(ph * 24.f + 0.35f) * 1.35f * env; // 미세 진동
+        const float shakeY =
+            std::sin(ph * 1.07f + 0.6f) * 2.2f * env;
+        drawPos.x += shakeX + trem;
+        drawPos.y += shakeY;
+    }
+
+    Math::Matrix transMatrix = Math::Matrix::CreateTranslation(drawPos);
+    Math::Matrix model       = transMatrix * rotationMatrix * scaleMatrix;
 
     shader.use();
     shader.setMat4("model", model);
     shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     shader.setBool("flipX", flipX);
+    {
+        float drawAlpha = 1.f;
+        if (m_isDead && m_corpseFadeAlpha > 0.f)
+            drawAlpha = m_corpseFadeAlpha;
+        shader.setFloat("alpha", drawAlpha);
+    }
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureID);
@@ -564,7 +783,7 @@ void Drone::Draw(const Shader& shader) const
 
 void Drone::DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) const
 {
-    if (m_isDead) return;
+    if (m_isDead && m_corpseFadeAlpha <= 0.f) return;
 
     const int numLines = 14;
     const float sweepAngle = 45.0f;
@@ -604,6 +823,8 @@ void Drone::Reset()
     m_damageDelay        = 0.0f;
     m_hitRotation   = 0.0f;
     m_fallSpeed     = 0.0f;
+    m_corpseRestTimer = 0.f;
+    m_corpseFadeAlpha = 0.f;
     m_hp            = m_maxHP;
     m_searchRotation = 0.0f;
     m_searchDir     = 1;
@@ -623,6 +844,16 @@ void Drone::Reset()
     m_hitHorzVel                = 0.f;
     m_hitWindSign               = 1;
     m_sirenMapDrone             = false;
+    m_sirenPulseRevealTimer     = 0.f;
+    m_sirenPulseAggroTimer      = 0.f;
+
+    m_carTransportJamConfused     = false;
+    m_carTransportAnchorWorld     = {};
+    m_carTransportBobPhase        = 0.f;
+    m_carTransportAggroChase      = false;
+    m_carTransportHover           = m_carTransportPersistHover;
+    m_trainCarSegment             = 0;
+    m_tracerHeatLevel             = 0;
 }
 
 void Drone::Shutdown()

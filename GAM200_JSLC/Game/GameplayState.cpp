@@ -790,6 +790,8 @@ void GameplayState::Update(double dt)
             checkDrones(m_rooftop->GetDrones());
             if (m_undergroundAccessed) checkDrones(m_underground->GetDrones());
             if (m_trainAccessed) checkDrones(m_train->GetDrones());
+            if (m_trainAccessed && m_train && m_train->GetCarTransportDroneManager())
+                checkDrones(m_train->GetCarTransportDroneManager()->GetDrones());
             if (m_trainAccessed && m_train && m_train->GetSirenDroneManager())
                 checkDrones(m_train->GetSirenDroneManager()->GetDrones());
 
@@ -906,50 +908,12 @@ void GameplayState::Update(double dt)
 
         if (ctl.IsActionTriggered(ControlAction::Attack, input))
         {
-            bool trainCarIgniteHandled = false;
-            if (m_trainAccessed && m_train && !m_isGameOver)
-            {
-                int carSlot = -1;
-                if (m_train->TryGetCarTransportClickIgniteTarget(playerHbCenter, playerHitboxSize, mouseWorldPos,
-                                                                 carSlot))
-                {
-                    auto* imguiMgrClick = gsm.GetEngine().GetImguiManager();
-                    const bool gmClick  = imguiMgrClick && imguiMgrClick->IsPlayerGodMode();
-                    constexpr float kCarIgnitePulseCost = 5.0f;
-                    Pulse& pulseRef                     = player.GetPulseCore().getPulse();
-
-                    if (gmClick || pulseRef.Value() >= kCarIgnitePulseCost)
-                    {
-                        if (m_train->TryIgniteCarTransportSlot(carSlot))
-                        {
-                            if (!gmClick)
-                                pulseRef.spend(kCarIgnitePulseCost);
-                            trainCarIgniteHandled = true;
-                        }
-                    }
-                    else
-                        trainCarIgniteHandled = true;
-                }
-            }
-
-            if (!trainCarIgniteHandled)
-            {
-                if (m_room->IsBlindOpen())
-                {
-                    m_door->Update(player, true, mouseWorldPos);
-                }
-                else
-                {
-                    m_door->Update(player, false, mouseWorldPos);
-                }
-
-                m_rooftopDoor->Update(player, true, mouseWorldPos);
-            }
+            if (m_room->IsBlindOpen())
+                m_door->Update(player, true, mouseWorldPos);
             else
-            {
                 m_door->Update(player, false, mouseWorldPos);
-                m_rooftopDoor->Update(player, false, mouseWorldPos);
-            }
+
+            m_rooftopDoor->Update(player, true, mouseWorldPos);
         }
         else
         {
@@ -1155,7 +1119,9 @@ void GameplayState::Update(double dt)
             (m_trainAccessed && m_train) ? m_train->GetDroneManager() : nullptr,
             (m_trainAccessed && m_train) ? m_train->GetSirenDroneManager() : nullptr,
             trainPulseAnchorOk ? &trainPulseAnchor : nullptr,
-            &trainStaticChainArcs);
+            &trainStaticChainArcs,
+            (m_trainAccessed && m_train) ? m_train->GetCarTransportDroneManager() : nullptr,
+            (m_trainAccessed && m_train) ? m_train.get() : nullptr);
     }
 
     if (m_storyDialogue && m_rooftopAccessed && !m_undergroundAccessed && m_rooftop && !m_blockAmbientStoryForSession
@@ -1186,8 +1152,18 @@ void GameplayState::Update(double dt)
         }();
         const bool attackHeld = ctl.IsActionPressed(ControlAction::Attack, input);
         const bool attackTriggered = ctl.IsActionTriggered(ControlAction::Attack, input);
-        m_train->Update(dt, player, playerHitboxSize, isPressingInteract, trainCarInjectGodMode,
-                        attackHeld, attackTriggered, mouseWorldPos);
+        int        carInjectForced = -1;
+        if (m_train)
+            carInjectForced =
+                m_train->TryGetCarTransportStartInjectSlot(player.GetHitboxCenter(), playerHitboxSize, mouseWorldPos);
+        const bool injectViaStartIcon = carInjectForced >= 0 && attackHeld;
+        const bool carTransportInjectHeld = isPressingInteract || injectViaStartIcon;
+        m_train->Update(dt, player, playerHitboxSize, isPressingInteract, carTransportInjectHeld, trainCarInjectGodMode,
+                        attackHeld, attackTriggered, mouseWorldPos, injectViaStartIcon ? carInjectForced : -1);
+
+        const float shakePx = m_train->ConsumeTrainCameraShakeRequest();
+        if (shakePx > 0.f)
+            m_camera.AddScreenShake(0.48f, shakePx);
 
         // Keep right bound expanding while player advances.
         // This prevents camera lock when the player leaves the train and keeps moving right.
@@ -1258,11 +1234,18 @@ void GameplayState::Update(double dt)
         const bool isPlayerHidingInTrain =
             m_train->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
 
-        auto& trainDrones = m_train->GetDrones();
+        auto&     trainDrones      = m_train->GetDrones();
+        const int trainPlayerCar   = m_train->GetPlayerTrainCarIndex(playerHbCenter);
         for (auto& drone : trainDrones)
         {
             if (!drone.IsDead() && drone.ShouldDealDamage())
             {
+                const int ds = drone.GetTrainCarSegment();
+                if (ds != 0 && ds != trainPlayerCar)
+                {
+                    drone.ResetDamageFlag();
+                    continue;
+                }
                 if (!isPlayerHidingInTrain)
                 {
                     auto* imguiManager = gsm.GetEngine().GetImguiManager();
@@ -1278,6 +1261,34 @@ void GameplayState::Update(double dt)
             }
         }
 
+        if (m_train->GetCarTransportDroneManager())
+        {
+            auto& ctDrones = m_train->GetCarTransportDroneManager()->GetDrones();
+            for (auto& drone : ctDrones)
+            {
+                if (!drone.IsDead() && drone.ShouldDealDamage())
+                {
+                    if (trainPlayerCar != 4)
+                    {
+                        drone.ResetDamageFlag();
+                        continue;
+                    }
+                    if (!isPlayerHidingInTrain)
+                    {
+                        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                        if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                        {
+                            player.TakeDamage(25.0f);
+                            if (m_train)
+                                m_train->NotifyCarTransportInjectionInterrupted();
+                        }
+                    }
+                    drone.ResetDamageFlag();
+                    break;
+                }
+            }
+        }
+
         if (m_train->GetSirenDroneManager())
         {
             auto& sirenDrones = m_train->GetSirenDroneManager()->GetDrones();
@@ -1285,6 +1296,11 @@ void GameplayState::Update(double dt)
             {
                 if (!drone.IsDead() && drone.ShouldDealDamage())
                 {
+                    if (trainPlayerCar != 3)
+                    {
+                        drone.ResetDamageFlag();
+                        continue;
+                    }
                     if (!m_train->IsSirenDroneDamageBlocked(playerHbCenter, playerHitboxSize, player.IsCrouching()))
                     {
                         auto* imguiManager = gsm.GetEngine().GetImguiManager();
@@ -1311,6 +1327,7 @@ void GameplayState::Update(double dt)
     {
         m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
     }
+    m_camera.UpdateScreenShake(static_cast<float>(dt));
 
     if (m_hallwayEntryStoryPending && m_storyDialogue && m_font && m_fontShader && !m_blockAmbientStoryForSession
         && !suppressAmbientStoryThisFrame)
@@ -1595,6 +1612,8 @@ void GameplayState::RespawnAtCheckpoint()
     if (m_train)
     {
         m_train->GetDroneManager()->ResetAllDrones();
+        if (m_train->GetCarTransportDroneManager())
+            m_train->GetCarTransportDroneManager()->ResetAllDrones();
         if (m_train->GetSirenDroneManager())
             m_train->GetSirenDroneManager()->ResetAllDrones();
         for (auto& robot : m_train->GetRobots()) robot.Reset();
@@ -1798,6 +1817,11 @@ void GameplayState::ApplyGamepadDroneTargetingAssist(double dt, Input::Input& in
     {
         for (const auto& d : m_train->GetDrones())
             considerMagnet(d);
+        if (m_train && m_train->GetCarTransportDroneManager())
+        {
+            for (const auto& d : m_train->GetCarTransportDroneManager()->GetDrones())
+                considerMagnet(d);
+        }
         if (m_train && m_train->GetSirenDroneManager())
         {
             for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
@@ -1841,6 +1865,11 @@ void GameplayState::ApplyGamepadDroneTargetingAssist(double dt, Input::Input& in
         {
             for (const auto& d : m_train->GetDrones())
                 considerManual(d);
+            if (m_train && m_train->GetCarTransportDroneManager())
+            {
+                for (const auto& d : m_train->GetCarTransportDroneManager()->GetDrones())
+                    considerManual(d);
+            }
             if (m_train && m_train->GetSirenDroneManager())
             {
                 for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
@@ -1954,9 +1983,10 @@ void GameplayState::DrawMainLayer()
     const float viewHalfW = effectiveWidth * 0.5f;
     Math::Matrix worldProjection;
     {
-        Math::Vec2 camPos = m_camera.GetPosition();
-        float offsetX = std::round(effectiveWidth  * 0.5f - camPos.x);
-        float offsetY = std::round(effectiveHeight * 0.5f - camPos.y);
+        Math::Vec2 camPos   = m_camera.GetPosition();
+        Math::Vec2 camShake = m_camera.GetScreenShakeOffset();
+        float      offsetX  = std::round(effectiveWidth * 0.5f - camPos.x + camShake.x);
+        float      offsetY  = std::round(effectiveHeight * 0.5f - camPos.y + camShake.y);
         Math::Matrix zoomedOrtho = Math::Matrix::CreateOrtho(
             0.0f, effectiveWidth, 0.0f, effectiveHeight, -1.0f, 1.0f);
         Math::Matrix zoomedView = Math::Matrix::CreateTranslation({ offsetX, offsetY });
@@ -1988,7 +2018,27 @@ void GameplayState::DrawMainLayer()
     m_underground->Draw(textureShader);
     m_train->Draw(textureShader, m_camera.GetPosition(), viewHalfW);
     if (m_trainAccessed)
+    {
+        colorShader->use();
+        colorShader->setMat4("projection", worldProjection);
+        colorShader->setFloat("uAlpha", 1.0f);
+        m_train->DrawRobotTrainAlerts(*colorShader, *m_debugRenderer);
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
         m_train->DrawCar2EnterLeavePrompt(textureShader, m_camera.GetPosition(), viewHalfW);
+    }
+
+    if (m_trainAccessed)
+    {
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        m_train->DrawCarTransportOverlays(textureShader, m_camera.GetPosition(), viewHalfW);
+    }
 
     if (m_trainAccessed)
     {
@@ -2112,7 +2162,10 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     for (const auto& src : m_train->GetPulseSources())
         src.DrawRemainGauge(*colorShader);
     if (m_trainAccessed && m_train)
+    {
         m_train->DrawCar3SirenProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
+        m_train->DrawCarTransportInjectProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
+    }
     colorShader->setFloat("uAlpha", 1.0f);
 
     textureShader.use();
@@ -2419,6 +2472,17 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         {
             for (const auto& d : m_train->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
         }
+        if (!overLeftClickTarget && m_trainAccessed && m_train && m_train->GetCarTransportDroneManager())
+        {
+            for (const auto& d : m_train->GetCarTransportDroneManager()->GetDrones())
+            {
+                if (isMouseOnDrone(d))
+                {
+                    overLeftClickTarget = true;
+                    break;
+                }
+            }
+        }
         if (!overLeftClickTarget && m_trainAccessed && m_train && m_train->GetSirenDroneManager())
         {
             for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
@@ -2559,6 +2623,18 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             {
                 m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
                 m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+            }
+        }
+
+        if (m_train && m_train->GetCarTransportDroneManager())
+        {
+            for (const auto& drone : m_train->GetCarTransportDroneManager()->GetDrones())
+            {
+                if (!drone.IsDead())
+                {
+                    m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+                    m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+                }
             }
         }
 

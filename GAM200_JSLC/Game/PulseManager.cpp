@@ -616,14 +616,14 @@ void PulseManager::DrawDetonationVFX(Shader& colorShader, DebugRenderer& debugRe
                     Math::Vec2 endPt = m_detonationOrigin
                         + Math::Vec2{ std::cos(angle), std::sin(angle) } * len;
                     float rS = fade * 0.3f, gS = fade, bS = fade;
-                    debugRenderer.DrawLine(colorShader, m_detonationOrigin, endPt, rS, gS, bS);
+                    debugRenderer.DrawLine(colorShader, m_detonationOrigin, endPt, rS, gS, bS, 7.f);
 
-                    // Secondary thinner spike at halfway angle
+                    // Secondary spike at halfway angle
                     float aHalf = angle + (PI / SPIKE_COUNT);
                     Math::Vec2 ep2 = m_detonationOrigin
                         + Math::Vec2{ std::cos(aHalf), std::sin(aHalf) } * (len * 0.60f);
                     debugRenderer.DrawLine(colorShader, m_detonationOrigin, ep2,
-                                           rS * 0.5f, gS * 0.5f, bS * 0.5f);
+                                           rS * 0.55f, gS * 0.55f, bS * 0.55f, 4.5f);
                 }
             }
         }
@@ -664,13 +664,13 @@ void PulseManager::DrawDetonationVFX(Shader& colorShader, DebugRenderer& debugRe
         Math::Vec2 normDir = dir / len;
         Math::Vec2 perp    = normDir.Perpendicular();
 
-        // High-frequency flicker (mostly on, occasional blink)
-        float flicker = (std::sin(arc.timer * 180.f) > -0.35f) ? 1.f : 0.25f;
-        float ef = fade * flicker;
+        // 부드러운 밝기 변조 (지지직 단절 느낌 완화)
+        const float flicker = 0.78f + 0.22f * (0.5f + 0.5f * std::sin(arc.timer * 22.f));
+        float       ef      = fade * flicker;
 
-        // Zigzag control points — oscillate rapidly to create electric "jitter"
-        float amp  = 28.f * fade;
-        float freq = 50.f;
+        // 지그재그: 주파수 낮춤 → 흐름이 더 부드럽고 읽기 쉬움
+        const float amp  = 44.f * fade;
+        const float freq = 16.f;
         Math::Vec2 q1 = arc.from + normDir * (len * 0.25f)
                         + perp * (amp * std::sin(arc.timer * freq));
         Math::Vec2 q2 = arc.from + normDir * (len * 0.50f)
@@ -678,32 +678,53 @@ void PulseManager::DrawDetonationVFX(Shader& colorShader, DebugRenderer& debugRe
         Math::Vec2 q3 = arc.from + normDir * (len * 0.75f)
                         + perp * (amp * std::sin(arc.timer * freq + 2.7f));
 
-        // Core: bright purple zigzag (4 segments)  R high, G low, B ~0.9
-        float rC = ef * 1.00f, gC = ef * 0.16f, bC = ef * 1.00f;
-        debugRenderer.DrawLine(colorShader, arc.from, q1,      rC, gC, bC);
-        debugRenderer.DrawLine(colorShader, q1,       q2,      rC, gC, bC);
-        debugRenderer.DrawLine(colorShader, q2,       q3,      rC, gC, bC);
-        debugRenderer.DrawLine(colorShader, q3,       arc.to,  rC, gC, bC);
+        auto seg = [&](Math::Vec2 a, Math::Vec2 b, float r, float g, float bcol, float thick) {
+            debugRenderer.DrawLine(colorShader, a, b, r, g, bcol, thick);
+        };
 
-        // Glow: straight offset lines in deep purple
-        float rG = ef * 0.85f, gG = ef * 0.10f, bG = ef * 0.95f;
-        constexpr float GLOW_OFF = 5.0f;
-        Math::Vec2 off = perp * GLOW_OFF;
-        debugRenderer.DrawLine(colorShader, arc.from + off, arc.to + off, rG, gG, bG);
-        debugRenderer.DrawLine(colorShader, arc.from - off, arc.to - off, rG, gG, bG);
-        debugRenderer.DrawLine(colorShader, arc.from + off * 1.65f, arc.to + off * 1.65f, rG * 0.70f, gG * 0.70f, bG * 0.70f);
-        debugRenderer.DrawLine(colorShader, arc.from - off * 1.65f, arc.to - off * 1.65f, rG * 0.70f, gG * 0.70f, bG * 0.70f);
+        // 넓은 페더 (가장 아래 — 차-차 / 차-드론 연쇄가 잘 보이도록)
+        float rF = ef * 0.35f, gF = ef * 0.06f, bF = ef * 0.45f;
+        seg(arc.from, q1, rF, gF, bF, 26.f);
+        seg(q1, q2, rF, gF, bF, 26.f);
+        seg(q2, q3, rF, gF, bF, 26.f);
+        seg(q3, arc.to, rF, gF, bF, 26.f);
 
-        // Impact burst at chain target  (DrawCircle: {R, G}, B=0.8 fixed)
-        // Purple circle: R=high, G=0  → (ef*0.85, 0, 0.8)
+        // 직선 백본 (지그재그 중심 대략 따라 가시성 보강)
+        float rB = ef * 0.45f, gB = ef * 0.08f, bB = ef * 0.55f;
+        seg(arc.from, arc.to, rB, gB, bB, 12.f);
+
+        // 코어: 밝은 지그재그
+        float rC = ef * 1.00f, gC = ef * 0.20f, bC = ef * 1.00f;
+        seg(arc.from, q1, rC, gC, bC, 9.f);
+        seg(q1, q2, rC, gC, bC, 9.f);
+        seg(q2, q3, rC, gC, bC, 9.f);
+        seg(q3, arc.to, rC, gC, bC, 9.f);
+
+        // 시안 하이라이트 (두껍게)
+        {
+            float rA = ef * 0.18f, gA = ef * 1.00f, bA = ef * 1.0f;
+            constexpr float AC_OFF = 5.0f;
+            Math::Vec2      aoff   = normDir * AC_OFF + perp * (AC_OFF * 0.45f);
+            seg(arc.from + aoff * 0.25f, q2 + aoff, rA, gA, bA, 6.f);
+            seg(q2 + aoff, arc.to - aoff * 0.18f, rA * 0.88f, gA * 0.88f, bA * 0.88f, 5.f);
+        }
+
+        // 글로우: 이중 오프셋 직선
+        float rG = ef * 0.88f, gG = ef * 0.12f, bG = ef * 1.0f;
+        constexpr float GLOW_OFF = 11.0f;
+        Math::Vec2      off      = perp * GLOW_OFF;
+        seg(arc.from + off, arc.to + off, rG * 0.55f, gG * 0.55f, bG * 0.55f, 8.f);
+        seg(arc.from - off, arc.to - off, rG * 0.55f, gG * 0.55f, bG * 0.55f, 8.f);
+        seg(arc.from + off * 1.55f, arc.to + off * 1.55f, rG * 0.40f, gG * 0.40f, bG * 0.40f, 5.f);
+        seg(arc.from - off * 1.55f, arc.to - off * 1.55f, rG * 0.40f, gG * 0.40f, bG * 0.40f, 5.f);
+
         float hf   = fade * 1.0f;
-        float hitR = 28.f + (1.f - fade) * 42.f;
-        debugRenderer.DrawCircle(colorShader, arc.to, hitR,          { hf * 0.85f, 0.f });
-        debugRenderer.DrawCircle(colorShader, arc.to, hitR * 0.60f,  { hf * 0.60f, 0.f });
+        float hitR = 46.f + (1.f - fade) * 58.f;
+        debugRenderer.DrawCircle(colorShader, arc.to, hitR, { hf * 0.90f, 0.f });
+        debugRenderer.DrawCircle(colorShader, arc.to, hitR * 0.58f, { hf * 0.68f, 0.f });
 
-        // Source "release" circle at arc origin (dimmer purple)
-        float sf   = fade * 0.72f;
-        float srcR = 20.f + (1.f - fade) * 24.f;
-        debugRenderer.DrawCircle(colorShader, arc.from, srcR, { sf * 0.70f, 0.f });
+        float sf   = fade * 0.78f;
+        float srcR = 32.f + (1.f - fade) * 34.f;
+        debugRenderer.DrawCircle(colorShader, arc.from, srcR, { sf * 0.75f, 0.f });
     }
 }

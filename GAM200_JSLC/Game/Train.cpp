@@ -27,6 +27,8 @@
 //   localCenter.y = from map bottom (MIN_Y), Y going UP in world space
 // ---------------------------------------------------------------------------
 static constexpr float ASSUMED_IMG_HEIGHT = 1080.0f; // expected car image height in pixels
+// Flatbed deck surface: art row py=804 → world offset above Train::MIN_Y (see MakeHitbox for [84,804,2472,45]).
+static constexpr float kTrainFlatbedDeckTopLocalY = ASSUMED_IMG_HEIGHT - 804.f;
 
 static float WrapAnglePi(float a)
 {
@@ -198,18 +200,31 @@ static bool HitboxInTrainCarryBand(float trainWorldLeft, float totalTrainWidth,
 // Third_ThirdTrain — 자동차 운반 칸 6슬롯 (엔진 / 펄스 주입 / 직선 연쇄)
 // ---------------------------------------------------------------------------
 namespace {
-constexpr float kCarInjectDurationSec   = 2.0f;
-constexpr float kCarInjectPulseDrainSec = 22.0f;
-constexpr float kCarInteractRangeSq   = 380.0f * 380.0f;
+constexpr float kCarTransportPulseInjectTotal     = 3.f;
+constexpr float kCarTransportPulseInjectDuration = 1.5f;
+// 플레이어 히트박스와 차 슬롯 박스가 겹칠 필요 없음 — 슬롯 중심까지 거리만 검사
+constexpr float kCarInteractRangeSq   = 600.0f * 600.0f;
 constexpr float kCarSkillAnchorRangeSq = 400.0f * 400.0f;
 constexpr float kChainDetonateRadius  = 440.0f;
 constexpr float kChainDetonateStun    = 2.0f;
 constexpr float kMoorePulseShareRate  = 2.5f;
 constexpr int   kCarTransportCount    = 6;
+constexpr int   kCarTransportHoverDroneCount = 14;
 
 static const int kStraightCarPairs[][2] = {
     { 0, 1 }, { 1, 2 }, { 3, 4 }, { 4, 5 },
     { 0, 3 }, { 1, 4 }, { 2, 5 },
+};
+
+// Car4(Third_Third) 이미지 픽셀 — x: 칸 왼쪽 기준, yTop: 이미지 상단에서 아래로 (+Y 아래)
+static const struct
+{
+    float x, yTop;
+} kCarTransportDronePixels[kCarTransportHoverDroneCount] = {
+    { 620.f, 52.f },  { 1380.f, 50.f }, { 2100.f, 54.f }, { 2850.f, 48.f },
+    { 700.f, 258.f },  { 1480.f, 266.f }, { 2280.f, 252.f }, { 3080.f, 260.f },
+    { 330.f, 122.f }, { 315.f, 292.f },  { 360.f, 532.f },
+    { 3380.f, 118.f }, { 3420.f, 288.f }, { 3360.f, 528.f },
 };
 }
 
@@ -271,8 +286,9 @@ void Train::ResetCarTransportSlotsToInitialState()
         m_carTransportSlots[static_cast<size_t>(i)].localCenter    = hb.localCenter;
         m_carTransportSlots[static_cast<size_t>(i)].halfSize       = hb.size * 0.5f;
         m_carTransportSlots[static_cast<size_t>(i)].engineOn       = defs[i].startEngine;
-        m_carTransportSlots[static_cast<size_t>(i)].injectSeconds  = 0.f;
+        m_carTransportSlots[static_cast<size_t>(i)].injectPulseAccum = 0.f;
         m_carTransportSlots[static_cast<size_t>(i)].engineGlowTimer = 0.f;
+        m_carTransportSlots[static_cast<size_t>(i)].skipPulseLineOverlay = (i == 0 || i == 5);
     }
     m_carInjectFocusSlot = -1;
 }
@@ -280,7 +296,7 @@ void Train::ResetCarTransportSlotsToInitialState()
 void Train::NotifyCarTransportInjectionInterrupted()
 {
     for (auto& s : m_carTransportSlots)
-        s.injectSeconds = 0.f;
+        s.injectPulseAccum = 0.f;
     m_carInjectFocusSlot = -1;
 }
 
@@ -303,9 +319,42 @@ bool Train::TryGetCarTransportSkillAnchor(Math::Vec2 playerHbCenter, Math::Vec2&
     return true;
 }
 
+int Train::TryGetCarTransportStartInjectSlot(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize,
+                                             Math::Vec2 mouseWorldPos) const
+{
+    (void)playerHbSize;
+    const Math::Vec2 kCursorHitbox{ 32.f, 32.f };
+    constexpr float  kIconW = 110.f;
+    float              aspect = 1.f;
+    if (m_carTransportStartTex && m_carTransportStartTex->GetWidth() > 0)
+        aspect = static_cast<float>(m_carTransportStartTex->GetHeight())
+               / static_cast<float>(m_carTransportStartTex->GetWidth());
+    const Math::Vec2 iconSize{ kIconW, kIconW * aspect };
+
+    const float trainLeft = MIN_X + m_trainOffset;
+
+    for (int i = 0; i < kCarTransportCount; ++i)
+    {
+        if (m_carTransportSlots[static_cast<size_t>(i)].engineOn)
+            continue;
+        const auto&      slot = m_carTransportSlots[static_cast<size_t>(i)];
+        const Math::Vec2 wc   = { trainLeft + slot.localCenter.x, MIN_Y + slot.localCenter.y };
+        const float      d    = (playerHbCenter - wc).LengthSq();
+        if (d > kCarInteractRangeSq)
+            continue;
+
+        const Math::Vec2 iconHit{ iconSize.x * 1.2f, iconSize.y * 1.2f };
+        if (Collision::CheckPointInAABB(mouseWorldPos, wc, iconHit)
+            || Collision::CheckAABB(mouseWorldPos, kCursorHitbox, wc, iconHit))
+            return i;
+    }
+    return -1;
+}
+
 bool Train::TryGetCarTransportClickIgniteTarget(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize,
                                                 Math::Vec2 mouseWorldPos, int& outSlotIndex) const
 {
+    (void)playerHbSize;
     const Math::Vec2 kCursorHitbox{ 32.f, 32.f };
 
     for (int i = 0; i < kCarTransportCount; ++i)
@@ -316,8 +365,8 @@ bool Train::TryGetCarTransportClickIgniteTarget(Math::Vec2 playerHbCenter, Math:
 
         const Math::Vec2 wc   = CarTransportWorldCenter(i);
         const Math::Vec2 full = slot.halfSize * 2.f;
-
-        if (!Collision::CheckAABB(playerHbCenter, playerHbSize, wc, full))
+        const float      d    = (playerHbCenter - wc).LengthSq();
+        if (d > kCarInteractRangeSq)
             continue;
 
         const bool mouseOnCar = Collision::CheckPointInAABB(mouseWorldPos, wc, full)
@@ -341,7 +390,7 @@ bool Train::TryIgniteCarTransportSlot(int slotIndex)
         return false;
 
     slot.engineOn        = true;
-    slot.injectSeconds   = 0.f;
+    slot.injectPulseAccum = 0.f;
     slot.engineGlowTimer = 1.35f;
     if (m_carInjectFocusSlot == slotIndex)
         m_carInjectFocusSlot = -1;
@@ -366,6 +415,364 @@ void Train::AppendCarTransportStraightChainArcs(std::vector<std::pair<Math::Vec2
             continue;
 
         outArcs.push_back({ CarTransportWorldCenter(a), CarTransportWorldCenter(b) });
+    }
+}
+
+void Train::AppendCarTransportPulseBranchArcs(std::vector<std::pair<Math::Vec2, Math::Vec2>>& outArcs,
+                                              Math::Vec2 pulseWorldCenter, float pulseRadius) const
+{
+    if (!m_carTransportDroneManager)
+        return;
+
+    const float    pulseR2     = pulseRadius * pulseRadius;
+    constexpr float kCarDroneMax   = 580.f;
+    const float     kCarDroneMaxSq = kCarDroneMax * kCarDroneMax;
+    constexpr float kDroneBranchMax   = 420.f;
+    const float     kDroneBranchMaxSq = kDroneBranchMax * kDroneBranchMax;
+
+    int          litSlot[kCarTransportCount];
+    Math::Vec2   litPos[kCarTransportCount];
+    int litCount = 0;
+    for (int s = 0; s < kCarTransportCount; ++s)
+    {
+        if (!m_carTransportSlots[static_cast<size_t>(s)].engineOn)
+            continue;
+        litSlot[litCount] = s;
+        litPos[litCount] = CarTransportWorldCenter(s);
+        ++litCount;
+    }
+    if (litCount == 0)
+        return;
+
+    const auto& drones = m_carTransportDroneManager->GetDrones();
+
+    struct NearD
+    {
+        size_t     idx{};
+        int        carSlot{};
+        Math::Vec2 carCenter{};
+        float      distCarSq{};
+        Math::Vec2 dronePos{};
+    };
+    std::vector<NearD> near;
+    near.reserve(drones.size());
+
+    for (size_t i = 0; i < drones.size(); ++i)
+    {
+        const Drone& d = drones[i];
+        if (d.IsDead())
+            continue;
+        const Math::Vec2 dp = d.GetPosition();
+        if ((dp - pulseWorldCenter).LengthSq() > pulseR2)
+            continue;
+
+        int   bestLitI = 0;
+        float bestD    = (dp - litPos[0]).LengthSq();
+        for (int L = 1; L < litCount; ++L)
+        {
+            const float dsq = (dp - litPos[L]).LengthSq();
+            if (dsq < bestD)
+            {
+                bestD    = dsq;
+                bestLitI = L;
+            }
+        }
+        if (bestD > kCarDroneMaxSq)
+            continue;
+        near.push_back({ i, litSlot[bestLitI], litPos[bestLitI], bestD, dp });
+    }
+    if (near.empty())
+        return;
+
+    std::sort(near.begin(), near.end(), [](const NearD& A, const NearD& B) {
+        if (A.carSlot != B.carSlot)
+            return A.carSlot < B.carSlot;
+        return A.distCarSq < B.distCarSq;
+    });
+
+    for (size_t i = 0; i < near.size(); ++i)
+    {
+        const NearD& nd = near[i];
+        outArcs.push_back({ nd.carCenter, nd.dronePos });
+
+        if (i + 1 < near.size())
+        {
+            const NearD& n2 = near[i + 1];
+            if (n2.carSlot == nd.carSlot)
+            {
+                const float bridgesq = (n2.dronePos - nd.dronePos).LengthSq();
+                if (bridgesq <= kDroneBranchMaxSq && bridgesq > 4.f)
+                    outArcs.push_back({ nd.dronePos, n2.dronePos });
+            }
+        }
+    }
+}
+
+void Train::ApplyPulseToTrainRobots(Math::Vec2 pulseWorldCenter, float radius)
+{
+    constexpr float kDamage            = 14.f;
+    constexpr float kImpulseCenter     = 900.f;
+    constexpr float kImpulseEdge       = 400.f;
+    constexpr float kRobotImpulseScale = 0.48f;
+    constexpr float kLift              = 135.f;
+
+    const float rSq = radius * radius;
+    for (auto& robot : m_robots)
+    {
+        if (robot.IsDead())
+            continue;
+        const Math::Vec2 pos = robot.GetPosition();
+        Math::Vec2       d   = pos - pulseWorldCenter;
+        const float      dSq = d.LengthSq();
+        if (dSq > rSq)
+            continue;
+        const float dist = std::sqrt(dSq);
+        float       t    = (dist < 0.1f) ? 1.f : (1.f - dist / (radius + 1.f));
+        t                = (std::max)(0.f, t);
+        const float      impulseMag = t * (kImpulseCenter - kImpulseEdge) + kImpulseEdge;
+        const Math::Vec2 dir        = (dist > 0.1f) ? (d * (1.f / dist)) : Math::Vec2{ 1.f, 0.f };
+        const Math::Vec2 impulse    = dir * (impulseMag * kRobotImpulseScale) + Math::Vec2{ 0.f, kLift };
+        robot.ApplyPulseImpact(impulse, kDamage);
+    }
+}
+
+float Train::GetTrainCarLocalLeftEdge(int carIndex1To5) const
+{
+    switch (carIndex1To5)
+    {
+    case 1: return 0.f;
+    case 2: return m_car1Width;
+    case 3: return m_car1Width + m_car2Width;
+    case 4: return m_car1Width + m_car2Width + m_car3Width;
+    case 5: return m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+    case 6: return m_totalTrainWidth;
+    default: return m_totalTrainWidth;
+    }
+}
+
+int Train::GetPlayerTrainCarIndex(Math::Vec2 worldHbCenter) const
+{
+    const float lx = worldHbCenter.x - MIN_X - m_trainOffset;
+    if (lx < 0.f || lx >= m_totalTrainWidth)
+        return 0;
+    if (lx < m_car1Width)
+        return 1;
+    if (lx < m_car1Width + m_car2Width)
+        return 2;
+    if (lx < m_car1Width + m_car2Width + m_car3Width)
+        return 3;
+    if (lx < m_car1Width + m_car2Width + m_car3Width + m_car4Width)
+        return 4;
+    return 5;
+}
+
+bool Train::IsTrainCarCombatCleared(int car1To5) const
+{
+    if (car1To5 < 1 || car1To5 > 5)
+        return true;
+
+    if (m_droneManager)
+    {
+        for (const auto& d : m_droneManager->GetDrones())
+            if (!d.IsDead() && d.GetTrainCarSegment() == car1To5)
+                return false;
+    }
+    if (car1To5 == 3 && m_sirenDroneManager)
+    {
+        for (const auto& d : m_sirenDroneManager->GetDrones())
+            if (!d.IsDead())
+                return false;
+    }
+    if (car1To5 == 4 && m_carTransportDroneManager)
+    {
+        for (const auto& d : m_carTransportDroneManager->GetDrones())
+            if (!d.IsDead())
+                return false;
+    }
+    for (const auto& r : m_robots)
+        if (!r.IsDead() && r.GetTrainCarSegment() == car1To5)
+            return false;
+    return true;
+}
+
+float Train::GetTrainCombatAdvanceCapWorldX() const
+{
+    for (int c = 1; c <= 5; ++c)
+    {
+        if (!IsTrainCarCombatCleared(c))
+            return MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(c + 1) - 38.f;
+    }
+    return 1.0e9f;
+}
+
+void Train::RequestTrainCameraShake(float maxPixelOffset)
+{
+    m_pendingTrainCameraShakePx = std::max(m_pendingTrainCameraShakePx, maxPixelOffset);
+}
+
+float Train::ConsumeTrainCameraShakeRequest()
+{
+    const float t                  = m_pendingTrainCameraShakePx;
+    m_pendingTrainCameraShakePx = 0.f;
+    return t;
+}
+
+void Train::DrawRobotTrainAlerts(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    for (const auto& robot : m_robots)
+    {
+        if (!robot.IsDead())
+            robot.DrawTrainDetectAlert(colorShader, debugRenderer);
+    }
+}
+
+void Train::TryDeckPatrolRobotJumpAndLandingShake(Robot& r, size_t robotIndex, float dt,
+                                                   const std::vector<ObstacleInfo>& tallCarObs, int playerTrainCar)
+{
+    if (r.IsDead() || !r.IsTrainDeckPatrol() || robotIndex >= m_trainDeckRobotWasAirborne.size())
+        return;
+    if (robotIndex >= m_trainDeckRobotJumpPrepT.size())
+        return;
+
+    const bool airborne = !r.IsOnGround() || r.GetVelocity().y > 95.f;
+    if (!airborne && m_trainDeckRobotWasAirborne[robotIndex])
+    {
+        if (playerTrainCar == r.GetTrainCarSegment() && robotIndex < m_trainDeckRobotUsedLandingShake.size()
+            && !m_trainDeckRobotUsedLandingShake[robotIndex])
+        {
+            RequestTrainCameraShake(22.f);
+            m_trainDeckRobotUsedLandingShake[robotIndex] = true;
+        }
+    }
+    m_trainDeckRobotWasAirborne[robotIndex] = airborne;
+
+    if (!r.IsOnGround())
+    {
+        m_trainDeckRobotJumpPrepT[robotIndex] = 0.f;
+        return;
+    }
+    if (r.GetVelocity().y > 25.f)
+        return;
+    if (std::abs(r.GetVelocity().x) < 22.f)
+    {
+        m_trainDeckRobotJumpPrepT[robotIndex] = 0.f;
+        return;
+    }
+
+    const int        seg    = r.GetTrainCarSegment();
+    const float      fwd    = (seg == 5) ? (r.GetSize().x * 0.32f + 92.f) : (r.GetSize().x * 0.32f + 62.f);
+    const float      dir    = r.GetDirectionX();
+    const Math::Vec2 rp     = r.GetPosition();
+    const float      probeX = rp.x + dir * fwd;
+    const Math::Vec2 probe{ probeX, rp.y };
+    const Math::Vec2 psz{ r.GetSize().x * 0.42f, r.GetSize().y * 0.68f };
+
+    bool           blocked        = false;
+    Math::Vec2     blockedCenter{};
+    const float    minObsH = (seg == 5) ? 48.f : 110.f;
+    for (const auto& o : tallCarObs)
+    {
+        if (o.size.y < minObsH)
+            continue;
+        if (!Collision::CheckAABB(probe, psz, o.pos, o.size))
+            continue;
+        blocked       = true;
+        blockedCenter = o.pos;
+        break;
+    }
+
+    constexpr float kJumpPrepSec = 0.36f;
+    float&          prep         = m_trainDeckRobotJumpPrepT[robotIndex];
+    if (!blocked)
+    {
+        prep = 0.f;
+        return;
+    }
+
+    prep += dt;
+    if (prep < kJumpPrepSec)
+        return;
+
+    prep         = 0.f;
+    Math::Vec2 v = r.GetVelocity();
+    // 장애물이 왼쪽/오른쪽 어디든, 수평으로 장애 쪽으로 밀어 올려 넘기기 (패트롤 방향과 반대면 옆으로만 튀는 문제 방지)
+    const float toObsX = blockedCenter.x - rp.x;
+    const float pushX =
+        (std::abs(toObsX) < 15.f) ? (dir * 420.f) : (std::copysign(420.f, toObsX));
+    if (seg == 5)
+    {
+        v.y = 1580.f;
+        v.x += pushX * 1.05f;
+    }
+    else if (seg == 1 || seg == 2)
+    {
+        v.y = 1500.f;
+        v.x += pushX * 1.08f;
+    }
+    else
+    {
+        v.y = 1380.f;
+        v.x += pushX;
+    }
+    r.SetVelocity(v);
+    m_trainDeckRobotWasAirborne[robotIndex] = true;
+}
+
+void Train::UpdateTrainDeckPatrolRobots(float dt, Player& player, Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize)
+{
+    (void)playerHitboxSize;
+    if (m_robots.empty())
+        return;
+
+    const float tl   = MIN_X + m_trainOffset;
+    const int   pcar = GetPlayerTrainCarIndex(playerHbCenter);
+
+    for (size_t ri = 0; ri < m_robots.size(); ++ri)
+    {
+        Robot& r = m_robots[ri];
+        if (r.IsDead() || !r.IsTrainDeckPatrol())
+            continue;
+
+        const int seg = r.GetTrainCarSegment();
+        if (seg != 1 && seg != 2 && seg != 5)
+            continue;
+
+        float carW = m_car1Width;
+        if (seg == 2)
+            carW = m_car2Width;
+        else if (seg == 5)
+            carW = m_car5Width;
+
+        const float carLocalL = GetTrainCarLocalLeftEdge(seg);
+        const float carWorldL = tl + carLocalL;
+        const float carWorldR = carWorldL + carW;
+
+        r.SetAllowTrainCombatVsPlayer(pcar == seg);
+
+        std::vector<ObstacleInfo> carTall;
+        carTall.reserve(8);
+        const float minHbH = (seg == 5) ? 68.f : 100.f;
+        for (const auto& hb : m_trainHitboxes)
+        {
+            if (!hb.collision)
+                continue;
+            if (hb.kind == TrainHitboxKind::JumpThroughPipe)
+                continue;
+            if (hb.size.y < minHbH)
+                continue;
+            Math::Vec2 world = { tl + hb.localCenter.x, MIN_Y + hb.localCenter.y };
+            const float wxL = world.x - hb.size.x * 0.5f;
+            const float wxR = world.x + hb.size.x * 0.5f;
+            if (wxR < carWorldL || wxL > carWorldR)
+                continue;
+            carTall.push_back({ world, hb.size });
+        }
+
+        r.SetUsePatrolWorldClamp(true);
+        r.SetPatrolWorldClamp(carWorldL + 90.f, carWorldR - 90.f);
+
+        r.Update(dt, player, carTall, carWorldL + 55.f, carWorldR - 55.f);
+        TryDeckPatrolRobotJumpAndLandingShake(r, ri, static_cast<float>(dt), carTall, pcar);
     }
 }
 
@@ -520,7 +927,7 @@ void Train::ApplyMooreConnectedPulseShare(Player& player, float dt)
 
 void Train::FireStraightLineChainDetonations()
 {
-    if (!m_droneManager)
+    if (!m_droneManager && !m_carTransportDroneManager)
         return;
 
     constexpr int pairCount = static_cast<int>(sizeof(kStraightCarPairs) / sizeof(kStraightCarPairs[0]));
@@ -535,12 +942,15 @@ void Train::FireStraightLineChainDetonations()
         const Math::Vec2 wa  = CarTransportWorldCenter(a);
         const Math::Vec2 wb  = CarTransportWorldCenter(b);
         const Math::Vec2 mid = { (wa.x + wb.x) * 0.5f, (wa.y + wb.y) * 0.5f };
-        m_droneManager->ApplyDetonation(mid, kChainDetonateRadius, kChainDetonateStun);
+        if (m_droneManager)
+            m_droneManager->ApplyDetonation(mid, kChainDetonateRadius, kChainDetonateStun);
+        if (m_carTransportDroneManager)
+            m_carTransportDroneManager->ApplyDetonation(mid, kChainDetonateRadius, kChainDetonateStun);
     }
 }
 
 void Train::UpdateCarTransport(float dt, Player& player, Math::Vec2 playerHbCenter,
-                               bool pulseAbsorbHeld, bool ignorePulseCost)
+                               bool injectHeld, bool ignorePulseCost, int forcedInjectSlot)
 {
     const float fdt = dt;
 
@@ -553,56 +963,98 @@ void Train::UpdateCarTransport(float dt, Player& player, Math::Vec2 playerHbCent
     ApplyMooreConnectedPulseShare(player, fdt);
 
     int focus = -1;
-    if (pulseAbsorbHeld)
+    if (forcedInjectSlot >= 0 && forcedInjectSlot < kCarTransportCount)
+    {
+        auto& fs = m_carTransportSlots[static_cast<size_t>(forcedInjectSlot)];
+        if (!fs.engineOn)
+        {
+            const Math::Vec2 w = CarTransportWorldCenter(forcedInjectSlot);
+            const float      d = (playerHbCenter - w).LengthSq();
+            if (d <= kCarInteractRangeSq)
+                focus = forcedInjectSlot;
+        }
+    }
+    if (focus < 0 && injectHeld)
         focus = FindCarTransportInjectTarget(playerHbCenter);
 
-    if (!pulseAbsorbHeld || focus < 0)
+    if (!injectHeld || focus < 0)
     {
         if (m_carInjectFocusSlot >= 0)
         {
-            m_carTransportSlots[static_cast<size_t>(m_carInjectFocusSlot)].injectSeconds = 0.f;
+            m_carTransportSlots[static_cast<size_t>(m_carInjectFocusSlot)].injectPulseAccum = 0.f;
             m_carInjectFocusSlot                                                             = -1;
         }
         return;
     }
 
     if (m_carInjectFocusSlot >= 0 && m_carInjectFocusSlot != focus)
-        m_carTransportSlots[static_cast<size_t>(m_carInjectFocusSlot)].injectSeconds = 0.f;
+        m_carTransportSlots[static_cast<size_t>(m_carInjectFocusSlot)].injectPulseAccum = 0.f;
 
     m_carInjectFocusSlot = focus;
     auto& slot           = m_carTransportSlots[static_cast<size_t>(focus)];
 
     if (slot.engineOn)
     {
-        slot.injectSeconds   = 0.f;
+        slot.injectPulseAccum = 0.f;
         m_carInjectFocusSlot = -1;
         return;
     }
 
-    Pulse& pulse = player.GetPulseCore().getPulse();
+    Pulse&        pulse       = player.GetPulseCore().getPulse();
+    const float   pulsePerSec = kCarTransportPulseInjectTotal / kCarTransportPulseInjectDuration;
+    const float   needPulse   = pulsePerSec * fdt;
 
     if (!ignorePulseCost)
     {
-        const float need = kCarInjectPulseDrainSec * fdt;
-        if (pulse.Value() < need)
+        if (pulse.Value() < needPulse)
         {
-            slot.injectSeconds   = 0.f;
+            slot.injectPulseAccum = 0.f;
             m_carInjectFocusSlot = -1;
             return;
         }
-        pulse.spend(need);
+        pulse.spend(needPulse);
     }
 
-    slot.injectSeconds += fdt;
-    if (slot.injectSeconds >= kCarInjectDurationSec)
+    slot.injectPulseAccum += needPulse;
+    if (slot.injectPulseAccum >= kCarTransportPulseInjectTotal)
     {
-        slot.engineOn      = true;
-        slot.injectSeconds = 0.f;
-        slot.engineGlowTimer = 1.35f;
-        m_carInjectFocusSlot = -1;
+        slot.engineOn         = true;
+        slot.injectPulseAccum = 0.f;
+        slot.engineGlowTimer  = 1.35f;
+        m_carInjectFocusSlot  = -1;
         FireStraightLineChainDetonations();
         Logger::Instance().Log(Logger::Severity::Info,
                                "Train: Car transport engine ON (slot %d)", focus);
+    }
+}
+
+void Train::UpdateCarTransportDrones(float dt, const Player& player, Math::Vec2 playerHitboxSize,
+                                     bool isPlayerHidingTrain)
+{
+    if (!m_carTransportDroneManager)
+        return;
+
+    const float        c4        = m_car1Width + m_car2Width + m_car3Width;
+    const float        trainLeft = MIN_X + m_trainOffset;
+    auto&              drones = m_carTransportDroneManager->GetDrones();
+    const Math::Vec2   pHb    = player.GetHitboxCenter();
+    const bool         inPulseBox = IsPlayerInCar2PurplePulseBox(pHb, playerHitboxSize);
+    const bool         undetect   = isPlayerHidingTrain || inPulseBox;
+
+    for (size_t i = 0; i < drones.size(); ++i)
+    {
+        Drone& d = drones[i];
+        if (static_cast<int>(i) < kCarTransportHoverDroneCount && d.IsCarTransportPersistHover())
+        {
+            const float lx = c4 + kCarTransportDronePixels[i].x;
+            const float ly = ASSUMED_IMG_HEIGHT - kCarTransportDronePixels[i].yTop;
+            d.SetCarTransportAnchorWorld({ trainLeft + lx, MIN_Y + ly });
+            d.SetCarTransportJamConfused(inPulseBox);
+        }
+        d.Update(dt, player, playerHitboxSize, undetect, false, 1.f);
+        if (static_cast<int>(i) < kCarTransportHoverDroneCount && d.IsCarTransportPersistHover() && !d.IsDead()
+            && !d.IsHit() && !d.IsCarTransportAggroChase())
+            d.SetCarTransportHover(true);
     }
 }
 
@@ -672,13 +1124,21 @@ void Train::Initialize()
     m_position = { MIN_X + m_totalTrainWidth * 0.5f, MIN_Y + HEIGHT * 0.5f };
 
     // --- Drone manager ---
-    m_droneManager       = std::make_unique<DroneManager>();
-    m_sirenDroneManager  = std::make_unique<DroneManager>();
+    m_droneManager                 = std::make_unique<DroneManager>();
+    m_sirenDroneManager            = std::make_unique<DroneManager>();
+    m_carTransportDroneManager     = std::make_unique<DroneManager>();
 
     m_car2EnterPromptTex = std::make_unique<Background>();
     m_car2LeavePromptTex = std::make_unique<Background>();
     m_car2EnterPromptTex->Initialize("Asset/Train/Enter.png");
     m_car2LeavePromptTex->Initialize("Asset/Train/Leave.png");
+
+    m_carTransportPulseLeftTex  = std::make_unique<Background>();
+    m_carTransportPulseRightTex = std::make_unique<Background>();
+    m_carTransportStartTex      = std::make_unique<Background>();
+    m_carTransportPulseLeftTex->Initialize("Asset/Train/PulseLine_Left.png");
+    m_carTransportPulseRightTex->Initialize("Asset/Train/PulseLine_Right.png");
+    m_carTransportStartTex->Initialize("Asset/Train/Start.png");
 
     // --- Build train hitboxes from known pixel coordinates ---
     BuildTrainHitboxes();
@@ -709,7 +1169,7 @@ void Train::Initialize()
 
     ApplyConfig(MapObjectConfig::Instance().GetData().train);
 
-    // 드론 10 / 로봇 3 — FourthTrain(물탱크) 구간 스크립트 전제 배치 (플레이어가 Car5 발판에 올라올 때까지 정지)
+    // 드론: 1~4호차 각 2기 + 5호차 6기; 1·2호차 덱 패트롤 로봇 + 5호차 덱 패트롤 로봇 3
     {
         for (auto& r : m_robots)
             r.Shutdown();
@@ -717,42 +1177,145 @@ void Train::Initialize()
         if (m_droneManager)
             m_droneManager->ClearAllDrones();
 
-        const float        c5      = m_car1Width + m_car2Width + m_car3Width + m_car4Width;
-        const TrainHitbox  deck5   = MakeHitbox(c5, 84, 804, 2472, 45);
+        const float        c5   = m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        constexpr float kLowY = Train::MIN_Y + 95.f + 88.f;
+        const float     deckSurfaceY = Train::MIN_Y + kTrainFlatbedDeckTopLocalY;
+        const float     highCarDroneHoverY =
+            m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f)
+                                 : (deckSurfaceY + 380.f);
 
-        constexpr float kLowDroneY = Train::MIN_Y + 95.f + 88.f;
-        const float kDroneXLocs[10] = {
-            c5 + 160.f,  c5 + 420.f,  c5 + 620.f,  c5 + 860.f,  c5 + 1080.f,
-            c5 + 1320.f, c5 + 1540.f, c5 + 1760.f, c5 + 1980.f, c5 + 2180.f
-        };
-
-        for (int i = 0; i < 10; ++i)
+        for (int carIdx = 1; carIdx <= 5; ++carIdx)
         {
-            const float x = MIN_X + kDroneXLocs[i];
-            const float y = kLowDroneY + std::sin(static_cast<float>(i) * 1.55f) * 18.f;
-            m_droneManager->SpawnDrone({ x, y }, "Asset/Drone.png", false).SetBaseSpeed(95.f);
+            const float l = GetTrainCarLocalLeftEdge(carIdx);
+            float       w = m_car5Width;
+            if (carIdx == 1)
+                w = m_car1Width;
+            else if (carIdx == 2)
+                w = m_car2Width;
+            else if (carIdx == 3)
+                w = m_car3Width;
+            else if (carIdx == 4)
+                w = m_car4Width;
+
+            if (carIdx == 5)
+            {
+                const float ySiren =
+                    m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f) : highCarDroneHoverY;
+                constexpr int kCar5DroneCount = 6;
+                for (int j = 0; j < kCar5DroneCount; ++j)
+                {
+                    const float t = (kCar5DroneCount <= 1) ? 0.5f
+                                                           : static_cast<float>(j) / static_cast<float>(kCar5DroneCount - 1);
+                    const float xj =
+                        MIN_X + l + w * (0.11f + t * 0.78f) + static_cast<float>((j * 19 + 2) % 9 - 4) * 7.f;
+                    const float yPh = static_cast<float>((j * 13 + 3) % 11 - 5); // 약 ±5
+                    Drone&      dj = m_droneManager->SpawnDrone({ xj, ySiren + yPh }, "Asset/Drone.png", false);
+                    dj.SetBaseSpeed(82.f + static_cast<float>(j % 7) * 6.5f);
+                    dj.SetTrainCarSegment(5);
+                }
+                continue;
+            }
+
+            const float xA = MIN_X + l + w * 0.28f;
+            const float xB = MIN_X + l + w * 0.72f;
+            float       yA = kLowY + 12.f;
+            float       yB = kLowY + 22.f;
+            if (carIdx == 1 || carIdx == 2)
+            {
+                yA = highCarDroneHoverY + 8.f;
+                yB = highCarDroneHoverY + 28.f;
+            }
+            else if (carIdx == 3 && m_car3SirenHbValid)
+            {
+                const float yAtSiren = MIN_Y + m_car3SirenHb.localCenter.y + 55.f;
+                yA                 = yAtSiren + 8.f;
+                yB                 = yAtSiren + 28.f;
+            }
+            Drone& da = m_droneManager->SpawnDrone({ xA, yA }, "Asset/Drone.png", false);
+            da.SetBaseSpeed(95.f);
+            da.SetTrainCarSegment(carIdx);
+            Drone& db = m_droneManager->SpawnDrone({ xB, yB }, "Asset/Drone.png", false);
+            db.SetBaseSpeed(95.f);
+            db.SetTrainCarSegment(carIdx);
         }
 
-        const float railFoot = Train::MIN_Y + 95.f;
+        m_robots.emplace_back();
+        {
+            Robot&      rr        = m_robots.back();
+            const float car1MidX  = MIN_X + m_car1Width * 0.52f;
+            rr.Init({ car1MidX, deckSurfaceY + 260.f });
+            const float car1RobotY = deckSurfaceY + rr.GetSize().y * 0.5f;
+            rr.SetPosition({ car1MidX, car1RobotY });
+            rr.SetTrainCarSegment(1);
+            rr.SetTrainDeckPatrol(true);
+            rr.SetGroundLimitY(deckSurfaceY);
+            rr.SetSpawnPosition(rr.GetPosition());
+        }
+
+        m_robots.emplace_back();
+        {
+            Robot&      rr        = m_robots.back();
+            const float car2MidX  = MIN_X + m_car1Width + m_car2Width * 0.5f;
+            rr.Init({ car2MidX, deckSurfaceY + 260.f });
+            const float car2RobotY = deckSurfaceY + rr.GetSize().y * 0.5f;
+            rr.SetPosition({ car2MidX, car2RobotY });
+            rr.SetTrainCarSegment(2);
+            rr.SetTrainDeckPatrol(true);
+            rr.SetGroundLimitY(deckSurfaceY);
+            rr.SetSpawnPosition(rr.GetPosition());
+        }
+
         for (int i = 0; i < 3; ++i)
         {
             m_robots.emplace_back();
-            Robot& rr = m_robots.back();
-            rr.Init({ MIN_X + c5 + 400.f, railFoot + 120.f });
-            const float cx = MIN_X + c5 + 520.f + static_cast<float>(i) * 260.f;
-            const float cy = railFoot + rr.GetSize().y * 0.5f;
+            Robot&      rr       = m_robots.back();
+            const float staggerY = static_cast<float>(i - 1) * 12.f;
+            const float phaseX   = static_cast<float>(i - 1) * 16.f;
+            const float cx =
+                MIN_X + c5 + m_car5Width - 92.f - static_cast<float>(i) * 126.f + phaseX;
+            rr.Init({ cx, deckSurfaceY + 260.f });
+            const float cy = deckSurfaceY + rr.GetSize().y * 0.5f + staggerY;
             rr.SetPosition({ cx, cy });
-            rr.ApplyUndergroundDifficultyBoost();
-            rr.SetGroundLimitY(Train::MIN_Y + 85.f);
+            rr.SetTrainCarSegment(5);
+            rr.SetTrainDeckPatrol(true);
+            rr.SetGroundLimitY(deckSurfaceY);
+            rr.SetSpawnPosition(rr.GetPosition());
         }
+
+        m_trainDeckRobotWasAirborne.assign(m_robots.size(), false);
+        m_trainDeckRobotJumpPrepT.assign(m_robots.size(), 0.f);
+        m_trainDeckRobotUsedLandingShake.assign(m_robots.size(), false);
 
         m_droneWaterCd.assign(m_droneManager->GetDrones().size(), 0.f);
         m_robotWaterCd.assign(m_robots.size(), 0.f);
+
+        if (m_carTransportDroneManager)
+        {
+            m_carTransportDroneManager->ClearAllDrones();
+            const float c4sum = m_car1Width + m_car2Width + m_car3Width;
+            for (int i = 0; i < kCarTransportHoverDroneCount; ++i)
+            {
+                const float lx = c4sum + kCarTransportDronePixels[i].x;
+                const float ly = ASSUMED_IMG_HEIGHT - kCarTransportDronePixels[i].yTop;
+                const float wx = MIN_X + lx;
+                const float wy = MIN_Y + ly;
+                Drone&      dd = m_carTransportDroneManager->SpawnDrone({ wx, wy }, "Asset/Drone.png", false);
+                dd.SetBaseSpeed(0.f);
+                dd.SetCarTransportPersistHover(true);
+                dd.SetCarTransportBobPhase(static_cast<float>(i) * 0.71f);
+                dd.SetTrainCarSegment(4);
+            }
+            m_carTransportDroneWaterCd.assign(m_carTransportDroneManager->GetDrones().size(), 0.f);
+        }
     }
 
     m_prevTrainOffsetActors = m_trainOffset;
     m_car5EncounterActive     = false;
     m_encounterScriptTime     = 0.f;
+    m_trainDeckRobotWasAirborne.assign(m_robots.size(), false);
+    m_trainDeckRobotJumpPrepT.assign(m_robots.size(), 0.f);
+    m_trainDeckRobotUsedLandingShake.assign(m_robots.size(), false);
+    m_pendingTrainCameraShakePx = 0.f;
 
     Logger::Instance().Log(Logger::Severity::Info,
         "Train Map initialized – car widths: %.0f / %.0f / %.0f / %.0f / %.0f (total %.0f), rail tile: %.0f — drones %zu robots %zu",
@@ -1198,6 +1761,39 @@ void Train::ApplyValveWaterDamageToEnemies(float dt)
         }
     }
 
+    if (m_carTransportDroneManager)
+    {
+        auto& ctd = m_carTransportDroneManager->GetDrones();
+        for (size_t i = 0; i < ctd.size(); ++i)
+        {
+            auto& d = ctd[i];
+            if (d.IsDead())
+                continue;
+
+            if (i < m_carTransportDroneWaterCd.size() && m_carTransportDroneWaterCd[i] > 0.0f)
+                m_carTransportDroneWaterCd[i] -= dt;
+
+            if (i < m_carTransportDroneWaterCd.size() && m_carTransportDroneWaterCd[i] > 0.0f)
+                continue;
+
+            const bool wet = hitsWater(d.GetPosition(), d.GetSize(), 36.0f)
+                             || inSprayBand(d.GetPosition(), d.GetSize());
+            if (!wet)
+                continue;
+
+            Math::Vec2 wp = d.GetPosition();
+            wp.x += 280.f;
+            d.SetPosition(wp);
+            d.SetCarTransportPersistHover(false);
+            d.SetCarTransportHover(false);
+            d.SetVelocity({ 0.f, 0.f });
+            const float dmg = d.GetMaxHP() * 0.80f;
+            d.TakeDamage(dmg);
+            if (i < m_carTransportDroneWaterCd.size())
+                m_carTransportDroneWaterCd[i] = 1.15f;
+        }
+    }
+
     for (size_t i = 0; i < m_robots.size(); ++i)
     {
         auto& r = m_robots[i];
@@ -1237,6 +1833,12 @@ void Train::ApplyTrainMotionToDronesAndRobots(float deltaTrainX)
     if (m_sirenDroneManager)
     {
         for (auto& d : m_sirenDroneManager->GetDrones())
+            d.SetPosition(d.GetPosition() + Math::Vec2{ deltaTrainX, 0.f });
+    }
+
+    if (m_carTransportDroneManager)
+    {
+        for (auto& d : m_carTransportDroneManager->GetDrones())
             d.SetPosition(d.GetPosition() + Math::Vec2{ deltaTrainX, 0.f });
     }
 
@@ -1282,19 +1884,23 @@ void Train::TryActivateCar5Encounter(Math::Vec2 hbCenter, Math::Vec2 hbSize)
     m_car5EncounterActive = true;
     m_encounterScriptTime = 0.f;
 
-    // 로봇을 레일 바닥 근처에 두고(Robot::Update — Underground AI) 벽·차체에 막히면 점프해 탑승.
+    // 로봇: 덱 패트롤(1·2·5호차)은 유지 — 레일 재배치는 그 외만
     if (!m_robots.empty())
     {
-        const float tl   = MIN_X + m_trainOffset;
-        const float c5L  = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
-        const float rail = Train::MIN_Y + 95.f;
+        const float tl      = MIN_X + m_trainOffset;
+        const float c4Right = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        const float rail    = Train::MIN_Y + 95.f;
+        int railSlot = 0;
         for (size_t i = 0; i < m_robots.size(); ++i)
         {
             Robot& rr = m_robots[i];
-            const float cx = c5L + 280.f + static_cast<float>(i) * 240.f;
+            if (rr.IsTrainDeckPatrol())
+                continue;
+            const float cx = c4Right - 95.f - static_cast<float>(railSlot) * 158.f;
             const float cy = rail + rr.GetSize().y * 0.5f;
             rr.SetPosition({ cx, cy });
             rr.SetGroundLimitY(Train::MIN_Y + 85.f);
+            ++railSlot;
         }
     }
     Logger::Instance().Log(Logger::Severity::Event, "Train: FourthTrain deck encounter activated");
@@ -1322,11 +1928,13 @@ void Train::AssistRobotRailJumpTowardTrain(Robot& robot, const Player& player, f
     if (st != RobotState::Chase && st != RobotState::Patrol && st != RobotState::Windup && st != RobotState::Recover)
         return;
 
-    if (std::abs(robot.GetVelocity().x) > 40.f)
+    if (std::abs(robot.GetVelocity().x) > 72.f)
         return;
 
-    Math::Vec2 v = robot.GetVelocity();
-    v.y          = 980.f;
+    const float dx = pp.x - rp.x;
+    Math::Vec2  v  = robot.GetVelocity();
+    v.x            = std::clamp(dx * 0.19f, -88.f, 88.f);
+    v.y            = 695.f;
     robot.SetVelocity(v);
 }
 
@@ -1357,6 +1965,8 @@ void Train::UpdateTrainRobotsAI(float dt, Player& player)
     {
         if (r.IsDead())
             continue;
+        if (r.IsTrainDeckPatrol())
+            continue;
 
         r.SetGroundLimitY(Train::MIN_Y + 85.f);
 
@@ -1371,6 +1981,9 @@ void Train::UpdateTrainRobotsAI(float dt, Player& player)
             r.SetPosition(p);
             continue;
         }
+
+        const int pcar = GetPlayerTrainCarIndex(player.GetHitboxCenter());
+        r.SetAllowTrainCombatVsPlayer(pcar == r.GetTrainCarSegment());
 
         r.Update(dt, player, obstacleInfos, mapMinX, mapMaxX);
         AssistRobotRailJumpTowardTrain(r, player, dt);
@@ -1405,14 +2018,17 @@ void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter,
 
     if (m_car3SirenActive)
     {
-        m_car3SirenSpawnTimer += dt;
-        if (m_car3SirenSpawnTimer >= 2.4f && m_sirenDroneManager->GetDrones().size() < 14)
+        const bool playerOnCar3 = (GetPlayerTrainCarIndex(playerHbCenter) == 3);
+        if (playerOnCar3)
+            m_car3SirenSpawnTimer += static_cast<float>(dt);
+        if (playerOnCar3 && m_car3SirenSpawnTimer >= 2.4f && m_sirenDroneManager->GetDrones().size() < 14)
         {
             m_car3SirenSpawnTimer = 0.f;
             const Math::Vec2 spawnPos = { sirenW.x + 25.f, sirenW.y + 55.f };
             Drone& d = m_sirenDroneManager->SpawnDrone(spawnPos, "Asset/Drone.png", true);
             d.SetBaseSpeed(185.f);
             d.SetSirenMapDrone(true);
+            d.SetTrainCarSegment(3);
         }
 
         if (attackHeld && inInjectRange && cursorOnSiren)
@@ -1444,7 +2060,11 @@ void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter,
         IsPlayerHiding(playerHbCenter, playerHitboxSize, player.IsCrouching())
         || IsPlayerInCar2PurplePulseBox(playerHbCenter, playerHitboxSize);
     const float chaseMul = m_car3SirenActive ? 1.f : kPostSirenChaseMul;
-    m_sirenDroneManager->Update(dt, player, playerHitboxSize, hideForSiren, true, chaseMul);
+    const float speedRatio =
+        (TRAIN_SPEED > 0.f) ? std::clamp(m_trainCurrentSpeed / TRAIN_SPEED, 0.f, 1.f) : 0.f;
+    constexpr float kSirenTracerTrainAssistK = 0.42f;
+    const float     trainAssist              = 1.f + kSirenTracerTrainAssistK * speedRatio;
+    m_sirenDroneManager->Update(dt, player, playerHitboxSize, hideForSiren, true, chaseMul, trainAssist);
 }
 
 
@@ -1737,6 +2357,56 @@ void Train::DrawCar3SirenProgressGauge(Shader& colorShader, Math::Vec2 cameraPos
 }
 
 
+void Train::DrawCarTransportInjectProgressGauge(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
+{
+    if (!m_skyVAO)
+        return;
+    if (m_carInjectFocusSlot < 0 || m_carInjectFocusSlot >= kCarTransportCount)
+        return;
+
+    const auto& slot = m_carTransportSlots[static_cast<size_t>(m_carInjectFocusSlot)];
+    if (slot.engineOn)
+        return;
+
+    const float trainLeft = MIN_X + m_trainOffset;
+    const Math::Vec2 posC = { trainLeft + slot.localCenter.x, MIN_Y + slot.localCenter.y };
+    const Math::Vec2 half = slot.halfSize;
+
+    const float barW            = 10.0f;
+    const float barH            = std::min(110.0f, std::max(44.0f, half.y * 2.f * 0.9f));
+    const float padY            = 10.0f;
+    const float horizNudgeRight = 38.0f;
+    const float vertNudgeDown   = -8.0f;
+
+    const float rx = posC.x + half.x;
+    const float ty = posC.y + half.y;
+    const float barCenterX = rx - 10.0f - barW * 0.5f + horizNudgeRight;
+    const float innerTopY    = ty + padY + vertNudgeDown;
+    const float innerCenterY = innerTopY - barH * 0.5f;
+
+    const float visLeft  = cameraPos.x - viewHalfW - 400.f;
+    const float visRight = cameraPos.x + viewHalfW + 400.f;
+    if (barCenterX < visLeft || barCenterX > visRight)
+        return;
+
+    colorShader.use();
+
+    const Math::Vec2 bgSize = { barW + 6.0f, barH + 6.0f };
+    DrawFilledQuad(colorShader, { barCenterX, innerCenterY }, bgSize, 0.2f, 0.2f, 0.2f, 1.0f);
+
+    DrawFilledQuad(colorShader, { barCenterX, innerCenterY }, { barW, barH }, 0.14f, 0.14f, 0.18f, 1.0f);
+
+    const float t     = std::clamp(slot.injectPulseAccum / kCarTransportPulseInjectTotal, 0.f, 1.f);
+    const float fillH = barH * t;
+    if (fillH > 0.5f)
+    {
+        const float innerBottomY = innerTopY - barH;
+        const float fillCenterY  = innerBottomY + fillH * 0.5f;
+        DrawFilledQuad(colorShader, { barCenterX, fillCenterY }, { barW, fillH }, 0.25f, 0.85f, 1.0f, 1.0f);
+    }
+}
+
+
 void Train::UpdateTrainEncounterScript(float dt, Player& player)
 {
     if (!m_car5EncounterActive)
@@ -1746,25 +2416,32 @@ void Train::UpdateTrainEncounterScript(float dt, Player& player)
     const float                 trainRight = tl + m_totalTrainWidth;
     const bool                  fleeWater = (m_valvePressureT > 0.10f);
     const Math::Vec2          ppos      = player.GetHitboxCenter();
-    constexpr float             kApproach = 102.f;
+    constexpr float kCar5DroneApproach = 52.f;
 
     if (m_droneManager)
     {
         auto& drones = m_droneManager->GetDrones();
         const float c5L = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
         const float c5R = c5L + m_car5Width;
-        const float formationCenter = std::clamp(ppos.x, c5L + 260.f, c5R - 260.f);
-        const float formationSpacing = 150.f;
+        const float formationCenter     = std::clamp(ppos.x, c5L + 260.f, c5R - 260.f);
+        const float formationSpacingBase = 142.f;
+        const float car5HoverY =
+            m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f)
+                               : (Train::MIN_Y + kTrainFlatbedDeckTopLocalY + 380.f);
         for (size_t i = 0; i < drones.size(); ++i)
         {
             auto& d = drones[i];
             if (d.IsDead())
                 continue;
+            if (d.IsHit() || d.IsStunned())
+                continue;
+            if (d.GetTrainCarSegment() != 5)
+                continue;
 
             Math::Vec2 pos = d.GetPosition();
-            const float bob =
-                std::sin(m_encounterScriptTime * 2.45f + static_cast<float>(i) * 0.73f) * 22.f;
-            const float lowY = Train::MIN_Y + 95.f + 82.f + bob;
+            const float bobY =
+                std::sin(m_encounterScriptTime * 2.45f + static_cast<float>(i) * 0.73f) * 5.f;
+            const float hoverY = car5HoverY + bobY;
 
             float dx = 0.f;
             if (fleeWater)
@@ -1777,16 +2454,18 @@ void Train::UpdateTrainEncounterScript(float dt, Player& player)
             }
             else
             {
-                const float slot = static_cast<float>(i) - static_cast<float>(drones.size() - 1) * 0.5f;
-                const float desiredX = std::clamp(formationCenter + slot * formationSpacing, c5L + 120.f, c5R - 120.f);
-                dx = std::clamp(desiredX - pos.x, -kApproach * dt, kApproach * dt);
+                const float spacing  = formationSpacingBase + static_cast<float>(i % 5) * 13.f;
+                const float slot     = static_cast<float>(i) - static_cast<float>(drones.size() - 1) * 0.5f;
+                const float desiredX = std::clamp(formationCenter + slot * spacing, c5L + 120.f, c5R - 120.f);
+                const float ap       = kCar5DroneApproach + static_cast<float>(i % 4) * 8.f;
+                dx                   = std::clamp(desiredX - pos.x, -ap * dt, ap * dt);
             }
 
             pos.x += dx;
-            pos.y = lowY;
+            pos.y = hoverY;
             d.SetPosition(pos);
             d.SetVelocity({ 0.f, 0.f });
-            d.SetBaseSpeed(95.f);
+            d.SetBaseSpeed(86.f + static_cast<float>(i % 7) * 6.f);
         }
     }
 
@@ -2046,8 +2725,9 @@ static bool ResolveAABB(Player& player, Math::Vec2& currentHbCenter,
 // Update
 // ---------------------------------------------------------------------------
 void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
-                   bool pulseAbsorbHeld, bool ignoreCarInjectPulseCost,
-                   bool attackHeld, bool attackTriggered, Math::Vec2 mouseWorldPos)
+                   bool pulseAbsorbHeld, bool carTransportInjectHeld, bool ignoreCarInjectPulseCost,
+                   bool attackHeld, bool attackTriggered, Math::Vec2 mouseWorldPos,
+                   int carTransportInjectForcedSlot)
 {
     const float fdt = static_cast<float>(dt);
     m_encounterScriptTime += fdt;
@@ -2116,33 +2796,120 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     const bool isPlayerHiding = IsPlayerHiding(player.GetHitboxCenter(), playerHitboxSize, player.IsCrouching());
     player.SetHiding(isPlayerHiding);
 
+    UpdateCarTransportDrones(fdt, player, playerHitboxSize, isPlayerHiding);
+
+    UpdateTrainDeckPatrolRobots(fdt, player, player.GetHitboxCenter(), playerHitboxSize);
+
+    if (m_droneManager)
+        m_droneManager->Update(fdt, player, playerHitboxSize, isPlayerHiding, false, 1.f);
+
     if (m_car5EncounterActive)
         UpdateTrainEncounterScript(fdt, player);
     else if (m_droneManager)
     {
-        // 인카운터 전: Car5 드론은 저공 호버링 + 플레이어(히트박스) 방향으로 일정 속도 추적.
-        auto& drones = m_droneManager->GetDrones();
-        const float baseY = Train::MIN_Y + 95.f + 82.f;
-        const float tl = MIN_X + m_trainOffset;
-        const float c5L = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
-        const float c5R = c5L + m_car5Width;
+        // 인카운터 전: 1·2호차·3호차(사이렌 칸) 드론은 사이렌 높이 근처 + 칸 안 X 추적, 4호차 저공 호버, 5호차 성형
+        auto&          drones = m_droneManager->GetDrones();
+        const float    baseY = Train::MIN_Y + 95.f + 82.f;
+        const float    tl    = MIN_X + m_trainOffset;
+        const float    c5L   = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        const float    c5R   = c5L + m_car5Width;
         const Math::Vec2 pTarget = player.GetHitboxCenter();
-        constexpr float kPreApproach = 90.f;
-        const float formationCenter = std::clamp(pTarget.x, c5L + 260.f, c5R - 260.f);
-        const float formationSpacing = 160.f;
+        constexpr float kCar12DroneTrackSpeed = 42.f;
+        const float     car12DroneHoverBase =
+            m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f)
+                               : (Train::MIN_Y + kTrainFlatbedDeckTopLocalY + 380.f);
+        const float car3DroneHoverBase =
+            m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f) : car12DroneHoverBase;
+
         for (size_t i = 0; i < drones.size(); ++i)
         {
             auto& d = drones[i];
             if (d.IsDead())
                 continue;
-            Math::Vec2 p = d.GetPosition();
-            const float slot = static_cast<float>(i) - static_cast<float>(drones.size() - 1) * 0.5f;
-            const float desiredX = std::clamp(formationCenter + slot * formationSpacing, c5L + 120.f, c5R - 120.f);
-            p.x = std::clamp(p.x + std::clamp(desiredX - p.x, -kPreApproach * fdt, kPreApproach * fdt), c5L + 120.f, c5R - 120.f);
-            p.y = baseY + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 18.f;
-            d.SetPosition(p);
-            d.SetVelocity({ 0.f, 0.f });
-            d.SetBaseSpeed(95.f);
+            if (d.IsHit() || d.IsStunned())
+                continue;
+            const int seg = d.GetTrainCarSegment();
+            if (seg == 1)
+            {
+                const float car1L = tl + 120.f;
+                const float car1R = tl + m_car1Width - 120.f;
+                const float hoverY =
+                    car12DroneHoverBase
+                    + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 14.f;
+                Math::Vec2 p = d.GetPosition();
+                const float desiredX = std::clamp(pTarget.x, car1L, car1R);
+                p.x                  = std::clamp(
+                    p.x + std::clamp(desiredX - p.x, -kCar12DroneTrackSpeed * fdt, kCar12DroneTrackSpeed * fdt),
+                    car1L, car1R);
+                p.y = hoverY;
+                d.SetPosition(p);
+                d.SetVelocity({ 0.f, 0.f });
+                d.SetBaseSpeed(95.f);
+                continue;
+            }
+            if (seg == 2)
+            {
+                const float car2L = tl + m_car1Width + 120.f;
+                const float car2R = tl + m_car1Width + m_car2Width - 120.f;
+                const float hoverY =
+                    car12DroneHoverBase
+                    + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 14.f;
+                Math::Vec2 p = d.GetPosition();
+                const float desiredX = std::clamp(pTarget.x, car2L, car2R);
+                p.x                  = std::clamp(
+                    p.x + std::clamp(desiredX - p.x, -kCar12DroneTrackSpeed * fdt, kCar12DroneTrackSpeed * fdt),
+                    car2L, car2R);
+                p.y = hoverY;
+                d.SetPosition(p);
+                d.SetVelocity({ 0.f, 0.f });
+                d.SetBaseSpeed(95.f);
+                continue;
+            }
+            if (seg == 3)
+            {
+                const float car3L = tl + m_car1Width + m_car2Width + 120.f;
+                const float car3R = tl + m_car1Width + m_car2Width + m_car3Width - 120.f;
+                const float hoverY =
+                    car3DroneHoverBase
+                    + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 14.f;
+                Math::Vec2 p = d.GetPosition();
+                const float desiredX = std::clamp(pTarget.x, car3L, car3R);
+                p.x                  = std::clamp(
+                    p.x + std::clamp(desiredX - p.x, -kCar12DroneTrackSpeed * fdt, kCar12DroneTrackSpeed * fdt),
+                    car3L, car3R);
+                p.y = hoverY;
+                d.SetPosition(p);
+                d.SetVelocity({ 0.f, 0.f });
+                d.SetBaseSpeed(95.f);
+                continue;
+            }
+            if (seg == 4)
+            {
+                Math::Vec2 p = d.GetPosition();
+                p.y          = baseY + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 20.f;
+                d.SetPosition(p);
+                d.SetVelocity({ 0.f, 0.f });
+                d.SetBaseSpeed(95.f);
+                continue;
+            }
+            if (seg == 5)
+            {
+                const float ySiren =
+                    m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f) : car12DroneHoverBase;
+                const float hoverY =
+                    ySiren + std::sin(m_encounterScriptTime * 2.2f + static_cast<float>(i) * 0.61f) * 5.f;
+                Math::Vec2 p = d.GetPosition();
+                const float desiredX = std::clamp(pTarget.x, c5L + 100.f, c5R - 100.f);
+                const float ap       = 34.f + static_cast<float>(i % 5) * 6.f;
+                p.x                  = std::clamp(
+                    p.x + std::clamp(desiredX - p.x, -ap * fdt, ap * fdt),
+                    c5L + 100.f, c5R - 100.f);
+                p.y = hoverY;
+                d.SetPosition(p);
+                d.SetVelocity({ 0.f, 0.f });
+                d.SetBaseSpeed(88.f + static_cast<float>(i % 6) * 5.5f);
+                continue;
+            }
         }
     }
 
@@ -2263,7 +3030,8 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     if (!playerOnTrainSurface)
         player.SetOnGround(false);
 
-    UpdateCarTransport(fdt, player, currentHbCenter, pulseAbsorbHeld, ignoreCarInjectPulseCost);
+    UpdateCarTransport(fdt, player, currentHbCenter, carTransportInjectHeld, ignoreCarInjectPulseCost,
+                       carTransportInjectForcedSlot);
 
     // --- Entry countdown → automatic departure ---
     if (m_entryTimer >= 0.0f && m_trainState == TrainState::Stationary)
@@ -2307,6 +3075,19 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             player.SetPosition(player.GetPosition() + Math::Vec2{ move, 0.0f });
     }
 
+    // --- Train combat progression: 클리어 전에는 다음 칸 경계에서 막음 ---
+    currentHbCenter = player.GetHitboxCenter();
+    {
+        const float capWorldX = GetTrainCombatAdvanceCapWorldX();
+        if (currentHbCenter.x > capWorldX)
+        {
+            const float dx = capWorldX - currentHbCenter.x;
+            Math::Vec2 pp = player.GetPosition();
+            player.SetPosition({ pp.x + dx, pp.y });
+            currentHbCenter = player.GetHitboxCenter();
+        }
+    }
+
     // --- Left map boundary ---
     currentHbCenter = player.GetHitboxCenter();
     if (currentHbCenter.x - playerHalfSize.x < MIN_X)
@@ -2346,9 +3127,15 @@ void Train::StartEntryTimer()
         m_valveWaterParticles.clear();
         m_car5EncounterActive     = false;
         m_encounterScriptTime     = 0.f;
+        m_trainDeckRobotWasAirborne.assign(m_robots.size(), false);
+        m_trainDeckRobotJumpPrepT.assign(m_robots.size(), 0.f);
+        m_trainDeckRobotUsedLandingShake.assign(m_robots.size(), false);
+        m_pendingTrainCameraShakePx = 0.f;
         m_prevTrainOffsetActors   = m_trainOffset;
         if (!m_droneWaterCd.empty())
             std::fill(m_droneWaterCd.begin(), m_droneWaterCd.end(), 0.f);
+        if (!m_carTransportDroneWaterCd.empty())
+            std::fill(m_carTransportDroneWaterCd.begin(), m_carTransportDroneWaterCd.end(), 0.f);
         if (!m_robotWaterCd.empty())
             std::fill(m_robotWaterCd.begin(), m_robotWaterCd.end(), 0.f);
         m_car2HidePhase        = Car2HidePhase::None;
@@ -2524,6 +3311,65 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
 
 
 // ---------------------------------------------------------------------------
+// DrawCarTransportOverlays — 시동 ON: PulseLine 스프라이트 / 시동 OFF: Start.png
+// ---------------------------------------------------------------------------
+void Train::DrawCarTransportOverlays(Shader& textureShader, Math::Vec2 cameraPos, float viewHalfW) const
+{
+    float halfW = (viewHalfW > 300.0f) ? viewHalfW : 300.0f;
+    const float margin   = 900.0f;
+    const float visLeft  = cameraPos.x - halfW - margin;
+    const float visRight = cameraPos.x + halfW + margin;
+    const float trainLeft = MIN_X + m_trainOffset;
+
+    textureShader.use();
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+    textureShader.setFloat("alpha", 1.0f);
+
+    for (int i = 0; i < kCarTransportCount; ++i)
+    {
+        const auto& slot = m_carTransportSlots[static_cast<size_t>(i)];
+        const Math::Vec2 wc = { trainLeft + slot.localCenter.x, MIN_Y + slot.localCenter.y };
+        if (wc.x + slot.halfSize.x < visLeft || wc.x - slot.halfSize.x > visRight)
+            continue;
+
+        if (slot.engineOn && !slot.skipPulseLineOverlay)
+        {
+            const bool useLeft = (i == 2);
+            Background* tex = useLeft ? m_carTransportPulseLeftTex.get() : m_carTransportPulseRightTex.get();
+            if (!tex || tex->GetWidth() <= 0)
+                continue;
+
+            // ─── PulseLine 오버레이 월드 좌표 (시각 조정용) ─────────────────────
+            // 기준점 wc = CarTransportWorldCenter(i) 와 동일 — 슬롯 히트박스 중심.
+            // 펄스 스프라이트 **중심** 최종 위치: ( wc.x + 오프셋X, wc.y )
+            // 요청 오프셋: Left 텍스처 -30, Right 텍스처 -24 (차 중심 대비 X만).
+            const float ox = useLeft ? -30.f : -24.f;
+            const Math::Vec2 pulseCenter{ wc.x + ox, wc.y };
+
+            const float      carW      = slot.halfSize.x * 2.f;
+            const float      scaleW    = carW * 0.98f;
+            const float      texAspect = static_cast<float>(tex->GetHeight()) / static_cast<float>(tex->GetWidth());
+            const Math::Vec2 scale{ scaleW, scaleW * texAspect };
+
+            const Math::Matrix model =
+                Math::Matrix::CreateTranslation(pulseCenter) * Math::Matrix::CreateScale(scale);
+            tex->Draw(textureShader, model);
+        }
+        else if (!slot.engineOn && m_carTransportStartTex && m_carTransportStartTex->GetWidth() > 0)
+        {
+            constexpr float iconW = 110.f;
+            const float     aspect = static_cast<float>(m_carTransportStartTex->GetHeight())
+                                 / static_cast<float>(m_carTransportStartTex->GetWidth());
+            const Math::Matrix model =
+                Math::Matrix::CreateTranslation(wc) * Math::Matrix::CreateScale({ iconW, iconW * aspect });
+            m_carTransportStartTex->Draw(textureShader, model);
+        }
+    }
+}
+
+
+// ---------------------------------------------------------------------------
 // DrawCarTransportVFX — 시동된 차량 상단 펄스 라이트(플레이스홀더)
 // ---------------------------------------------------------------------------
 void Train::DrawCarTransportVFX(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
@@ -2681,6 +3527,8 @@ void Train::DrawDrones(Shader& shader) const
 {
     if (m_droneManager)
         m_droneManager->Draw(shader);
+    if (m_carTransportDroneManager)
+        m_carTransportDroneManager->Draw(shader);
     if (m_sirenDroneManager)
         m_sirenDroneManager->Draw(shader);
 }
@@ -2689,6 +3537,8 @@ void Train::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) 
 {
     if (m_droneManager)
         m_droneManager->DrawRadars(colorShader, debugRenderer);
+    if (m_carTransportDroneManager)
+        m_carTransportDroneManager->DrawRadars(colorShader, debugRenderer);
     if (m_sirenDroneManager)
         m_sirenDroneManager->DrawRadars(colorShader, debugRenderer);
 }
@@ -2697,6 +3547,8 @@ void Train::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     if (m_droneManager)
         m_droneManager->DrawGauges(colorShader, debugRenderer);
+    if (m_carTransportDroneManager)
+        m_carTransportDroneManager->DrawGauges(colorShader, debugRenderer);
     if (m_sirenDroneManager)
         m_sirenDroneManager->DrawGauges(colorShader, debugRenderer);
     for (const auto& robot : m_robots)
@@ -2778,6 +3630,8 @@ void Train::Shutdown()
 
     if (m_droneManager)
         m_droneManager->Shutdown();
+    if (m_carTransportDroneManager)
+        m_carTransportDroneManager->Shutdown();
     if (m_sirenDroneManager)
         m_sirenDroneManager->Shutdown();
 
@@ -2785,6 +3639,12 @@ void Train::Shutdown()
         m_car2EnterPromptTex->Shutdown();
     if (m_car2LeavePromptTex)
         m_car2LeavePromptTex->Shutdown();
+    if (m_carTransportPulseLeftTex)
+        m_carTransportPulseLeftTex->Shutdown();
+    if (m_carTransportPulseRightTex)
+        m_carTransportPulseRightTex->Shutdown();
+    if (m_carTransportStartTex)
+        m_carTransportStartTex->Shutdown();
 
     Logger::Instance().Log(Logger::Severity::Info, "Train Map Shutdown");
 }
@@ -2802,6 +3662,8 @@ void Train::ClearAllDrones()
 {
     if (m_droneManager)
         m_droneManager->ClearAllDrones();
+    if (m_carTransportDroneManager)
+        m_carTransportDroneManager->ClearAllDrones();
     if (m_sirenDroneManager)
         m_sirenDroneManager->ClearAllDrones();
 }

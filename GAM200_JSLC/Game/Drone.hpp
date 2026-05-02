@@ -18,7 +18,8 @@ public:
     /// sirenTracerJamEvade: 사이렌 추적 드론만 — 미포착 시 좌우 흔들림 후 랜덤 방향 이탈
     /// sirenTracerSpeedMul: 사이렌 가동 중 1, 파괴 후 추적 감속 시 1 미만
     void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerUndetectable,
-                bool sirenTracerJamEvade = false, float sirenTracerSpeedMul = 1.f);
+                bool sirenTracerJamEvade = false, float sirenTracerSpeedMul = 1.f,
+                float sirenTracerTrainAssistMul = 1.f);
     void Draw(const Shader& shader) const;
     void DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const;
@@ -38,7 +39,7 @@ public:
     bool IsHit() const { return m_isHit; }
 
     bool IsStunned() const { return m_stunTimer > 0.f; }
-    void ApplyStun(float duration) { if (!m_isDead) m_stunTimer = duration; }
+    void ApplyStun(float duration);
     // velocity: initial impulse direction×speed; delay: seconds before slide starts (domino wave)
     void ApplyKnockback(Math::Vec2 velocity, float delay)
     {
@@ -69,6 +70,18 @@ public:
     void SetDead(bool dead) { m_isDead = dead; }
     void SetHit(bool hit) { m_isHit = hit; if (hit) m_hitTimer = 0.0f; }
     void SetAttacking(bool attacking) { m_isAttacking = attacking; }
+    /// Third_Third 자동차 칸: 파이프 근처 고정 호버 (Train이 매 프레임 앵커 갱신)
+    void SetCarTransportHover(bool v) { m_carTransportHover = v; }
+    bool IsCarTransportHover() const { return m_carTransportHover; }
+    /// 체크포인트 리스폰 시 Reset() 후에도 호버 모드 유지
+    void SetCarTransportPersistHover(bool v) { m_carTransportPersistHover = v; m_carTransportHover = v; }
+    bool IsCarTransportPersistHover() const { return m_carTransportPersistHover; }
+    /// 펄스/넉백 후: 고정 호버 대신 플레이어를 느리게 추적
+    bool IsCarTransportAggroChase() const { return m_carTransportAggroChase; }
+    void SetCarTransportAnchorWorld(const Math::Vec2& w) { m_carTransportAnchorWorld = w; }
+    void SetCarTransportJamConfused(bool v) { m_carTransportJamConfused = v; }
+    float GetCarTransportBobPhase() const { return m_carTransportBobPhase; }
+    void  SetCarTransportBobPhase(float p) { m_carTransportBobPhase = p; }
     float GetDamageTimer() const { return m_damageTimer; }
     void SetDamageTimer(float timer) { m_damageTimer = timer; }
     float GetAttackRadius() const { return m_attackRadius; }
@@ -91,6 +104,8 @@ public:
             // Revive if HP is set above 0
             m_isDead = false;
             m_isHit = false;
+            m_corpseRestTimer = 0.f;
+            m_corpseFadeAlpha = 0.f;
         }
     }
     float GetMaxHP() const { return m_maxHP; }
@@ -100,6 +115,13 @@ public:
     // Debug mode control
     void SetDebugMode(bool debug);
     bool IsDebugMode() const { return m_debugMode; }
+
+    /// Train 전용: 이 칸(1~5)에 묶인 전투 드론 — 다른 칸 플레이어에게 피해 안 줌
+    void SetTrainCarSegment(int car1To5) { m_trainCarSegment = car1To5; }
+    int GetTrainCarSegment() const { return m_trainCarSegment; }
+    /// TraceSystem 경고 단계(0~2): 추적 속도·거리 보정에 사용
+    void SetTracerHeatLevel(int level) { m_tracerHeatLevel = level < 0 ? 0 : level; }
+    int GetTracerHeatLevel() const { return m_tracerHeatLevel; }
 
 private:
     void StartDeathSequence();
@@ -118,6 +140,9 @@ private:
     float      m_damageDelay      = 0.f;   // countdown before pending damage applies
 
     bool m_isHit = false;
+    /// 시체: 착지 후 대기(초) → 알파 페이드. 즉사 시 둘 다 0이면 드로우 생략.
+    float m_corpseRestTimer = 0.f;
+    float m_corpseFadeAlpha = 0.f;
     float m_hitTimer = 0.0f;
     const float m_hitDuration = 2.0f;
     float m_hitRotation = 0.0f;
@@ -171,8 +196,23 @@ private:
     Math::Vec2 m_jamFleeDir{ 1.f, 0.f };
 
     bool  m_sirenMapDrone = false;
+    /// Q/펄스 피격 직후: 히딩/펄스박스여도 잠시 플레이어를 추적 (잘못된 방향 이탈 방지)
+    float m_sirenPulseRevealTimer = 0.f;
+    /// Q 펄스 넉백 직후 추적 가속 (초)
+    float m_sirenPulseAggroTimer  = 0.f;
     float m_hitHorzVel    = 0.f;
     int   m_hitWindSign   = 1;
 
     Sound m_moveSound;
+
+    bool       m_carTransportHover          = false;
+    bool       m_carTransportPersistHover   = false;
+    bool       m_carTransportAggroChase    = false;
+    bool       m_carTransportJamConfused     = false;
+    Math::Vec2 m_carTransportAnchorWorld{};
+    float      m_carTransportBobPhase       = 0.f;
+
+    int m_trainCarSegment = 0;
+    /// 0 = 일반/입장 트레이서, 1~2 = TraceSystem 경고 단계
+    int m_tracerHeatLevel = 0;
 };

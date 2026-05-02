@@ -14,7 +14,8 @@ class DroneManager
 public:
     Drone& SpawnDrone(Math::Vec2 position, const char* texturePath, bool isTracer = false);
     void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerUndetectable,
-                 bool sirenTracerJamEvade = false, float sirenTracerSpeedMul = 1.f);
+                 bool sirenTracerJamEvade = false, float sirenTracerSpeedMul = 1.f,
+                 float sirenTracerTrainAssistMul = 1.f);
     void Draw(const Shader& shader);
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const;

@@ -11,6 +11,7 @@
 class Player;
 class DroneManager;
 class PulseManager;
+class Train;
 class Shader;
 class ControlBindings;
 namespace Input { class Input; }
@@ -37,7 +38,9 @@ public:
                 DroneManager* trainDroneManager = nullptr,
                 DroneManager* trainSirenDroneManager = nullptr,
                 const Math::Vec2* trainDetonationOrigin = nullptr,
-                const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs = nullptr);
+                const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs = nullptr,
+                DroneManager* trainCarTransportDroneManager = nullptr,
+                Train* trainMapForBranchArcs = nullptr);
 
     // Bake the cooldown string into a GL texture — call during the text-update phase.
     void UpdateCooldownText(Font& font, Shader& fontShader);
@@ -58,7 +61,7 @@ private:
     CachedTextureInfo m_cooldownText{};
 
     static constexpr float SKILL_COST     = 8.f;
-    static constexpr float SKILL_RADIUS   = 600.f;
-    static constexpr float SKILL_COOLDOWN = 6.f;
+    static constexpr float SKILL_RADIUS   = 535.f;
+    static constexpr float SKILL_COOLDOWN = 3.f;
     static constexpr float STUN_DURATION  = 2.0f;
 };

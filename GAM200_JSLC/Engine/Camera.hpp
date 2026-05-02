@@ -23,6 +23,12 @@ public:
     Math::Matrix GetViewMatrix() const;
     Math::Vec2 GetPosition() const { return m_position; }
 
+    Math::Vec2 GetScreenShakeOffset() const;
+
+    /// 짧은 화면 흔들림 (Train 로봇 착지 등)
+    void AddScreenShake(float durationSeconds, float maxPixelOffset);
+    void UpdateScreenShake(float dt);
+
 private:
     Math::Vec2 m_position;
     float m_viewWidth;
@@ -37,4 +43,9 @@ private:
     Math::Vec2 m_animEndPos;
     float m_animDuration = 0.0f;
     float m_animElapsed = 0.0f;
+
+    float m_shakeRemain    = 0.f;
+    float m_shakeDuration  = 0.f;
+    float m_shakePeakPx    = 0.f;
+    float m_shakePhase     = 0.f;
 };

@@ -79,15 +79,18 @@ public:
         Math::Vec2 localCenter{};
         Math::Vec2 halfSize{};
         bool       engineOn       = false;
-        float      injectSeconds  = 0.f;
+        /// 펄스 주입 누적량(0~kCarTransportPulseInjectTotal). 펄스 흡수가 끊기면 0으로 리셋.
+        float      injectPulseAccum = 0.f;
         float      engineGlowTimer = 0.f;
+        bool       skipPulseLineOverlay = false;
     };
 
     void Initialize();
     void ApplyConfig(const TrainObjectConfig& cfg);
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
-                bool pulseAbsorbHeld, bool ignoreCarInjectPulseCost,
-                bool attackHeld, bool attackTriggered, Math::Vec2 mouseWorldPos);
+                bool pulseAbsorbHeld, bool carTransportInjectHeld, bool ignoreCarInjectPulseCost,
+                bool attackHeld, bool attackTriggered, Math::Vec2 mouseWorldPos,
+                int carTransportInjectForcedSlot = -1);
 
     // Call once when the Train map becomes active to begin the departure countdown
     void StartEntryTimer();
@@ -107,6 +110,8 @@ public:
 
     // 시동된 차량 펄스 라이트(플레이스홀더). 열차 스프라이트 위에 그림.
     void DrawCarTransportVFX(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
+    // PulseLine / Start 아이콘 (텍스처). 열차 스프라이트에 이미 펄스가 있는 슬롯은 skipPulseLineOverlay로 스킵.
+    void DrawCarTransportOverlays(Shader& textureShader, Math::Vec2 cameraPos, float viewHalfW) const;
     void DrawValveWaterVFX(Shader& colorShader, const Math::Matrix& worldProjection, Math::Vec2 cameraPos,
                            float viewHalfW) const;
 
@@ -120,6 +125,8 @@ public:
     void DrawCar3SirenWaves(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
     /// ThirdTrain 사이렌 펄스 차단 진행 — Room 충전소 남은 양 바와 같은 스타일, 사이렌 옆 월드 좌표 (solid_color)
     void DrawCar3SirenProgressGauge(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
+    /// Third_ThirdTrain 자동차 펄스 주입 진행(좌클릭 Start / 상호작용 키)
+    void DrawCarTransportInjectProgressGauge(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
     /// SecondTrain Enter/Leave 아이콘 위에 마우스가 있고 플레이어가 컨테이너 근처일 때 (커서 프롬프트용)
     bool IsCar2EnterLeavePromptHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld,
                                        Math::Vec2 cameraPos, float viewHalfW) const;
@@ -131,8 +138,10 @@ public:
     std::vector<Drone>& GetDrones();
     DroneManager* GetDroneManager() { return m_droneManager.get(); }
     DroneManager* GetSirenDroneManager() { return m_sirenDroneManager.get(); }
-    /// ThirdTrain 사이렌 전용 드론 (추적용 — FourthTrain 전투 드론과 분리)
+    /// Third_ThirdTrain 사이렌 전용 드론 (추적용 — FourthTrain 전투 드론과 분리)
     const std::vector<Drone>& GetSirenDrones() const;
+    /// Third_Third 자동차 칸 주변 호버 드론 (Car5 전투 드론과 별도 매니저)
+    DroneManager* GetCarTransportDroneManager() { return m_carTransportDroneManager.get(); }
     float GetCar3SirenInjectT() const { return m_car3SirenInjectT; }
     bool  GetCar3SirenActive() const { return m_car3SirenActive; }
     float GetCar2ContainerChargePct() const { return m_car2InsideCharge; }
@@ -157,6 +166,10 @@ public:
     /// Q 스킬 등 근거리 펄스가 차량에 닿은 것처럼 처리할 월드 기준점 (범위 안일 때만 true)
     bool TryGetCarTransportSkillAnchor(Math::Vec2 playerHbCenter, Math::Vec2& outWorldAnchor) const;
 
+    /// 시동 꺼진 차: Start 아이콘 위에 커서 + 플레이어가 차 슬롯 안에 있을 때 슬롯 인덱스 (펄스 주입 UI용)
+    int TryGetCarTransportStartInjectSlot(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize,
+                                          Math::Vec2 mouseWorldPos) const;
+
     /// 플레이어 히트박스와 차가 겹치고 마우스가 그 차 위에 있으며 시동 꺼진 경우 (마우스 커서용 / 클릭 시동)
     bool TryGetCarTransportClickIgniteTarget(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize,
                                              Math::Vec2 mouseWorldPos, int& outSlotIndex) const;
@@ -164,7 +177,24 @@ public:
     /// 좌클릭 시동 (시동 이미 켜짐이면 false). 연쇄 반응 등 기존 로직 호출.
     bool TryIgniteCarTransportSlot(int slotIndex);
     void AppendCarTransportStraightChainArcs(std::vector<std::pair<Math::Vec2, Math::Vec2>>& outArcs) const;
+    /// Q/펄스 시: 시동 중인 차 각각에서 가장 가까운 Car4 호버 드론으로 번가지(가지) 아크 추가
+    void AppendCarTransportPulseBranchArcs(std::vector<std::pair<Math::Vec2, Math::Vec2>>& outArcs,
+                                           Math::Vec2 pulseWorldCenter, float pulseRadius) const;
+    /// Q 스킬: FourthTrain 전투 로봇에게 반경 내 넉백 + 데미지
+    void ApplyPulseToTrainRobots(Math::Vec2 pulseWorldCenter, float radius);
     bool IsValveMouseHoverable(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorldPos) const;
+
+    /// 플레이어 히트박스 X 기준 현재 칸 (1~5, 밖이면 0)
+    int GetPlayerTrainCarIndex(Math::Vec2 worldHbCenter) const;
+    /// 해당 칸 전투 드론·로봇(및 Car4 CT드론, Car3 사이렌드론) 전멸 여부
+    bool IsTrainCarCombatCleared(int car1To5) const;
+    /// 아직 클리어 안 된 가장 앞 칸의 경계 X (플레이어 최대 진행)
+    float GetTrainCombatAdvanceCapWorldX() const;
+
+    void RequestTrainCameraShake(float maxPixelOffset);
+    float ConsumeTrainCameraShakeRequest();
+
+    void DrawRobotTrainAlerts(Shader& colorShader, DebugRenderer& debugRenderer) const;
 
     float      GetTrainOffset() const { return m_trainOffset; }
     TrainState GetTrainState()  const { return m_trainState; }
@@ -237,6 +267,7 @@ private:
     // Config-driven obstacles / pulse sources (retain for JSON hot-reload)
     std::unique_ptr<DroneManager>  m_droneManager;
     std::unique_ptr<DroneManager>  m_sirenDroneManager;
+    std::unique_ptr<DroneManager> m_carTransportDroneManager;
     std::vector<Obstacle>          m_obstacles;
     std::vector<PulseSource>       m_pulseSources;
     std::vector<Robot>             m_robots;
@@ -262,11 +293,18 @@ private:
     void UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize,
                          Math::Vec2 mouseWorldPos, bool attackHeld, bool injectGodMode);
     static void AssistRobotRailJumpTowardTrain(Robot& robot, const Player& player, float dt);
+    float GetTrainCarLocalLeftEdge(int carIndex) const;
+    void UpdateTrainDeckPatrolRobots(float dt, Player& player, Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize);
+    void TryDeckPatrolRobotJumpAndLandingShake(Robot& r, size_t robotIndex, float dt,
+                                               const std::vector<ObstacleInfo>& tallCarObs, int playerTrainCar);
     /// SecondTrain 보라 컨테이너 솔리드 히트박스와 동일한지 (숨기기 중 충돌 해제용)
     bool IsCar2PurpleHitbox(const TrainHitbox& hb) const;
 
     std::unique_ptr<Background> m_car2EnterPromptTex;
     std::unique_ptr<Background> m_car2LeavePromptTex;
+    std::unique_ptr<Background> m_carTransportPulseLeftTex;
+    std::unique_ptr<Background> m_carTransportPulseRightTex;
+    std::unique_ptr<Background> m_carTransportStartTex;
 
     enum class Car2HidePhase : uint8_t { None, Entering, Inside };
     Car2HidePhase       m_car2HidePhase        = Car2HidePhase::None;
@@ -291,9 +329,10 @@ private:
 
     void ResetCarTransportSlotsToInitialState();
     void UpdateCarTransport(float dt, Player& player, Math::Vec2 playerHbCenter,
-                            bool pulseAbsorbHeld, bool ignorePulseCost);
+                            bool injectHeld, bool ignorePulseCost, int forcedInjectSlot = -1);
     void ApplyMooreConnectedPulseShare(Player& player, float dt);
     void FireStraightLineChainDetonations();
+    void UpdateCarTransportDrones(float dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHidingTrain);
     Math::Vec2 CarTransportWorldCenter(int slotIndex) const;
     int FindCarTransportInjectTarget(Math::Vec2 playerHbCenter) const;
     static bool IsMooreAdjacentCarSlots(int a, int b);
@@ -351,6 +390,13 @@ private:
     float             m_prevTrainOffsetActors = 0.0f;
     bool              m_car5EncounterActive = false;
     float             m_encounterScriptTime = 0.0f;
+    float             m_pendingTrainCameraShakePx = 0.f;
+    std::vector<bool> m_trainDeckRobotWasAirborne;
+    /// 덱 패트롤 로봇: 컨테이너 앞에서 점프하기까지 축적(초)
+    std::vector<float> m_trainDeckRobotJumpPrepT;
+    /// 덱 로봇: 첫 번째 컨테이너 점프 착지 시에만 카메라 쉐이크 1회
+    std::vector<bool> m_trainDeckRobotUsedLandingShake;
     std::vector<float> m_droneWaterCd;
+    std::vector<float> m_carTransportDroneWaterCd;
     std::vector<float> m_robotWaterCd;
 };

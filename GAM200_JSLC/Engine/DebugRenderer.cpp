@@ -43,18 +43,23 @@ void DebugRenderer::Initialize()
     GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     GL::EnableVertexAttribArray(0);
 
-    // --- Line VAO ---
+    // --- Line VAO (filled quad — 두께 scale Y로 제어) ---
     float line_vertices[] = {
-        -0.5f, 0.0f,
-         0.5f, 0.0f
+        -0.5f, -0.5f,
+         0.5f, -0.5f,
+         0.5f,  0.5f,
+        -0.5f,  0.5f
     };
+    unsigned int line_indices[] = { 0, 1, 2, 0, 2, 3 };
 
     GL::GenVertexArrays(1, &lineVAO);
-    unsigned int lineVBO;
     GL::GenBuffers(1, &lineVBO);
+    GL::GenBuffers(1, &lineEBO);
     GL::BindVertexArray(lineVAO);
     GL::BindBuffer(GL_ARRAY_BUFFER, lineVBO);
     GL::BufferData(GL_ARRAY_BUFFER, sizeof(line_vertices), line_vertices, GL_STATIC_DRAW);
+    GL::BindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineEBO);
+    GL::BufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(line_indices), line_indices, GL_STATIC_DRAW);
     GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     GL::EnableVertexAttribArray(0);
 
@@ -66,6 +71,8 @@ void DebugRenderer::Shutdown() const
     GL::DeleteVertexArrays(1, &circleVAO);
     GL::DeleteVertexArrays(1, &boxVAO);
     GL::DeleteVertexArrays(1, &lineVAO);
+    GL::DeleteBuffers(1, &lineVBO);
+    GL::DeleteBuffers(1, &lineEBO);
     GL::DeleteBuffers(1, &VBO);
     GL::DeleteBuffers(1, &EBO);
 }
@@ -103,22 +110,26 @@ void DebugRenderer::DrawBox(Shader& shader, Math::Vec2 pos, Math::Vec2 size, flo
     GL::BindVertexArray(0);
 }
 
-void DebugRenderer::DrawLine(const Shader& shader, Math::Vec2 start, Math::Vec2 end, float r, float g, float b) const
+void DebugRenderer::DrawLine(const Shader& shader, Math::Vec2 start, Math::Vec2 end, float r, float g, float b,
+                             float thickness) const
 {
     Math::Vec2 direction = end - start;
     float length = direction.Length();
+    if (length < 1e-4f)
+        return;
     Math::Vec2 center = (start + end) * 0.5f;
 
     float angle = std::atan2(direction.y, direction.x) * (180.0f / 3.14159265359f);
 
+    const float t = std::max(0.15f, thickness);
     Math::Matrix model = Math::Matrix::CreateTranslation(center) *
         Math::Matrix::CreateRotation(angle) *
-        Math::Matrix::CreateScale({ length, 1.0f });
+        Math::Matrix::CreateScale({ length, t });
 
     shader.setMat4("model", model);
     shader.setVec3("objectColor", r, g, b);
 
     GL::BindVertexArray(lineVAO);
-    GL::DrawArrays(GL_LINES, 0, 2);
+    GL::DrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     GL::BindVertexArray(0);
 }

@@ -6,6 +6,7 @@
 #include "DroneManager.hpp"
 #include "PulseManager.hpp"
 #include "PulseCore.hpp"
+#include "Train.hpp"
 #include "../Engine/ControlBindings.hpp"
 #include "../Engine/Logger.hpp"
 #include <sstream>
@@ -38,7 +39,9 @@ void PulseDetonateSkill::Update(
     DroneManager*          trainDM,
     DroneManager*          trainSirenDM,
     const Math::Vec2*      trainDetonationOrigin,
-    const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs)
+    const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs,
+    DroneManager*          trainCarTransportDM,
+    Train*                 trainMapForBranchArcs)
 {
     // Unlock once the player enters the Rooftop for the first time
     if (rooftopAccessed && !m_unlocked)
@@ -96,9 +99,23 @@ void PulseDetonateSkill::Update(
         if (trainDetonationOrigin)
             vfxOrigin = *trainDetonationOrigin;
     }
+    if (trainCarTransportDM)
+    {
+        const Math::Vec2 trainOrigin = trainDetonationOrigin ? *trainDetonationOrigin : playerCenter;
+        auto arcs = trainCarTransportDM->ApplyDetonation(trainOrigin, SKILL_RADIUS, STUN_DURATION);
+        allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
+        if (trainDetonationOrigin)
+            vfxOrigin = *trainDetonationOrigin;
+    }
 
     if (extraChainArcs && !extraChainArcs->empty())
         allArcs.insert(allArcs.end(), extraChainArcs->begin(), extraChainArcs->end());
+
+    if (trainMapForBranchArcs)
+    {
+        trainMapForBranchArcs->AppendCarTransportPulseBranchArcs(allArcs, vfxOrigin, SKILL_RADIUS);
+        trainMapForBranchArcs->ApplyPulseToTrainRobots(vfxOrigin, SKILL_RADIUS);
+    }
 
     pulseManager.StartDetonationVFX(vfxOrigin, SKILL_RADIUS, allArcs);
 

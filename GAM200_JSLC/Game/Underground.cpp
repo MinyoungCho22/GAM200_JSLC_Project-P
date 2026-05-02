@@ -31,6 +31,7 @@ void Underground::ReapplyEntryTracerDroneAfterLiveState()
     Drone& entryTracer = drones[0];
     entryTracer.SetMaxHP(kUndergroundEntryTracerMaxHp);
     entryTracer.SetHP(kUndergroundEntryTracerMaxHp);
+    entryTracer.SetTracerHeatLevel(0);
 }
 
 void Underground::Initialize()
@@ -51,6 +52,7 @@ void Underground::Initialize()
         entryTracer.SetBaseSpeed(55.0f);
         entryTracer.SetMaxHP(kUndergroundEntryTracerMaxHp);
         entryTracer.SetHP(kUndergroundEntryTracerMaxHp);
+        entryTracer.SetTracerHeatLevel(0);
     }
     // First patrol drone: shifted left toward robot patrol (~18.2k)
     m_droneManager->SpawnDrone({ 18470.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(180.0f);

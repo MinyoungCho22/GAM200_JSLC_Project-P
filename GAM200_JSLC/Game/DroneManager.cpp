@@ -15,11 +15,12 @@ Drone& DroneManager::SpawnDrone(Math::Vec2 position, const char* texturePath, bo
 }
 
 void DroneManager::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerUndetectable,
-                          bool sirenTracerJamEvade, float sirenTracerSpeedMul)
+                          bool sirenTracerJamEvade, float sirenTracerSpeedMul, float sirenTracerTrainAssistMul)
 {
     for (auto& drone : drones)
     {
-        drone.Update(dt, player, playerHitboxSize, isPlayerUndetectable, sirenTracerJamEvade, sirenTracerSpeedMul);
+        drone.Update(dt, player, playerHitboxSize, isPlayerUndetectable, sirenTracerJamEvade, sirenTracerSpeedMul,
+                     sirenTracerTrainAssistMul);
     }
 }
 
@@ -75,8 +76,8 @@ std::vector<std::pair<Math::Vec2, Math::Vec2>> DroneManager::ApplyDetonation(
 {
     std::vector<std::pair<Math::Vec2, Math::Vec2>> arcs;
 
-    constexpr float PRIMARY_DAMAGE   = 25.f;
-    constexpr float CHAIN_DAMAGE     = 15.f;
+    constexpr float PRIMARY_DAMAGE   = 14.f;
+    constexpr float CHAIN_DAMAGE     = 8.f;
     // Shockwave propagation speed: closer drones react first (domino)
     // delay = dist / WAVE_SPEED  →  at 300px: 0.25s, at 600px: 0.50s
     constexpr float WAVE_SPEED       = 1200.f;

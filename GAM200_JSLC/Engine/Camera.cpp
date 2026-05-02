@@ -97,10 +97,48 @@ void Camera::StopAnimation()
     m_isAnimating = false;
 }
 
+void Camera::AddScreenShake(float durationSeconds, float maxPixelOffset)
+{
+    if (durationSeconds <= 0.f || maxPixelOffset <= 0.f)
+        return;
+    m_shakeRemain   = std::max(m_shakeRemain, durationSeconds);
+    m_shakeDuration = std::max(m_shakeDuration, durationSeconds);
+    m_shakePeakPx   = std::max(m_shakePeakPx, maxPixelOffset);
+}
+
+void Camera::UpdateScreenShake(float dt)
+{
+    if (m_shakeRemain <= 0.f)
+        return;
+    m_shakeRemain -= dt;
+    m_shakePhase += dt * 84.f;
+    if (m_shakeRemain <= 0.f)
+    {
+        m_shakeRemain   = 0.f;
+        m_shakeDuration = 0.f;
+        m_shakePeakPx   = 0.f;
+    }
+}
+
+Math::Vec2 Camera::GetScreenShakeOffset() const
+{
+    if (m_shakeRemain <= 0.f || m_shakeDuration <= 0.01f)
+        return { 0.f, 0.f };
+    const float env = std::clamp(m_shakeRemain / m_shakeDuration, 0.f, 1.f);
+    const float mag = m_shakePeakPx * env;
+    const float sx  = std::sin(m_shakePhase) * mag + std::sin(m_shakePhase * 2.31f) * mag * 0.45f;
+    const float sy  = std::cos(m_shakePhase * 0.88f) * mag * 0.62f;
+    return { sx, sy };
+}
+
 Math::Matrix Camera::GetViewMatrix() const
 {
-    float offsetX = m_viewWidth / 2.0f - m_position.x;
-    float offsetY = m_viewHeight / 2.0f - m_position.y;
+    const Math::Vec2 sh = GetScreenShakeOffset();
+    float shakeX = sh.x;
+    float shakeY = sh.y;
+
+    float offsetX = m_viewWidth / 2.0f - m_position.x + shakeX;
+    float offsetY = m_viewHeight / 2.0f - m_position.y + shakeY;
 
     // Snap scroll to integer pixels in framebuffer space. Sub-pixel camera
     // translation lets adjacent quads land on fractional device coordinates;
