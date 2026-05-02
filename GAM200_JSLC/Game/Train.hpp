@@ -20,14 +20,13 @@ enum class TrainState { Stationary, Starting, Moving };
  * @class Train
  * @brief Train map - Final stage with train ride mechanics.
  *        Rail is static; train moves at camera speed for parallax effect.
- *        Three train cars (FirstTrain, SecondTrain, ThirdTrain) assembled end-to-end.
+ *        Five train cars (First…Third, Third_ThirdTrain, FourthTrain.png) assembled end-to-end.
  *        Sunset parallax sky background.
  */
 class Train
 {
 public:
-    // Map boundaries
-    static constexpr float WIDTH  = 7920.0f;
+    // Map boundaries (WIDTH is sum of loaded car image widths — use GetMapWidth() at runtime)
     static constexpr float HEIGHT = 1080.0f;
     static constexpr float MIN_X  = 24180.0f;
     static constexpr float MIN_Y  = -3500.0f;
@@ -42,6 +41,12 @@ public:
         Math::Vec2 size;
     };
 
+    enum class TrainHitboxKind : uint8_t
+    {
+        Solid,             // 전방향 AABB 충돌
+        JumpThroughPipe    // 얇은 발판: 아래→위 점프 통과, 위에서만 착지, 웅크리면 낙하
+    };
+
     // Hitbox in LOCAL train space:
     //   center.x = distance from train's initial left edge (MIN_X)
     //   center.y = distance from map bottom (MIN_Y), Y going up
@@ -49,6 +54,8 @@ public:
     {
         Math::Vec2 localCenter;
         Math::Vec2 size;
+        bool collision = true; // false = 디버그 표시만, 물리 통과 (Third_Third 자동차 등)
+        TrainHitboxKind kind = TrainHitboxKind::Solid;
     };
 
     // A hiding box moves with the train (same local-space coords as TrainHitbox).
@@ -99,14 +106,19 @@ public:
     float      GetTrainOffset() const { return m_trainOffset; }
     TrainState GetTrainState()  const { return m_trainState; }
 
+    // Total world width of all train car images (1 px = 1 world unit)
+    float GetMapWidth() const { return m_totalTrainWidth; }
+
     // Right boundary that expands as train moves (for camera bounds)
-    float GetEffectiveRightBound() const { return MIN_X + WIDTH + m_trainOffset + 960.0f; }
+    float GetEffectiveRightBound() const { return MIN_X + m_totalTrainWidth + m_trainOffset + 960.0f; }
 
 private:
     // Train car textures
     std::unique_ptr<Background> m_firstTrain;
     std::unique_ptr<Background> m_secondTrain;
     std::unique_ptr<Background> m_thirdTrain;
+    std::unique_ptr<Background> m_thirdThirdTrain;
+    std::unique_ptr<Background> m_fourthTrain;
 
     // Rail tile texture (tiled horizontally along train-map floor)
     std::unique_ptr<Background> m_railTile;
@@ -118,6 +130,9 @@ private:
     float m_car1Width = 2640.0f;
     float m_car2Width = 2640.0f;
     float m_car3Width = 2640.0f;
+    float m_car4Width = 2640.0f;
+    float m_car5Width = 2640.0f;
+    float m_totalTrainWidth = 7920.0f;
 
     // Rail tile info (computed after loading rail image)
     float m_railTileW  = 256.0f;
@@ -128,6 +143,14 @@ private:
     TrainState m_trainState   = TrainState::Stationary;
     float      m_trainOffset  = 0.0f;
     bool       m_playerOnTrain = false;
+
+    // Riding momentum: carry player X with moving train while grounded, jumping above cars, or crouching on deck
+    bool       m_prevPlayerOnTrain = false;
+    bool       m_airborneFromTrain = false;
+    bool       m_crouchCarryLatched = false;
+    bool       m_prevOnJumpThroughSurface = false;
+    bool       m_prevCrouchHeld = false;     // edge-trigger pipe drop-through
+    float      m_pipeDropCooldown = 0.0f;    // 드롭 발동 직후 잠시 파이프 충돌·스냅을 무시
 
     // Entry countdown: -1 means not yet started; counts up to TRAIN_DEPART_DELAY
     float m_entryTimer        = -1.0f;

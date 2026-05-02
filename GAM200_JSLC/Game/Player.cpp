@@ -214,7 +214,11 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
         velocity.x = m_currentHorizontalSpeed;
     }
 
-    velocity.y += GRAVITY * fdt;
+    // 지면에 있을 때는 중력을 넣지 않음 — 그대로 두면 매 프레임 살짝 가라앉았다가 맵 충돌이 다시 올려 통통 튐 (열차 파이프 등)
+    if (!is_on_ground)
+        velocity.y += GRAVITY * fdt;
+    else
+        velocity.y = 0.0f;
 
     Math::Vec2 final_velocity = velocity;
     if (is_dashing)

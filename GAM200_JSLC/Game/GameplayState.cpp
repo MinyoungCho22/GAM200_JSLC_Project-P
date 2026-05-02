@@ -108,8 +108,7 @@ void GameplayState::Initialize()
 
     droneManager = std::make_unique<DroneManager>();
 
-    // Left-middle gauge position
-    m_pulseGauge.Initialize({ 75.f, GAME_HEIGHT * 0.5f }, { 40.f, 300.f });
+    m_pulseGauge.Initialize();
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
 
@@ -599,7 +598,7 @@ void GameplayState::Update(double dt)
 
         m_camera.SetBounds(
             { Train::MIN_X, Train::MIN_Y },
-            { Train::MIN_X + Train::WIDTH, Train::MIN_Y + Train::HEIGHT });
+            { Train::MIN_X + m_train->GetMapWidth(), Train::MIN_Y + Train::HEIGHT });
         m_cameraSmoothSpeed = 0.05f;
         m_camera.SetPosition({ Train::MIN_X + GAME_WIDTH / 2.0f, Train::MIN_Y + GAME_HEIGHT / 2.0f });
         if (m_train) m_train->StartEntryTimer();
@@ -1399,7 +1398,7 @@ void GameplayState::HandleUndergroundToTrainTransition()
     player.SetOnGround(false);
 
     float worldMinX = Train::MIN_X;
-    float worldMaxX = Train::MIN_X + Train::WIDTH;
+    float worldMaxX = Train::MIN_X + m_train->GetMapWidth();
     float worldMinY = Train::MIN_Y;
     float worldMaxY = Train::MIN_Y + Train::HEIGHT;
 
@@ -1555,7 +1554,7 @@ void GameplayState::RespawnAtCheckpoint()
         player.SetPosition({ playerStartX, playerStartY });
         player.SetOnGround(false);
         m_camera.SetBounds({ Train::MIN_X, Train::MIN_Y },
-                           { Train::MIN_X + Train::WIDTH, Train::MIN_Y + Train::HEIGHT });
+                           { Train::MIN_X + m_train->GetMapWidth(), Train::MIN_Y + Train::HEIGHT });
         m_camera.SetPosition(player.GetPosition());
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Train");
         break;
@@ -2055,12 +2054,18 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     }
 
     // 8) Screen-space HUD (pulse gauge)
-    colorShader->use();
-    colorShader->setMat4("projection", baseProjection);
-    m_pulseGauge.Draw(*colorShader);
-
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    textureShader.use();
+    textureShader.setMat4("projection", baseProjection);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+    textureShader.setFloat("alpha", 1.0f);
+    textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+    textureShader.setFloat("tintStrength", 0.0f);
+
+    m_pulseGauge.Draw(textureShader);
 
     // 9) Fonts / minimap / tutorial
     m_fontShader->use();

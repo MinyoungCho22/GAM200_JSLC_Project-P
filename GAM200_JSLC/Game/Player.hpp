@@ -79,6 +79,7 @@ public:
     bool IsDashing() const { return is_dashing; }
     bool IsFacingRight() const;
     bool IsCrouching() const { return is_crouching; }
+    bool IsCrouchTriggered() const { return m_crouchTriggered; }  // S 한 번 눌린 프레임만 true
     bool IsDead() const;
 
 private:
@@ -95,6 +96,7 @@ private:
     PulseCore m_pulseCore{ 100.f, 20.f };
     bool is_crouching = false;
     bool m_crouchAnimationFinished = false;
+    bool m_crouchTriggered = false;  // S 키가 이번 프레임에 처음 눌린 순간만 true
     Math::Vec2 original_size{};
     bool is_dashing = false;
     float dash_timer = 0.0f;

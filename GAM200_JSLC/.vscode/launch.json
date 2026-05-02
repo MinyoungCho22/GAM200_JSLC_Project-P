@@ -25,16 +25,28 @@
             }
         },
         {
-            "name": "Run GAM200JSLC (Windows)",
+            "name": "Run No. 99 (CMake, Debug x64)",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/GAM200JSLC.exe",
+            "program": "${workspaceFolder}/build/build-vs2022/Debug/No. 99.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build/Debug",
+            "cwd": "${workspaceFolder}/build/build-vs2022/Debug",
             "environment": [],
-            "console": "externalConsole",
+            "console": "integratedTerminal",
             "preLaunchTask": "CMake: Build"
+        },
+        {
+            "name": "Run No. 99 (MSBuild vcxproj, Debug x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/x64/Debug/No. 99.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/x64/Debug",
+            "environment": [],
+            "console": "integratedTerminal",
+            "preLaunchTask": "MSBuild: Debug x64 (vcxproj)"
         }
     ]
 }

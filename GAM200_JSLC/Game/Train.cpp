@@ -25,11 +25,36 @@
 static constexpr float ASSUMED_IMG_HEIGHT = 1080.0f; // expected car image height in pixels
 
 // Convert pixel (px,py) top-left + size to world local center (Y-flipped)
-static Train::TrainHitbox MakeHitbox(float carOffset, float px, float py, float pw, float ph)
+static Train::TrainHitbox MakeHitbox(float carOffset, float px, float py, float pw, float ph,
+                                     bool collision = true,
+                                     Train::TrainHitboxKind kind = Train::TrainHitboxKind::Solid)
 {
     float cx = carOffset + px + pw * 0.5f;
     float cy = ASSUMED_IMG_HEIGHT - py - ph * 0.5f; // flip Y: pixel-from-top → world-from-bottom
-    return { {cx, cy}, {pw, ph} };
+    return { {cx, cy}, {pw, ph}, collision, kind };
+}
+
+// Third_Third 자동차 영역: 단일 바깥 박스 (표시용). collision=false면 플레이어 통과.
+static void AppendCarSilhouette(std::vector<Train::TrainHitbox>& out, float carOffset,
+                                float px, float py, float pw, float ph, bool collision)
+{
+    out.push_back(MakeHitbox(carOffset, px, py, pw, ph, collision, Train::TrainHitboxKind::Solid));
+}
+
+// Loose world-space band over the train cars for “riding” horizontal carry (jump / crouch).
+static bool HitboxInTrainCarryBand(float trainWorldLeft, float totalTrainWidth,
+                                   const Math::Vec2& hbCenter, const Math::Vec2& hbHalf)
+{
+    constexpr float margin = 56.0f;
+    const float l = trainWorldLeft - margin;
+    const float r = trainWorldLeft + totalTrainWidth + margin;
+    if (hbCenter.x + hbHalf.x < l || hbCenter.x - hbHalf.x > r)
+        return false;
+    if (hbCenter.y + hbHalf.y < Train::MIN_Y + 24.0f)
+        return false;
+    if (hbCenter.y - hbHalf.y > Train::MIN_Y + Train::HEIGHT + 40.0f)
+        return false;
+    return true;
 }
 
 
@@ -40,19 +65,33 @@ void Train::Initialize()
 {
     Logger::Instance().Log(Logger::Severity::Info, "Train Map Initialize");
 
+    m_prevPlayerOnTrain   = false;
+    m_airborneFromTrain   = false;
+    m_crouchCarryLatched  = false;
+    m_prevOnJumpThroughSurface = false;
+    m_prevCrouchHeld = false;
+    m_pipeDropCooldown = 0.0f;
+
     // --- Train car images ---
     m_firstTrain  = std::make_unique<Background>();
     m_secondTrain = std::make_unique<Background>();
-    m_thirdTrain  = std::make_unique<Background>();
+    m_thirdTrain       = std::make_unique<Background>();
+    m_thirdThirdTrain  = std::make_unique<Background>();
+    m_fourthTrain      = std::make_unique<Background>();
 
     m_firstTrain ->Initialize("Asset/Train/FirstTrain.png");
     m_secondTrain->Initialize("Asset/Train/SecondTrain.png");
     m_thirdTrain ->Initialize("Asset/Train/ThirdTrain.png");
+    m_thirdThirdTrain->Initialize("Asset/Train/Third_ThirdTrain.png");
+    m_fourthTrain    ->Initialize("Asset/Train/FourthTrain.png");
 
     // Use actual image widths as world widths (1 pixel = 1 world unit)
     if (m_firstTrain->GetWidth()  > 0) m_car1Width = static_cast<float>(m_firstTrain->GetWidth());
     if (m_secondTrain->GetWidth() > 0) m_car2Width = static_cast<float>(m_secondTrain->GetWidth());
     if (m_thirdTrain->GetWidth()  > 0) m_car3Width = static_cast<float>(m_thirdTrain->GetWidth());
+    if (m_thirdThirdTrain->GetWidth() > 0) m_car4Width = static_cast<float>(m_thirdThirdTrain->GetWidth());
+    if (m_fourthTrain->GetWidth()     > 0) m_car5Width = static_cast<float>(m_fourthTrain->GetWidth());
+    m_totalTrainWidth = m_car1Width + m_car2Width + m_car3Width + m_car4Width + m_car5Width;
 
     // --- Rail tile ---
     m_railTile = std::make_unique<Background>();
@@ -64,11 +103,11 @@ void Train::Initialize()
         m_railTileH = static_cast<float>(m_railTile->GetHeight());
 
     // How many rail tiles needed to cover train width (plus a few extra for safety)
-    m_railTileCount = static_cast<int>(std::ceil(WIDTH / m_railTileW)) + 4;
+    m_railTileCount = static_cast<int>(std::ceil(m_totalTrainWidth / m_railTileW)) + 4;
 
     // --- Map extents (kept for legacy code / config) ---
-    m_size     = { WIDTH, HEIGHT };
-    m_position = { MIN_X + WIDTH * 0.5f, MIN_Y + HEIGHT * 0.5f };
+    m_size     = { m_totalTrainWidth, HEIGHT };
+    m_position = { MIN_X + m_totalTrainWidth * 0.5f, MIN_Y + HEIGHT * 0.5f };
 
     // --- Drone manager ---
     m_droneManager = std::make_unique<DroneManager>();
@@ -89,8 +128,8 @@ void Train::Initialize()
     ApplyConfig(MapObjectConfig::Instance().GetData().train);
 
     Logger::Instance().Log(Logger::Severity::Info,
-        "Train Map initialized – car widths: %.0f / %.0f / %.0f, rail tile: %.0f",
-        m_car1Width, m_car2Width, m_car3Width, m_railTileW);
+        "Train Map initialized – car widths: %.0f / %.0f / %.0f / %.0f / %.0f (total %.0f), rail tile: %.0f",
+        m_car1Width, m_car2Width, m_car3Width, m_car4Width, m_car5Width, m_totalTrainWidth, m_railTileW);
 }
 
 
@@ -197,8 +236,63 @@ void Train::BuildTrainHitboxes()
 
 
     // ════════════════════════════════════════════════════════════════════════
+    // ▣  Car 4  –  Third_ThirdTrain.png
+    //    발판만 충돌 — 자동차 박스는 디버그 표시 전용(collision false), 앞으로 걸어 통과
+    // ════════════════════════════════════════════════════════════════════════
+    const float c4 = m_car1Width + m_car2Width + m_car3Width;
+
+    // [Car4] 발판  위치: X=84  Y=804  크기: 3789 x 45
+    m_trainHitboxes.push_back(MakeHitbox(c4, 84, 804, 3789, 45));
+
+    // [Car4] 3층·2층 파이프 (실제 파이프 구간만 점프통과 발판으로 등록)
+    // 이전의 "층당 1개 긴 박스"는 빈 공간에도 경계가 생겨 낙하/웅크리기 낙하가 막혔다.
+    constexpr float kPipeH = 18.0f;
+
+    // 3층 파이프: 상단 3개 구간 (top-left / top-middle / top-right)
+    // 2층 갭(2층 차 Y=489 - 2층 파이프 바닥(434+18=452) = 37px)과 동일하게 맞추기 위해
+    // 3층 차 Y=129 기준 파이프 Y = 129 - 37 - 18 = 74
+    m_trainHitboxes.push_back(MakeHitbox(c4, 429.0f, 74.0f, 886.0f, kPipeH, true,
+                                         Train::TrainHitboxKind::JumpThroughPipe));
+    m_trainHitboxes.push_back(MakeHitbox(c4, 1536.0f, 74.0f, 886.0f, kPipeH, true,
+                                         Train::TrainHitboxKind::JumpThroughPipe));
+    m_trainHitboxes.push_back(MakeHitbox(c4, 2629.0f, 74.0f, 886.0f, kPipeH, true,
+                                         Train::TrainHitboxKind::JumpThroughPipe));
+
+    // 2층 파이프: 하단 3개 구간 (bottom-left / bottom-middle / bottom-right)
+    m_trainHitboxes.push_back(MakeHitbox(c4, 432.0f, 434.0f, 876.0f, kPipeH, true,
+                                         Train::TrainHitboxKind::JumpThroughPipe));
+    m_trainHitboxes.push_back(MakeHitbox(c4, 1539.0f, 434.0f, 876.0f, kPipeH, true,
+                                         Train::TrainHitboxKind::JumpThroughPipe));
+    m_trainHitboxes.push_back(MakeHitbox(c4, 2631.0f, 434.0f, 876.0f, kPipeH, true,
+                                         Train::TrainHitboxKind::JumpThroughPipe));
+
+    constexpr bool kCar4VisualOnly = false;
+    AppendCarSilhouette(m_trainHitboxes, c4, 429,  129, 886, 304, kCar4VisualOnly); // top-left
+    AppendCarSilhouette(m_trainHitboxes, c4, 1536, 129, 886, 304, kCar4VisualOnly); // top-middle
+    AppendCarSilhouette(m_trainHitboxes, c4, 2629, 129, 886, 304, kCar4VisualOnly); // top-right
+
+    AppendCarSilhouette(m_trainHitboxes, c4, 432,  489, 876, 306, kCar4VisualOnly); // bottom-left
+    AppendCarSilhouette(m_trainHitboxes, c4, 1539, 489, 876, 306, kCar4VisualOnly); // bottom-middle
+    AppendCarSilhouette(m_trainHitboxes, c4, 2631, 489, 876, 306, kCar4VisualOnly); // bottom-right
+
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ▣  Car 5  –  FourthTrain.png (탱크 + 밸브)
+    // ════════════════════════════════════════════════════════════════════════
+    const float c5 = c4 + m_car4Width;
+
+    // [Car5] 발판  위치: X=84  Y=804  크기: 2472 x 45
+    m_trainHitboxes.push_back(MakeHitbox(c5, 84, 804, 2472, 45));
+
+    m_trainHitboxes.push_back(MakeHitbox(c5, 342, 498, 63, 307));   // tank left end
+    m_trainHitboxes.push_back(MakeHitbox(c5, 405, 498, 948, 307)); // tank main body
+    m_trainHitboxes.push_back(MakeHitbox(c5, 1353, 498, 62, 307)); // tank right end
+    m_trainHitboxes.push_back(MakeHitbox(c5, 894, 351, 317, 162));  // valve / pipe on top
+
+
+    // ════════════════════════════════════════════════════════════════════════
     // ▣  Hiding Spots  (기차와 함께 이동, 드론 탐지 차단)
-    //    Car1 우측 은색 대형 컨테이너(D)  /  Car3 좌측 은색 컨테이너(I)
+    //    Car1 D / Car3 I  (Car4 자동차 윤곽은 비충돌 표시만)
     // ════════════════════════════════════════════════════════════════════════
     m_hidingSpots.clear();
 
@@ -279,11 +373,112 @@ bool Train::IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bo
 
 
 // ---------------------------------------------------------------------------
+// ResolveJumpThroughAABB – thin “pipe” tiers on Third_ThirdTrain: pass upward, land from above, crouch = fall through.
+// ---------------------------------------------------------------------------
+static bool ResolveJumpThroughAABB(Player& player, Math::Vec2& currentHbCenter,
+                                   const Math::Vec2& playerHalfSize,
+                                   const Math::Vec2& obsCenter, const Math::Vec2& obsSize,
+                                   bool crouchHeld)
+{
+    Math::Vec2 obsHalf = obsSize * 0.5f;
+    Math::Vec2 obsMin  = obsCenter - obsHalf;
+    Math::Vec2 obsMax  = obsCenter + obsHalf;
+    Math::Vec2 pMin    = currentHbCenter - playerHalfSize;
+    Math::Vec2 pMax    = currentHbCenter + playerHalfSize;
+
+    // Jump-through slab은 가로 구간에서만 고려.
+    const bool horizOverlap = pMax.x > obsMin.x && pMin.x < obsMax.x;
+    if (!horizOverlap)
+        return false;
+
+    if (crouchHeld)
+        return false;
+
+    const float platTop = obsMax.y;
+    const float vy      = player.GetVelocity().y;
+    const float feet    = currentHbCenter.y - playerHalfSize.y;
+
+    // 이 발판보다 확실히 위층에 있으면 무시 (3층 위에서 2층/바닥 발판 간섭 차단).
+    constexpr float kTierAboveSlab = 36.0f;
+    if (feet > platTop + kTierAboveSlab)
+        return false;
+
+    // 빠르게 상승 중이면 무조건 통과.
+    // (2층 파이프에서 점프 시작 프레임에 같은 파이프가 다시 스냅해 점프를 막는 문제 방지)
+    constexpr float kRiseVy       = 52.0f;
+    if (vy > kRiseVy)
+        return false;
+
+    // 핵심: 정확히 닿는 프레임(겹침 0)도 착지로 유지하도록 작은 상향 오차를 허용.
+    constexpr float kSnapDownRange = 96.0f;
+    constexpr float kSnapUpRange   = 8.0f;
+    if (feet < platTop - kSnapDownRange || feet > platTop + kSnapUpRange)
+        return false;
+
+    Math::Vec2 newHbCenter = currentHbCenter;
+    newHbCenter.y = platTop + playerHalfSize.y;
+    Math::Vec2 shift = newHbCenter - currentHbCenter;
+    player.SetPosition(player.GetPosition() + shift);
+    currentHbCenter = newHbCenter;
+    player.SetOnGround(true);
+    return true;
+}
+
+// Maintain stable standing when the player is exactly touching a platform top.
+// Without this, exact-contact frames may flip on/off ground and cause jitter.
+static bool SnapToTopSupport(Player& player, Math::Vec2& currentHbCenter,
+                             const Math::Vec2& playerHalfSize,
+                             const Math::Vec2& obsCenter, const Math::Vec2& obsSize,
+                             Train::TrainHitboxKind kind, bool crouchHeld)
+{
+    if (kind == Train::TrainHitboxKind::JumpThroughPipe && crouchHeld)
+        return false;
+
+    Math::Vec2 obsHalf = obsSize * 0.5f;
+    Math::Vec2 obsMin  = obsCenter - obsHalf;
+    Math::Vec2 obsMax  = obsCenter + obsHalf;
+
+    const float pMinX = currentHbCenter.x - playerHalfSize.x;
+    const float pMaxX = currentHbCenter.x + playerHalfSize.x;
+    const bool horizOverlap = pMaxX > obsMin.x && pMinX < obsMax.x;
+    if (!horizOverlap)
+        return false;
+
+    const float platTop = obsMax.y;
+    const float feet    = currentHbCenter.y - playerHalfSize.y;
+    const float vy      = player.GetVelocity().y;
+
+    // Don't glue while strongly rising.
+    if (vy > 60.0f)
+        return false;
+
+    const float aboveTol = (kind == Train::TrainHitboxKind::JumpThroughPipe) ? 10.0f : 8.0f;
+    const float belowTol = (kind == Train::TrainHitboxKind::JumpThroughPipe) ? 72.0f : 24.0f;
+
+    if (feet > platTop + aboveTol || feet < platTop - belowTol)
+        return false;
+
+    Math::Vec2 newHbCenter = currentHbCenter;
+    newHbCenter.y = platTop + playerHalfSize.y;
+    Math::Vec2 shift = newHbCenter - currentHbCenter;
+    player.SetPosition(player.GetPosition() + shift);
+    currentHbCenter = newHbCenter;
+    player.SetOnGround(true);
+    return true;
+}
+
+
+// ---------------------------------------------------------------------------
 // ResolveAABB – identical algorithm to Underground so behaviour is consistent.
 //   Uses actual penetration depth (min-of-max minus max-of-min) on each axis,
 //   resolves along the axis with the SMALLER overlap.
 //   Returns true if the player was pushed UP onto the surface (standing on top).
 // ---------------------------------------------------------------------------
+static bool IsThinHorizontalSlab(const Math::Vec2& obsSize)
+{
+    return obsSize.y <= 72.0f && obsSize.x >= obsSize.y * 3.0f;
+}
+
 static bool ResolveAABB(Player& player, Math::Vec2& currentHbCenter,
                          const Math::Vec2& playerHalfSize,
                          const Math::Vec2& obsCenter, const Math::Vec2& obsSize)
@@ -296,6 +491,33 @@ static bool ResolveAABB(Player& player, Math::Vec2& currentHbCenter,
     Math::Vec2 obsMax  = obsCenter + obsHalf;
     Math::Vec2 pMin    = currentHbCenter - playerHalfSize;
     Math::Vec2 pMax    = currentHbCenter + playerHalfSize;
+
+    // 얇은 가로 발판: overlapY가 작을 때 overlapX < overlapY 로 가로 밀림이 나와 웅크리기 낙하 시 옆으로 튐 → 세로 착지만
+    if (IsThinHorizontalSlab(obsSize))
+    {
+        const float platTop = obsMax.y;
+        const float platBot = obsMin.y;
+        const float feet    = currentHbCenter.y - playerHalfSize.y;
+        const float vy      = player.GetVelocity().y;
+
+        // 위층에 있을 때 아래쪽 얇은 발판(열차 바닥 등)과 몸만 겹치면 해석하지 않음
+        constexpr float kTierAboveSlab = 36.0f;
+        if (feet > platTop + kTierAboveSlab)
+            return false;
+
+        const bool horizOverlap = pMax.x > obsMin.x && pMin.x < obsMax.x;
+        // 윗면 근처에서만 세로 스냅(공중에서 발판보다 훨씬 위에 있을 때는 건너뜀 → 가로 밀림 방지)
+        if (horizOverlap && vy <= 160.0f && feet <= platTop + 56.0f && feet >= platTop - 88.0f)
+        {
+            Math::Vec2 newHbCenter = currentHbCenter;
+            newHbCenter.y          = platTop + playerHalfSize.y;
+            Math::Vec2 shift       = newHbCenter - currentHbCenter;
+            player.SetPosition(player.GetPosition() + shift);
+            currentHbCenter = newHbCenter;
+            player.SetOnGround(true);
+            return true;
+        }
+    }
 
     float overlapX = std::min(pMax.x, obsMax.x) - std::max(pMin.x, obsMin.x);
     float overlapY = std::min(pMax.y, obsMax.y) - std::max(pMin.y, obsMin.y);
@@ -345,9 +567,11 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
 
     Math::Vec2 playerPos = player.GetPosition();
 
-    // Only run when player is roughly within (or near) the train region
+    // Only run when player is roughly within (or near) the train region.
+    // Upper bound needs extra margin: on the 3F pipe (local top ≈ 1006)
+    // the player centre can exceed MIN_Y + HEIGHT.
     const bool playerInSubway =
-        playerPos.y >= MIN_Y && playerPos.y <= MIN_Y + HEIGHT &&
+        playerPos.y >= MIN_Y && playerPos.y <= MIN_Y + HEIGHT + 400.0f &&
         playerPos.x >= MIN_X - 200.0f;
 
     if (!playerInSubway) return;
@@ -368,19 +592,123 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     // --- Train hitbox collision ---
     const float trainWorldLeft = MIN_X + m_trainOffset;
     bool playerOnTrainSurface = false;
+    bool playerOnJumpThroughSurface = false;
+
+    const bool crouchHeld = player.IsCrouching();
+    const bool crouchPressed = crouchHeld && !m_prevCrouchHeld;
+
+    // ─── 파이프 드롭스루 (S 누르는 순간) ───
+    // collision pass 전에 직접 검사: 파이프 top과 발 차이가 작으면 즉시 -100px nudge.
+    // 이렇게 하면 SnapToTopSupport / ResolveJumpThroughAABB의 race 조건과 무관하게 확실히 드롭된다.
+    if (m_pipeDropCooldown > 0.0f)
+        m_pipeDropCooldown = std::max(0.0f, m_pipeDropCooldown - fdt);
+
+    if (crouchPressed && m_pipeDropCooldown <= 0.0f)
+    {
+        const Math::Vec2 hc = player.GetHitboxCenter();
+        const float feet    = hc.y - playerHalfSize.y;
+        for (const auto& hb : m_trainHitboxes)
+        {
+            if (!hb.collision) continue;
+            if (hb.kind != Train::TrainHitboxKind::JumpThroughPipe) continue;
+
+            const float xMin = trainWorldLeft + hb.localCenter.x - hb.size.x * 0.5f;
+            const float xMax = trainWorldLeft + hb.localCenter.x + hb.size.x * 0.5f;
+            const float top  = MIN_Y          + hb.localCenter.y + hb.size.y * 0.5f;
+
+            const bool xOverlap = (hc.x + playerHalfSize.x > xMin) && (hc.x - playerHalfSize.x < xMax);
+            if (!xOverlap) continue;
+            if (std::abs(feet - top) > 24.0f) continue; // 파이프 top 근처에 발이 있어야 함
+
+            constexpr float kPipeDropNudge = 100.0f;
+            player.SetPosition(player.GetPosition() + Math::Vec2{ 0.0f, -kPipeDropNudge });
+            player.SetOnGround(false);
+            m_pipeDropCooldown = 0.18f;
+            currentHbCenter = player.GetHitboxCenter();
+            break;
+        }
+    }
 
     for (const auto& hb : m_trainHitboxes)
     {
+        if (!hb.collision)
+            continue;
+
         Math::Vec2 hbWorld = {
             trainWorldLeft + hb.localCenter.x,
             MIN_Y          + hb.localCenter.y
         };
-        if (ResolveAABB(player, currentHbCenter, playerHalfSize, hbWorld, hb.size))
+
+        bool landed = false;
+        if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe)
+        {
+            if (m_pipeDropCooldown > 0.0f) continue; // 드롭 직후엔 파이프 다시 잡지 않음
+            landed = ResolveJumpThroughAABB(player, currentHbCenter, playerHalfSize, hbWorld, hb.size, crouchHeld);
+        }
+        else
+            landed = ResolveAABB(player, currentHbCenter, playerHalfSize, hbWorld, hb.size);
+
+        if (landed)
+        {
             playerOnTrainSurface = true;
+            if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe)
+                playerOnJumpThroughSurface = true;
+        }
     }
+
+    // Exact-touch stabilization pass:
+    // if collision solver didn't mark landed this frame, keep support when feet are already on a top surface.
+    if (!playerOnTrainSurface)
+    {
+        for (const auto& hb : m_trainHitboxes)
+        {
+            if (!hb.collision)
+                continue;
+
+            Math::Vec2 hbWorld = {
+                trainWorldLeft + hb.localCenter.x,
+                MIN_Y          + hb.localCenter.y
+            };
+            if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe && m_pipeDropCooldown > 0.0f)
+                continue;
+            if (SnapToTopSupport(player, currentHbCenter, playerHalfSize, hbWorld, hb.size, hb.kind, crouchHeld))
+            {
+                playerOnTrainSurface = true;
+                if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe)
+                    playerOnJumpThroughSurface = true;
+                break;
+            }
+        }
+    }
+
+    // 드롭은 위쪽에서 이미 처리됨. 여기서는 prev 상태만 갱신.
+    m_prevCrouchHeld = crouchHeld;
 
     // Track whether player is on train this frame
     m_playerOnTrain = playerOnTrainSurface;
+
+    // 발판에서 벗어났으면 지면 플래그 해제 — 다음 프레임부터 중력 적용 (걷다가 낭떠러지)
+    if (!playerOnTrainSurface)
+        player.SetOnGround(false);
+
+    // Keep jump arc / crouch aligned with moving train (Player::Update runs before this)
+    {
+        const Math::Vec2 hc = player.GetHitboxCenter();
+        const Math::Vec2 hh = playerHitboxSize * 0.5f;
+        const bool inCarryBand = HitboxInTrainCarryBand(trainWorldLeft, m_totalTrainWidth, hc, hh);
+
+        if (playerOnTrainSurface)
+            m_airborneFromTrain = false;
+        else if (m_prevPlayerOnTrain && !playerOnTrainSurface && player.GetVelocity().y > 80.0f)
+            m_airborneFromTrain = true; // left top of car with upward velocity (jump)
+        if (!inCarryBand)
+            m_airborneFromTrain = false;
+
+        if (playerOnTrainSurface && player.IsCrouching())
+            m_crouchCarryLatched = true;
+        if (!player.IsCrouching() || !inCarryBand)
+            m_crouchCarryLatched = false;
+    }
 
     // --- Entry countdown → automatic departure ---
     if (m_entryTimer >= 0.0f && m_trainState == TrainState::Stationary)
@@ -404,8 +732,17 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
         const float move = TRAIN_SPEED * fdt;
         m_trainOffset += move;
 
-        // Move player with the train so it looks like they're riding it
-        if (playerOnTrainSurface)
+        const Math::Vec2 hc = player.GetHitboxCenter();
+        const Math::Vec2 hh = playerHitboxSize * 0.5f;
+        const float twLeft = MIN_X + m_trainOffset - move;
+        const bool inCarryBand = HitboxInTrainCarryBand(twLeft, m_totalTrainWidth, hc, hh);
+
+        const bool carryHorizontally =
+            playerOnTrainSurface
+            || (m_airborneFromTrain && inCarryBand)
+            || (m_crouchCarryLatched && player.IsCrouching() && inCarryBand);
+
+        if (carryHorizontally)
             player.SetPosition(player.GetPosition() + Math::Vec2{ move, 0.0f });
     }
 
@@ -413,6 +750,9 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     currentHbCenter = player.GetHitboxCenter();
     if (currentHbCenter.x - playerHalfSize.x < MIN_X)
         player.SetPosition({ player.GetPosition().x + (MIN_X - (currentHbCenter.x - playerHalfSize.x)), player.GetPosition().y });
+
+    m_prevPlayerOnTrain = playerOnTrainSurface;
+    m_prevOnJumpThroughSurface = playerOnJumpThroughSurface;
 }
 
 
@@ -426,6 +766,12 @@ void Train::StartEntryTimer()
         m_entryTimer  = 0.0f;
         m_trainState  = TrainState::Stationary;
         m_trainOffset = 0.0f;
+        m_prevPlayerOnTrain  = false;
+        m_airborneFromTrain  = false;
+        m_crouchCarryLatched = false;
+        m_prevOnJumpThroughSurface = false;
+        m_prevCrouchHeld = false;
+        m_pipeDropCooldown = 0.0f;
         Logger::Instance().Log(Logger::Severity::Info,
             "Train: Entry timer started – train departs in %.1f s", TRAIN_DEPART_DELAY);
     }
@@ -496,7 +842,7 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
 
     // Sky gradient only needs to cover current visible area.
     const float spanW = (visibleRight - visibleLeft) + 1200.0f;
-    const float centerX = MIN_X + WIDTH * 0.5f;
+    const float centerX = MIN_X + m_totalTrainWidth * 0.5f;
     const float camDx = cameraPos.x - centerX;
     // Keep base sky centered on camera so it never falls out of view.
     // Only foreground/background objects use parallax offsets.
@@ -640,6 +986,26 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
         m_thirdTrain->Draw(shader, model);
     }
 
+    if (m_thirdThirdTrain)
+    {
+        float cx = trainLeft + m_car1Width + m_car2Width + m_car3Width + m_car4Width * 0.5f;
+        float cy = MIN_Y + HEIGHT * 0.5f;
+        Math::Matrix model =
+            Math::Matrix::CreateTranslation({ cx, cy }) *
+            Math::Matrix::CreateScale({ m_car4Width, HEIGHT });
+        m_thirdThirdTrain->Draw(shader, model);
+    }
+
+    if (m_fourthTrain)
+    {
+        float cx = trainLeft + m_car1Width + m_car2Width + m_car3Width + m_car4Width + m_car5Width * 0.5f;
+        float cy = MIN_Y + HEIGHT * 0.5f;
+        Math::Matrix model =
+            Math::Matrix::CreateTranslation({ cx, cy }) *
+            Math::Matrix::CreateScale({ m_car5Width, HEIGHT });
+        m_fourthTrain->Draw(shader, model);
+    }
+
     // ── Robots (none currently, kept for future use) ─────────────────────
     for (const auto& robot : m_robots)
     {
@@ -711,7 +1077,7 @@ void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
     debugRenderer.DrawBox(colorShader,
         { MIN_X,         MIN_Y + bndH * 0.5f }, { 10.0f, bndH }, { 1.0f, 1.0f });
     debugRenderer.DrawBox(colorShader,
-        { MIN_X + WIDTH, MIN_Y + bndH * 0.5f }, { 10.0f, bndH }, { 1.0f, 1.0f });
+        { MIN_X + m_totalTrainWidth, MIN_Y + bndH * 0.5f }, { 10.0f, bndH }, { 1.0f, 1.0f });
 }
 
 
@@ -720,10 +1086,12 @@ void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 // ---------------------------------------------------------------------------
 void Train::Shutdown()
 {
-    if (m_firstTrain)  m_firstTrain->Shutdown();
-    if (m_secondTrain) m_secondTrain->Shutdown();
-    if (m_thirdTrain)  m_thirdTrain->Shutdown();
-    if (m_railTile)    m_railTile->Shutdown();
+    if (m_firstTrain)      m_firstTrain->Shutdown();
+    if (m_secondTrain)     m_secondTrain->Shutdown();
+    if (m_thirdTrain)      m_thirdTrain->Shutdown();
+    if (m_thirdThirdTrain) m_thirdThirdTrain->Shutdown();
+    if (m_fourthTrain)     m_fourthTrain->Shutdown();
+    if (m_railTile)        m_railTile->Shutdown();
 
     if (m_skyVAO) { GL::DeleteVertexArrays(1, &m_skyVAO); m_skyVAO = 0; }
     if (m_skyVBO) { GL::DeleteBuffers(1, &m_skyVBO);      m_skyVBO = 0; }
