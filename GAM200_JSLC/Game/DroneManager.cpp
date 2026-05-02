@@ -118,6 +118,9 @@ std::vector<std::pair<Math::Vec2, Math::Vec2>> DroneManager::ApplyDetonation(
 
         Math::Vec2 dir = (dist > 0.1f) ? toTarget / dist : Math::Vec2{ 1.f, 0.f };
 
+        // Show source-to-target shock links as well, so train-car Q casts visibly "reach" drones.
+        arcs.push_back({ origin, drones[i].GetPosition() });
+
         drones[i].ApplyStun(stunDuration);
         drones[i].ApplyKnockback(dir * impulse, delay);
         // Damage appears after the slide finishes (delay + full slide window)

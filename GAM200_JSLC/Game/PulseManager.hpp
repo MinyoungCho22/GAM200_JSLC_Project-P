@@ -94,5 +94,5 @@ private:
         float timer = 0.f;
     };
     std::vector<ChainArc> m_chainArcs;
-    static constexpr float CHAIN_ARC_DURATION = 0.18f;  // flash only — gone before knockback displaces drone
+    static constexpr float CHAIN_ARC_DURATION = 0.40f;  // longer visibility for readability
 };

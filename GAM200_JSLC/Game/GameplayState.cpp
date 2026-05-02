@@ -18,6 +18,8 @@
 #include <sstream>
 #include <cmath>
 #include <algorithm>
+#include <utility>
+#include <vector>
 
 #include "../Engine/Sound.hpp"
 
@@ -637,6 +639,7 @@ void GameplayState::Update(double dt)
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
+    Math::Vec2 playerHbCenter = player.GetHitboxCenter();
 
     const bool hallwayHidingBlocksDroneAttack = m_doorOpened && !m_rooftopAccessed
         && m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
@@ -879,16 +882,50 @@ void GameplayState::Update(double dt)
 
         if (ctl.IsActionTriggered(ControlAction::Attack, input))
         {
-            if (m_room->IsBlindOpen())
+            bool trainCarIgniteHandled = false;
+            if (m_trainAccessed && m_train && !m_isGameOver)
             {
-                m_door->Update(player, true, mouseWorldPos);
+                int carSlot = -1;
+                if (m_train->TryGetCarTransportClickIgniteTarget(playerHbCenter, playerHitboxSize, mouseWorldPos,
+                                                                 carSlot))
+                {
+                    auto* imguiMgrClick = gsm.GetEngine().GetImguiManager();
+                    const bool gmClick  = imguiMgrClick && imguiMgrClick->IsPlayerGodMode();
+                    constexpr float kCarIgnitePulseCost = 5.0f;
+                    Pulse& pulseRef                     = player.GetPulseCore().getPulse();
+
+                    if (gmClick || pulseRef.Value() >= kCarIgnitePulseCost)
+                    {
+                        if (m_train->TryIgniteCarTransportSlot(carSlot))
+                        {
+                            if (!gmClick)
+                                pulseRef.spend(kCarIgnitePulseCost);
+                            trainCarIgniteHandled = true;
+                        }
+                    }
+                    else
+                        trainCarIgniteHandled = true;
+                }
+            }
+
+            if (!trainCarIgniteHandled)
+            {
+                if (m_room->IsBlindOpen())
+                {
+                    m_door->Update(player, true, mouseWorldPos);
+                }
+                else
+                {
+                    m_door->Update(player, false, mouseWorldPos);
+                }
+
+                m_rooftopDoor->Update(player, true, mouseWorldPos);
             }
             else
             {
                 m_door->Update(player, false, mouseWorldPos);
+                m_rooftopDoor->Update(player, false, mouseWorldPos);
             }
-
-            m_rooftopDoor->Update(player, true, mouseWorldPos);
         }
         else
         {
@@ -1079,10 +1116,21 @@ void GameplayState::Update(double dt)
             auto* im = gsm.GetEngine().GetImguiManager();
             return im && im->IsPlayerGodMode();
         }();
-        m_pulseDetonateSkill.Update(dt, player, playerCenter,
+        Math::Vec2 trainPulseAnchor{};
+        const bool trainPulseAnchorOk =
+            m_trainAccessed && m_train && m_train->TryGetCarTransportSkillAnchor(playerHbCenter, trainPulseAnchor);
+        std::vector<std::pair<Math::Vec2, Math::Vec2>> trainStaticChainArcs;
+        if (m_trainAccessed && m_train)
+            m_train->AppendCarTransportStraightChainArcs(trainStaticChainArcs);
+
+        // 플레이어 중심은 스프라이트 위치보다 히트박스 중심이 펄스/판정과 일치
+        m_pulseDetonateSkill.Update(dt, player, playerHbCenter,
             m_rooftop->GetDroneManager(), droneManager.get(),
             *pulseManager, ctl, input,
-            m_isGameOver, m_rooftopAccessed, isGodMode);
+            m_isGameOver, m_rooftopAccessed, isGodMode,
+            (m_trainAccessed && m_train) ? m_train->GetDroneManager() : nullptr,
+            trainPulseAnchorOk ? &trainPulseAnchor : nullptr,
+            &trainStaticChainArcs);
     }
 
     if (m_storyDialogue && m_rooftopAccessed && !m_undergroundAccessed && m_rooftop && !m_blockAmbientStoryForSession
@@ -1107,7 +1155,11 @@ void GameplayState::Update(double dt)
 
     if (m_trainAccessed)
     {
-        m_train->Update(dt, player, playerHitboxSize);
+        const bool trainCarInjectGodMode = [&]() -> bool {
+            auto* im = gsm.GetEngine().GetImguiManager();
+            return im && im->IsPlayerGodMode();
+        }();
+        m_train->Update(dt, player, playerHitboxSize, isPressingInteract, trainCarInjectGodMode);
 
         // Keep right bound expanding while player advances.
         // This prevents camera lock when the player leaves the train and keeps moving right.
@@ -1189,6 +1241,8 @@ void GameplayState::Update(double dt)
                     if (!imguiManager || !imguiManager->IsPlayerGodMode())
                     {
                         player.TakeDamage(25.0f);
+                        if (m_train)
+                            m_train->NotifyCarTransportInjectionInterrupted();
                     }
                 }
                 drone.ResetDamageFlag();
@@ -1851,6 +1905,17 @@ void GameplayState::DrawMainLayer()
     m_underground->Draw(textureShader);
     m_train->Draw(textureShader, m_camera.GetPosition(), viewHalfW);
 
+    if (m_trainAccessed)
+    {
+        colorShader->use();
+        colorShader->setMat4("projection", worldProjection);
+        m_train->DrawCarTransportVFX(*colorShader, m_camera.GetPosition(), viewHalfW);
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+    }
+
     // Hallway railings: DrawForegroundLayer (after player / VFX) so Railing.png sits in front.
 
     GL::Disable(GL_BLEND);
@@ -2263,6 +2328,15 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         if (!overLeftClickTarget && m_trainAccessed)
         {
             for (const auto& r : m_train->GetRobots()) { if (isMouseOnRobot(r)) { overLeftClickTarget = true; break; } }
+        }
+
+        // 운반 차량: 플레이어와 차 히트박스 겹침 + 마우스가 차 위 → 좌클릭 커서
+        if (!overLeftClickTarget && m_trainAccessed && m_train)
+        {
+            int carSlot = -1;
+            if (m_train->TryGetCarTransportClickIgniteTarget(playerHitboxCenter, playerHitboxSize,
+                                                             mouseWorldPosForHover, carSlot))
+                overLeftClickTarget = true;
         }
     }
 

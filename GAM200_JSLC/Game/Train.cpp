@@ -11,9 +11,11 @@
 #include "../Engine/Logger.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "MapObjectConfig.hpp"
+#include "Robot.hpp"
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <vector>
 
 
 // ---------------------------------------------------------------------------
@@ -55,6 +57,309 @@ static bool HitboxInTrainCarryBand(float trainWorldLeft, float totalTrainWidth,
     if (hbCenter.y - hbHalf.y > Train::MIN_Y + Train::HEIGHT + 40.0f)
         return false;
     return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// Third_ThirdTrain — 자동차 운반 칸 6슬롯 (엔진 / 펄스 주입 / 직선 연쇄)
+// ---------------------------------------------------------------------------
+namespace {
+constexpr float kCarInjectDurationSec   = 2.0f;
+constexpr float kCarInjectPulseDrainSec = 22.0f;
+constexpr float kCarInteractRangeSq   = 380.0f * 380.0f;
+constexpr float kCarSkillAnchorRangeSq = 400.0f * 400.0f;
+constexpr float kChainDetonateRadius  = 440.0f;
+constexpr float kChainDetonateStun    = 2.0f;
+constexpr float kMoorePulseShareRate  = 2.5f;
+constexpr int   kCarTransportCount    = 6;
+
+static const int kStraightCarPairs[][2] = {
+    { 0, 1 }, { 1, 2 }, { 3, 4 }, { 4, 5 },
+    { 0, 3 }, { 1, 4 }, { 2, 5 },
+};
+}
+
+Math::Vec2 Train::CarTransportWorldCenter(int slotIndex) const
+{
+    const float trainLeft = MIN_X + m_trainOffset;
+    const auto& s         = m_carTransportSlots[static_cast<size_t>(slotIndex)];
+    return { trainLeft + s.localCenter.x, MIN_Y + s.localCenter.y };
+}
+
+bool Train::IsMooreAdjacentCarSlots(int a, int b)
+{
+    const int ra = a / 3, ca = a % 3;
+    const int rb = b / 3, cb = b % 3;
+    const int dr = std::abs(ra - rb), dc = std::abs(ca - cb);
+    return dr <= 1 && dc <= 1 && (dr + dc) > 0;
+}
+
+int Train::FindCarTransportInjectTarget(Math::Vec2 playerHbCenter) const
+{
+    int   best   = -1;
+    float bestD  = 1.e18f;
+    for (int i = 0; i < kCarTransportCount; ++i)
+    {
+        if (m_carTransportSlots[static_cast<size_t>(i)].engineOn)
+            continue;
+        const Math::Vec2 w = CarTransportWorldCenter(i);
+        const float      d = (playerHbCenter - w).LengthSq();
+        if (d > kCarInteractRangeSq || d >= bestD)
+            continue;
+        bestD = d;
+        best  = i;
+    }
+    return best;
+}
+
+void Train::ResetCarTransportSlotsToInitialState()
+{
+    const float c4 = m_car1Width + m_car2Width + m_car3Width;
+
+    struct Def
+    {
+        float px, py, pw, ph;
+        bool startEngine;
+    };
+    static const Def defs[kCarTransportCount] = {
+        { 429.f, 129.f, 886.f, 304.f, true },   // 좌상 — 시동 ON
+        { 1536.f, 129.f, 886.f, 304.f, false },
+        { 2629.f, 129.f, 886.f, 304.f, false },
+        { 432.f, 489.f, 876.f, 306.f, false },
+        { 1539.f, 489.f, 876.f, 306.f, false },
+        { 2631.f, 489.f, 876.f, 306.f, true }, // 우하 — 시동 ON
+    };
+
+    for (int i = 0; i < kCarTransportCount; ++i)
+    {
+        Train::TrainHitbox hb = MakeHitbox(c4, defs[i].px, defs[i].py, defs[i].pw, defs[i].ph, false,
+                                           TrainHitboxKind::Solid);
+        m_carTransportSlots[static_cast<size_t>(i)].localCenter    = hb.localCenter;
+        m_carTransportSlots[static_cast<size_t>(i)].halfSize       = hb.size * 0.5f;
+        m_carTransportSlots[static_cast<size_t>(i)].engineOn       = defs[i].startEngine;
+        m_carTransportSlots[static_cast<size_t>(i)].injectSeconds  = 0.f;
+        m_carTransportSlots[static_cast<size_t>(i)].engineGlowTimer = 0.f;
+    }
+    m_carInjectFocusSlot = -1;
+}
+
+void Train::NotifyCarTransportInjectionInterrupted()
+{
+    for (auto& s : m_carTransportSlots)
+        s.injectSeconds = 0.f;
+    m_carInjectFocusSlot = -1;
+}
+
+bool Train::TryGetCarTransportSkillAnchor(Math::Vec2 playerHbCenter, Math::Vec2& outWorldAnchor) const
+{
+    int   best  = -1;
+    float bestD = 1.e18f;
+    for (int i = 0; i < kCarTransportCount; ++i)
+    {
+        const Math::Vec2 w = CarTransportWorldCenter(i);
+        const float      d = (playerHbCenter - w).LengthSq();
+        if (d > kCarSkillAnchorRangeSq || d >= bestD)
+            continue;
+        bestD = d;
+        best  = i;
+    }
+    if (best < 0)
+        return false;
+    outWorldAnchor = CarTransportWorldCenter(best);
+    return true;
+}
+
+bool Train::TryGetCarTransportClickIgniteTarget(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize,
+                                                Math::Vec2 mouseWorldPos, int& outSlotIndex) const
+{
+    const Math::Vec2 kCursorHitbox{ 32.f, 32.f };
+
+    for (int i = 0; i < kCarTransportCount; ++i)
+    {
+        const auto& slot = m_carTransportSlots[static_cast<size_t>(i)];
+        if (slot.engineOn)
+            continue;
+
+        const Math::Vec2 wc   = CarTransportWorldCenter(i);
+        const Math::Vec2 full = slot.halfSize * 2.f;
+
+        if (!Collision::CheckAABB(playerHbCenter, playerHbSize, wc, full))
+            continue;
+
+        const bool mouseOnCar = Collision::CheckPointInAABB(mouseWorldPos, wc, full)
+                                || Collision::CheckAABB(mouseWorldPos, kCursorHitbox, wc, full);
+        if (!mouseOnCar)
+            continue;
+
+        outSlotIndex = i;
+        return true;
+    }
+    return false;
+}
+
+bool Train::TryIgniteCarTransportSlot(int slotIndex)
+{
+    if (slotIndex < 0 || slotIndex >= kCarTransportCount)
+        return false;
+
+    auto& slot = m_carTransportSlots[static_cast<size_t>(slotIndex)];
+    if (slot.engineOn)
+        return false;
+
+    slot.engineOn        = true;
+    slot.injectSeconds   = 0.f;
+    slot.engineGlowTimer = 1.35f;
+    if (m_carInjectFocusSlot == slotIndex)
+        m_carInjectFocusSlot = -1;
+
+    FireStraightLineChainDetonations();
+
+    Logger::Instance().Log(Logger::Severity::Info,
+                           "Train: Car transport engine ON (click slot %d)", slotIndex);
+    return true;
+}
+
+void Train::AppendCarTransportStraightChainArcs(std::vector<std::pair<Math::Vec2, Math::Vec2>>& outArcs) const
+{
+    constexpr int pairCount = static_cast<int>(sizeof(kStraightCarPairs) / sizeof(kStraightCarPairs[0]));
+    for (int e = 0; e < pairCount; ++e)
+    {
+        const int a = kStraightCarPairs[e][0];
+        const int b = kStraightCarPairs[e][1];
+
+        if (!m_carTransportSlots[static_cast<size_t>(a)].engineOn
+            || !m_carTransportSlots[static_cast<size_t>(b)].engineOn)
+            continue;
+
+        outArcs.push_back({ CarTransportWorldCenter(a), CarTransportWorldCenter(b) });
+    }
+}
+
+void Train::ApplyMooreConnectedPulseShare(Player& player, float dt)
+{
+    bool visited[kCarTransportCount] = {};
+    float bonus                       = 0.f;
+
+    for (int i = 0; i < kCarTransportCount; ++i)
+    {
+        if (!m_carTransportSlots[static_cast<size_t>(i)].engineOn || visited[i])
+            continue;
+
+        std::vector<int> q;
+        q.push_back(i);
+        visited[i] = true;
+        size_t qi = 0;
+        int cluster = 0;
+
+        while (qi < q.size())
+        {
+            const int u = q[qi++];
+            ++cluster;
+            for (int v = 0; v < kCarTransportCount; ++v)
+            {
+                if (!m_carTransportSlots[static_cast<size_t>(v)].engineOn || visited[v])
+                    continue;
+                if (!IsMooreAdjacentCarSlots(u, v))
+                    continue;
+                visited[v] = true;
+                q.push_back(v);
+            }
+        }
+
+        if (cluster >= 2)
+            bonus += static_cast<float>(cluster - 1) * kMoorePulseShareRate * dt;
+    }
+
+    if (bonus > 0.f)
+        player.GetPulseCore().getPulse().add(bonus);
+}
+
+void Train::FireStraightLineChainDetonations()
+{
+    if (!m_droneManager)
+        return;
+
+    constexpr int pairCount = static_cast<int>(sizeof(kStraightCarPairs) / sizeof(kStraightCarPairs[0]));
+    for (int e = 0; e < pairCount; ++e)
+    {
+        const int        a = kStraightCarPairs[e][0];
+        const int        b = kStraightCarPairs[e][1];
+        if (!m_carTransportSlots[static_cast<size_t>(a)].engineOn
+            || !m_carTransportSlots[static_cast<size_t>(b)].engineOn)
+            continue;
+
+        const Math::Vec2 wa  = CarTransportWorldCenter(a);
+        const Math::Vec2 wb  = CarTransportWorldCenter(b);
+        const Math::Vec2 mid = { (wa.x + wb.x) * 0.5f, (wa.y + wb.y) * 0.5f };
+        m_droneManager->ApplyDetonation(mid, kChainDetonateRadius, kChainDetonateStun);
+    }
+}
+
+void Train::UpdateCarTransport(float dt, Player& player, Math::Vec2 playerHbCenter,
+                               bool pulseAbsorbHeld, bool ignorePulseCost)
+{
+    const float fdt = dt;
+
+    for (auto& s : m_carTransportSlots)
+    {
+        if (s.engineGlowTimer > 0.f)
+            s.engineGlowTimer = std::max(0.f, s.engineGlowTimer - fdt);
+    }
+
+    ApplyMooreConnectedPulseShare(player, fdt);
+
+    int focus = -1;
+    if (pulseAbsorbHeld)
+        focus = FindCarTransportInjectTarget(playerHbCenter);
+
+    if (!pulseAbsorbHeld || focus < 0)
+    {
+        if (m_carInjectFocusSlot >= 0)
+        {
+            m_carTransportSlots[static_cast<size_t>(m_carInjectFocusSlot)].injectSeconds = 0.f;
+            m_carInjectFocusSlot                                                             = -1;
+        }
+        return;
+    }
+
+    if (m_carInjectFocusSlot >= 0 && m_carInjectFocusSlot != focus)
+        m_carTransportSlots[static_cast<size_t>(m_carInjectFocusSlot)].injectSeconds = 0.f;
+
+    m_carInjectFocusSlot = focus;
+    auto& slot           = m_carTransportSlots[static_cast<size_t>(focus)];
+
+    if (slot.engineOn)
+    {
+        slot.injectSeconds   = 0.f;
+        m_carInjectFocusSlot = -1;
+        return;
+    }
+
+    Pulse& pulse = player.GetPulseCore().getPulse();
+
+    if (!ignorePulseCost)
+    {
+        const float need = kCarInjectPulseDrainSec * fdt;
+        if (pulse.Value() < need)
+        {
+            slot.injectSeconds   = 0.f;
+            m_carInjectFocusSlot = -1;
+            return;
+        }
+        pulse.spend(need);
+    }
+
+    slot.injectSeconds += fdt;
+    if (slot.injectSeconds >= kCarInjectDurationSec)
+    {
+        slot.engineOn      = true;
+        slot.injectSeconds = 0.f;
+        slot.engineGlowTimer = 1.35f;
+        m_carInjectFocusSlot = -1;
+        FireStraightLineChainDetonations();
+        Logger::Instance().Log(Logger::Severity::Info,
+                               "Train: Car transport engine ON (slot %d)", focus);
+    }
 }
 
 
@@ -114,6 +419,7 @@ void Train::Initialize()
 
     // --- Build train hitboxes from known pixel coordinates ---
     BuildTrainHitboxes();
+    ResetCarTransportSlotsToInitialState();
 
     // --- Sky gradient VAO ---
     InitSkyVAO();
@@ -127,9 +433,37 @@ void Train::Initialize()
 
     ApplyConfig(MapObjectConfig::Instance().GetData().train);
 
+    // 드론·로봇은 기존에 스폰 코드가 없어 비어 있었음 — 맵 길이에 맞춰 기본 배치
+    {
+        for (auto& r : m_robots)
+            r.Shutdown();
+        m_robots.clear();
+
+        constexpr float kRobotDeckY = MIN_Y + 315.f;
+        const float W               = (std::max)(m_totalTrainWidth, 4000.f);
+        const float robotLaneX[]    = { W * 0.12f, W * 0.32f, W * 0.52f, W * 0.72f, W * 0.90f };
+        for (float lx : robotLaneX)
+        {
+            m_robots.emplace_back();
+            m_robots.back().Init({ MIN_X + lx, kRobotDeckY });
+        }
+
+        const float droneBandY[] = { MIN_Y + 380.f, MIN_Y + 560.f, MIN_Y + 760.f };
+        constexpr int kDroneCount = 18;
+        for (int i = 0; i < kDroneCount; ++i)
+        {
+            const float t       = (static_cast<float>(i) + 0.5f) / static_cast<float>(kDroneCount);
+            const float spawnX  = MIN_X + 480.f + t * (W - 960.f);
+            const float spawnY  = droneBandY[i % 3];
+            const float speed   = 125.f + static_cast<float>((i * 17) % 260);
+            m_droneManager->SpawnDrone({ spawnX, spawnY }, "Asset/Drone.png", false).SetBaseSpeed(speed);
+        }
+    }
+
     Logger::Instance().Log(Logger::Severity::Info,
-        "Train Map initialized – car widths: %.0f / %.0f / %.0f / %.0f / %.0f (total %.0f), rail tile: %.0f",
-        m_car1Width, m_car2Width, m_car3Width, m_car4Width, m_car5Width, m_totalTrainWidth, m_railTileW);
+        "Train Map initialized – car widths: %.0f / %.0f / %.0f / %.0f / %.0f (total %.0f), rail tile: %.0f — drones %zu robots %zu",
+        m_car1Width, m_car2Width, m_car3Width, m_car4Width, m_car5Width, m_totalTrainWidth, m_railTileW,
+        m_droneManager->GetDrones().size(), m_robots.size());
 }
 
 
@@ -550,7 +884,8 @@ static bool ResolveAABB(Player& player, Math::Vec2& currentHbCenter,
 // ---------------------------------------------------------------------------
 // Update
 // ---------------------------------------------------------------------------
-void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
+void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
+                   bool pulseAbsorbHeld, bool ignoreCarInjectPulseCost)
 {
     const float fdt = static_cast<float>(dt);
 
@@ -569,6 +904,19 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     const bool isPlayerHiding = IsPlayerHiding(player.GetHitboxCenter(), playerHitboxSize, player.IsCrouching());
     player.SetHiding(isPlayerHiding);
     m_droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
+
+    {
+        std::vector<ObstacleInfo> obstacleInfos;
+        obstacleInfos.reserve(m_obstacles.size());
+        for (const auto& obs : m_obstacles)
+            obstacleInfos.push_back({ obs.pos, obs.size });
+
+        const float mapMinX = MIN_X;
+        const float mapMaxX = MIN_X + m_totalTrainWidth;
+
+        for (auto& robot : m_robots)
+            robot.Update(dt, player, obstacleInfos, mapMinX, mapMaxX);
+    }
 
     // Use hitbox center (matches Underground / other maps)
     Math::Vec2 currentHbCenter = player.GetHitboxCenter();
@@ -681,9 +1029,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     if (!playerOnTrainSurface)
         player.SetOnGround(false);
 
-    // Keep jump arc / crouch / drop aligned with moving train
-    {
-    }
+    UpdateCarTransport(fdt, player, currentHbCenter, pulseAbsorbHeld, ignoreCarInjectPulseCost);
 
     // --- Entry countdown → automatic departure ---
     if (m_entryTimer >= 0.0f && m_trainState == TrainState::Stationary)
@@ -742,6 +1088,7 @@ void Train::StartEntryTimer()
         m_prevOnJumpThroughSurface = false;
         m_prevCrouchHeld = false;
         m_pipeDropCooldown = 0.0f;
+        ResetCarTransportSlotsToInitialState();
         Logger::Instance().Log(Logger::Severity::Info,
             "Train: Entry timer started – train departs in %.1f s", TRAIN_DEPART_DELAY);
     }
@@ -892,6 +1239,46 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
         DrawFilledQuad(colorShader, { x, MIN_Y + HEIGHT * 0.22f },
                        { 10.0f, 170.0f + static_cast<float>((i + 80) % 3) * 36.0f },
                        0.06f, 0.04f, 0.05f, 0.94f);
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// DrawCarTransportVFX — 시동된 차량 상단 펄스 라이트(플레이스홀더)
+// ---------------------------------------------------------------------------
+void Train::DrawCarTransportVFX(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
+{
+    if (!m_skyVAO)
+        return;
+
+    float halfW = (viewHalfW > 300.0f) ? viewHalfW : 300.0f;
+    const float margin  = 900.0f;
+    const float visLeft = cameraPos.x - halfW - margin;
+    const float visRight = cameraPos.x + halfW + margin;
+
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    const float trainLeft = MIN_X + m_trainOffset;
+
+    for (int i = 0; i < kCarTransportCount; ++i)
+    {
+        const auto& s = m_carTransportSlots[static_cast<size_t>(i)];
+        if (!s.engineOn && s.engineGlowTimer <= 0.f)
+            continue;
+
+        const Math::Vec2 wc = { trainLeft + s.localCenter.x, MIN_Y + s.localCenter.y };
+        if (wc.x + s.halfSize.x < visLeft || wc.x - s.halfSize.x > visRight)
+            continue;
+
+        const float flash = (s.engineGlowTimer > 0.f) ? std::min(1.f, s.engineGlowTimer * 2.f) : 0.f;
+        const float baseA = s.engineOn ? 0.20f : 0.f;
+        const float a     = std::min(1.f, baseA + flash * 0.55f);
+
+        DrawFilledQuad(colorShader, wc, { s.halfSize.x * 1.65f, s.halfSize.y * 0.52f }, 0.22f, 0.82f, 1.0f, a);
+        if (flash > 0.02f)
+            DrawFilledQuad(colorShader, wc, { s.halfSize.x * 2.15f, s.halfSize.y * 0.82f }, 0.35f, 0.92f, 1.0f,
+                           flash * 0.38f);
     }
 }
 
@@ -1067,6 +1454,10 @@ void Train::Shutdown()
     if (m_skyVBO) { GL::DeleteBuffers(1, &m_skyVBO);      m_skyVBO = 0; }
 
     for (auto& source : m_pulseSources) source.Shutdown();
+
+    for (auto& robot : m_robots)
+        robot.Shutdown();
+    m_robots.clear();
 
     if (m_droneManager) m_droneManager->Shutdown();
 

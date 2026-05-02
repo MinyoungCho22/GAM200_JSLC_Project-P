@@ -5,6 +5,8 @@
 
 #include "Font.hpp"            // CachedTextureInfo
 #include "../Engine/Vec2.hpp"  // Math::Vec2
+#include <utility>
+#include <vector>
 
 class Player;
 class DroneManager;
@@ -31,7 +33,10 @@ public:
                 const Input::Input&    input,
                 bool isGameOver,
                 bool rooftopAccessed,
-                bool isGodMode);
+                bool isGodMode,
+                DroneManager* trainDroneManager = nullptr,
+                const Math::Vec2* trainDetonationOrigin = nullptr,
+                const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs = nullptr);
 
     // Bake the cooldown string into a GL texture — call during the text-update phase.
     void UpdateCooldownText(Font& font, Shader& fontShader);

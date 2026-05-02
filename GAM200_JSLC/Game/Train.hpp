@@ -6,7 +6,9 @@
 #include "DroneManager.hpp"
 #include "Robot.hpp"
 #include "../Engine/Vec2.hpp"
+#include <array>
 #include <memory>
+#include <utility>
 #include <vector>
 
 class Shader;
@@ -66,9 +68,20 @@ public:
         Math::Vec2 size;
     };
 
+    /// Third_ThirdTrain 2×3 자동차 운반 구역 — 엔진 시동 / 펄스 주입 / 연쇄 반응
+    struct CarTransportSlot
+    {
+        Math::Vec2 localCenter{};
+        Math::Vec2 halfSize{};
+        bool       engineOn       = false;
+        float      injectSeconds  = 0.f;
+        float      engineGlowTimer = 0.f;
+    };
+
     void Initialize();
     void ApplyConfig(const TrainObjectConfig& cfg);
-    void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
+    void Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
+                bool pulseAbsorbHeld, bool ignoreCarInjectPulseCost);
 
     // Call once when the Train map becomes active to begin the departure countdown
     void StartEntryTimer();
@@ -83,6 +96,9 @@ public:
     // Draws sunset sky gradient bands (call before Draw, with colorShader active)
     // viewHalfW: half of currently visible world width (zoom-aware)
     void DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
+
+    // 시동된 차량 펄스 라이트(플레이스홀더). 열차 스프라이트 위에 그림.
+    void DrawCarTransportVFX(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
 
     void DrawDrones(Shader& shader) const;
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
@@ -102,6 +118,20 @@ public:
     // Returns true when the player is crouching inside a hiding spot (drones cannot see them)
     bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
     const std::vector<HidingSpot>& GetHidingSpots() const { return m_hidingSpots; }
+
+    /// 드론 피격 등으로 펄스 주입이 끊겼을 때 호출 — 해당 구역 주입 진행 리셋
+    void NotifyCarTransportInjectionInterrupted();
+
+    /// Q 스킬 등 근거리 펄스가 차량에 닿은 것처럼 처리할 월드 기준점 (범위 안일 때만 true)
+    bool TryGetCarTransportSkillAnchor(Math::Vec2 playerHbCenter, Math::Vec2& outWorldAnchor) const;
+
+    /// 플레이어 히트박스와 차가 겹치고 마우스가 그 차 위에 있으며 시동 꺼진 경우 (마우스 커서용 / 클릭 시동)
+    bool TryGetCarTransportClickIgniteTarget(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize,
+                                             Math::Vec2 mouseWorldPos, int& outSlotIndex) const;
+
+    /// 좌클릭 시동 (시동 이미 켜짐이면 false). 연쇄 반응 등 기존 로직 호출.
+    bool TryIgniteCarTransportSlot(int slotIndex);
+    void AppendCarTransportStraightChainArcs(std::vector<std::pair<Math::Vec2, Math::Vec2>>& outArcs) const;
 
     float      GetTrainOffset() const { return m_trainOffset; }
     TrainState GetTrainState()  const { return m_trainState; }
@@ -178,4 +208,16 @@ private:
     void DrawFilledQuad(Shader& colorShader,
                         Math::Vec2 center, Math::Vec2 size,
                         float r, float g, float b, float a = 1.0f) const;
+
+    void ResetCarTransportSlotsToInitialState();
+    void UpdateCarTransport(float dt, Player& player, Math::Vec2 playerHbCenter,
+                            bool pulseAbsorbHeld, bool ignorePulseCost);
+    void ApplyMooreConnectedPulseShare(Player& player, float dt);
+    void FireStraightLineChainDetonations();
+    Math::Vec2 CarTransportWorldCenter(int slotIndex) const;
+    int FindCarTransportInjectTarget(Math::Vec2 playerHbCenter) const;
+    static bool IsMooreAdjacentCarSlots(int a, int b);
+
+    std::array<CarTransportSlot, 6> m_carTransportSlots{};
+    int                             m_carInjectFocusSlot = -1;
 };

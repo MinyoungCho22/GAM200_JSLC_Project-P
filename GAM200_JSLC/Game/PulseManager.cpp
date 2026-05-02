@@ -654,7 +654,7 @@ void PulseManager::DrawDetonationVFX(Shader& colorShader, DebugRenderer& debugRe
     for (const auto& arc : m_chainArcs)
     {
         float p    = arc.timer / CHAIN_ARC_DURATION;
-        float fade = 1.f - p * p;   // quadratic — bright flash, snappy exit
+        float fade = std::max(0.f, 1.f - p * 0.75f); // slower fade-out so arcs stay readable
         if (fade <= 0.f) continue;
 
         Math::Vec2 dir = arc.to - arc.from;
@@ -669,7 +669,7 @@ void PulseManager::DrawDetonationVFX(Shader& colorShader, DebugRenderer& debugRe
         float ef = fade * flicker;
 
         // Zigzag control points — oscillate rapidly to create electric "jitter"
-        float amp  = 18.f * fade;
+        float amp  = 28.f * fade;
         float freq = 50.f;
         Math::Vec2 q1 = arc.from + normDir * (len * 0.25f)
                         + perp * (amp * std::sin(arc.timer * freq));
@@ -679,29 +679,31 @@ void PulseManager::DrawDetonationVFX(Shader& colorShader, DebugRenderer& debugRe
                         + perp * (amp * std::sin(arc.timer * freq + 2.7f));
 
         // Core: bright purple zigzag (4 segments)  R high, G low, B ~0.9
-        float rC = ef * 0.90f, gC = ef * 0.05f, bC = ef * 0.95f;
+        float rC = ef * 1.00f, gC = ef * 0.16f, bC = ef * 1.00f;
         debugRenderer.DrawLine(colorShader, arc.from, q1,      rC, gC, bC);
         debugRenderer.DrawLine(colorShader, q1,       q2,      rC, gC, bC);
         debugRenderer.DrawLine(colorShader, q2,       q3,      rC, gC, bC);
         debugRenderer.DrawLine(colorShader, q3,       arc.to,  rC, gC, bC);
 
         // Glow: straight offset lines in deep purple
-        float rG = ef * 0.50f, gG = ef * 0.00f, bG = ef * 0.70f;
-        constexpr float GLOW_OFF = 3.5f;
+        float rG = ef * 0.85f, gG = ef * 0.10f, bG = ef * 0.95f;
+        constexpr float GLOW_OFF = 5.0f;
         Math::Vec2 off = perp * GLOW_OFF;
         debugRenderer.DrawLine(colorShader, arc.from + off, arc.to + off, rG, gG, bG);
         debugRenderer.DrawLine(colorShader, arc.from - off, arc.to - off, rG, gG, bG);
+        debugRenderer.DrawLine(colorShader, arc.from + off * 1.65f, arc.to + off * 1.65f, rG * 0.70f, gG * 0.70f, bG * 0.70f);
+        debugRenderer.DrawLine(colorShader, arc.from - off * 1.65f, arc.to - off * 1.65f, rG * 0.70f, gG * 0.70f, bG * 0.70f);
 
         // Impact burst at chain target  (DrawCircle: {R, G}, B=0.8 fixed)
         // Purple circle: R=high, G=0  → (ef*0.85, 0, 0.8)
-        float hf   = fade * 0.95f;
-        float hitR = 22.f + (1.f - fade) * 35.f;
+        float hf   = fade * 1.0f;
+        float hitR = 28.f + (1.f - fade) * 42.f;
         debugRenderer.DrawCircle(colorShader, arc.to, hitR,          { hf * 0.85f, 0.f });
         debugRenderer.DrawCircle(colorShader, arc.to, hitR * 0.60f,  { hf * 0.60f, 0.f });
 
         // Source "release" circle at arc origin (dimmer purple)
-        float sf   = fade * 0.5f;
-        float srcR = 14.f + (1.f - fade) * 20.f;
+        float sf   = fade * 0.72f;
+        float srcR = 20.f + (1.f - fade) * 24.f;
         debugRenderer.DrawCircle(colorShader, arc.from, srcR, { sf * 0.70f, 0.f });
     }
 }

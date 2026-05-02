@@ -34,7 +34,10 @@ void PulseDetonateSkill::Update(
     const Input::Input&    input,
     bool                   isGameOver,
     bool                   rooftopAccessed,
-    bool                   isGodMode)
+    bool                   isGodMode,
+    DroneManager*          trainDM,
+    const Math::Vec2*      trainDetonationOrigin,
+    const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs)
 {
     // Unlock once the player enters the Rooftop for the first time
     if (rooftopAccessed && !m_unlocked)
@@ -74,11 +77,25 @@ void PulseDetonateSkill::Update(
         allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
     }
 
-    pulseManager.StartDetonationVFX(playerCenter, SKILL_RADIUS, allArcs);
+    // Train 드론은 전용 DroneManager에만 들어 있음. 차량 앵커가 없어도 항상 적용해야 함 (예전엔 앵커 없으면 스킵됐음).
+    Math::Vec2 vfxOrigin = playerCenter;
+    if (trainDM)
+    {
+        const Math::Vec2 trainOrigin = trainDetonationOrigin ? *trainDetonationOrigin : playerCenter;
+        auto arcs = trainDM->ApplyDetonation(trainOrigin, SKILL_RADIUS, STUN_DURATION);
+        allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
+        if (trainDetonationOrigin)
+            vfxOrigin = *trainDetonationOrigin;
+    }
+
+    if (extraChainArcs && !extraChainArcs->empty())
+        allArcs.insert(allArcs.end(), extraChainArcs->begin(), extraChainArcs->end());
+
+    pulseManager.StartDetonationVFX(vfxOrigin, SKILL_RADIUS, allArcs);
 
     Logger::Instance().Log(Logger::Severity::Info,
         "Pulse Resonance Burst activated at (%.1f, %.1f)",
-        playerCenter.x, playerCenter.y);
+        vfxOrigin.x, vfxOrigin.y);
 }
 
 // ── UI text ──────────────────────────────────────────────────────────────────

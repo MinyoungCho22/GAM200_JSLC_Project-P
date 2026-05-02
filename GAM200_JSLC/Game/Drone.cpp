@@ -4,6 +4,7 @@
 #include "Player.hpp"
 #include "Hallway.hpp"
 #include "Rooftop.hpp"
+#include "Train.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../Engine/Logger.hpp"
@@ -47,6 +48,12 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     else if (startPos.x >= HALLWAY_MIN_WORLD_X && startPos.x < HALLWAY_MAX_WORLD_X)
     {
         m_groundLevel = HALLWAY_GROUND_LEVEL;
+    }
+    // Train 구역: 넓은 X 범위 + 세로 맵 밴드 (넓게 잡아 확장 월드폭에도 대응)
+    else if (startPos.x >= Train::MIN_X && startPos.x < Train::MIN_X + 52000.f && startPos.y >= Train::MIN_Y - 120.f
+             && startPos.y <= Train::MIN_Y + Train::HEIGHT + 120.f)
+    {
+        m_groundLevel = Train::MIN_Y + 95.f;
     }
     else
     {
