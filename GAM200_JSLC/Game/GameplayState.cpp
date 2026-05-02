@@ -109,7 +109,7 @@ void GameplayState::Initialize()
     droneManager = std::make_unique<DroneManager>();
 
     // Left-middle gauge position
-    m_pulseGauge.Initialize({ 75.f, GAME_HEIGHT * 0.5f }, { 40.f, 300.f });
+    m_pulseGauge.Initialize();
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
 
@@ -1932,12 +1932,19 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     }
 
     // 8) Screen-space HUD (pulse gauge)
-    colorShader->use();
-    colorShader->setMat4("projection", baseProjection);
-    m_pulseGauge.Draw(*colorShader);
 
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    textureShader.use();
+    textureShader.setMat4("projection", baseProjection);
+    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.setBool("flipX", false);
+    textureShader.setFloat("alpha", 1.0f);
+    textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+    textureShader.setFloat("tintStrength", 0.0f);
+
+    m_pulseGauge.Draw(textureShader);
 
     // 9) Fonts / minimap / tutorial
     m_fontShader->use();
