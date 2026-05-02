@@ -399,6 +399,18 @@ bool MapObjectConfig::ParseFile()
             for (auto it = begin; it != end; ++it)
                 next.underground.robotSpawns.push_back(ParseVec2Direct(it->str(), {}));
         }
+
+        const std::string undergroundHidingArray = ExtractArrayByKey(undergroundObj, "hiding_spots");
+        if (!undergroundHidingArray.empty())
+        {
+            next.underground.hidingSpots.clear();
+            for (const auto& obj : SplitTopLevelObjectsInArray(undergroundHidingArray))
+            {
+                SpriteRectConfig fallback{};
+                fallback.spritePath = "Asset/HidingSpot.png";
+                next.underground.hidingSpots.push_back(ParseSpriteRect(obj, fallback));
+            }
+        }
     }
 
     const std::string trainObj = ExtractObjectByKey(text, "train");

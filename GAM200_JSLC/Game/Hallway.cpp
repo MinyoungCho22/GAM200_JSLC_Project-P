@@ -74,7 +74,7 @@ void Hallway::ApplyConfig(const HallwayObjectConfig& cfg)
 
 void Hallway::Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPlayerHiding)
 {
-    m_droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
+    m_droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding, true, 1.f);
 
     Math::Vec2 playerPos = player.GetPosition();
 

@@ -260,7 +260,6 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         float      dist   = std::sqrt(distSq);
 
         constexpr float kAggroChaseSpeed = 90.f;
-        constexpr float kSlowWhenHidden  = 38.f;
 
         if (dist > 12.f)
         {
@@ -271,9 +270,8 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
             }
             else
             {
-                // 히딩 중에는 정확한 위치를 모르므로 수평으로만 매우 느리게 압박
-                const float sx = (toP.x >= 0.f) ? 1.f : -1.f;
-                center.x += sx * kSlowWhenHidden * fdt;
+                // 히딩: 방향을 모름 — 좌우 배회만 (플레이어 X로 천천히 압박하지 않음)
+                center.x += std::sin(m_carTransportBobPhase * 2.55f) * 52.f * fdt;
             }
         }
 

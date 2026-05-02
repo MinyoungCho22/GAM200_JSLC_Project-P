@@ -604,7 +604,7 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
     }
 
     // Update enemies (drones)
-    m_droneManager->Update(dt, player, playerHitboxSize, false);
+    m_droneManager->Update(dt, player, playerHitboxSize, false, true, 1.f);
 
     m_prevPlayerX = player.GetPosition().x;
     m_hasPrevPlayerX = true;

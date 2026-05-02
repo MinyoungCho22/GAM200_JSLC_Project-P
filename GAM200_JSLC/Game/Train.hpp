@@ -192,8 +192,6 @@ public:
     bool IsTrainCarCombatCleared(int car1To5) const;
     /// 아직 클리어 안 된 가장 앞 칸의 경계 X (플레이어 최대 진행)
     float GetTrainCombatAdvanceCapWorldX() const;
-    /// 진입한 가장 앞 칸 기준 — 이전 칸으로 되돌아갈 수 없는 최소 X
-    float GetTrainCombatRetreatMinWorldX() const;
     /// Car5 덱 최초 진입 시 밸브 힌트 (일반 진입만 — Alt 텔레포트 중엔 표시 안 함)
     std::string GetCar5ValveHintBannerText() const;
 
@@ -401,7 +399,6 @@ private:
     bool              m_car5EncounterActive = false;
     float             m_car5ValveHintTimer = 0.0f;
     bool              m_trainCheatCarUnlock        = false;
-    int               m_trainHighestCarEntered = 1;
     float             m_encounterScriptTime = 0.0f;
     float             m_pendingTrainCameraShakePx = 0.f;
     std::vector<bool> m_trainDeckRobotWasAirborne;

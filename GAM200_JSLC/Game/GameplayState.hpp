@@ -129,7 +129,7 @@ private:
     float m_cameraSmoothSpeed = 0.1f;
     Sound m_bgm;
 
-    // Q-skill: Pulse Resonance Burst (unlocked on Rooftop / Underground) — 루프탭 진입 시 Conversion 대화로 힌트
+    // Q-skill hint on first Rooftop visit — plain on-screen text (no Conversion backdrop)
     PulseDetonateSkill m_pulseDetonateSkill;
     bool               m_prevRooftopForQHint  = false;
     bool               m_skipRooftopQHintByCheat = false;

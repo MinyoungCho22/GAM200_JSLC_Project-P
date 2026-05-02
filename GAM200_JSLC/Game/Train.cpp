@@ -29,6 +29,19 @@
 static constexpr float ASSUMED_IMG_HEIGHT = 1080.0f; // expected car image height in pixels
 // Flatbed deck surface: art row py=804 → world offset above Train::MIN_Y (see MakeHitbox for [84,804,2472,45]).
 static constexpr float kTrainFlatbedDeckTopLocalY = ASSUMED_IMG_HEIGHT - 804.f;
+static constexpr float kTrainCombatEnemyScale      = 0.75f;
+
+static void ScaleTrainCombatDrone(Drone& d)
+{
+    const Math::Vec2 s = d.GetSize();
+    d.SetSize({ s.x * kTrainCombatEnemyScale, s.y * kTrainCombatEnemyScale });
+}
+
+static void ScaleTrainCombatRobot(Robot& r)
+{
+    const Math::Vec2 s = r.GetSize();
+    r.SetSize({ s.x * kTrainCombatEnemyScale, s.y * kTrainCombatEnemyScale });
+}
 
 static float WrapAnglePi(float a)
 {
@@ -631,13 +644,6 @@ float Train::GetTrainCombatAdvanceCapWorldX() const
     return std::min(capCombat, tailGuard);
 }
 
-float Train::GetTrainCombatRetreatMinWorldX() const
-{
-    if (m_trainCheatCarUnlock)
-        return MIN_X + m_trainOffset - 800.f;
-    return MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(m_trainHighestCarEntered) - 52.f;
-}
-
 std::string Train::GetCar5ValveHintBannerText() const
 {
     if (m_car5ValveHintTimer <= 0.0f)
@@ -1175,9 +1181,9 @@ void Train::UpdateCarTransportDrones(float dt, const Player& player, Math::Vec2 
             const float lx = c4 + kCarTransportDronePixels[i].x;
             const float ly = ASSUMED_IMG_HEIGHT - kCarTransportDronePixels[i].yTop;
             d.SetCarTransportAnchorWorld({ trainLeft + lx, MIN_Y + ly });
-            d.SetCarTransportJamConfused(inPulseBox);
+            d.SetCarTransportJamConfused(inPulseBox || isPlayerHidingTrain);
         }
-        d.Update(dt, player, playerHitboxSize, undetect, false, 1.f);
+        d.Update(dt, player, playerHitboxSize, undetect, true, 1.f);
         if (static_cast<int>(i) < kCarTransportHoverDroneCount && d.IsCarTransportPersistHover() && !d.IsDead()
             && !d.IsHit() && !d.IsCarTransportAggroChase())
             d.SetCarTransportHover(true);
@@ -1295,7 +1301,7 @@ void Train::Initialize()
 
     ApplyConfig(MapObjectConfig::Instance().GetData().train);
 
-    // 드론: 1~4호차 각 2기 + 5호차 6기; 1·2·4호차·5호차 덱 패트롤 로봇 + 5호차 광폭 2
+    // 드론: 1~4호차 각 2기 + 5호차 6기; Car4(카트랜스포트)는 덱 로봇 없음 · 1·2·5호차 덱 패트롤 + 5호차 광폭 2
     {
         for (auto& r : m_robots)
             r.Shutdown();
@@ -1341,6 +1347,7 @@ void Train::Initialize()
                     const float yExtra = behindTank ? (-18.f - static_cast<float>(sub) * 14.f)
                                                     : (12.f + static_cast<float>(sub) * 16.f);
                     Drone& dj = m_droneManager->SpawnDrone({ xj, ySiren + yExtra }, "Asset/Drone.png", false);
+                    ScaleTrainCombatDrone(dj);
                     const float spd = behindTank ? (62.f + static_cast<float>(sub) * 19.f)
                                                  : (74.f + static_cast<float>(sub) * 21.f);
                     dj.SetBaseSpeed(spd);
@@ -1365,9 +1372,11 @@ void Train::Initialize()
                 yB                 = yAtSiren + 28.f;
             }
             Drone& da = m_droneManager->SpawnDrone({ xA, yA }, "Asset/Drone.png", false);
+            ScaleTrainCombatDrone(da);
             da.SetBaseSpeed(95.f);
             da.SetTrainCarSegment(carIdx);
             Drone& db = m_droneManager->SpawnDrone({ xB, yB }, "Asset/Drone.png", false);
+            ScaleTrainCombatDrone(db);
             db.SetBaseSpeed(95.f);
             db.SetTrainCarSegment(carIdx);
         }
@@ -1377,6 +1386,7 @@ void Train::Initialize()
             Robot&      rr        = m_robots.back();
             const float car1MidX  = MIN_X + m_car1Width * 0.52f;
             rr.Init({ car1MidX, deckSurfaceY + 260.f });
+            ScaleTrainCombatRobot(rr);
             const float car1RobotY = deckSurfaceY + rr.GetSize().y * 0.5f;
             rr.SetPosition({ car1MidX, car1RobotY });
             rr.SetTrainCarSegment(1);
@@ -1390,25 +1400,10 @@ void Train::Initialize()
             Robot&      rr        = m_robots.back();
             const float car2MidX  = MIN_X + m_car1Width + m_car2Width * 0.5f;
             rr.Init({ car2MidX, deckSurfaceY + 260.f });
+            ScaleTrainCombatRobot(rr);
             const float car2RobotY = deckSurfaceY + rr.GetSize().y * 0.5f;
             rr.SetPosition({ car2MidX, car2RobotY });
             rr.SetTrainCarSegment(2);
-            rr.SetTrainDeckPatrol(true);
-            rr.SetGroundLimitY(deckSurfaceY);
-            rr.SetSpawnPosition(rr.GetPosition());
-        }
-
-        for (int k = 0; k < 2; ++k)
-        {
-            m_robots.emplace_back();
-            Robot&      rr = m_robots.back();
-            const float car4LocalL = GetTrainCarLocalLeftEdge(4);
-            const float cx =
-                MIN_X + car4LocalL + m_car4Width * (0.26f + static_cast<float>(k) * 0.28f);
-            rr.Init({ cx, deckSurfaceY + 260.f });
-            const float cy = deckSurfaceY + rr.GetSize().y * 0.5f;
-            rr.SetPosition({ cx, cy });
-            rr.SetTrainCarSegment(4);
             rr.SetTrainDeckPatrol(true);
             rr.SetGroundLimitY(deckSurfaceY);
             rr.SetSpawnPosition(rr.GetPosition());
@@ -1423,6 +1418,7 @@ void Train::Initialize()
             const float cx =
                 MIN_X + c5 + m_car5Width - 92.f - static_cast<float>(i) * 126.f + phaseX;
             rr.Init({ cx, deckSurfaceY + 260.f });
+            ScaleTrainCombatRobot(rr);
             const float cy = deckSurfaceY + rr.GetSize().y * 0.5f + staggerY;
             rr.SetPosition({ cx, cy });
             rr.SetTrainCarSegment(5);
@@ -1438,6 +1434,7 @@ void Train::Initialize()
             const float bx  = MIN_X + c5 + m_car5Width * (0.38f + static_cast<float>(b) * 0.16f);
             const float bst = static_cast<float>(b) * 9.f;
             rr.Init({ bx, deckSurfaceY + 260.f });
+            ScaleTrainCombatRobot(rr);
             rr.SetPosition({ bx, deckSurfaceY + rr.GetSize().y * 0.5f + bst });
             rr.SetTrainCarSegment(5);
             rr.SetTrainDeckPatrol(true);
@@ -1464,6 +1461,7 @@ void Train::Initialize()
                 const float wx = MIN_X + lx;
                 const float wy = MIN_Y + ly;
                 Drone&      dd = m_carTransportDroneManager->SpawnDrone({ wx, wy }, "Asset/Drone.png", false);
+                ScaleTrainCombatDrone(dd);
                 dd.SetBaseSpeed(0.f);
                 dd.SetCarTransportPersistHover(true);
                 dd.SetCarTransportBobPhase(static_cast<float>(i) * 0.71f);
@@ -1477,7 +1475,6 @@ void Train::Initialize()
     m_car5EncounterActive    = false;
     m_car5ValveHintTimer     = 0.0f;
     m_trainCheatCarUnlock    = false;
-    m_trainHighestCarEntered  = 1;
     m_encounterScriptTime     = 0.f;
     m_trainDeckRobotWasAirborne.assign(m_robots.size(), false);
     m_trainDeckRobotJumpPrepT.assign(m_robots.size(), 0.f);
@@ -2198,6 +2195,7 @@ void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter,
             m_car3SirenSpawnTimer = 0.f;
             const Math::Vec2 spawnPos = { sirenW.x + 25.f, sirenW.y + 55.f };
             Drone& d = m_sirenDroneManager->SpawnDrone(spawnPos, "Asset/Drone.png", true);
+            ScaleTrainCombatDrone(d);
             d.SetBaseSpeed(185.f);
             d.SetSirenMapDrone(true);
             d.SetTrainCarSegment(3);
@@ -2588,6 +2586,8 @@ void Train::UpdateTrainEncounterScript(float dt, Player& player)
     const float                 trainRight = tl + m_totalTrainWidth;
     const bool                  fleeWater = (m_valvePressureT > 0.10f);
     const Math::Vec2          ppos      = player.GetHitboxCenter();
+    const bool                hidePlayer =
+        IsPlayerHiding(ppos, player.GetHitboxSize(), player.IsCrouching());
     constexpr float kCar5DroneApproach = 268.f;
 
     if (m_droneManager)
@@ -2595,7 +2595,10 @@ void Train::UpdateTrainEncounterScript(float dt, Player& player)
         auto& drones = m_droneManager->GetDrones();
         const float c5L = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
         const float c5R = c5L + m_car5Width;
-        const float formationCenter     = std::clamp(ppos.x, c5L + 260.f, c5R - 260.f);
+        const float formationCenter =
+            hidePlayer ? (c5L + c5R) * 0.5f
+                               + std::sin(m_encounterScriptTime * 3.05f) * (c5R - c5L) * 0.30f
+                       : std::clamp(ppos.x, c5L + 260.f, c5R - 260.f);
         const float formationSpacingBase = 228.f;
         const float car5HoverY =
             m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f)
@@ -2976,7 +2979,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     UpdateTrainDeckPatrolRobots(fdt, player, player.GetHitboxCenter(), playerHitboxSize);
 
     if (m_droneManager)
-        m_droneManager->Update(fdt, player, playerHitboxSize, isPlayerHiding, false, 1.f);
+        m_droneManager->Update(fdt, player, playerHitboxSize, isPlayerHiding, true, 1.f);
 
     if (m_car5EncounterActive)
         UpdateTrainEncounterScript(fdt, player);
@@ -2989,6 +2992,17 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         const float    c5L   = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
         const float    c5R   = c5L + m_car5Width;
         const Math::Vec2 pTarget = player.GetHitboxCenter();
+        /// 히딩 중: 플레이어 X 추적 대신 칸 안에서 좌우 왕복(레이더 흔들림 + 배회)
+        const auto trackXInRange = [&](float left, float right, float wanderFreq, size_t idx) -> float
+        {
+            if (!isPlayerHiding)
+                return std::clamp(pTarget.x, left, right);
+            const float mid  = 0.5f * (left + right);
+            const float half = 0.5f * (right - left) - 40.f;
+            if (half <= 8.f)
+                return mid;
+            return mid + std::sin(m_encounterScriptTime * wanderFreq + static_cast<float>(idx) * 0.91f) * half * 0.88f;
+        };
         constexpr float kCar12DroneTrackSpeed = 42.f;
         const float     car12DroneHoverBase =
             m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f)
@@ -3012,7 +3026,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                     car12DroneHoverBase
                     + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 14.f;
                 Math::Vec2 p = d.GetPosition();
-                const float desiredX = std::clamp(pTarget.x, car1L, car1R);
+                const float desiredX = trackXInRange(car1L, car1R, 2.85f, i);
                 p.x                  = std::clamp(
                     p.x + std::clamp(desiredX - p.x, -kCar12DroneTrackSpeed * fdt, kCar12DroneTrackSpeed * fdt),
                     car1L, car1R);
@@ -3030,7 +3044,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                     car12DroneHoverBase
                     + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 14.f;
                 Math::Vec2 p = d.GetPosition();
-                const float desiredX = std::clamp(pTarget.x, car2L, car2R);
+                const float desiredX = trackXInRange(car2L, car2R, 2.85f, i);
                 p.x                  = std::clamp(
                     p.x + std::clamp(desiredX - p.x, -kCar12DroneTrackSpeed * fdt, kCar12DroneTrackSpeed * fdt),
                     car2L, car2R);
@@ -3048,7 +3062,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                     car3DroneHoverBase
                     + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 14.f;
                 Math::Vec2 p = d.GetPosition();
-                const float desiredX = std::clamp(pTarget.x, car3L, car3R);
+                const float desiredX = trackXInRange(car3L, car3R, 2.85f, i);
                 p.x                  = std::clamp(
                     p.x + std::clamp(desiredX - p.x, -kCar12DroneTrackSpeed * fdt, kCar12DroneTrackSpeed * fdt),
                     car3L, car3R);
@@ -3074,7 +3088,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                 const float hoverY =
                     ySiren + std::sin(m_encounterScriptTime * 2.2f + static_cast<float>(i) * 0.61f) * 5.f;
                 Math::Vec2 p = d.GetPosition();
-                const float desiredX = std::clamp(pTarget.x, c5L + 100.f, c5R - 100.f);
+                const float desiredX = trackXInRange(c5L + 100.f, c5R - 100.f, 2.95f, i);
                 const float ap       = 118.f + static_cast<float>(i % 5) * 11.f;
                 p.x                  = std::clamp(
                     p.x + std::clamp(desiredX - p.x, -ap * fdt, ap * fdt),
@@ -3266,25 +3280,6 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         }
     }
 
-    // --- 한 번 진입한 칸보다 이전 칸으로는 되돌아가지 못하게 (Car5 클리어 후에도 유지) ---
-    currentHbCenter = player.GetHitboxCenter();
-    {
-        const int pc = GetPlayerTrainCarIndex(currentHbCenter);
-        if (!m_trainCheatCarUnlock && pc >= 1 && pc > m_trainHighestCarEntered)
-            m_trainHighestCarEntered = pc;
-        if (pc >= 1)
-        {
-            const float minWx = GetTrainCombatRetreatMinWorldX();
-            if (currentHbCenter.x < minWx)
-            {
-                const float dx = minWx - currentHbCenter.x;
-                Math::Vec2 pp = player.GetPosition();
-                player.SetPosition({ pp.x + dx, pp.y });
-                currentHbCenter = player.GetHitboxCenter();
-            }
-        }
-    }
-
     // --- Left map boundary ---
     currentHbCenter = player.GetHitboxCenter();
     if (currentHbCenter.x - playerHalfSize.x < MIN_X)
@@ -3324,7 +3319,6 @@ void Train::StartEntryTimer()
         m_valveWaterParticles.clear();
         m_car5EncounterActive       = false;
         m_car5ValveHintTimer        = 0.0f;
-        m_trainHighestCarEntered     = 1;
         m_encounterScriptTime     = 0.f;
         m_trainDeckRobotWasAirborne.assign(m_robots.size(), false);
         m_trainDeckRobotJumpPrepT.assign(m_robots.size(), 0.f);

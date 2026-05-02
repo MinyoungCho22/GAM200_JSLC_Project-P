@@ -697,7 +697,7 @@ void GameplayState::Update(double dt)
         if (StoryDialogue::IsDialogueEnabled())
         {
             m_storyDialogue->EnqueueLines(
-                { "Can't attack all at once? Try using Q." }, *m_font, *m_fontShader);
+                { "Can't attack all at once? Try using Q" }, *m_font, *m_fontShader, nullptr, false);
         }
         m_prevRooftopForQHint = true;
     }
@@ -998,7 +998,7 @@ void GameplayState::Update(double dt)
 
     player.SetHiding(isPlayerHiding);
 
-    droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
+    droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding, true, 1.f);
 
     if (m_rooftopAccessed && !m_undergroundAccessed && !m_trainAccessed)
     {
@@ -1257,15 +1257,20 @@ void GameplayState::Update(double dt)
 
     if (m_undergroundAccessed)
     {
+        const bool isPlayerHidingInUnderground =
+            m_underground->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
         auto& undergroundDrones = m_underground->GetDrones();
         for (auto& drone : undergroundDrones)
         {
             if (!drone.IsDead() && drone.ShouldDealDamage())
             {
-                auto* imguiManager = gsm.GetEngine().GetImguiManager();
-                if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                if (!isPlayerHidingInUnderground)
                 {
-                    player.TakeDamage(20.0f);
+                    auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                    if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                    {
+                        player.TakeDamage(20.0f);
+                    }
                 }
                 drone.ResetDamageFlag();
                 break;
@@ -2336,16 +2341,29 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_font->DrawBakedText(*m_fontShader, countdownTexture, { GAME_WIDTH / 2.0f - 250.0f, 100.0f }, 50.0f);
     }
 
-    // Train departure announcement (fallback if narrative dialogue is disabled in settings)
-    if (m_trainAccessed && m_train && !StoryDialogue::IsDialogueEnabled())
+    // Train departure countdown / status — always plain text (not tied to narrative backdrop / Conversion art).
+    if (m_trainAccessed && m_train)
     {
         std::string trainMsg = m_train->GetDepartureAnnouncementText();
         if (!trainMsg.empty())
         {
+            constexpr float kTrainBannerFontH = 44.0f;
             CachedTextureInfo trainMsgTex = m_font->PrintToTexture(*m_fontShader, trainMsg);
-            // Draw centred near the top of the screen
+            const float rw =
+                static_cast<float>(trainMsgTex.width) * (kTrainBannerFontH / static_cast<float>(m_font->m_fontHeight));
             m_font->DrawBakedText(*m_fontShader, trainMsgTex,
-                { GAME_WIDTH / 2.0f - 400.0f, GAME_HEIGHT - 120.0f }, 44.0f);
+                { GAME_WIDTH * 0.5f - rw * 0.5f, GAME_HEIGHT - 120.0f }, kTrainBannerFontH);
+        }
+
+        std::string valveHint = m_train->GetCar5ValveHintBannerText();
+        if (!valveHint.empty())
+        {
+            constexpr float kValveHintFontH = 38.0f;
+            CachedTextureInfo valveTex = m_font->PrintToTexture(*m_fontShader, valveHint);
+            const float rw =
+                static_cast<float>(valveTex.width) * (kValveHintFontH / static_cast<float>(m_font->m_fontHeight));
+            m_font->DrawBakedText(*m_fontShader, valveTex, { GAME_WIDTH * 0.5f - rw * 0.5f, 125.0f },
+                                  kValveHintFontH);
         }
     }
 

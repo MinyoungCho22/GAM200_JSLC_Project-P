@@ -17,7 +17,7 @@ class ControlBindings;
 class Shader;
 class Background;
 
-/// Full-screen narrative box (Conversion.png) with typewriter text; blocks gameplay while active.
+/// Narrative typewriter text; optional full-screen box (Conversion.png). Blocks gameplay while active.
 class StoryDialogue
 {
 public:
@@ -35,7 +35,7 @@ public:
     bool IsBlocking() const { return m_active && s_dialogueEnabled; }
 
     void EnqueueLines(const std::vector<std::string>& lines, Font& font, Shader& fontShader,
-        std::function<void()> onSequenceComplete = nullptr);
+        std::function<void()> onSequenceComplete = nullptr, bool useConversionBackdrop = true);
     void EnqueueOpening(Font& font, Shader& fontShader);
 
     void Update(float dt, const Input::Input& input, const ControlBindings& controls, Font& font, Shader& fontShader);
@@ -48,10 +48,12 @@ private:
     {
         std::vector<std::string> lines;
         std::function<void()> onComplete;
-        float preTypeDelay = 0.0f;
+        float preTypeDelay                = 0.0f;
+        bool useConversionBackdrop        = true;
     };
 
-    void BeginSequence(std::vector<std::string> lines, std::function<void()> onComplete, float preTypeDelay);
+    void BeginSequence(std::vector<std::string> lines, std::function<void()> onComplete, float preTypeDelay,
+                       bool useConversionBackdrop);
     void FinishSequence(Font& font, Shader& fontShader);
 
     static bool s_dialogueEnabled;
@@ -64,7 +66,8 @@ private:
     float m_secondsPerChar = 0.035f;
     float m_preTypeDelayRemaining = 0.0f;
 
-    bool m_active = false;
+    bool m_active                  = false;
+    bool m_useConversionBackdrop   = true;
     std::function<void()> m_onSequenceComplete;
     std::deque<QueuedSequence> m_pending;
 

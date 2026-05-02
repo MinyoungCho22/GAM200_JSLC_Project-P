@@ -87,6 +87,7 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
     m_lights.clear();
     m_ramps.clear();
     m_robots.clear();
+    m_hidingSpots.clear();
 
     for (const auto& spawn : cfg.robotSpawns)
     {
@@ -140,6 +141,13 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
             obs.sprite->Initialize(o.spritePath.c_str());
         }
         m_obstacles.push_back(std::move(obs));
+    }
+
+    for (const auto& h : cfg.hidingSpots)
+    {
+        float cx = MIN_X + h.topLeft.x + h.size.x * 0.5f;
+        float cy = MIN_Y + (HEIGHT - h.topLeft.y) - h.size.y * 0.5f;
+        m_hidingSpots.push_back({ { cx, cy }, h.size });
     }
 
     const auto& pulses = cfg.pulseSources;
@@ -226,7 +234,9 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
 
 void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
 {
-    m_droneManager->Update(dt, player, playerHitboxSize, false);
+    const bool hide =
+        IsPlayerHiding(player.GetHitboxCenter(), playerHitboxSize, player.IsCrouching());
+    m_droneManager->Update(dt, player, playerHitboxSize, hide, true, 1.f);
 
     // Prep obstacle info for robot AI pathfinding/collision
     std::vector<ObstacleInfo> obstacleInfos;
@@ -490,6 +500,19 @@ void Underground::ApplyPulseToRobots(Math::Vec2 pulseWorldCenter, float radius)
         const Math::Vec2 impulse    = dir * (impulseMag * kRobotImpulseScale) + Math::Vec2{ 0.f, kLift };
         robot.ApplyPulseImpact(impulse, kDamage);
     }
+}
+
+bool Underground::IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize,
+                                 bool isPlayerCrouching) const
+{
+    if (!isPlayerCrouching || m_hidingSpots.empty())
+        return false;
+    for (const auto& hv : m_hidingSpots)
+    {
+        if (Collision::CheckAABB(playerHbCenter, playerHitboxSize, hv.center, hv.size))
+            return true;
+    }
+    return false;
 }
 
 void Underground::Shutdown()
