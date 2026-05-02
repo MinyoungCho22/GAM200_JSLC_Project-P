@@ -5,6 +5,16 @@
 #include <iomanip>
 #include <sstream>
 #include <cstdarg>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+// Windows.h 매크로 FormatMessage가 Logger::FormatMessage 멤버와 충돌
+#ifdef FormatMessage
+#undef FormatMessage
+#endif
+#endif
 
 Logger& Logger::Instance()
 {
@@ -30,6 +40,22 @@ void Logger::Initialize(Severity severity, bool use_console)
 {
     min_severity = severity;
     use_console_output = use_console;
+#ifdef _WIN32
+    // std::cout UTF-8과 터미널 코드 페이지 맞춤 — 깨진 글자·이상한 커서 동작 완화
+    if (use_console)
+    {
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+        // 일부 환경에서 글자색이 배경과 같아져 드래그(선택)할 때만 보이는 문제 완화
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hOut != INVALID_HANDLE_VALUE && hOut != nullptr && GetFileType(hOut) == FILE_TYPE_CHAR)
+        {
+            SetConsoleTextAttribute(
+                hOut,
+                FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+        }
+    }
+#endif
     // Disable file logging; keep console output only.
     if (log_file.is_open())
     {

@@ -1395,7 +1395,8 @@ void GameplayState::Update(double dt)
 
     static double cameraLogTimer = 0.0f;
     cameraLogTimer += dt;
-    if (cameraLogTimer > 1.0f && m_rooftopAccessed)
+    // 모든 맵에서 동일하게 좌표 로그 (루프탑 전용이면 Train/언더그라운드·치트 이동 시 콘솔이 비어 보임)
+    if (cameraLogTimer > 1.0f)
     {
         Math::Vec2 camPos = m_camera.GetPosition();
         Logger::Instance().Log(Logger::Severity::Debug,
