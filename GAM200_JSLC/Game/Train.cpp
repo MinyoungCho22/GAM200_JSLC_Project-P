@@ -14,6 +14,8 @@
 #include "Robot.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -25,6 +27,138 @@
 //   localCenter.y = from map bottom (MIN_Y), Y going UP in world space
 // ---------------------------------------------------------------------------
 static constexpr float ASSUMED_IMG_HEIGHT = 1080.0f; // expected car image height in pixels
+
+static float WrapAnglePi(float a)
+{
+    while (a > 3.14159265359f) a -= 6.28318530718f;
+    while (a < -3.14159265359f) a += 6.28318530718f;
+    return a;
+}
+
+#ifdef __EMSCRIPTEN__
+static std::string PatchShaderForWebGL330(const std::string& src)
+{
+    std::string out = src;
+    const std::string from = "#version 330 core";
+    auto pos = out.find(from);
+    if (pos != std::string::npos)
+    {
+        size_t endPos = pos + from.size();
+        if (endPos < out.size() && out[endPos] == '\n')
+            ++endPos;
+        out.erase(pos, endPos - pos);
+        out = "#version 300 es\nprecision highp float;\n" + out;
+    }
+    return out;
+}
+#endif
+
+static GLuint CompileGLShader(GLenum type, const char* src)
+{
+#ifdef __EMSCRIPTEN__
+    std::string patched = PatchShaderForWebGL330(std::string(src));
+    const char* code = patched.c_str();
+#else
+    const char* code = src;
+#endif
+
+    GLuint shader = GL::CreateShader(type);
+    GL::ShaderSource(shader, 1, &code, nullptr);
+    GL::CompileShader(shader);
+
+    GLint ok = 0;
+    GL::GetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+    if (!ok)
+    {
+        char log[1024];
+        GL::GetShaderInfoLog(shader, static_cast<GLsizei>(sizeof(log)), nullptr, log);
+        Logger::Instance().Log(Logger::Severity::Error, "Train valve water shader compile failed:\n%s", log);
+        GL::DeleteShader(shader);
+        return 0;
+    }
+    return shader;
+}
+
+static GLuint LinkGLProgram(GLuint vs, GLuint fs)
+{
+    GLuint program = GL::CreateProgram();
+    GL::AttachShader(program, vs);
+    GL::AttachShader(program, fs);
+    GL::LinkProgram(program);
+
+    GLint ok = 0;
+    GL::GetProgramiv(program, GL_LINK_STATUS, &ok);
+    if (!ok)
+    {
+        char log[1024];
+        GL::GetProgramInfoLog(program, static_cast<GLsizei>(sizeof(log)), nullptr, log);
+        Logger::Instance().Log(Logger::Severity::Error, "Train valve water program link failed:\n%s", log);
+        GL::DeleteProgram(program);
+        return 0;
+    }
+    return program;
+}
+
+namespace {
+// GPU-instanced valve water shader (GLSL 330 core — patched for WebGL2 in __EMSCRIPTEN__ builds)
+constexpr const char* kValveWaterVS = R"GLSL(
+#version 330 core
+layout (location = 0) in vec2 aPos;
+
+layout (location = 1) in vec2 iCenter;
+layout (location = 2) in vec2 iHalfSize;
+layout (location = 3) in float iAlpha;
+layout (location = 4) in float iLayer;
+
+uniform mat4 projection;
+
+out vec4 vColor;
+
+void main()
+{
+    vec2 corner = aPos * 2.0; // (-0.5..0.5) -> (-1..1)
+    vec2 world = iCenter + corner * iHalfSize;
+
+    // Tiny screen-space offsets from old multi-quad look (layer encoded as 0/1/2)
+    if (iLayer > 1.5)
+        world += vec2(-1.8, -1.0);
+    else if (iLayer > 0.5)
+        world += vec2(1.5, 1.5);
+
+    vec3 rgb = vec3(0.16, 0.74, 0.98);
+    float a = iAlpha;
+    if (iLayer > 1.5)
+    {
+        rgb = vec3(0.03, 0.25, 0.55);
+        a *= 0.28;
+    }
+    else if (iLayer > 0.5)
+    {
+        rgb = vec3(0.72, 0.95, 1.00);
+        a *= 0.62;
+    }
+    else
+    {
+        rgb = vec3(0.16, 0.74, 0.98);
+        a *= 0.55;
+    }
+
+    vColor = vec4(rgb, a);
+    gl_Position = projection * vec4(world, 0.0, 1.0);
+}
+)GLSL";
+
+constexpr const char* kValveWaterFS = R"GLSL(
+#version 330 core
+in vec4 vColor;
+out vec4 FragColor;
+
+void main()
+{
+    FragColor = vColor;
+}
+)GLSL";
+} // namespace
 
 // Convert pixel (px,py) top-left + size to world local center (Y-flipped)
 static Train::TrainHitbox MakeHitbox(float carOffset, float px, float py, float pw, float ph,
@@ -235,6 +369,115 @@ void Train::AppendCarTransportStraightChainArcs(std::vector<std::pair<Math::Vec2
     }
 }
 
+bool Train::IsValveMouseHoverable(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorldPos) const
+{
+    const Math::Vec2 valveWorld = { MIN_X + m_trainOffset + m_valveLocalCenter.x, MIN_Y + m_valveLocalCenter.y };
+    // Interaction range widened so player can rotate from noticeably farther away.
+    if (!Collision::CheckAABB(playerHbCenter, playerHbSize, valveWorld, { 560.0f, 320.0f }))
+        return false;
+
+    return Collision::CheckPointInAABB(mouseWorldPos, valveWorld, m_valveVisualSize)
+        || Collision::CheckAABB(mouseWorldPos, { 32.0f, 32.0f }, valveWorld, m_valveVisualSize);
+}
+
+void Train::UpdateValveWaterParticles(float dt)
+{
+    const float gravityY = -1200.0f;
+    const float floorY = MIN_Y - 80.0f;
+    const Math::Vec2 valveWorld = { MIN_X + m_trainOffset + m_valveLocalCenter.x, MIN_Y + m_valveLocalCenter.y };
+    std::vector<ValveWaterParticle> splashSpawn;
+
+    // 1) update existing particles
+    for (auto& p : m_valveWaterParticles)
+    {
+        const float prevY = p.pos.y;
+        p.vel.y += gravityY * dt;
+        p.pos += p.vel * dt;
+        p.life -= dt;
+
+        // Floor collision -> burst splash particles
+        if (p.life > 0.0f && p.vel.y < -120.0f && p.maxLife > 0.45f && prevY >= floorY && p.pos.y < floorY)
+        {
+            const int splashCount = 3 + static_cast<int>(m_valvePressureT * 6.0f);
+            for (int i = 0; i < splashCount; ++i)
+            {
+                const float fi = static_cast<float>(i);
+                const float ph = m_valveWaterAnimTime * 6.5f + fi * 1.37f + static_cast<float>(m_valveParticleCounter % 29u);
+                ValveWaterParticle sp{};
+                sp.pos = { p.pos.x + std::sin(ph) * 10.0f, floorY + 2.0f };
+                sp.vel = { std::sin(ph * 1.9f) * (70.0f + m_valvePressureT * 120.0f),
+                           140.0f + m_valvePressureT * 230.0f + std::cos(ph) * 40.0f };
+                const float s = 7.0f + m_valvePressureT * 8.0f;
+                sp.size = { s, s * 0.9f };
+                sp.maxLife = 0.22f + m_valvePressureT * 0.22f;
+                sp.life = sp.maxLife;
+                sp.alpha = 0.30f + m_valvePressureT * 0.35f;
+                splashSpawn.push_back(sp);
+            }
+            p.life = 0.0f;
+        }
+    }
+    m_valveWaterParticles.erase(
+        std::remove_if(m_valveWaterParticles.begin(), m_valveWaterParticles.end(),
+            [floorY](const ValveWaterParticle& p) { return p.life <= 0.0f || p.pos.y < floorY; }),
+        m_valveWaterParticles.end());
+    if (!splashSpawn.empty())
+        m_valveWaterParticles.insert(m_valveWaterParticles.end(), splashSpawn.begin(), splashSpawn.end());
+
+    ApplyValveWaterDamageToEnemies(dt);
+
+    // 2) spawn based on pressure (swampy-like: starts weak, ramps up)
+    if (m_valvePressureT <= 0.01f)
+    {
+        m_valveParticleSpawnCarry = 0.0f;
+        return;
+    }
+
+    const float spawnRateLeft = 52.0f + m_valvePressureT * 290.0f;
+    const float spawnRateRight = 92.0f + m_valvePressureT * 420.0f;
+    const float spawnAvg = 0.5f * (spawnRateLeft + spawnRateRight);
+    m_valveParticleSpawnCarry += (spawnAvg * 2.0f) * dt;
+
+    while (m_valveParticleSpawnCarry >= 1.0f)
+    {
+        m_valveParticleSpawnCarry -= 1.0f;
+
+        // Strong bias to the right nozzle (5:1) — primary anti-enemy jet.
+        const float dirSign = ((m_valveParticleCounter % 6u) == 0u) ? -1.0f : 1.0f;
+        const float ph = static_cast<float>(m_valveParticleCounter) * 0.91f + m_valveWaterAnimTime * 2.4f;
+        ++m_valveParticleCounter;
+
+        ValveWaterParticle p{};
+        const float outletJitterX = std::sin(ph * 1.3f) * 7.0f;
+        const float outletJitterY = std::cos(ph * 1.9f) * 4.0f;
+        float outletX = dirSign * 132.0f;
+        if (dirSign > 0.0f)
+            outletX += 42.0f; // right nozzle feels more "open"
+        p.pos = { valveWorld.x + outletX + outletJitterX, valveWorld.y - 40.0f + outletJitterY };
+
+        const float pressureSpeed = 80.0f + m_valvePressureT * 360.0f;
+        float sideKick = dirSign * (180.0f + m_valvePressureT * 420.0f + std::sin(ph) * 64.0f);
+        if (dirSign > 0.0f)
+            sideKick *= 2.15f; // right stream: much stronger horizontal push
+
+        float vertical = -pressureSpeed + std::cos(ph * 1.7f) * 32.0f;
+        if (dirSign < 0.0f)
+            vertical *= 0.50f; // slightly flatter than before
+        if (dirSign > 0.0f)
+            vertical *= 0.26f; // right stream: slightly lower launch angle
+        p.vel = { sideKick, vertical };
+
+        const float s = 18.0f + m_valvePressureT * 24.0f + std::sin(ph * 0.8f) * 3.4f;
+        const float sMul = (dirSign > 0.0f) ? 1.22f : 1.12f;
+        p.size = { s * 1.12f * sMul, s * 1.60f * sMul };
+        p.maxLife = 0.55f + m_valvePressureT * 0.55f + std::abs(std::sin(ph * 0.6f)) * 0.18f;
+        p.life = p.maxLife;
+        p.alpha = 0.25f + m_valvePressureT * 0.55f;
+
+        m_valveWaterParticles.push_back(p);
+    }
+}
+
 void Train::ApplyMooreConnectedPulseShare(Player& player, float dt)
 {
     bool visited[kCarTransportCount] = {};
@@ -383,12 +626,17 @@ void Train::Initialize()
     m_thirdTrain       = std::make_unique<Background>();
     m_thirdThirdTrain  = std::make_unique<Background>();
     m_fourthTrain      = std::make_unique<Background>();
+    m_valveSprite      = std::make_unique<Background>();
 
     m_firstTrain ->Initialize("Asset/Train/FirstTrain.png");
     m_secondTrain->Initialize("Asset/Train/SecondTrain.png");
     m_thirdTrain ->Initialize("Asset/Train/ThirdTrain.png");
     m_thirdThirdTrain->Initialize("Asset/Train/Third_ThirdTrain.png");
     m_fourthTrain    ->Initialize("Asset/Train/FourthTrain.png");
+    // File name in request had spacing typo ("Valve. png"), so try common variants.
+    m_valveSprite->Initialize("Asset/Train/Valve.png");
+    if (m_valveSprite->GetWidth() <= 0)
+        m_valveSprite->Initialize("Asset/Train/Valve. png");
 
     // Use actual image widths as world widths (1 pixel = 1 world unit)
     if (m_firstTrain->GetWidth()  > 0) m_car1Width = static_cast<float>(m_firstTrain->GetWidth());
@@ -397,6 +645,14 @@ void Train::Initialize()
     if (m_thirdThirdTrain->GetWidth() > 0) m_car4Width = static_cast<float>(m_thirdThirdTrain->GetWidth());
     if (m_fourthTrain->GetWidth()     > 0) m_car5Width = static_cast<float>(m_fourthTrain->GetWidth());
     m_totalTrainWidth = m_car1Width + m_car2Width + m_car3Width + m_car4Width + m_car5Width;
+
+    // Car5 valve anchor: centered on existing valve/pipe hitbox (c5, 894,351,317,162).
+    // Keep local-space so it follows train offset automatically.
+    {
+        const float c5 = m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        Train::TrainHitbox valveHb = MakeHitbox(c5, 894.0f, 351.0f, 317.0f, 162.0f);
+        m_valveLocalCenter = valveHb.localCenter;
+    }
 
     // --- Rail tile ---
     m_railTile = std::make_unique<Background>();
@@ -423,6 +679,7 @@ void Train::Initialize()
 
     // --- Sky gradient VAO ---
     InitSkyVAO();
+    InitValveWaterGpu();
 
     // --- Train state ---
     m_trainState      = TrainState::Stationary;
@@ -641,6 +898,234 @@ void Train::BuildTrainHitboxes()
     {
         auto hs = MakeHitbox(c3, 330, 504, 378, 300);
         m_hidingSpots.push_back({ hs.localCenter, hs.size });
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// Valve water — GPU instanced rendering (single batched draw)
+// ---------------------------------------------------------------------------
+void Train::InitValveWaterGpu()
+{
+    ShutdownValveWaterGpu();
+
+    GLuint vs = CompileGLShader(GL_VERTEX_SHADER, kValveWaterVS);
+    GLuint fs = CompileGLShader(GL_FRAGMENT_SHADER, kValveWaterFS);
+    if (!vs || !fs)
+        return;
+
+    m_valveWaterProg = LinkGLProgram(vs, fs);
+    GL::DeleteShader(vs);
+    GL::DeleteShader(fs);
+    if (!m_valveWaterProg)
+        return;
+
+    m_valveWaterLocProjection = GL::GetUniformLocation(m_valveWaterProg, "projection");
+
+    float quadVerts[] = {
+        -0.5f,  0.5f,
+         0.5f, -0.5f,
+        -0.5f, -0.5f,
+        -0.5f,  0.5f,
+         0.5f,  0.5f,
+         0.5f, -0.5f
+    };
+
+    GL::GenVertexArrays(1, &m_valveWaterVAO);
+    GL::GenBuffers(1, &m_valveWaterQuadVBO);
+    GL::GenBuffers(1, &m_valveWaterInstVBO);
+
+    GL::BindVertexArray(m_valveWaterVAO);
+
+    GL::BindBuffer(GL_ARRAY_BUFFER, m_valveWaterQuadVBO);
+    GL::BufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    GL::EnableVertexAttribArray(0);
+
+    constexpr GLsizei instStride = sizeof(ValveWaterGpuInstance);
+    GL::BindBuffer(GL_ARRAY_BUFFER, m_valveWaterInstVBO);
+    m_valveWaterInstPoolBytes = sizeof(ValveWaterGpuInstance) * 4096u;
+    GL::BufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(m_valveWaterInstPoolBytes), nullptr, GL_DYNAMIC_DRAW);
+
+    GL::VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, instStride, (void*)offsetof(ValveWaterGpuInstance, center));
+    GL::EnableVertexAttribArray(1);
+    GL::VertexAttribDivisor(1, 1);
+
+    GL::VertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, instStride, (void*)offsetof(ValveWaterGpuInstance, halfSize));
+    GL::EnableVertexAttribArray(2);
+    GL::VertexAttribDivisor(2, 1);
+
+    GL::VertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, instStride, (void*)offsetof(ValveWaterGpuInstance, alpha));
+    GL::EnableVertexAttribArray(3);
+    GL::VertexAttribDivisor(3, 1);
+
+    GL::VertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, instStride, (void*)offsetof(ValveWaterGpuInstance, layer));
+    GL::EnableVertexAttribArray(4);
+    GL::VertexAttribDivisor(4, 1);
+
+    GL::BindVertexArray(0);
+    GL::BindBuffer(GL_ARRAY_BUFFER, 0);
+
+    m_valveWaterGpuReady = true;
+}
+
+void Train::ShutdownValveWaterGpu()
+{
+    if (m_valveWaterVAO) { GL::DeleteVertexArrays(1, &m_valveWaterVAO); m_valveWaterVAO = 0; }
+    if (m_valveWaterQuadVBO) { GL::DeleteBuffers(1, &m_valveWaterQuadVBO); m_valveWaterQuadVBO = 0; }
+    if (m_valveWaterInstVBO) { GL::DeleteBuffers(1, &m_valveWaterInstVBO); m_valveWaterInstVBO = 0; }
+    if (m_valveWaterProg) { GL::DeleteProgram(m_valveWaterProg); m_valveWaterProg = 0; }
+    m_valveWaterLocProjection = -1;
+    m_valveWaterInstPoolBytes = 0;
+    m_valveWaterGpuReady = false;
+}
+
+void Train::UploadAndDrawValveWaterGpu(const Math::Matrix& projection, Math::Vec2 cameraPos, float viewHalfW) const
+{
+    if (!m_valveWaterGpuReady || !m_valveWaterProg || !m_valveWaterVAO)
+        return;
+
+    const float valveY = MIN_Y + m_valveLocalCenter.y;
+
+    const float halfW = (viewHalfW > 300.0f) ? viewHalfW : 300.0f;
+    const float visL = cameraPos.x - halfW - 900.0f;
+    const float visR = cameraPos.x + halfW + 900.0f;
+
+    m_valveWaterGpuScratch.clear();
+    m_valveWaterGpuScratch.reserve(m_valveWaterParticles.size() * 3u + 64u);
+
+    for (const auto& p : m_valveWaterParticles)
+    {
+        if (p.pos.x < visL || p.pos.x > visR)
+            continue;
+
+        const float lifeT = (p.maxLife > 0.0f) ? std::clamp(p.life / p.maxLife, 0.0f, 1.0f) : 0.0f;
+        const float alphaBase = p.alpha * (0.35f + lifeT * 0.65f);
+        const float stretch = 1.0f + std::min(1.8f, std::abs(p.vel.y) / 320.0f);
+        const float depthT = std::clamp((valveY - p.pos.y) / 360.0f, 0.0f, 1.0f);
+
+        const float widthMul = 1.65f + depthT * 2.45f;
+        const float rightOnlyBoost = (p.vel.x > 0.0f) ? 1.48f : 1.0f;
+        const Math::Vec2 mainSize = { p.size.x * widthMul * rightOnlyBoost, p.size.y * stretch * 1.20f };
+
+        const Math::Vec2 half = { mainSize.x * 0.5f, mainSize.y * 0.5f };
+
+        ValveWaterGpuInstance body{};
+        body.center = p.pos;
+        body.halfSize = half;
+        body.alpha = alphaBase;
+        body.layer = 0.0f;
+        m_valveWaterGpuScratch.push_back(body);
+
+        ValveWaterGpuInstance core{};
+        core.center = p.pos + Math::Vec2{ 1.5f, 1.5f };
+        core.halfSize = { mainSize.x * 0.56f * 0.5f, mainSize.y * 0.76f * 0.5f };
+        core.alpha = alphaBase;
+        core.layer = 1.0f;
+        m_valveWaterGpuScratch.push_back(core);
+
+        ValveWaterGpuInstance sh{};
+        sh.center = p.pos + Math::Vec2{ -1.8f, -1.0f };
+        sh.halfSize = { mainSize.x * 0.66f * 0.5f, mainSize.y * 0.74f * 0.5f };
+        sh.alpha = alphaBase;
+        sh.layer = 2.0f;
+        m_valveWaterGpuScratch.push_back(sh);
+    }
+
+    if (m_valveWaterGpuScratch.empty())
+        return;
+
+    const GLsizeiptr bytesNeeded =
+        static_cast<GLsizeiptr>(m_valveWaterGpuScratch.size() * sizeof(ValveWaterGpuInstance));
+
+    GL::BindBuffer(GL_ARRAY_BUFFER, m_valveWaterInstVBO);
+    if (bytesNeeded > static_cast<GLsizeiptr>(m_valveWaterInstPoolBytes))
+    {
+        const GLsizeiptr newBytes =
+            (bytesNeeded * 3) / 2 + static_cast<GLsizeiptr>(sizeof(ValveWaterGpuInstance)) * 256;
+        GL::BufferData(GL_ARRAY_BUFFER, newBytes, nullptr, GL_DYNAMIC_DRAW);
+        m_valveWaterInstPoolBytes = static_cast<std::uint32_t>(newBytes);
+    }
+
+    GL::BufferSubData(GL_ARRAY_BUFFER, 0,
+                      static_cast<GLsizeiptr>(m_valveWaterGpuScratch.size() * sizeof(ValveWaterGpuInstance)),
+                      m_valveWaterGpuScratch.data());
+    GL::BindBuffer(GL_ARRAY_BUFFER, 0);
+
+    GL::UseProgram(m_valveWaterProg);
+    GL::UniformMatrix4fv(m_valveWaterLocProjection, 1, GL_FALSE, projection.Ptr());
+
+    GL::BindVertexArray(m_valveWaterVAO);
+    GL::DrawArraysInstanced(GL_TRIANGLES, 0, 6, static_cast<GLsizei>(m_valveWaterGpuScratch.size()));
+    GL::BindVertexArray(0);
+    GL::UseProgram(0);
+}
+
+void Train::ApplyValveWaterDamageToEnemies(float dt)
+{
+    if (dt <= 0.0f)
+        return;
+    if (m_valvePressureT <= 0.01f && m_valveWaterParticles.empty())
+        return;
+
+    const float valveY = MIN_Y + m_valveLocalCenter.y;
+
+    auto hitsWater = [&](const Math::Vec2& enemyCenter, const Math::Vec2& enemySize, float extraEnemyPadding) -> bool
+    {
+        for (const auto& p : m_valveWaterParticles)
+        {
+            if (p.life <= 0.0f)
+                continue;
+
+            const float lifeT = (p.maxLife > 0.0f) ? std::clamp(p.life / p.maxLife, 0.0f, 1.0f) : 0.0f;
+            const float stretch = 1.0f + std::min(1.8f, std::abs(p.vel.y) / 320.0f);
+            const float depthT = std::clamp((valveY - p.pos.y) / 360.0f, 0.0f, 1.0f);
+            const float widthMul = 1.65f + depthT * 2.45f;
+
+            const bool isRightJet = (p.vel.x > 0.0f);
+            const float jetBoost = isRightJet ? 1.48f : 1.0f;
+            const float hitBoost = isRightJet ? 1.35f : 1.0f;
+
+            Math::Vec2 paddedEnemySize = enemySize;
+            paddedEnemySize.x += extraEnemyPadding;
+            paddedEnemySize.y += extraEnemyPadding;
+
+            const Math::Vec2 mainSize = { p.size.x * widthMul * jetBoost * hitBoost, p.size.y * stretch * 1.20f };
+            if (!Collision::CheckAABB(p.pos, mainSize, enemyCenter, paddedEnemySize))
+                continue;
+
+            // Require some spray intensity so valve-off can't randomly overlap forever.
+            if (m_valvePressureT < 0.05f && lifeT < 0.05f)
+                continue;
+
+            return true;
+        }
+        return false;
+    };
+
+    if (m_droneManager)
+    {
+        auto& drones = m_droneManager->GetDrones();
+        for (auto& d : drones)
+        {
+            if (d.IsDead())
+                continue;
+            if (!hitsWater(d.GetPosition(), d.GetSize(), 8.0f))
+                continue;
+
+            (void)d.ApplyDamage(dt);
+        }
+    }
+
+    for (auto& r : m_robots)
+    {
+        if (r.IsDead())
+            continue;
+        if (!hitsWater(r.GetPosition(), r.GetSize(), 10.0f))
+            continue;
+
+        // Stronger vs robots on the right jet side (same overlap boost already applied in hitsWater)
+        r.TakeDamage(110.0f * m_valvePressureT * dt + 35.0f * dt);
     }
 }
 
@@ -897,7 +1382,8 @@ static bool ResolveAABB(Player& player, Math::Vec2& currentHbCenter,
 // Update
 // ---------------------------------------------------------------------------
 void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
-                   bool pulseAbsorbHeld, bool ignoreCarInjectPulseCost)
+                   bool pulseAbsorbHeld, bool ignoreCarInjectPulseCost,
+                   bool attackHeld, bool attackTriggered, Math::Vec2 mouseWorldPos)
 {
     const float fdt = static_cast<float>(dt);
 
@@ -911,6 +1397,43 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         playerPos.x >= MIN_X - 200.0f;
 
     if (!playerInSubway) return;
+
+    // Valve clockwise drag interaction (Car5 top valve) -> tank spill VFX.
+    {
+        const Math::Vec2 valveWorld = { MIN_X + m_trainOffset + m_valveLocalCenter.x, MIN_Y + m_valveLocalCenter.y };
+        const bool canHover = IsValveMouseHoverable(player.GetHitboxCenter(), playerHitboxSize, mouseWorldPos);
+
+        if (!attackHeld)
+            m_valveDragging = false;
+
+        if (attackTriggered && canHover)
+        {
+            const Math::Vec2 d = mouseWorldPos - valveWorld;
+            m_valvePrevMouseAngle = std::atan2(d.y, d.x);
+            m_valveDragging = true;
+        }
+
+        if (m_valveDragging && attackHeld)
+        {
+            const Math::Vec2 d = mouseWorldPos - valveWorld;
+            const float currA = std::atan2(d.y, d.x);
+            const float delta = WrapAnglePi(currA - m_valvePrevMouseAngle);
+            m_valvePrevMouseAngle = currA;
+
+            // Clockwise in world space = negative angular delta.
+            if (delta < 0.0f)
+                m_valveOpenAccum = std::min(3.5f, m_valveOpenAccum + (-delta) * 1.2f);
+        }
+        else
+            m_valveOpenAccum = std::max(0.0f, m_valveOpenAccum - fdt * 0.45f);
+
+        m_valveOpenT = std::clamp(m_valveOpenAccum / 2.8f, 0.0f, 1.0f);
+        const float pressureFollow = std::min(1.0f, fdt * 1.25f);
+        m_valvePressureT += (m_valveOpenT - m_valvePressureT) * pressureFollow;
+        if (m_valvePressureT > 0.01f)
+            m_valveWaterAnimTime += fdt * (0.8f + m_valvePressureT * 2.7f);
+    }
+    UpdateValveWaterParticles(fdt);
 
     // --- Drone update (hiding spots block detection) ---
     const bool isPlayerHiding = IsPlayerHiding(player.GetHitboxCenter(), playerHitboxSize, player.IsCrouching());
@@ -1114,6 +1637,14 @@ void Train::StartEntryTimer()
         m_pipeDropCooldown = 0.0f;
         m_trainStartSound.Stop();
         m_trainRunLoopSound.Stop();
+        m_valveDragging = false;
+        m_valveOpenAccum = 0.0f;
+        m_valveOpenT = 0.0f;
+        m_valvePressureT = 0.0f;
+        m_valveWaterAnimTime = 0.0f;
+        m_valveParticleSpawnCarry = 0.0f;
+        m_valveParticleCounter = 0;
+        m_valveWaterParticles.clear();
         ResetCarTransportSlotsToInitialState();
         Logger::Instance().Log(Logger::Severity::Info,
             "Train: Entry timer started – train departs in %.1f s", TRAIN_DEPART_DELAY);
@@ -1315,6 +1846,17 @@ void Train::DrawCarTransportVFX(Shader& colorShader, Math::Vec2 cameraPos, float
     }
 }
 
+void Train::DrawValveWaterVFX(Shader& colorShader, const Math::Matrix& worldProjection, Math::Vec2 cameraPos,
+                              float viewHalfW) const
+{
+    (void)colorShader;
+
+    if (m_valveWaterParticles.empty() && m_valvePressureT <= 0.01f)
+        return;
+
+    UploadAndDrawValveWaterGpu(worldProjection, cameraPos, viewHalfW);
+}
+
 
 // ---------------------------------------------------------------------------
 // Draw – draws rail tiles and train car images
@@ -1394,6 +1936,17 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
             Math::Matrix::CreateTranslation({ cx, cy }) *
             Math::Matrix::CreateScale({ m_car5Width, HEIGHT });
         m_fourthTrain->Draw(shader, model);
+    }
+
+    if (m_valveSprite && m_valveSprite->GetWidth() > 0)
+    {
+        const Math::Vec2 valveWorld = { trainLeft + m_valveLocalCenter.x, MIN_Y + m_valveLocalCenter.y };
+        const float cwDeg = -m_valveOpenT * 115.0f;
+        Math::Matrix model =
+            Math::Matrix::CreateTranslation(valveWorld) *
+            Math::Matrix::CreateRotation(cwDeg) *
+            Math::Matrix::CreateScale(m_valveVisualSize);
+        m_valveSprite->Draw(shader, model);
     }
 
     // ── Robots (none currently, kept for future use) ─────────────────────
@@ -1478,12 +2031,15 @@ void Train::Shutdown()
 {
     m_trainStartSound.Stop();
     m_trainRunLoopSound.Stop();
+    m_valveWaterParticles.clear();
+    ShutdownValveWaterGpu();
 
     if (m_firstTrain)      m_firstTrain->Shutdown();
     if (m_secondTrain)     m_secondTrain->Shutdown();
     if (m_thirdTrain)      m_thirdTrain->Shutdown();
     if (m_thirdThirdTrain) m_thirdThirdTrain->Shutdown();
     if (m_fourthTrain)     m_fourthTrain->Shutdown();
+    if (m_valveSprite)     m_valveSprite->Shutdown();
     if (m_railTile)        m_railTile->Shutdown();
 
     if (m_skyVAO) { GL::DeleteVertexArrays(1, &m_skyVAO); m_skyVAO = 0; }

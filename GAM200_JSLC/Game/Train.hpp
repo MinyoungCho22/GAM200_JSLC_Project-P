@@ -7,10 +7,13 @@
 #include "Robot.hpp"
 #include "../Engine/Sound.hpp"
 #include "../Engine/Vec2.hpp"
+#include <cstdint>
 #include <array>
 #include <memory>
 #include <utility>
 #include <vector>
+
+namespace Math { class Matrix; }
 
 class Shader;
 class Player;
@@ -83,7 +86,8 @@ public:
     void Initialize();
     void ApplyConfig(const TrainObjectConfig& cfg);
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
-                bool pulseAbsorbHeld, bool ignoreCarInjectPulseCost);
+                bool pulseAbsorbHeld, bool ignoreCarInjectPulseCost,
+                bool attackHeld, bool attackTriggered, Math::Vec2 mouseWorldPos);
 
     // Call once when the Train map becomes active to begin the departure countdown
     void StartEntryTimer();
@@ -103,6 +107,8 @@ public:
 
     // 시동된 차량 펄스 라이트(플레이스홀더). 열차 스프라이트 위에 그림.
     void DrawCarTransportVFX(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
+    void DrawValveWaterVFX(Shader& colorShader, const Math::Matrix& worldProjection, Math::Vec2 cameraPos,
+                           float viewHalfW) const;
 
     void DrawDrones(Shader& shader) const;
     void DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const;
@@ -136,6 +142,7 @@ public:
     /// 좌클릭 시동 (시동 이미 켜짐이면 false). 연쇄 반응 등 기존 로직 호출.
     bool TryIgniteCarTransportSlot(int slotIndex);
     void AppendCarTransportStraightChainArcs(std::vector<std::pair<Math::Vec2, Math::Vec2>>& outArcs) const;
+    bool IsValveMouseHoverable(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorldPos) const;
 
     float      GetTrainOffset() const { return m_trainOffset; }
     TrainState GetTrainState()  const { return m_trainState; }
@@ -153,6 +160,7 @@ private:
     std::unique_ptr<Background> m_thirdTrain;
     std::unique_ptr<Background> m_thirdThirdTrain;
     std::unique_ptr<Background> m_fourthTrain;
+    std::unique_ptr<Background> m_valveSprite;
 
     // Rail tile texture (tiled horizontally along train-map floor)
     std::unique_ptr<Background> m_railTile;
@@ -216,6 +224,11 @@ private:
                         Math::Vec2 center, Math::Vec2 size,
                         float r, float g, float b, float a = 1.0f) const;
 
+    void InitValveWaterGpu();
+    void ShutdownValveWaterGpu();
+    void UploadAndDrawValveWaterGpu(const Math::Matrix& projection, Math::Vec2 cameraPos, float viewHalfW) const;
+    void ApplyValveWaterDamageToEnemies(float dt);
+
     void ResetCarTransportSlotsToInitialState();
     void UpdateCarTransport(float dt, Player& player, Math::Vec2 playerHbCenter,
                             bool pulseAbsorbHeld, bool ignorePulseCost);
@@ -224,7 +237,51 @@ private:
     Math::Vec2 CarTransportWorldCenter(int slotIndex) const;
     int FindCarTransportInjectTarget(Math::Vec2 playerHbCenter) const;
     static bool IsMooreAdjacentCarSlots(int a, int b);
+    void UpdateValveWaterParticles(float dt);
 
     std::array<CarTransportSlot, 6> m_carTransportSlots{};
     int                             m_carInjectFocusSlot = -1;
+
+    // Car5 valve interaction + spill VFX
+    Math::Vec2 m_valveLocalCenter{};
+    Math::Vec2 m_valveVisualSize{ 135.0f, 135.0f };
+    bool       m_valveDragging = false;
+    float      m_valvePrevMouseAngle = 0.0f;
+    float      m_valveOpenAccum = 0.0f;
+    float      m_valveOpenT = 0.0f;
+    float      m_valvePressureT = 0.0f;
+    float      m_valveWaterAnimTime = 0.0f;
+    float      m_valveParticleSpawnCarry = 0.0f;
+    std::uint32_t m_valveParticleCounter = 0;
+
+    struct ValveWaterParticle
+    {
+        Math::Vec2 pos{};
+        Math::Vec2 vel{};
+        Math::Vec2 size{};
+        float life = 0.0f;
+        float maxLife = 0.0f;
+        float alpha = 0.0f;
+    };
+    std::vector<ValveWaterParticle> m_valveWaterParticles;
+
+    // GPU-instanced valve water rendering (single draw call; avoids CPU quad loops)
+    struct ValveWaterGpuInstance
+    {
+        Math::Vec2 center{};
+        Math::Vec2 halfSize{};
+        float alpha = 0.0f;
+        float layer = 0.0f; // 0 body, 1 core, 2 shadow
+        float pad0 = 0.0f;
+        float pad1 = 0.0f;
+    };
+
+    bool          m_valveWaterGpuReady = false;
+    unsigned int  m_valveWaterProg = 0;
+    int           m_valveWaterLocProjection = -1;
+    unsigned int  m_valveWaterVAO = 0;
+    unsigned int  m_valveWaterQuadVBO = 0;
+    unsigned int  m_valveWaterInstVBO = 0;
+    mutable std::uint32_t m_valveWaterInstPoolBytes = 0;
+    mutable std::vector<ValveWaterGpuInstance> m_valveWaterGpuScratch;
 };

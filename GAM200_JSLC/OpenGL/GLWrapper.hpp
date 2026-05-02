@@ -40,8 +40,10 @@ namespace GL
     static inline void BindVertexArray(GLuint array) { glBindVertexArray(array); }
     static inline void BindBuffer(GLenum target, GLuint buffer) { glBindBuffer(target, buffer); }
     static inline void BufferData(GLenum target, GLsizeiptr size, const void* data, GLenum usage) { glBufferData(target, size, data, usage); }
+    static inline void BufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, const void* data) { glBufferSubData(target, offset, size, data); }
     static inline void VertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void* pointer) { glVertexAttribPointer(index, size, type, normalized, stride, pointer); }
     static inline void EnableVertexAttribArray(GLuint index) { glEnableVertexAttribArray(index); }
+    static inline void VertexAttribDivisor(GLuint index, GLuint divisor) { glVertexAttribDivisor(index, divisor); }
     static inline void DeleteVertexArrays(GLsizei n, const GLuint* arrays) { glDeleteVertexArrays(n, arrays); }
     static inline void DeleteBuffers(GLsizei n, const GLuint* buffers) { glDeleteBuffers(n, buffers); }
 
@@ -49,6 +51,7 @@ namespace GL
     // Drawing Commands
     // -------------------------------------------------------------------------
     static inline void DrawArrays(GLenum mode, GLint first, GLsizei count) { glDrawArrays(mode, first, count); }
+    static inline void DrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei instancecount) { glDrawArraysInstanced(mode, first, count, instancecount); }
     static inline void DrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices) { glDrawElements(mode, count, type, indices); }
 
     // -------------------------------------------------------------------------

@@ -1165,7 +1165,10 @@ void GameplayState::Update(double dt)
             auto* im = gsm.GetEngine().GetImguiManager();
             return im && im->IsPlayerGodMode();
         }();
-        m_train->Update(dt, player, playerHitboxSize, isPressingInteract, trainCarInjectGodMode);
+        const bool attackHeld = ctl.IsActionPressed(ControlAction::Attack, input);
+        const bool attackTriggered = ctl.IsActionTriggered(ControlAction::Attack, input);
+        m_train->Update(dt, player, playerHitboxSize, isPressingInteract, trainCarInjectGodMode,
+                        attackHeld, attackTriggered, mouseWorldPos);
 
         // Keep right bound expanding while player advances.
         // This prevents camera lock when the player leaves the train and keeps moving right.
@@ -1936,6 +1939,7 @@ void GameplayState::DrawMainLayer()
         colorShader->use();
         colorShader->setMat4("projection", worldProjection);
         m_train->DrawCarTransportVFX(*colorShader, m_camera.GetPosition(), viewHalfW);
+        m_train->DrawValveWaterVFX(*colorShader, worldProjection, m_camera.GetPosition(), viewHalfW);
         textureShader.use();
         textureShader.setMat4("projection", worldProjection);
         textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
@@ -2362,6 +2366,12 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             int carSlot = -1;
             if (m_train->TryGetCarTransportClickIgniteTarget(playerHitboxCenter, playerHitboxSize,
                                                              mouseWorldPosForHover, carSlot))
+                overLeftClickTarget = true;
+        }
+
+        if (!overLeftClickTarget && m_trainAccessed && m_train)
+        {
+            if (m_train->IsValveMouseHoverable(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
                 overLeftClickTarget = true;
         }
     }
