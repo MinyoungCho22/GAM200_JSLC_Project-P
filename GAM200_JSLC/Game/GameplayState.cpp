@@ -139,6 +139,7 @@ void GameplayState::Initialize()
     m_train = std::make_unique<Train>();
     m_train->Initialize();
     m_trainAccessed = false;
+    m_trainDeferEntryUntilIntroDone = false;
     m_rooftopAccessed = false;
     m_pulseDetonateSkill.Initialize();
 
@@ -215,10 +216,8 @@ void GameplayState::Initialize()
     m_doorOpened = false;
     m_currentCheckpoint = MapZone::Room;
     m_pendingTransition = PendingTransition::None;
-    m_qSkillHintTimer     = 0.f;
     m_prevRooftopForQHint = false;
     m_skipRooftopQHintByCheat = false;
-    m_qSkillHintTexture   = {};
     m_fadeAlpha = 1.0f;                // start fully black
     m_fadeState = FadeState::FadingIn; // fade in from black on game start
 
@@ -429,6 +428,18 @@ void GameplayState::Update(double dt)
     }
 
     bool suppressAmbientStoryThisFrame = false;
+
+    if (m_trainDeferEntryUntilIntroDone)
+    {
+        if (!m_trainAccessed || !m_train)
+            m_trainDeferEntryUntilIntroDone = false;
+        else if (!m_trainZoomTransition)
+        {
+            m_train->StartEntryTimer();
+            m_trainDeferEntryUntilIntroDone = false;
+        }
+    }
+
     const auto silenceStoryForMapCheat = [&]() {
         m_blockAmbientStoryForSession = true;
         suppressAmbientStoryThisFrame = true;
@@ -444,6 +455,7 @@ void GameplayState::Update(double dt)
         m_rooftopAccessed = false;
         m_undergroundAccessed = false;
         m_trainAccessed = false;
+        m_trainDeferEntryUntilIntroDone = false;
         m_room->SetRightBoundaryActive(true);
         m_door->ResetMapTransition();
         m_rooftopDoor->ResetMapTransition();
@@ -537,6 +549,7 @@ void GameplayState::Update(double dt)
         m_camera.StopAnimation();
         m_undergroundAccessed = false;
         m_trainAccessed = false;
+        m_trainDeferEntryUntilIntroDone = false;
         m_cameraZoom = 1.0f;
         m_trainZoomTransition = false;
         player.SetSizeScale(1.0f);
@@ -558,6 +571,7 @@ void GameplayState::Update(double dt)
         if (m_trainAccessed)
         {
             m_trainAccessed = false;
+            m_trainDeferEntryUntilIntroDone = false;
             m_rooftopAccessed = true;
             m_undergroundAccessed = true;
             m_currentCheckpoint = MapZone::Underground;
@@ -614,9 +628,32 @@ void GameplayState::Update(double dt)
             { Train::MIN_X + m_train->GetMapWidth(), Train::MIN_Y + Train::HEIGHT });
         m_cameraSmoothSpeed = 0.05f;
         m_camera.SetPosition({ Train::MIN_X + GAME_WIDTH / 2.0f, Train::MIN_Y + GAME_HEIGHT / 2.0f });
-        if (m_train) m_train->StartEntryTimer();
+        m_trainDeferEntryUntilIntroDone = false;
+        if (m_train)
+            m_train->StartEntryTimer();
         m_currentCheckpoint = MapZone::Train;
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Train (Ctrl+5)");
+    }
+
+    if (m_trainAccessed && m_train
+        && (input.IsGlfwKeyPressed(GLFW_KEY_LEFT_ALT) || input.IsGlfwKeyPressed(GLFW_KEY_RIGHT_ALT)))
+    {
+        auto warpTrainCarIf = [&](Input::Key numKey, int car1to5) {
+            if (!input.IsKeyTriggered(numKey))
+                return;
+            const float    cx = m_train->GetTrainCarCenterWorldX(car1to5);
+            const Math::Vec2 p0 = player.GetPosition();
+            const Math::Vec2 hc = player.GetHitboxCenter();
+            player.SetPosition({ p0.x + (cx - hc.x), p0.y });
+            player.ResetVelocity();
+            m_train->SetTrainCarCheatUnlock(true);
+            Logger::Instance().Log(Logger::Severity::Event, "Cheat: Train warp carIdx %d (Alt key)", car1to5);
+        };
+        warpTrainCarIf(Input::Key::Num1, 1);
+        warpTrainCarIf(Input::Key::Num2, 2);
+        warpTrainCarIf(Input::Key::Num3, 3);
+        warpTrainCarIf(Input::Key::Num4, 5);
+        warpTrainCarIf(Input::Key::Num5, 4);
     }
 
     const float delayTick = std::min(static_cast<float>(dt), STORY_DELAY_DT_CAP);
@@ -653,15 +690,19 @@ void GameplayState::Update(double dt)
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
     Math::Vec2 playerHbCenter = player.GetHitboxCenter();
 
-    if (m_rooftopAccessed && !m_prevRooftopForQHint && !m_skipRooftopQHintByCheat && m_font && m_fontShader)
+    if (m_rooftopAccessed && !m_prevRooftopForQHint && !m_skipRooftopQHintByCheat && m_font && m_fontShader
+        && m_storyDialogue && !m_blockAmbientStoryForSession && !suppressAmbientStoryThisFrame
+        && !m_storyDialogue->IsBlocking())
     {
-        m_qSkillHintTimer = 10.f;
-        m_qSkillHintTexture =
-            m_font->PrintToTexture(*m_fontShader, "Can't attack all at once? Try using Q");
+        if (StoryDialogue::IsDialogueEnabled())
+        {
+            m_storyDialogue->EnqueueLines(
+                { "Can't attack all at once? Try using Q." }, *m_font, *m_fontShader);
+        }
+        m_prevRooftopForQHint = true;
     }
-    m_prevRooftopForQHint = m_rooftopAccessed;
-    if (m_qSkillHintTimer > 0.f)
-        m_qSkillHintTimer -= static_cast<float>(dt);
+    else if (!m_rooftopAccessed)
+        m_prevRooftopForQHint = false;
 
     const bool hallwayHidingBlocksDroneAttack = m_doorOpened && !m_rooftopAccessed
         && m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
@@ -1113,15 +1154,18 @@ void GameplayState::Update(double dt)
 
         // 플레이어 중심은 스프라이트 위치보다 히트박스 중심이 펄스/판정과 일치
         m_pulseDetonateSkill.Update(dt, player, playerHbCenter,
-            m_rooftop->GetDroneManager(), droneManager.get(),
+            m_rooftop->GetDroneManager(),
+            (m_undergroundAccessed && m_underground) ? m_underground->GetDroneManager() : nullptr,
+            droneManager.get(),
             *pulseManager, ctl, input,
-            m_isGameOver, m_rooftopAccessed, isGodMode,
+            m_isGameOver, m_rooftopAccessed || m_undergroundAccessed, isGodMode,
             (m_trainAccessed && m_train) ? m_train->GetDroneManager() : nullptr,
             (m_trainAccessed && m_train) ? m_train->GetSirenDroneManager() : nullptr,
             trainPulseAnchorOk ? &trainPulseAnchor : nullptr,
             &trainStaticChainArcs,
             (m_trainAccessed && m_train) ? m_train->GetCarTransportDroneManager() : nullptr,
-            (m_trainAccessed && m_train) ? m_train.get() : nullptr);
+            (m_trainAccessed && m_train) ? m_train.get() : nullptr,
+            (m_undergroundAccessed && m_underground) ? m_underground.get() : nullptr);
     }
 
     if (m_storyDialogue && m_rooftopAccessed && !m_undergroundAccessed && m_rooftop && !m_blockAmbientStoryForSession
@@ -1550,8 +1594,8 @@ void GameplayState::HandleUndergroundToTrainTransition()
 
     m_cameraSmoothSpeed = 0.05f;
 
-    // Begin the 3-second departure countdown
-    if (m_train) m_train->StartEntryTimer();
+    // 출발 카운트다운은 페이드 인 + 카메라 줌(플레이어 축소)이 끝난 뒤 시작
+    m_trainDeferEntryUntilIntroDone = true;
 
     Logger::Instance().Log(Logger::Severity::Event,
         "Train Transition! Camera snapped to (%.1f, %.1f), Player: (%.1f, %.1f)",
@@ -2284,9 +2328,6 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
     m_pulseDetonateSkill.DrawCooldownUI(*m_font, *m_fontShader, GAME_HEIGHT - 80.f);
 
-    if (m_qSkillHintTimer > 0.f && m_qSkillHintTexture.textureID != 0)
-        m_font->DrawBakedText(*m_fontShader, m_qSkillHintTexture, { GAME_WIDTH * 0.5f - 520.f, GAME_HEIGHT - 92.f }, 34.f);
-
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())
     {
@@ -2294,8 +2335,8 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_font->DrawBakedText(*m_fontShader, countdownTexture, { GAME_WIDTH / 2.0f - 250.0f, 100.0f }, 50.0f);
     }
 
-    // Train departure announcement
-    if (m_trainAccessed && m_train)
+    // Train departure announcement (fallback if narrative dialogue is disabled in settings)
+    if (m_trainAccessed && m_train && !StoryDialogue::IsDialogueEnabled())
     {
         std::string trainMsg = m_train->GetDepartureAnnouncementText();
         if (!trainMsg.empty())

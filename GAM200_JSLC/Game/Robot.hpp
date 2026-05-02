@@ -40,6 +40,8 @@ public:
     void ApplyUndergroundDifficultyBoost();
     /// Train FourthCar 구간: 체만 지하 배율 수준으로, 추적 속도는 낮춤
     void ApplyTrainEncounterDifficulty();
+    /// Car5 마지막 칸: 더 빠른 추적 + 시야 밖에서도 주기적으로 공격 시도
+    void ApplyTrainBerserkerProfile();
     /// Q 펄스: 넉백 + HP (드론 주입과 비슷한 느낌)
     void ApplyPulseImpact(Math::Vec2 impulse, float damage);
     void Update(double dt, Player& player, const std::vector<ObstacleInfo>& obstacles, float mapMinX, float mapMaxX);
@@ -155,4 +157,6 @@ private:
     float m_patrolWorldMaxX       = 0.f;
     bool m_allowTrainCombatVsPlayer = true;
     float m_trainDetectAlertTimer = 0.f;
+    bool  m_trainBlindAggro       = false;
+    float m_trainBlindSweepTimer  = 0.f;
 };

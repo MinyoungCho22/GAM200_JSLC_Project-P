@@ -128,6 +128,14 @@ void Robot::ApplyTrainEncounterDifficulty()
     m_windupTime  = (std::max)(0.05f, m_windupTime - 0.3f);
 }
 
+void Robot::ApplyTrainBerserkerProfile()
+{
+    m_chaseSpeed           = 252.f;
+    m_patrolSpeed          = 120.f;
+    m_trainBlindAggro      = true;
+    m_trainBlindSweepTimer = 0.55f;
+}
+
 void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& obstacles, float mapMinX, float mapMaxX)
 {
     if (m_state == RobotState::Dead) return;
@@ -146,11 +154,29 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     Math::Vec2 playerPos = player.GetPosition();
     float distToPlayer = std::abs(playerPos.x - m_position.x);
     float heightDiff = std::abs(playerPos.y - m_position.y);
+    const float detHeight = (m_trainDeckPatrol || m_trainCarSegment > 0) ? 520.f : 300.f;
 
     // FSM State Logic
     switch (m_state)
     {
     case RobotState::Patrol:
+        if (m_trainBlindAggro)
+        {
+            m_directionX = (playerPos.x > m_position.x) ? 1.0f : -1.0f;
+            m_velocity.x = m_directionX * m_chaseSpeed;
+
+            m_trainBlindSweepTimer -= fDt;
+            if (m_trainBlindSweepTimer <= 0.f && m_attackCooldownTimer <= 0.f)
+            {
+                m_trainBlindSweepTimer = 1.9f;
+                DecideAttackPattern();
+                m_state            = RobotState::Windup;
+                m_stateTimer       = m_windupTime;
+                m_velocity.x       = 0.f;
+                m_hasDealtDamage   = false;
+            }
+            break;
+        }
         // Reverse direction at patrol boundaries
         if (m_usePatrolWorldClamp)
         {
@@ -170,7 +196,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         m_velocity.x = m_directionX * m_patrolSpeed;
 
         // Transition to Chase if player is detected
-        if (distToPlayer < DETECTION_RANGE && heightDiff < 300.0f)
+        if (distToPlayer < DETECTION_RANGE && heightDiff < detHeight)
         {
             m_state                     = RobotState::Chase;
             m_trainDetectAlertTimer     = 0.95f;
@@ -197,9 +223,25 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
                 m_velocity.x = 0.0f;
             }
         }
-        else if (distToPlayer > DETECTION_RANGE)
+        else
         {
-            m_state = RobotState::Patrol;
+            if (m_trainBlindAggro)
+            {
+                m_trainBlindSweepTimer -= fDt;
+                if (m_trainBlindSweepTimer <= 0.f && m_attackCooldownTimer <= 0.f)
+                {
+                    m_trainBlindSweepTimer = 1.45f;
+                    DecideAttackPattern();
+                    m_state          = RobotState::Windup;
+                    m_stateTimer     = m_windupTime;
+                    m_velocity.x     = 0.f;
+                    m_hasDealtDamage = false;
+                }
+            }
+            else if (distToPlayer > DETECTION_RANGE)
+            {
+                m_state = RobotState::Patrol;
+            }
         }
         break;
 
@@ -339,9 +381,24 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             // Only block movement if we're not currently colliding but would collide
             if (!currentlyColliding && wouldCollide)
             {
+                const bool trainVault = m_trainCarSegment > 0 && obs.size.y >= 95.f
+                                        && (m_state == RobotState::Chase || m_state == RobotState::Patrol);
+                if (trainVault)
+                {
+                    const float toObsX = obs.pos.x - m_position.x;
+                    const float pushX =
+                        (std::abs(toObsX) < 18.f) ? (m_directionX * 460.f) : (std::copysign(460.f, toObsX));
+                    const float vy = 1620.f + std::min(400.f, obs.size.y * 1.8f);
+                    m_velocity.y = std::max(m_velocity.y, vy);
+                    m_velocity.x += pushX * 1.06f;
+                    canMove      = false;
+                    nextPos.x    = m_position.x;
+                    break;
+                }
+
                 canMove = false;
                 nextPos.x = m_position.x;
-                
+
                 // Reverse direction if in Patrol or Retreat state
                 if (m_state == RobotState::Patrol || m_state == RobotState::Retreat)
                 {
@@ -626,6 +683,7 @@ void Robot::Reset()
     const int   trainSeg    = m_trainCarSegment;
     const bool  deckPatrol  = m_trainDeckPatrol;
     const float trainGround = m_groundLimitY;
+    const bool  blindKeep   = m_trainBlindAggro;
 
     m_groundLimitY          = -1910.0f;
     m_position              = m_spawnPos;
@@ -648,6 +706,8 @@ void Robot::Reset()
     m_usePatrolWorldClamp      = false;
     m_allowTrainCombatVsPlayer = true;
     m_trainDetectAlertTimer    = 0.f;
+    m_trainBlindAggro          = false;
+    m_trainBlindSweepTimer     = 0.f;
 
     if (trainSeg > 0)
     {
@@ -655,6 +715,9 @@ void Robot::Reset()
         m_trainDeckPatrol         = deckPatrol;
         m_groundLimitY            = trainGround;
         m_allowTrainCombatVsPlayer = true;
+        m_trainBlindAggro          = blindKeep;
+        if (blindKeep)
+            m_trainBlindSweepTimer = 0.55f;
     }
 }
 

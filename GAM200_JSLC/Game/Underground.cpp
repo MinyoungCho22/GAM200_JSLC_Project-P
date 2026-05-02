@@ -10,6 +10,7 @@
 #include "../Engine/Collision.hpp"
 #include "MapObjectConfig.hpp"
 #include <algorithm>
+#include <cmath>
 #include <unordered_map>
 #include <vector>
 
@@ -330,6 +331,58 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
             }
         }
     }
+
+    if (player.IsOnGround() && player.GetVelocity().y <= 1.f)
+    {
+        currentHitboxCenter = player.GetHitboxCenter();
+        playerHalfSize      = playerHitboxSize * 0.5f;
+        const float footY   = currentHitboxCenter.y - playerHalfSize.y;
+        const float footX   = currentHitboxCenter.x;
+        const float footL   = currentHitboxCenter.x - playerHalfSize.x;
+        const float footR   = currentHitboxCenter.x + playerHalfSize.x;
+        constexpr float kTol = 20.f;
+
+        bool supported = false;
+        const float     gl = player.GetCurrentGroundLevel();
+        if (footY >= gl - 28.f && footY <= gl + 32.f)
+            supported = true;
+
+        for (const auto& obs : m_obstacles)
+        {
+            const float halfW = obs.size.x * 0.5f;
+            const float halfH = obs.size.y * 0.5f;
+            const float top   = obs.pos.y + halfH;
+            const float ol    = obs.pos.x - halfW;
+            const float orr   = obs.pos.x + halfW;
+            if (footR > ol + 4.f && footL < orr - 4.f && std::abs(footY - top) <= kTol)
+            {
+                supported = true;
+                break;
+            }
+        }
+
+        for (const auto& ramp : m_ramps)
+        {
+            float        rampHalfW = ramp.size.x / 2.0f;
+            float        rampHalfH = ramp.size.y / 2.0f;
+            const float  rampLeft  = ramp.pos.x - rampHalfW;
+            const float  rampRight = ramp.pos.x + rampHalfW;
+            const float  rampBottom = ramp.pos.y - rampHalfH;
+            if (footX >= rampLeft && footX <= rampRight && ramp.size.x > 1.f)
+            {
+                const float localX   = (footX - rampLeft) / ramp.size.x;
+                const float targetY  = rampBottom + (localX * ramp.size.y);
+                if (std::abs(footY - targetY) <= kTol + 12.f)
+                {
+                    supported = true;
+                    break;
+                }
+            }
+        }
+
+        if (!supported)
+            player.SetOnGround(false);
+    }
 }
 
 void Underground::Draw(Shader& shader) const
@@ -409,6 +462,34 @@ void Underground::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) c
         debugRenderer.DrawBox(colorShader, ramp.pos, ramp.size, { 1.0f, 1.0f });
     }
 
+}
+
+void Underground::ApplyPulseToRobots(Math::Vec2 pulseWorldCenter, float radius)
+{
+    constexpr float kDamage            = 14.f;
+    constexpr float kImpulseCenter     = 900.f;
+    constexpr float kImpulseEdge       = 400.f;
+    constexpr float kRobotImpulseScale = 0.48f;
+    constexpr float kLift              = 135.f;
+
+    const float rSq = radius * radius;
+    for (auto& robot : m_robots)
+    {
+        if (robot.IsDead())
+            continue;
+        const Math::Vec2 pos = robot.GetPosition();
+        Math::Vec2       d   = pos - pulseWorldCenter;
+        const float      dSq = d.LengthSq();
+        if (dSq > rSq)
+            continue;
+        const float dist = std::sqrt(dSq);
+        float       t    = (dist < 0.1f) ? 1.f : (1.f - dist / (radius + 1.f));
+        t                = (std::max)(0.f, t);
+        const float      impulseMag = t * (kImpulseCenter - kImpulseEdge) + kImpulseEdge;
+        const Math::Vec2 dir        = (dist > 0.1f) ? (d * (1.f / dist)) : Math::Vec2{ 1.f, 0.f };
+        const Math::Vec2 impulse    = dir * (impulseMag * kRobotImpulseScale) + Math::Vec2{ 0.f, kLift };
+        robot.ApplyPulseImpact(impulse, kDamage);
+    }
 }
 
 void Underground::Shutdown()

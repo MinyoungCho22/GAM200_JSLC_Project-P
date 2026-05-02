@@ -129,12 +129,10 @@ private:
     float m_cameraSmoothSpeed = 0.1f;
     Sound m_bgm;
 
-    // Q-skill: Pulse Resonance Burst (unlocked on Rooftop)
+    // Q-skill: Pulse Resonance Burst (unlocked on Rooftop / Underground) — 루프탭 진입 시 Conversion 대화로 힌트
     PulseDetonateSkill m_pulseDetonateSkill;
-    float              m_qSkillHintTimer      = 0.f;
     bool               m_prevRooftopForQHint  = false;
     bool               m_skipRooftopQHintByCheat = false;
-    CachedTextureInfo  m_qSkillHintTexture{};
 
     // Train zoom transition: camera zooms in when entering train map, then eases out
     float m_cameraZoom = 1.0f;
@@ -142,4 +140,6 @@ private:
     float m_trainZoomTimer = 0.0f;
     static constexpr float TRAIN_ZOOM_DURATION = 3.0f;
     static constexpr float TRAIN_ZOOM_START    = 2.8f; // strong zoom-in; eases out as player shrinks to 0.6
+    /// Underground→Train 자연 진입: 페이드·카메라 줌이 끝난 뒤 출발 카운트다운 시작
+    bool m_trainDeferEntryUntilIntroDone = false;
 };

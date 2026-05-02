@@ -60,8 +60,10 @@ public:
     void TakeDamage(float amount);
     void SetPosition(Math::Vec2 new_pos);
     void SetCurrentGroundLevel(float newGroundLevel);
+    float GetCurrentGroundLevel() const { return m_currentGroundLevel; }
     void ResetVelocity();
     void SetOnGround(bool onGround);
+    bool IsOnGround() const { return is_on_ground; }
 
     void Revive(float newPulse);
     void SetHiding(bool hiding) { m_isHiding = hiding; }

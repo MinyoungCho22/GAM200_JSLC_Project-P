@@ -566,6 +566,23 @@ int Train::GetPlayerTrainCarIndex(Math::Vec2 worldHbCenter) const
     return 5;
 }
 
+float Train::GetTrainCarCenterWorldX(int carIndex1To5) const
+{
+    if (carIndex1To5 < 1 || carIndex1To5 > 5)
+        return MIN_X + m_trainOffset + m_totalTrainWidth * 0.5f;
+    const float l = GetTrainCarLocalLeftEdge(carIndex1To5);
+    float       w = m_car1Width;
+    if (carIndex1To5 == 2)
+        w = m_car2Width;
+    else if (carIndex1To5 == 3)
+        w = m_car3Width;
+    else if (carIndex1To5 == 4)
+        w = m_car4Width;
+    else if (carIndex1To5 == 5)
+        w = m_car5Width;
+    return MIN_X + m_trainOffset + l + w * 0.5f;
+}
+
 bool Train::IsTrainCarCombatCleared(int car1To5) const
 {
     if (car1To5 < 1 || car1To5 > 5)
@@ -597,12 +614,35 @@ bool Train::IsTrainCarCombatCleared(int car1To5) const
 
 float Train::GetTrainCombatAdvanceCapWorldX() const
 {
+    if (m_trainCheatCarUnlock)
+        return MIN_X + m_trainOffset + m_totalTrainWidth - 85.f;
+
+    float capCombat = 1.0e9f;
     for (int c = 1; c <= 5; ++c)
     {
         if (!IsTrainCarCombatCleared(c))
-            return MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(c + 1) - 38.f;
+        {
+            capCombat = MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(c + 1) - 38.f;
+            break;
+        }
     }
-    return 1.0e9f;
+    // 마지막 칸에서 전투를 클리어해도 열차 끝 밖으로 나가면 낙사 — 오른쪽 막기 유지
+    const float tailGuard = MIN_X + m_trainOffset + m_totalTrainWidth - 85.f;
+    return std::min(capCombat, tailGuard);
+}
+
+float Train::GetTrainCombatRetreatMinWorldX() const
+{
+    if (m_trainCheatCarUnlock)
+        return MIN_X + m_trainOffset - 800.f;
+    return MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(m_trainHighestCarEntered) - 52.f;
+}
+
+std::string Train::GetCar5ValveHintBannerText() const
+{
+    if (m_car5ValveHintTimer <= 0.0f)
+        return {};
+    return "Last car reached. Spin the valve to the right — flood the deck and wash the robots away!";
 }
 
 void Train::RequestTrainCameraShake(float maxPixelOffset)
@@ -634,6 +674,13 @@ void Train::TryDeckPatrolRobotJumpAndLandingShake(Robot& r, size_t robotIndex, f
     if (robotIndex >= m_trainDeckRobotJumpPrepT.size())
         return;
 
+    const RobotState stJump = r.GetState();
+    if (stJump == RobotState::Windup || stJump == RobotState::Attack)
+    {
+        m_trainDeckRobotJumpPrepT[robotIndex] = 0.f;
+        return;
+    }
+
     const bool airborne = !r.IsOnGround() || r.GetVelocity().y > 95.f;
     if (!airborne && m_trainDeckRobotWasAirborne[robotIndex])
     {
@@ -653,14 +700,16 @@ void Train::TryDeckPatrolRobotJumpAndLandingShake(Robot& r, size_t robotIndex, f
     }
     if (r.GetVelocity().y > 25.f)
         return;
-    if (std::abs(r.GetVelocity().x) < 22.f)
+    const float vxNeed = (stJump == RobotState::Chase) ? 12.f : 22.f;
+    if (std::abs(r.GetVelocity().x) < vxNeed)
     {
         m_trainDeckRobotJumpPrepT[robotIndex] = 0.f;
         return;
     }
 
     const int        seg    = r.GetTrainCarSegment();
-    const float      fwd    = (seg == 5) ? (r.GetSize().x * 0.32f + 92.f) : (r.GetSize().x * 0.32f + 62.f);
+    const float      fwd =
+        (seg == 5 || seg == 1 || seg == 2 || seg == 4) ? (r.GetSize().x * 0.32f + 92.f) : (r.GetSize().x * 0.32f + 62.f);
     const float      dir    = r.GetDirectionX();
     const Math::Vec2 rp     = r.GetPosition();
     const float      probeX = rp.x + dir * fwd;
@@ -669,7 +718,8 @@ void Train::TryDeckPatrolRobotJumpAndLandingShake(Robot& r, size_t robotIndex, f
 
     bool           blocked        = false;
     Math::Vec2     blockedCenter{};
-    const float    minObsH = (seg == 5) ? 48.f : 110.f;
+    float          blockedH       = 0.f;
+    const float    minObsH = (seg == 5 || seg == 1 || seg == 2 || seg == 4) ? 48.f : 110.f;
     for (const auto& o : tallCarObs)
     {
         if (o.size.y < minObsH)
@@ -678,6 +728,7 @@ void Train::TryDeckPatrolRobotJumpAndLandingShake(Robot& r, size_t robotIndex, f
             continue;
         blocked       = true;
         blockedCenter = o.pos;
+        blockedH      = o.size.y;
         break;
     }
 
@@ -699,23 +750,65 @@ void Train::TryDeckPatrolRobotJumpAndLandingShake(Robot& r, size_t robotIndex, f
     const float toObsX = blockedCenter.x - rp.x;
     const float pushX =
         (std::abs(toObsX) < 15.f) ? (dir * 420.f) : (std::copysign(420.f, toObsX));
-    if (seg == 5)
+    float vy = 1480.f;
+    if (seg == 5 || seg == 1 || seg == 2 || seg == 4)
     {
-        v.y = 1580.f;
-        v.x += pushX * 1.05f;
-    }
-    else if (seg == 1 || seg == 2)
-    {
-        v.y = 1500.f;
+        vy = 1680.f + std::min(380.f, blockedH * 1.75f);
+        v.y = vy;
         v.x += pushX * 1.08f;
     }
     else
     {
-        v.y = 1380.f;
+        v.y = vy;
         v.x += pushX;
     }
     r.SetVelocity(v);
     m_trainDeckRobotWasAirborne[robotIndex] = true;
+}
+
+void Train::ClampCarSegment4RobotsBeforeValve()
+{
+    const float valveX = MIN_X + m_trainOffset + m_valveLocalCenter.x;
+    constexpr float kMargin = 168.f;
+    const float capX = valveX - kMargin;
+
+    for (auto& r : m_robots)
+    {
+        if (r.IsDead() || r.GetTrainCarSegment() != 4)
+            continue;
+        Math::Vec2 p = r.GetPosition();
+        if (p.x <= capX)
+            continue;
+        p.x = capX;
+        r.SetPosition(p);
+        Math::Vec2 v = r.GetVelocity();
+        if (v.x > 0.f)
+            v.x = 0.f;
+        r.SetVelocity(v);
+    }
+}
+
+void Train::ClampCar5RobotsEastOfValve()
+{
+    // 밸브 중심보다 왼쪽(작은 X)으로 못 가게 — 마지막 칸 로봇은 밸브 오른쪽 덱에만
+    const float     valveCx = MIN_X + m_trainOffset + m_valveLocalCenter.x;
+    constexpr float kPastValve = 188.f;
+    const float     minRobotCx = valveCx + kPastValve;
+
+    for (auto& r : m_robots)
+    {
+        if (r.IsDead() || r.GetTrainCarSegment() != 5)
+            continue;
+        Math::Vec2 p = r.GetPosition();
+        if (p.x >= minRobotCx)
+            continue;
+        p.x = minRobotCx;
+        r.SetPosition(p);
+        Math::Vec2 v = r.GetVelocity();
+        if (v.x < 0.f)
+            v.x = 0.f;
+        r.SetVelocity(v);
+    }
 }
 
 void Train::UpdateTrainDeckPatrolRobots(float dt, Player& player, Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize)
@@ -734,12 +827,14 @@ void Train::UpdateTrainDeckPatrolRobots(float dt, Player& player, Math::Vec2 pla
             continue;
 
         const int seg = r.GetTrainCarSegment();
-        if (seg != 1 && seg != 2 && seg != 5)
+        if (seg != 1 && seg != 2 && seg != 4 && seg != 5)
             continue;
 
         float carW = m_car1Width;
         if (seg == 2)
             carW = m_car2Width;
+        else if (seg == 4)
+            carW = m_car4Width;
         else if (seg == 5)
             carW = m_car5Width;
 
@@ -751,7 +846,7 @@ void Train::UpdateTrainDeckPatrolRobots(float dt, Player& player, Math::Vec2 pla
 
         std::vector<ObstacleInfo> carTall;
         carTall.reserve(8);
-        const float minHbH = (seg == 5) ? 68.f : 100.f;
+        const float minHbH = (seg == 5 || seg == 1 || seg == 2) ? 68.f : 100.f;
         for (const auto& hb : m_trainHitboxes)
         {
             if (!hb.collision)
@@ -769,11 +864,42 @@ void Train::UpdateTrainDeckPatrolRobots(float dt, Player& player, Math::Vec2 pla
         }
 
         r.SetUsePatrolWorldClamp(true);
-        r.SetPatrolWorldClamp(carWorldL + 90.f, carWorldR - 90.f);
+        if (seg == 4)
+        {
+            const float valveX = MIN_X + m_trainOffset + m_valveLocalCenter.x;
+            const float capX   = valveX - 160.f;
+            r.SetPatrolWorldClamp(carWorldL + 90.f, std::min(carWorldR - 90.f, capX));
+        }
+        else if (seg == 5)
+        {
+            const float valveCx    = MIN_X + m_trainOffset + m_valveLocalCenter.x;
+            constexpr float kEastV = 188.f;
+            const float minPatrolX = valveCx + kEastV;
+            r.SetPatrolWorldClamp(std::max(carWorldL + 90.f, minPatrolX), carWorldR - 90.f);
+        }
+        else
+            r.SetPatrolWorldClamp(carWorldL + 90.f, carWorldR - 90.f);
 
         r.Update(dt, player, carTall, carWorldL + 55.f, carWorldR - 55.f);
         TryDeckPatrolRobotJumpAndLandingShake(r, ri, static_cast<float>(dt), carTall, pcar);
+
+        if (seg == 5 && m_valvePressureT > 0.10f && !r.IsDead())
+        {
+            Math::Vec2 p = r.GetPosition();
+            p.x += 520.f * dt;
+            const float maxX = carWorldR - 55.f;
+            if (p.x > maxX)
+                p.x = maxX;
+            r.SetPosition(p);
+            Math::Vec2 v = r.GetVelocity();
+            if (v.x < 180.f)
+                v.x = 180.f;
+            r.SetVelocity(v);
+        }
     }
+
+    ClampCarSegment4RobotsBeforeValve();
+    ClampCar5RobotsEastOfValve();
 }
 
 bool Train::IsValveMouseHoverable(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorldPos) const
@@ -1169,7 +1295,7 @@ void Train::Initialize()
 
     ApplyConfig(MapObjectConfig::Instance().GetData().train);
 
-    // 드론: 1~4호차 각 2기 + 5호차 6기; 1·2호차 덱 패트롤 로봇 + 5호차 덱 패트롤 로봇 3
+    // 드론: 1~4호차 각 2기 + 5호차 6기; 1·2·4호차·5호차 덱 패트롤 로봇 + 5호차 광폭 2
     {
         for (auto& r : m_robots)
             r.Shutdown();
@@ -1202,15 +1328,22 @@ void Train::Initialize()
                 const float ySiren =
                     m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f) : highCarDroneHoverY;
                 constexpr int kCar5DroneCount = 6;
+                // 물탱크 뒤(차량 앞쪽 / Car4 경계 쪽)와 앞(열차 끝 쪽)으로 나눠 배치, 속도·Y도 제각각
                 for (int j = 0; j < kCar5DroneCount; ++j)
                 {
-                    const float t = (kCar5DroneCount <= 1) ? 0.5f
-                                                           : static_cast<float>(j) / static_cast<float>(kCar5DroneCount - 1);
+                    const bool behindTank = j < 3;
+                    const int  sub        = behindTank ? j : (j - 3);
+                    const float span      = behindTank ? 0.34f : 0.34f;
+                    const float baseT     = behindTank ? 0.10f : 0.56f;
+                    const float t         = baseT + (static_cast<float>(sub) / 2.5f) * span;
                     const float xj =
-                        MIN_X + l + w * (0.11f + t * 0.78f) + static_cast<float>((j * 19 + 2) % 9 - 4) * 7.f;
-                    const float yPh = static_cast<float>((j * 13 + 3) % 11 - 5); // 약 ±5
-                    Drone&      dj = m_droneManager->SpawnDrone({ xj, ySiren + yPh }, "Asset/Drone.png", false);
-                    dj.SetBaseSpeed(82.f + static_cast<float>(j % 7) * 6.5f);
+                        MIN_X + l + w * t + static_cast<float>((j * 23 + 5) % 13 - 6) * 11.f;
+                    const float yExtra = behindTank ? (-18.f - static_cast<float>(sub) * 14.f)
+                                                    : (12.f + static_cast<float>(sub) * 16.f);
+                    Drone& dj = m_droneManager->SpawnDrone({ xj, ySiren + yExtra }, "Asset/Drone.png", false);
+                    const float spd = behindTank ? (62.f + static_cast<float>(sub) * 19.f)
+                                                 : (74.f + static_cast<float>(sub) * 21.f);
+                    dj.SetBaseSpeed(spd);
                     dj.SetTrainCarSegment(5);
                 }
                 continue;
@@ -1265,6 +1398,22 @@ void Train::Initialize()
             rr.SetSpawnPosition(rr.GetPosition());
         }
 
+        for (int k = 0; k < 2; ++k)
+        {
+            m_robots.emplace_back();
+            Robot&      rr = m_robots.back();
+            const float car4LocalL = GetTrainCarLocalLeftEdge(4);
+            const float cx =
+                MIN_X + car4LocalL + m_car4Width * (0.26f + static_cast<float>(k) * 0.28f);
+            rr.Init({ cx, deckSurfaceY + 260.f });
+            const float cy = deckSurfaceY + rr.GetSize().y * 0.5f;
+            rr.SetPosition({ cx, cy });
+            rr.SetTrainCarSegment(4);
+            rr.SetTrainDeckPatrol(true);
+            rr.SetGroundLimitY(deckSurfaceY);
+            rr.SetSpawnPosition(rr.GetPosition());
+        }
+
         for (int i = 0; i < 3; ++i)
         {
             m_robots.emplace_back();
@@ -1280,6 +1429,21 @@ void Train::Initialize()
             rr.SetTrainDeckPatrol(true);
             rr.SetGroundLimitY(deckSurfaceY);
             rr.SetSpawnPosition(rr.GetPosition());
+        }
+
+        for (int b = 0; b < 2; ++b)
+        {
+            m_robots.emplace_back();
+            Robot& rr = m_robots.back();
+            const float bx  = MIN_X + c5 + m_car5Width * (0.38f + static_cast<float>(b) * 0.16f);
+            const float bst = static_cast<float>(b) * 9.f;
+            rr.Init({ bx, deckSurfaceY + 260.f });
+            rr.SetPosition({ bx, deckSurfaceY + rr.GetSize().y * 0.5f + bst });
+            rr.SetTrainCarSegment(5);
+            rr.SetTrainDeckPatrol(true);
+            rr.SetGroundLimitY(deckSurfaceY);
+            rr.SetSpawnPosition(rr.GetPosition());
+            rr.ApplyTrainBerserkerProfile();
         }
 
         m_trainDeckRobotWasAirborne.assign(m_robots.size(), false);
@@ -1310,7 +1474,10 @@ void Train::Initialize()
     }
 
     m_prevTrainOffsetActors = m_trainOffset;
-    m_car5EncounterActive     = false;
+    m_car5EncounterActive    = false;
+    m_car5ValveHintTimer     = 0.0f;
+    m_trainCheatCarUnlock    = false;
+    m_trainHighestCarEntered  = 1;
     m_encounterScriptTime     = 0.f;
     m_trainDeckRobotWasAirborne.assign(m_robots.size(), false);
     m_trainDeckRobotJumpPrepT.assign(m_robots.size(), 0.f);
@@ -1812,9 +1979,9 @@ void Train::ApplyValveWaterDamageToEnemies(float dt)
             continue;
 
         r.SetPosition(r.GetPosition() + Math::Vec2{ 220.f, 0.f });
-        r.TakeDamage(r.GetMaxHP() * 0.80f);
+        r.TakeDamage(r.GetMaxHP() * 2.0f);
         if (i < m_robotWaterCd.size())
-            m_robotWaterCd[i] = 1.15f;
+            m_robotWaterCd[i] = 0.22f;
     }
 }
 
@@ -1882,6 +2049,8 @@ void Train::TryActivateCar5Encounter(Math::Vec2 hbCenter, Math::Vec2 hbSize)
         return;
 
     m_car5EncounterActive = true;
+    if (!m_trainCheatCarUnlock)
+        m_car5ValveHintTimer = 5.0f;
     m_encounterScriptTime = 0.f;
 
     // 로봇: 덱 패트롤(1·2·5호차)은 유지 — 레일 재배치는 그 외만
@@ -1988,6 +2157,9 @@ void Train::UpdateTrainRobotsAI(float dt, Player& player)
         r.Update(dt, player, obstacleInfos, mapMinX, mapMaxX);
         AssistRobotRailJumpTowardTrain(r, player, dt);
     }
+
+    ClampCarSegment4RobotsBeforeValve();
+    ClampCar5RobotsEastOfValve();
 }
 
 
@@ -2416,7 +2588,7 @@ void Train::UpdateTrainEncounterScript(float dt, Player& player)
     const float                 trainRight = tl + m_totalTrainWidth;
     const bool                  fleeWater = (m_valvePressureT > 0.10f);
     const Math::Vec2          ppos      = player.GetHitboxCenter();
-    constexpr float kCar5DroneApproach = 52.f;
+    constexpr float kCar5DroneApproach = 268.f;
 
     if (m_droneManager)
     {
@@ -2424,10 +2596,11 @@ void Train::UpdateTrainEncounterScript(float dt, Player& player)
         const float c5L = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
         const float c5R = c5L + m_car5Width;
         const float formationCenter     = std::clamp(ppos.x, c5L + 260.f, c5R - 260.f);
-        const float formationSpacingBase = 142.f;
+        const float formationSpacingBase = 228.f;
         const float car5HoverY =
             m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f)
                                : (Train::MIN_Y + kTrainFlatbedDeckTopLocalY + 380.f);
+        int car5LiveIdx = 0;
         for (size_t i = 0; i < drones.size(); ++i)
         {
             auto& d = drones[i];
@@ -2454,18 +2627,20 @@ void Train::UpdateTrainEncounterScript(float dt, Player& player)
             }
             else
             {
-                const float spacing  = formationSpacingBase + static_cast<float>(i % 5) * 13.f;
-                const float slot     = static_cast<float>(i) - static_cast<float>(drones.size() - 1) * 0.5f;
-                const float desiredX = std::clamp(formationCenter + slot * spacing, c5L + 120.f, c5R - 120.f);
-                const float ap       = kCar5DroneApproach + static_cast<float>(i % 4) * 8.f;
-                dx                   = std::clamp(desiredX - pos.x, -ap * dt, ap * dt);
+                const float spacing = formationSpacingBase + static_cast<float>(car5LiveIdx % 6) * 31.f;
+                const float slot    = static_cast<float>(car5LiveIdx) - 2.5f;
+                const float desiredX =
+                    std::clamp(formationCenter + slot * spacing, c5L + 110.f, c5R - 110.f);
+                const float ap = kCar5DroneApproach + static_cast<float>(car5LiveIdx % 5) * 19.f;
+                dx             = std::clamp(desiredX - pos.x, -ap * dt, ap * dt);
             }
 
             pos.x += dx;
             pos.y = hoverY;
             d.SetPosition(pos);
             d.SetVelocity({ 0.f, 0.f });
-            d.SetBaseSpeed(86.f + static_cast<float>(i % 7) * 6.f);
+            d.SetBaseSpeed(72.f + static_cast<float>(car5LiveIdx % 7) * 14.f);
+            ++car5LiveIdx;
         }
     }
 
@@ -2900,7 +3075,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                     ySiren + std::sin(m_encounterScriptTime * 2.2f + static_cast<float>(i) * 0.61f) * 5.f;
                 Math::Vec2 p = d.GetPosition();
                 const float desiredX = std::clamp(pTarget.x, c5L + 100.f, c5R - 100.f);
-                const float ap       = 34.f + static_cast<float>(i % 5) * 6.f;
+                const float ap       = 118.f + static_cast<float>(i % 5) * 11.f;
                 p.x                  = std::clamp(
                     p.x + std::clamp(desiredX - p.x, -ap * fdt, ap * fdt),
                     c5L + 100.f, c5R - 100.f);
@@ -3053,6 +3228,9 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     if (m_departedMsgTimer > 0.0f)
         m_departedMsgTimer -= fdt;
 
+    if (m_car5ValveHintTimer > 0.0f)
+        m_car5ValveHintTimer -= fdt;
+
     // --- Train movement ---
     if (m_trainState == TrainState::Moving)
     {
@@ -3075,7 +3253,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             player.SetPosition(player.GetPosition() + Math::Vec2{ move, 0.0f });
     }
 
-    // --- Train combat progression: 클리어 전에는 다음 칸 경계에서 막음 ---
+    // --- Train combat progression: 클리어 전에는 다음 칸 경계에서 막음, 끝 칸에서는 오른쪽 낙사 방지 ---
     currentHbCenter = player.GetHitboxCenter();
     {
         const float capWorldX = GetTrainCombatAdvanceCapWorldX();
@@ -3085,6 +3263,25 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             Math::Vec2 pp = player.GetPosition();
             player.SetPosition({ pp.x + dx, pp.y });
             currentHbCenter = player.GetHitboxCenter();
+        }
+    }
+
+    // --- 한 번 진입한 칸보다 이전 칸으로는 되돌아가지 못하게 (Car5 클리어 후에도 유지) ---
+    currentHbCenter = player.GetHitboxCenter();
+    {
+        const int pc = GetPlayerTrainCarIndex(currentHbCenter);
+        if (!m_trainCheatCarUnlock && pc >= 1 && pc > m_trainHighestCarEntered)
+            m_trainHighestCarEntered = pc;
+        if (pc >= 1)
+        {
+            const float minWx = GetTrainCombatRetreatMinWorldX();
+            if (currentHbCenter.x < minWx)
+            {
+                const float dx = minWx - currentHbCenter.x;
+                Math::Vec2 pp = player.GetPosition();
+                player.SetPosition({ pp.x + dx, pp.y });
+                currentHbCenter = player.GetHitboxCenter();
+            }
         }
     }
 
@@ -3125,7 +3322,9 @@ void Train::StartEntryTimer()
         m_valveParticleSpawnCarry = 0.0f;
         m_valveParticleCounter = 0;
         m_valveWaterParticles.clear();
-        m_car5EncounterActive     = false;
+        m_car5EncounterActive       = false;
+        m_car5ValveHintTimer        = 0.0f;
+        m_trainHighestCarEntered     = 1;
         m_encounterScriptTime     = 0.f;
         m_trainDeckRobotWasAirborne.assign(m_robots.size(), false);
         m_trainDeckRobotJumpPrepT.assign(m_robots.size(), 0.f);
@@ -3151,6 +3350,7 @@ void Train::StartEntryTimer()
         ResetCarTransportSlotsToInitialState();
         Logger::Instance().Log(Logger::Severity::Info,
             "Train: Entry timer started – train departs in %.1f s", TRAIN_DEPART_DELAY);
+        m_trainCheatCarUnlock      = false;
     }
 }
 
@@ -3176,10 +3376,11 @@ std::string Train::GetDepartureAnnouncementText() const
 
     if (m_entryTimer >= 0.0f && m_entryTimer < TRAIN_DEPART_DELAY)
     {
-        int secsLeft = static_cast<int>(std::ceil(TRAIN_DEPART_DELAY - m_entryTimer));
-        return "Train departs in " + std::to_string(secsLeft)
-               + (secsLeft == 1 ? " second" : " seconds")
-               + "  –  PLEASE BOARD!";
+        if (m_entryTimer < 0.55f)
+            return "The train will depart in 3 seconds. Please get on.";
+        const int secsLeft =
+            std::clamp(static_cast<int>(std::ceil(TRAIN_DEPART_DELAY - m_entryTimer)), 1, 3);
+        return std::to_string(secsLeft);
     }
 
     return "";

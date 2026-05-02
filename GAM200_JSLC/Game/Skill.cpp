@@ -7,6 +7,7 @@
 #include "PulseManager.hpp"
 #include "PulseCore.hpp"
 #include "Train.hpp"
+#include "Underground.hpp"
 #include "../Engine/ControlBindings.hpp"
 #include "../Engine/Logger.hpp"
 #include <sstream>
@@ -29,22 +30,24 @@ void PulseDetonateSkill::Update(
     Player&                player,
     Math::Vec2             playerCenter,
     DroneManager*          rooftopDM,
+    DroneManager*          undergroundDM,
     DroneManager*          tracerDM,
     PulseManager&          pulseManager,
     const ControlBindings& ctl,
     const Input::Input&    input,
     bool                   isGameOver,
-    bool                   rooftopAccessed,
+    bool                   pulseBurstUnlockEligible,
     bool                   isGodMode,
     DroneManager*          trainDM,
     DroneManager*          trainSirenDM,
     const Math::Vec2*      trainDetonationOrigin,
     const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs,
     DroneManager*          trainCarTransportDM,
-    Train*                 trainMapForBranchArcs)
+    Train*                 trainMapForBranchArcs,
+    Underground*           undergroundForPulseRobots)
 {
-    // Unlock once the player enters the Rooftop for the first time
-    if (rooftopAccessed && !m_unlocked)
+    // Unlock once the player reaches Rooftop or Underground (normal flow or cheat)
+    if (pulseBurstUnlockEligible && !m_unlocked)
         m_unlocked = true;
 
     if (m_cooldown > 0.f)
@@ -73,6 +76,11 @@ void PulseDetonateSkill::Update(
     if (rooftopDM)
     {
         auto arcs = rooftopDM->ApplyDetonation(playerCenter, SKILL_RADIUS, STUN_DURATION);
+        allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
+    }
+    if (undergroundDM)
+    {
+        auto arcs = undergroundDM->ApplyDetonation(playerCenter, SKILL_RADIUS, STUN_DURATION);
         allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
     }
     if (tracerDM)
@@ -110,6 +118,9 @@ void PulseDetonateSkill::Update(
 
     if (extraChainArcs && !extraChainArcs->empty())
         allArcs.insert(allArcs.end(), extraChainArcs->begin(), extraChainArcs->end());
+
+    if (undergroundForPulseRobots)
+        undergroundForPulseRobots->ApplyPulseToRobots(vfxOrigin, SKILL_RADIUS);
 
     if (trainMapForBranchArcs)
     {

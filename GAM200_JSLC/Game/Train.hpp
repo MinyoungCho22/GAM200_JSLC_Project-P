@@ -186,10 +186,18 @@ public:
 
     /// 플레이어 히트박스 X 기준 현재 칸 (1~5, 밖이면 0)
     int GetPlayerTrainCarIndex(Math::Vec2 worldHbCenter) const;
+    /// 치트 텔레포트 등: 해당 호차(1~5) 중심 월드 X (열차 오프셋 반영)
+    float GetTrainCarCenterWorldX(int carIndex1To5) const;
     /// 해당 칸 전투 드론·로봇(및 Car4 CT드론, Car3 사이렌드론) 전멸 여부
     bool IsTrainCarCombatCleared(int car1To5) const;
     /// 아직 클리어 안 된 가장 앞 칸의 경계 X (플레이어 최대 진행)
     float GetTrainCombatAdvanceCapWorldX() const;
+    /// 진입한 가장 앞 칸 기준 — 이전 칸으로 되돌아갈 수 없는 최소 X
+    float GetTrainCombatRetreatMinWorldX() const;
+    /// Car5 덱 최초 진입 시 밸브 힌트 (일반 진입만 — Alt 텔레포트 중엔 표시 안 함)
+    std::string GetCar5ValveHintBannerText() const;
+
+    void SetTrainCarCheatUnlock(bool v) { m_trainCheatCarUnlock = v; }
 
     void RequestTrainCameraShake(float maxPixelOffset);
     float ConsumeTrainCameraShakeRequest();
@@ -297,6 +305,8 @@ private:
     void UpdateTrainDeckPatrolRobots(float dt, Player& player, Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize);
     void TryDeckPatrolRobotJumpAndLandingShake(Robot& r, size_t robotIndex, float dt,
                                                const std::vector<ObstacleInfo>& tallCarObs, int playerTrainCar);
+    void ClampCarSegment4RobotsBeforeValve();
+    void ClampCar5RobotsEastOfValve();
     /// SecondTrain 보라 컨테이너 솔리드 히트박스와 동일한지 (숨기기 중 충돌 해제용)
     bool IsCar2PurpleHitbox(const TrainHitbox& hb) const;
 
@@ -389,6 +399,9 @@ private:
     bool              m_car5DeckHbValid = false;
     float             m_prevTrainOffsetActors = 0.0f;
     bool              m_car5EncounterActive = false;
+    float             m_car5ValveHintTimer = 0.0f;
+    bool              m_trainCheatCarUnlock        = false;
+    int               m_trainHighestCarEntered = 1;
     float             m_encounterScriptTime = 0.0f;
     float             m_pendingTrainCameraShakePx = 0.f;
     std::vector<bool> m_trainDeckRobotWasAirborne;

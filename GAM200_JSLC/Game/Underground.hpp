@@ -65,6 +65,9 @@ public:
     const std::vector<Robot>& GetRobots() const { return m_robots; }
     std::vector<Robot>& GetRobots() { return m_robots; }
 
+    /// Q 펄스: 반경 내 스토커 로봇 넉백 + 데미지 (열차 맵과 동일 논리)
+    void ApplyPulseToRobots(Math::Vec2 pulseWorldCenter, float radius);
+
 private:
     std::unique_ptr<Background> m_background;
     Math::Vec2 m_position;

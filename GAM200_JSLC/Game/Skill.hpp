@@ -1,5 +1,5 @@
 // Skill.hpp
-// Pulse Resonance Burst — Q-skill unlocked when the Rooftop is first accessed.
+// Pulse Resonance Burst — Q-skill unlocked when Rooftop or Underground is first accessed.
 
 #pragma once
 
@@ -12,6 +12,7 @@ class Player;
 class DroneManager;
 class PulseManager;
 class Train;
+class Underground;
 class Shader;
 class ControlBindings;
 namespace Input { class Input; }
@@ -22,25 +23,28 @@ public:
     void Initialize();
 
     // Call every frame inside GameplayState::Update().
-    // rooftopDM  : drone manager owned by the Rooftop zone (may be nullptr)
-    // tracerDM   : main drone manager (tracer drones)
+    // rooftopDM     : drone manager owned by the Rooftop zone (may be nullptr)
+    // undergroundDM : Underground zone drones (may be nullptr)
+    // tracerDM      : main drone manager (tracer drones)
     void Update(double dt,
                 Player&            player,
                 Math::Vec2         playerCenter,
                 DroneManager*      rooftopDM,
+                DroneManager*      undergroundDM,
                 DroneManager*      tracerDM,
                 PulseManager&      pulseManager,
                 const ControlBindings& ctl,
                 const Input::Input&    input,
                 bool isGameOver,
-                bool rooftopAccessed,
+                bool pulseBurstUnlockEligible,
                 bool isGodMode,
                 DroneManager* trainDroneManager = nullptr,
                 DroneManager* trainSirenDroneManager = nullptr,
                 const Math::Vec2* trainDetonationOrigin = nullptr,
                 const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs = nullptr,
                 DroneManager* trainCarTransportDroneManager = nullptr,
-                Train* trainMapForBranchArcs = nullptr);
+                Train* trainMapForBranchArcs = nullptr,
+                Underground* undergroundForPulseRobots = nullptr);
 
     // Bake the cooldown string into a GL texture — call during the text-update phase.
     void UpdateCooldownText(Font& font, Shader& fontShader);
