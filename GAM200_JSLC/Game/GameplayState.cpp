@@ -537,6 +537,7 @@ void GameplayState::Update(double dt)
         m_trainZoomTransition = false;
         player.SetSizeScale(1.0f);
         HandleHallwayToRooftopTransition();
+        m_currentCheckpoint = MapZone::Rooftop;
         m_camera.SetPosition(player.GetPosition());
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Rooftop (Ctrl+3)");
     }
@@ -554,6 +555,7 @@ void GameplayState::Update(double dt)
             m_trainAccessed = false;
             m_rooftopAccessed = true;
             m_undergroundAccessed = true;
+            m_currentCheckpoint = MapZone::Underground;
 
             float playerStartX = Underground::MIN_X + 100.0f;
             float playerStartY = Underground::MIN_Y + 270.0f;
@@ -573,6 +575,7 @@ void GameplayState::Update(double dt)
         else
         {
             HandleRooftopToUndergroundTransition();
+            m_currentCheckpoint = MapZone::Underground;
             m_camera.SetPosition(player.GetPosition());
             Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Underground (Ctrl+4)");
         }
