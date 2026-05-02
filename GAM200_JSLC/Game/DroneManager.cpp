@@ -14,11 +14,12 @@ Drone& DroneManager::SpawnDrone(Math::Vec2 position, const char* texturePath, bo
     return drones.back();
 }
 
-void DroneManager::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding)
+void DroneManager::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerUndetectable,
+                          bool sirenTracerJamEvade, float sirenTracerSpeedMul)
 {
     for (auto& drone : drones)
     {
-        drone.Update(dt, player, playerHitboxSize, isPlayerHiding);
+        drone.Update(dt, player, playerHitboxSize, isPlayerUndetectable, sirenTracerJamEvade, sirenTracerSpeedMul);
     }
 }
 

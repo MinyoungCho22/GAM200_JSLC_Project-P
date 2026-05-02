@@ -13,7 +13,12 @@ class Drone
 public:
     void Init(Math::Vec2 startPos, const char* texturePath, bool isTracer = false);
     void Reset();
-    void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding);
+    void SetSirenMapDrone(bool v) { m_sirenMapDrone = v; }
+    /// isPlayerUndetectable: 히딩/펄스박스 등으로 레이더 추적 불가
+    /// sirenTracerJamEvade: 사이렌 추적 드론만 — 미포착 시 좌우 흔들림 후 랜덤 방향 이탈
+    /// sirenTracerSpeedMul: 사이렌 가동 중 1, 파괴 후 추적 감속 시 1 미만
+    void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerUndetectable,
+                bool sirenTracerJamEvade = false, float sirenTracerSpeedMul = 1.f);
     void Draw(const Shader& shader) const;
     void DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawGauge(Shader& colorShader, DebugRenderer& debugRenderer) const;
@@ -159,6 +164,15 @@ private:
 
     bool m_debugMode = false; // When true, AI is disabled for manual positioning
     float m_debugExitTimer = 0.0f; // Timer to delay AI restart after exiting debug mode
+
+    // Train 사이렌 맵 전용: 히딩/펄스박스 미포착 시 흔들림 → 랜덤 방향 이탈
+    float      m_jamFleeTimer              = 0.f;
+    bool       m_jamScheduleFleeAfterWobble = false;
+    Math::Vec2 m_jamFleeDir{ 1.f, 0.f };
+
+    bool  m_sirenMapDrone = false;
+    float m_hitHorzVel    = 0.f;
+    int   m_hitWindSign   = 1;
 
     Sound m_moveSound;
 };

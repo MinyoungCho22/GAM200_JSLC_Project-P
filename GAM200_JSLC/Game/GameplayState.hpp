@@ -131,6 +131,10 @@ private:
 
     // Q-skill: Pulse Resonance Burst (unlocked on Rooftop)
     PulseDetonateSkill m_pulseDetonateSkill;
+    float              m_qSkillHintTimer      = 0.f;
+    bool               m_prevRooftopForQHint  = false;
+    bool               m_skipRooftopQHintByCheat = false;
+    CachedTextureInfo  m_qSkillHintTexture{};
 
     // Train zoom transition: camera zooms in when entering train map, then eases out
     float m_cameraZoom = 1.0f;

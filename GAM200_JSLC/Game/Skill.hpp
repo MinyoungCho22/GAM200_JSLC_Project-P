@@ -35,6 +35,7 @@ public:
                 bool rooftopAccessed,
                 bool isGodMode,
                 DroneManager* trainDroneManager = nullptr,
+                DroneManager* trainSirenDroneManager = nullptr,
                 const Math::Vec2* trainDetonationOrigin = nullptr,
                 const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs = nullptr);
 

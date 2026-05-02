@@ -57,6 +57,8 @@ public:
     void SetMaxHP(float maxHp) { m_maxHp = maxHp; }
     void SetDirectionX(float dir) { m_directionX = dir; }
     void SetState(RobotState state) { m_state = state; }
+    /// Train 등 맵별 바닥 Y (발 한계). 기본값은 Underground 근처 고정 바닥.
+    void SetGroundLimitY(float y) { m_groundLimitY = y; }
     
     // Debug getters for ImGui
     float GetHP() const { return m_hp; }
@@ -64,6 +66,7 @@ public:
     float GetDirectionX() const { return m_directionX; }
     RobotState GetState() const { return m_state; }
     Math::Vec2 GetVelocity() const { return m_velocity; }
+    void SetVelocity(const Math::Vec2& v) { m_velocity = v; }
     float GetPatrolSpeed() const { return m_patrolSpeed; }
     float GetChaseSpeed() const { return m_chaseSpeed; }
     float GetDetectionRange() const { return DETECTION_RANGE; }
@@ -108,6 +111,7 @@ private:
     const float GRAVITY = -2200.0f;
     float m_patrolSpeed = 140.0f;
     float m_chaseSpeed = 350.0f;
+    float m_groundLimitY = -1910.0f;
     float m_windupTime = 0.8f;
     const float DETECTION_RANGE = 500.0f;
     const float ATTACK_RANGE = 350.0f;

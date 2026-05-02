@@ -12,6 +12,7 @@
 #include "../OpenGL/GLWrapper.hpp"
 #include <cmath>
 #include <random>
+#include <algorithm>
 
 #pragma warning(push, 0)
 #include <stb_image.h>
@@ -127,7 +128,8 @@ void Drone::SetBaseSpeed(float speed)
     m_currentSpeed = speed;
 }
 
-void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerHiding)
+void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerUndetectable,
+                    bool sirenTracerJamEvade, float sirenTracerSpeedMul)
 {
     if (m_isDead)
     {
@@ -260,6 +262,12 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     {
         m_hitTimer -= static_cast<float>(dt);
 
+        if (m_sirenMapDrone)
+        {
+            m_hitHorzVel += static_cast<float>(m_hitWindSign) * 480.f * static_cast<float>(dt);
+            m_position.x += m_hitHorzVel * static_cast<float>(dt);
+        }
+
         m_hitRotation += 720.0f * static_cast<float>(dt);
         if (m_hitRotation > 360.0f) m_hitRotation -= 360.0f;
 
@@ -296,8 +304,9 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     float effectiveDetectionRange = DETECTION_RANGE + playerHitboxRadius;
     float effectiveDetectionRangeSq = effectiveDetectionRange * effectiveDetectionRange;
 
-    bool canDetectPlayer = !isPlayerHiding;
+    bool canDetectPlayer = !isPlayerUndetectable;
 
+    const float chaseMul = std::max(0.08f, sirenTracerSpeedMul);
     if (m_isAttacking)
     {
         m_attackTimer += static_cast<float>(dt);
@@ -351,13 +360,15 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
             Math::Vec2 targetVelocity;
             if (canDetectPlayer)
             {
-                m_isChasing = true;
-                m_lostTimer = 0.0f;
-                m_direction = toPlayer.GetNormalized();
-                targetVelocity = m_direction * m_currentSpeed;
+                m_jamFleeTimer              = 0.f;
+                m_jamScheduleFleeAfterWobble = false;
+                m_isChasing                 = true;
+                m_lostTimer                 = 0.0f;
+                m_direction                 = toPlayer.GetNormalized();
+                targetVelocity              = m_direction * m_currentSpeed * chaseMul;
 
                 m_searchRotation = 0.0f;
-                m_searchDir = 1;
+                m_searchDir      = 1;
             }
             else
             {
@@ -365,6 +376,8 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
                 {
                     m_isChasing = false;
                     m_lostTimer = 1.0f;
+                    if (sirenTracerJamEvade)
+                        m_jamScheduleFleeAfterWobble = true;
                 }
 
                 if (m_lostTimer > 0.0f)
@@ -377,23 +390,41 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
                     if (m_searchDir == 1 && m_searchRotation > m_searchMaxAngle)
                     {
                         m_searchRotation = m_searchMaxAngle;
-                        m_searchDir = -1;
+                        m_searchDir      = -1;
                     }
                     else if (m_searchDir == -1 && m_searchRotation < -m_searchMaxAngle)
                     {
                         m_searchRotation = -m_searchMaxAngle;
-                        m_searchDir = 1;
+                        m_searchDir      = 1;
                     }
 
                     targetVelocity = { 0.0f, 0.0f };
+
+                    if (m_lostTimer <= 0.0f && sirenTracerJamEvade && m_jamScheduleFleeAfterWobble)
+                    {
+                        const float ang   = (drone_distribution(drone_generator) + 1.0f) * PI;
+                        m_jamFleeDir      = { std::cos(ang), std::sin(ang) };
+                        const float lenSq = m_jamFleeDir.LengthSq();
+                        if (lenSq > 1e-4f)
+                            m_jamFleeDir = m_jamFleeDir.GetNormalized();
+                        else
+                            m_jamFleeDir = { 1.f, 0.f };
+                        m_jamFleeTimer                = 2.4f;
+                        m_jamScheduleFleeAfterWobble = false;
+                    }
+                }
+                else if (sirenTracerJamEvade && m_jamFleeTimer > 0.0f)
+                {
+                    m_jamFleeTimer -= static_cast<float>(dt);
+                    targetVelocity = m_jamFleeDir * m_currentSpeed * chaseMul * 0.88f;
                 }
                 else
                 {
-                    m_direction = { 1.0f, 0.0f };
-                    targetVelocity = m_direction * m_currentSpeed;
+                    m_direction    = { 1.0f, 0.0f };
+                    targetVelocity = m_direction * m_currentSpeed * chaseMul;
 
                     m_searchRotation = 0.0f;
-                    m_searchDir = 1;
+                    m_searchDir      = 1;
                 }
             }
 
@@ -585,6 +616,13 @@ void Drone::Reset()
     m_bobTimer      = 0.0f;
     m_debugMode     = false;
     m_debugExitTimer = 0.0f;
+
+    m_jamFleeTimer              = 0.f;
+    m_jamScheduleFleeAfterWobble = false;
+    m_jamFleeDir                = { 1.f, 0.f };
+    m_hitHorzVel                = 0.f;
+    m_hitWindSign               = 1;
+    m_sirenMapDrone             = false;
 }
 
 void Drone::Shutdown()
@@ -603,6 +641,9 @@ void Drone::StartDeathSequence()
     m_hitTimer = m_hitDuration;
     m_hitRotation = 0.0f;
     m_fallSpeed = 0.0f;
+    m_hitHorzVel = 0.f;
+    if (m_sirenMapDrone)
+        m_hitWindSign = (drone_distribution(drone_generator) >= 0.f) ? 1 : -1;
     m_isAttacking = false;
 
     Logger::Instance().Log(Logger::Severity::Event, "Drone hit! Starting death sequence.");

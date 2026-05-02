@@ -36,6 +36,7 @@ void PulseDetonateSkill::Update(
     bool                   rooftopAccessed,
     bool                   isGodMode,
     DroneManager*          trainDM,
+    DroneManager*          trainSirenDM,
     const Math::Vec2*      trainDetonationOrigin,
     const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs)
 {
@@ -83,6 +84,14 @@ void PulseDetonateSkill::Update(
     {
         const Math::Vec2 trainOrigin = trainDetonationOrigin ? *trainDetonationOrigin : playerCenter;
         auto arcs = trainDM->ApplyDetonation(trainOrigin, SKILL_RADIUS, STUN_DURATION);
+        allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
+        if (trainDetonationOrigin)
+            vfxOrigin = *trainDetonationOrigin;
+    }
+    if (trainSirenDM)
+    {
+        const Math::Vec2 trainOrigin = trainDetonationOrigin ? *trainDetonationOrigin : playerCenter;
+        auto arcs = trainSirenDM->ApplyDetonation(trainOrigin, SKILL_RADIUS, STUN_DURATION);
         allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
         if (trainDetonationOrigin)
             vfxOrigin = *trainDetonationOrigin;

@@ -215,6 +215,10 @@ void GameplayState::Initialize()
     m_doorOpened = false;
     m_currentCheckpoint = MapZone::Room;
     m_pendingTransition = PendingTransition::None;
+    m_qSkillHintTimer     = 0.f;
+    m_prevRooftopForQHint = false;
+    m_skipRooftopQHintByCheat = false;
+    m_qSkillHintTexture   = {};
     m_fadeAlpha = 1.0f;                // start fully black
     m_fadeState = FadeState::FadingIn; // fade in from black on game start
 
@@ -545,6 +549,7 @@ void GameplayState::Update(double dt)
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num4))
     {
         silenceStoryForMapCheat();
+        m_skipRooftopQHintByCheat = true;
         m_tutorial->DisableAll();
         m_camera.StopAnimation();
         m_cameraZoom = 1.0f;
@@ -584,6 +589,7 @@ void GameplayState::Update(double dt)
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num5))
     {
         silenceStoryForMapCheat();
+        m_skipRooftopQHintByCheat = true;
         m_tutorial->DisableAll();
         m_camera.StopAnimation();
         m_rooftopAccessed = true;
@@ -646,6 +652,16 @@ void GameplayState::Update(double dt)
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
     Math::Vec2 playerHbCenter = player.GetHitboxCenter();
+
+    if (m_rooftopAccessed && !m_prevRooftopForQHint && !m_skipRooftopQHintByCheat && m_font && m_fontShader)
+    {
+        m_qSkillHintTimer = 10.f;
+        m_qSkillHintTexture =
+            m_font->PrintToTexture(*m_fontShader, "Can't attack all at once? Try using Q");
+    }
+    m_prevRooftopForQHint = m_rooftopAccessed;
+    if (m_qSkillHintTimer > 0.f)
+        m_qSkillHintTimer -= static_cast<float>(dt);
 
     const bool hallwayHidingBlocksDroneAttack = m_doorOpened && !m_rooftopAccessed
         && m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
@@ -774,6 +790,8 @@ void GameplayState::Update(double dt)
             checkDrones(m_rooftop->GetDrones());
             if (m_undergroundAccessed) checkDrones(m_underground->GetDrones());
             if (m_trainAccessed) checkDrones(m_train->GetDrones());
+            if (m_trainAccessed && m_train && m_train->GetSirenDroneManager())
+                checkDrones(m_train->GetSirenDroneManager()->GetDrones());
 
             if (m_undergroundAccessed)
             {
@@ -1135,6 +1153,7 @@ void GameplayState::Update(double dt)
             *pulseManager, ctl, input,
             m_isGameOver, m_rooftopAccessed, isGodMode,
             (m_trainAccessed && m_train) ? m_train->GetDroneManager() : nullptr,
+            (m_trainAccessed && m_train) ? m_train->GetSirenDroneManager() : nullptr,
             trainPulseAnchorOk ? &trainPulseAnchor : nullptr,
             &trainStaticChainArcs);
     }
@@ -1256,6 +1275,29 @@ void GameplayState::Update(double dt)
                 }
                 drone.ResetDamageFlag();
                 break;
+            }
+        }
+
+        if (m_train->GetSirenDroneManager())
+        {
+            auto& sirenDrones = m_train->GetSirenDroneManager()->GetDrones();
+            for (auto& drone : sirenDrones)
+            {
+                if (!drone.IsDead() && drone.ShouldDealDamage())
+                {
+                    if (!m_train->IsSirenDroneDamageBlocked(playerHbCenter, playerHitboxSize, player.IsCrouching()))
+                    {
+                        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                        if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                        {
+                            player.TakeDamage(25.0f);
+                            if (m_train)
+                                m_train->NotifyCarTransportInjectionInterrupted();
+                        }
+                    }
+                    drone.ResetDamageFlag();
+                    break;
+                }
             }
         }
     }
@@ -1553,6 +1595,8 @@ void GameplayState::RespawnAtCheckpoint()
     if (m_train)
     {
         m_train->GetDroneManager()->ResetAllDrones();
+        if (m_train->GetSirenDroneManager())
+            m_train->GetSirenDroneManager()->ResetAllDrones();
         for (auto& robot : m_train->GetRobots()) robot.Reset();
     }
 
@@ -1754,6 +1798,11 @@ void GameplayState::ApplyGamepadDroneTargetingAssist(double dt, Input::Input& in
     {
         for (const auto& d : m_train->GetDrones())
             considerMagnet(d);
+        if (m_train && m_train->GetSirenDroneManager())
+        {
+            for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
+                considerMagnet(d);
+        }
     }
 
     // R3: snap cursor to nearest drone within world distance (LB is pulse absorb).
@@ -1792,6 +1841,11 @@ void GameplayState::ApplyGamepadDroneTargetingAssist(double dt, Input::Input& in
         {
             for (const auto& d : m_train->GetDrones())
                 considerManual(d);
+            if (m_train && m_train->GetSirenDroneManager())
+            {
+                for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
+                    considerManual(d);
+            }
         }
 
         if (best)
@@ -1933,11 +1987,16 @@ void GameplayState::DrawMainLayer()
     m_rooftop->Draw(textureShader);
     m_underground->Draw(textureShader);
     m_train->Draw(textureShader, m_camera.GetPosition(), viewHalfW);
+    if (m_trainAccessed)
+        m_train->DrawCar2EnterLeavePrompt(textureShader, m_camera.GetPosition(), viewHalfW);
 
     if (m_trainAccessed)
     {
         colorShader->use();
         colorShader->setMat4("projection", worldProjection);
+        GL::Enable(GL_BLEND);
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        m_train->DrawCar3SirenWaves(*colorShader, m_camera.GetPosition(), viewHalfW);
         m_train->DrawCarTransportVFX(*colorShader, m_camera.GetPosition(), viewHalfW);
         m_train->DrawValveWaterVFX(*colorShader, worldProjection, m_camera.GetPosition(), viewHalfW);
         textureShader.use();
@@ -2052,6 +2111,8 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         src.DrawRemainGauge(*colorShader);
     for (const auto& src : m_train->GetPulseSources())
         src.DrawRemainGauge(*colorShader);
+    if (m_trainAccessed && m_train)
+        m_train->DrawCar3SirenProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
     colorShader->setFloat("uAlpha", 1.0f);
 
     textureShader.use();
@@ -2169,6 +2230,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
 
     m_pulseDetonateSkill.DrawCooldownUI(*m_font, *m_fontShader, GAME_HEIGHT - 80.f);
+
+    if (m_qSkillHintTimer > 0.f && m_qSkillHintTexture.textureID != 0)
+        m_font->DrawBakedText(*m_fontShader, m_qSkillHintTexture, { GAME_WIDTH * 0.5f - 520.f, GAME_HEIGHT - 92.f }, 34.f);
 
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())
@@ -2297,6 +2361,10 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             Collision::CheckPointInAABB(mouseWorldPosForHover, m_rooftop->GetLiftButtonPos(), m_rooftop->GetLiftButtonSize()))
             overLeftClickTarget = true;
 
+        if (!overLeftClickTarget && m_trainAccessed && m_train && m_train->GetCar3SirenActive() &&
+            m_train->IsCar3SirenMouseHoverForPulseInject(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
+            overLeftClickTarget = true;
+
         // Right-click targets (pulse chargers): player overlaps AND cursor is inside the source
         auto checkPulseSources = [&](const std::vector<PulseSource>& sources) {
             for (const auto& src : sources)
@@ -2351,6 +2419,21 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         {
             for (const auto& d : m_train->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
         }
+        if (!overLeftClickTarget && m_trainAccessed && m_train && m_train->GetSirenDroneManager())
+        {
+            for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
+            {
+                if (isMouseOnDrone(d))
+                {
+                    overLeftClickTarget = true;
+                    break;
+                }
+            }
+        }
+        if (!overLeftClickTarget && m_trainAccessed && m_train &&
+            m_train->IsCar2EnterLeavePromptHovered(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover, fgCamPos,
+                                                   fgEffectiveWidth * 0.5f))
+            overLeftClickTarget = true;
         if (!overLeftClickTarget && m_undergroundAccessed)
         {
             for (const auto& r : m_underground->GetRobots()) { if (isMouseOnRobot(r)) { overLeftClickTarget = true; break; } }
@@ -2476,6 +2559,18 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             {
                 m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
                 m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+            }
+        }
+
+        if (m_train && m_train->GetSirenDroneManager())
+        {
+            for (const auto& drone : m_train->GetSirenDroneManager()->GetDrones())
+            {
+                if (!drone.IsDead())
+                {
+                    m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+                    m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+                }
             }
         }
 

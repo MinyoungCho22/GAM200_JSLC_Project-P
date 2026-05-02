@@ -67,6 +67,25 @@ public:
     void SetHiding(bool hiding) { m_isHiding = hiding; }
     void SetGodMode(bool godMode) { m_godMode = godMode; }
     bool IsGodMode() const { return m_godMode; }
+    /// Train 컨테이너 연출 등 — 입력 물리 업데이트 스킵 (위치는 Train 등에서 직접 설정).
+    void SetMovementLockedByTrain(bool locked) { m_movementLockedByTrain = locked; }
+    bool IsMovementLockedByTrain() const { return m_movementLockedByTrain; }
+    /// SecondTrain 보라 컨테이너 Leave 시 왼쪽으로 자동 걸음 (Train에서만 사용).
+    void SetCar2LeaveWalk(bool active, float speed = 175.f)
+    {
+        m_car2LeaveWalk     = active;
+        m_car2LeaveWalkSpeed = speed;
+        if (!active)
+            m_car2LeaveWalkSpeed = 175.f;
+    }
+    /// Train 보라 컨테이너 안 — 웅크리기 연출 (이동 잠금 중에도 애니 갱신).
+    void SetTrainCar2ForcedCrouch(bool on);
+    void SetSpriteAlphaMul(float m)
+    {
+        if (m < 0.f) m_spriteAlphaMul = 0.f;
+        else if (m > 1.f) m_spriteAlphaMul = 1.f;
+        else m_spriteAlphaMul = m;
+    }
     void SetSizeScale(float scale) { m_sizeScale = scale; }
     float GetSizeScale() const { return m_sizeScale; }
 
@@ -122,6 +141,11 @@ private:
     bool m_isHiding = false;
     bool m_godMode = false;
     float m_sizeScale = 1.0f;
+    bool m_movementLockedByTrain = false;
+    bool  m_car2LeaveWalk      = false;
+    float m_car2LeaveWalkSpeed = 175.f;
+    bool  m_trainForcedCar2Crouch = false;
+    float m_spriteAlphaMul = 1.0f;
 
     // Sandevistan afterimage effect
     std::vector<AfterimageGhost> m_afterimageGhosts;

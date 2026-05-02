@@ -327,7 +327,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     nextPos = m_position;
     nextPos.y += m_velocity.y * fDt;
 
-    float groundLimit = -1910.0f;
+    const float groundLimit = m_groundLimitY;
     if (nextPos.y - m_size.y / 2.0f < groundLimit)
     {
         nextPos.y = groundLimit + m_size.y / 2.0f;
@@ -557,6 +557,7 @@ void Robot::TakeDamage(float amount)
 
 void Robot::Reset()
 {
+    m_groundLimitY          = -1910.0f;
     m_position              = m_spawnPos;
     m_velocity              = { 0.0f, 0.0f };
     m_hp                    = m_maxHp;  // preserves difficulty boost
