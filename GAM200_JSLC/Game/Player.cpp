@@ -587,6 +587,9 @@ void Player::Crouch()
         is_crouching = true;
         m_crouchAnimationFinished = false;
 
+        m_currentHorizontalSpeed = 0.0f;
+        velocity.x = 0.0f;
+
         m_currentAnimState = AnimationState::Crouching;
         m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame = 0;
         m_animations[static_cast<int>(AnimationState::Crouching)].timer = 0.0f;

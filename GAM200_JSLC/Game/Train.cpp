@@ -244,26 +244,15 @@ void Train::BuildTrainHitboxes()
     // [Car4] 발판  위치: X=84  Y=804  크기: 3789 x 45
     m_trainHitboxes.push_back(MakeHitbox(c4, 84, 804, 3789, 45));
 
-    // [Car4] 3층·2층 파이프 (실제 파이프 구간만 점프통과 발판으로 등록)
-    // 이전의 "층당 1개 긴 박스"는 빈 공간에도 경계가 생겨 낙하/웅크리기 낙하가 막혔다.
+    // [Car4] 3층·2층 파이프 — 층당 1개의 긴 연속 파이프
     constexpr float kPipeH = 18.0f;
 
-    // 3층 파이프: 상단 3개 구간 (top-left / top-middle / top-right)
-    // 2층 갭(2층 차 Y=489 - 2층 파이프 바닥(434+18=452) = 37px)과 동일하게 맞추기 위해
-    // 3층 차 Y=129 기준 파이프 Y = 129 - 37 - 18 = 74
-    m_trainHitboxes.push_back(MakeHitbox(c4, 429.0f, 74.0f, 886.0f, kPipeH, true,
-                                         Train::TrainHitboxKind::JumpThroughPipe));
-    m_trainHitboxes.push_back(MakeHitbox(c4, 1536.0f, 74.0f, 886.0f, kPipeH, true,
-                                         Train::TrainHitboxKind::JumpThroughPipe));
-    m_trainHitboxes.push_back(MakeHitbox(c4, 2629.0f, 74.0f, 886.0f, kPipeH, true,
+    // 3층 파이프: X=429 ~ X=3515 (왼쪽 차 시작 ~ 오른쪽 차 끝), 폭 = 3086
+    m_trainHitboxes.push_back(MakeHitbox(c4, 429.0f, 74.0f, 3086.0f, kPipeH, true,
                                          Train::TrainHitboxKind::JumpThroughPipe));
 
-    // 2층 파이프: 하단 3개 구간 (bottom-left / bottom-middle / bottom-right)
-    m_trainHitboxes.push_back(MakeHitbox(c4, 432.0f, 434.0f, 876.0f, kPipeH, true,
-                                         Train::TrainHitboxKind::JumpThroughPipe));
-    m_trainHitboxes.push_back(MakeHitbox(c4, 1539.0f, 434.0f, 876.0f, kPipeH, true,
-                                         Train::TrainHitboxKind::JumpThroughPipe));
-    m_trainHitboxes.push_back(MakeHitbox(c4, 2631.0f, 434.0f, 876.0f, kPipeH, true,
+    // 2층 파이프: X=432 ~ X=3507 (왼쪽 차 시작 ~ 오른쪽 차 끝), 폭 = 3075
+    m_trainHitboxes.push_back(MakeHitbox(c4, 432.0f, 434.0f, 3075.0f, kPipeH, true,
                                          Train::TrainHitboxKind::JumpThroughPipe));
 
     constexpr bool kCar4VisualOnly = false;
@@ -624,6 +613,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
             player.SetPosition(player.GetPosition() + Math::Vec2{ 0.0f, -kPipeDropNudge });
             player.SetOnGround(false);
             m_pipeDropCooldown = 0.18f;
+            m_crouchCarryLatched = true;
             currentHbCenter = player.GetHitboxCenter();
             break;
         }
@@ -691,23 +681,8 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     if (!playerOnTrainSurface)
         player.SetOnGround(false);
 
-    // Keep jump arc / crouch aligned with moving train (Player::Update runs before this)
+    // Keep jump arc / crouch / drop aligned with moving train
     {
-        const Math::Vec2 hc = player.GetHitboxCenter();
-        const Math::Vec2 hh = playerHitboxSize * 0.5f;
-        const bool inCarryBand = HitboxInTrainCarryBand(trainWorldLeft, m_totalTrainWidth, hc, hh);
-
-        if (playerOnTrainSurface)
-            m_airborneFromTrain = false;
-        else if (m_prevPlayerOnTrain && !playerOnTrainSurface && player.GetVelocity().y > 80.0f)
-            m_airborneFromTrain = true; // left top of car with upward velocity (jump)
-        if (!inCarryBand)
-            m_airborneFromTrain = false;
-
-        if (playerOnTrainSurface && player.IsCrouching())
-            m_crouchCarryLatched = true;
-        if (!player.IsCrouching() || !inCarryBand)
-            m_crouchCarryLatched = false;
     }
 
     // --- Entry countdown → automatic departure ---
@@ -737,12 +712,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
         const float twLeft = MIN_X + m_trainOffset - move;
         const bool inCarryBand = HitboxInTrainCarryBand(twLeft, m_totalTrainWidth, hc, hh);
 
-        const bool carryHorizontally =
-            playerOnTrainSurface
-            || (m_airborneFromTrain && inCarryBand)
-            || (m_crouchCarryLatched && player.IsCrouching() && inCarryBand);
-
-        if (carryHorizontally)
+        if (inCarryBand)
             player.SetPosition(player.GetPosition() + Math::Vec2{ move, 0.0f });
     }
 
