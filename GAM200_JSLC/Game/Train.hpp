@@ -100,9 +100,12 @@ public:
     // Returns UI text for the departure countdown (empty string when not needed)
     std::string GetDepartureAnnouncementText() const;
 
-    // textureShader: draws rail tiles + train car images + robots
+    // textureShader: draws train car images + robots (레일 타일은 DrawRailTrack)
     // viewHalfW: half of currently visible world width (zoom-aware)
     void Draw(Shader& textureShader, Math::Vec2 cameraPos, float viewHalfW) const;
+
+    /// rail.png 타일만 그림. 하늘(DrawBackground) 직후 호출해 다른 맵·차량보다 아래 레이어에 두는 용도.
+    void DrawRailTrack(Shader& textureShader, Math::Vec2 cameraPos, float viewHalfW) const;
 
     // Draws sunset sky gradient bands (call before Draw, with colorShader active)
     // viewHalfW: half of currently visible world width (zoom-aware)
@@ -262,6 +265,8 @@ private:
 
     // Hitboxes defined in local train space
     std::vector<TrainHitbox> m_trainHitboxes;
+    /// rail.png 등 월드 고정 발판 — localCenter = 절대 월드 중심(열차 m_trainOffset 없음)
+    std::vector<TrainHitbox> m_staticWorldHitboxes;
 
     // Hiding spots (move with train, same local-space as TrainHitbox)
     std::vector<HidingSpot> m_hidingSpots;

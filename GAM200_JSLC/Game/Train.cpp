@@ -29,6 +29,9 @@
 static constexpr float ASSUMED_IMG_HEIGHT = 1080.0f; // expected car image height in pixels
 // Flatbed deck surface: art row py=804 → world offset above Train::MIN_Y (see MakeHitbox for [84,804,2472,45]).
 static constexpr float kTrainFlatbedDeckTopLocalY = ASSUMED_IMG_HEIGHT - 804.f;
+// rail.png: DrawRailTrack는 타일 전체(MIN_Y ~ MIN_Y+m_railTileH)에 맞추지만, 궤도 픽셀은 대부분 타일 하단에 있다.
+// 물리 슬랩 윗면 = MIN_Y + m_railTileH * 이 값 (아트와 맞지 않으면 0.32~0.48 사이에서만 조정).
+static constexpr float kRailWalkSurfaceFractionOfTileH = 0.08f;
 static constexpr float kTrainCombatEnemyScale      = 0.75f;
 
 static void ScaleTrainCombatDrone(Drone& d)
@@ -193,6 +196,11 @@ static void AppendCarSilhouette(std::vector<Train::TrainHitbox>& out, float carO
 }
 
 // Loose world-space band over the train cars for “riding” horizontal carry (jump / crouch).
+static bool IsThinHorizontalTrainSlab(const Math::Vec2& obsSize)
+{
+    return obsSize.y <= 72.0f && obsSize.x >= obsSize.y * 3.0f;
+}
+
 static bool HitboxInTrainCarryBand(float trainWorldLeft, float totalTrainWidth,
                                    const Math::Vec2& hbCenter, const Math::Vec2& hbHalf)
 {
@@ -630,18 +638,17 @@ float Train::GetTrainCombatAdvanceCapWorldX() const
     if (m_trainCheatCarUnlock)
         return MIN_X + m_trainOffset + m_totalTrainWidth - 85.f;
 
-    float capCombat = 1.0e9f;
-    for (int c = 1; c <= 5; ++c)
-    {
-        if (!IsTrainCarCombatCleared(c))
-        {
-            capCombat = MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(c + 1) - 38.f;
-            break;
-        }
-    }
-    // 마지막 칸에서 전투를 클리어해도 열차 끝 밖으로 나가면 낙사 — 오른쪽 막기 유지
     const float tailGuard = MIN_X + m_trainOffset + m_totalTrainWidth - 85.f;
-    return std::min(capCombat, tailGuard);
+
+    // Cars 1–3: single zone — move freely until all three are cleared, then cap at car 4.
+    const bool zone123Cleared =
+        IsTrainCarCombatCleared(1) && IsTrainCarCombatCleared(2) && IsTrainCarCombatCleared(3);
+    if (!zone123Cleared)
+        return std::min(MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(4) - 38.f, tailGuard);
+    if (!IsTrainCarCombatCleared(4))
+        return std::min(MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(5) - 38.f, tailGuard);
+
+    return tailGuard;
 }
 
 std::string Train::GetCar5ValveHintBannerText() const
@@ -706,70 +713,9 @@ void Train::TryDeckPatrolRobotJumpAndLandingShake(Robot& r, size_t robotIndex, f
     }
     if (r.GetVelocity().y > 25.f)
         return;
-    const float vxNeed = (stJump == RobotState::Chase) ? 12.f : 22.f;
-    if (std::abs(r.GetVelocity().x) < vxNeed)
-    {
-        m_trainDeckRobotJumpPrepT[robotIndex] = 0.f;
-        return;
-    }
 
-    const int        seg    = r.GetTrainCarSegment();
-    const float      fwd =
-        (seg == 5 || seg == 1 || seg == 2 || seg == 4) ? (r.GetSize().x * 0.32f + 92.f) : (r.GetSize().x * 0.32f + 62.f);
-    const float      dir    = r.GetDirectionX();
-    const Math::Vec2 rp     = r.GetPosition();
-    const float      probeX = rp.x + dir * fwd;
-    const Math::Vec2 probe{ probeX, rp.y };
-    const Math::Vec2 psz{ r.GetSize().x * 0.42f, r.GetSize().y * 0.68f };
-
-    bool           blocked        = false;
-    Math::Vec2     blockedCenter{};
-    float          blockedH       = 0.f;
-    const float    minObsH = (seg == 5 || seg == 1 || seg == 2 || seg == 4) ? 48.f : 110.f;
-    for (const auto& o : tallCarObs)
-    {
-        if (o.size.y < minObsH)
-            continue;
-        if (!Collision::CheckAABB(probe, psz, o.pos, o.size))
-            continue;
-        blocked       = true;
-        blockedCenter = o.pos;
-        blockedH      = o.size.y;
-        break;
-    }
-
-    constexpr float kJumpPrepSec = 0.36f;
-    float&          prep         = m_trainDeckRobotJumpPrepT[robotIndex];
-    if (!blocked)
-    {
-        prep = 0.f;
-        return;
-    }
-
-    prep += dt;
-    if (prep < kJumpPrepSec)
-        return;
-
-    prep         = 0.f;
-    Math::Vec2 v = r.GetVelocity();
-    // 장애물이 왼쪽/오른쪽 어디든, 수평으로 장애 쪽으로 밀어 올려 넘기기 (패트롤 방향과 반대면 옆으로만 튀는 문제 방지)
-    const float toObsX = blockedCenter.x - rp.x;
-    const float pushX =
-        (std::abs(toObsX) < 15.f) ? (dir * 420.f) : (std::copysign(420.f, toObsX));
-    float vy = 1480.f;
-    if (seg == 5 || seg == 1 || seg == 2 || seg == 4)
-    {
-        vy = 1680.f + std::min(380.f, blockedH * 1.75f);
-        v.y = vy;
-        v.x += pushX * 1.08f;
-    }
-    else
-    {
-        v.y = vy;
-        v.x += pushX;
-    }
-    r.SetVelocity(v);
-    m_trainDeckRobotWasAirborne[robotIndex] = true;
+    // No deck vault/jump (match Underground robots; avoids Car2 purple container snagging / flicker).
+    (void)tallCarObs;
 }
 
 void Train::ClampCarSegment4RobotsBeforeValve()
@@ -887,6 +833,30 @@ void Train::UpdateTrainDeckPatrolRobots(float dt, Player& player, Math::Vec2 pla
             r.SetPatrolWorldClamp(carWorldL + 90.f, carWorldR - 90.f);
 
         r.Update(dt, player, carTall, carWorldL + 55.f, carWorldR - 55.f);
+
+        if (seg == 2 && m_car2PurpleHbValid && !r.IsDead())
+        {
+            Math::Vec2       rp = r.GetPosition();
+            const Math::Vec2 rs = r.GetSize();
+            const Math::Vec2 pc = { tl + m_car2PurpleHb.localCenter.x, MIN_Y + m_car2PurpleHb.localCenter.y };
+            const Math::Vec2 psz = m_car2PurpleHb.size;
+            if (Collision::CheckAABB(rp, rs, pc, psz))
+            {
+                const float rL = rp.x - rs.x * 0.5f, rR = rp.x + rs.x * 0.5f;
+                const float rB = rp.y - rs.y * 0.5f, rT = rp.y + rs.y * 0.5f;
+                const float pL = pc.x - psz.x * 0.5f, pR = pc.x + psz.x * 0.5f;
+                const float pB = pc.y - psz.y * 0.5f, pT = pc.y + psz.y * 0.5f;
+                const float overlapX = std::min(rR, pR) - std::max(rL, pL);
+                const float overlapY = std::min(rT, pT) - std::max(rB, pB);
+                constexpr float kSepPad = 8.f;
+                if (overlapX < overlapY)
+                    rp.x += (rp.x < pc.x) ? -(overlapX + kSepPad) : (overlapX + kSepPad);
+                else
+                    rp.y += (rp.y < pc.y) ? -(overlapY + kSepPad) : (overlapY + kSepPad);
+                r.SetPosition(rp);
+            }
+        }
+
         TryDeckPatrolRobotJumpAndLandingShake(r, ri, static_cast<float>(dt), carTall, pcar);
 
         if (seg == 5 && m_valvePressureT > 0.10f && !r.IsDead())
@@ -1373,11 +1343,24 @@ void Train::Initialize()
             }
             Drone& da = m_droneManager->SpawnDrone({ xA, yA }, "Asset/Drone.png", false);
             ScaleTrainCombatDrone(da);
-            da.SetBaseSpeed(95.f);
-            da.SetTrainCarSegment(carIdx);
             Drone& db = m_droneManager->SpawnDrone({ xB, yB }, "Asset/Drone.png", false);
             ScaleTrainCombatDrone(db);
-            db.SetBaseSpeed(95.f);
+            if (carIdx == 1)
+            {
+                da.SetBaseSpeed(22.f);
+                db.SetBaseSpeed(34.f);
+            }
+            else if (carIdx == 2)
+            {
+                da.SetBaseSpeed(18.f);
+                db.SetBaseSpeed(30.f);
+            }
+            else
+            {
+                da.SetBaseSpeed(95.f);
+                db.SetBaseSpeed(95.f);
+            }
+            da.SetTrainCarSegment(carIdx);
             db.SetTrainCarSegment(carIdx);
         }
 
@@ -1669,6 +1652,23 @@ void Train::BuildTrainHitboxes()
     {
         auto hs = MakeHitbox(c3, 330, 504, 378, 300);
         m_hidingSpots.push_back({ hs.localCenter, hs.size });
+    }
+
+    // rail.png — Draw와 동일한 타일 박스 안에서 실제 궤도 높이(kRailWalkSurfaceFractionOfTileH)에 발판 정렬.
+    // localCenter: 맵 원점(MIN_X, MIN_Y) 기준 오프셋 (열차 히트박스와 동일).
+    m_staticWorldHitboxes.clear();
+    {
+        const float     railSpanW = static_cast<float>(m_railTileCount) * m_railTileW;
+        const float     tileH     = std::max(m_railTileH, 1.0f);
+        const float     walkY     = std::clamp(
+            tileH * kRailWalkSurfaceFractionOfTileH, 10.0f, std::max(12.0f, tileH - 4.0f));
+        constexpr float kSlabH = 36.f;
+        TrainHitbox     rail{};
+        rail.localCenter = { railSpanW * 0.5f, walkY - kSlabH * 0.5f };
+        rail.size        = { railSpanW, kSlabH };
+        rail.collision   = true;
+        rail.kind        = TrainHitboxKind::Solid;
+        m_staticWorldHitboxes.push_back(rail);
     }
 }
 
@@ -2152,7 +2152,8 @@ void Train::UpdateTrainRobotsAI(float dt, Player& player)
         r.SetAllowTrainCombatVsPlayer(pcar == r.GetTrainCarSegment());
 
         r.Update(dt, player, obstacleInfos, mapMinX, mapMaxX);
-        AssistRobotRailJumpTowardTrain(r, player, dt);
+        if (!r.IsTrainDeckPatrol())
+            AssistRobotRailJumpTowardTrain(r, player, dt);
     }
 
     ClampCarSegment4RobotsBeforeValve();
@@ -2785,6 +2786,13 @@ static bool SnapToTopSupport(Player& player, Math::Vec2& currentHbCenter,
     if (!horizOverlap)
         return false;
 
+    if (kind == Train::TrainHitboxKind::Solid && IsThinHorizontalTrainSlab(obsSize))
+    {
+        constexpr float kEdgeInset = 15.f;
+        if (currentHbCenter.x < obsMin.x + kEdgeInset || currentHbCenter.x > obsMax.x - kEdgeInset)
+            return false;
+    }
+
     const float platTop = obsMax.y;
     const float feet    = currentHbCenter.y - playerHalfSize.y;
     const float vy      = player.GetVelocity().y;
@@ -2794,7 +2802,8 @@ static bool SnapToTopSupport(Player& player, Math::Vec2& currentHbCenter,
         return false;
 
     const float aboveTol = (kind == Train::TrainHitboxKind::JumpThroughPipe) ? 10.0f : 8.0f;
-    const float belowTol = (kind == Train::TrainHitboxKind::JumpThroughPipe) ? 72.0f : 24.0f;
+    // 아래에서 점프해 덱에 올라오기 쉽게(떨어진 뒤 재탑승).
+    const float belowTol = (kind == Train::TrainHitboxKind::JumpThroughPipe) ? 72.0f : 88.0f;
 
     if (feet > platTop + aboveTol || feet < platTop - belowTol)
         return false;
@@ -2817,7 +2826,7 @@ static bool SnapToTopSupport(Player& player, Math::Vec2& currentHbCenter,
 // ---------------------------------------------------------------------------
 static bool IsThinHorizontalSlab(const Math::Vec2& obsSize)
 {
-    return obsSize.y <= 72.0f && obsSize.x >= obsSize.y * 3.0f;
+    return IsThinHorizontalTrainSlab(obsSize);
 }
 
 static bool ResolveAABB(Player& player, Math::Vec2& currentHbCenter,
@@ -2847,8 +2856,11 @@ static bool ResolveAABB(Player& player, Math::Vec2& currentHbCenter,
             return false;
 
         const bool horizOverlap = pMax.x > obsMin.x && pMin.x < obsMax.x;
-        // 윗면 근처에서만 세로 스냅(공중에서 발판보다 훨씬 위에 있을 때는 건너뜀 → 가로 밀림 방지)
-        if (horizOverlap && vy <= 160.0f && feet <= platTop + 56.0f && feet >= platTop - 88.0f)
+        constexpr float kDeckEdgeInset = 15.f;
+        const bool      centerOnSlab =
+            currentHbCenter.x >= obsMin.x + kDeckEdgeInset && currentHbCenter.x <= obsMax.x - kDeckEdgeInset;
+        // 공중·점프 상승 중에도 덱 아래에서 넓은 범위로 착지 허용(재탑승). 덱 좌우 끝 가장자리는 자석 현상 방지.
+        if (horizOverlap && centerOnSlab && vy <= 260.0f && feet <= platTop + 64.0f && feet >= platTop - 168.0f)
         {
             Math::Vec2 newHbCenter = currentHbCenter;
             newHbCenter.y          = platTop + playerHalfSize.y;
@@ -2972,20 +2984,23 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
 
     // --- Drone / Robot: FourthTrain 스크립트 (Car5 발판 진입 전까지 정지) ---
     const bool isPlayerHiding = IsPlayerHiding(player.GetHitboxCenter(), playerHitboxSize, player.IsCrouching());
+    const bool inCar2PulseBox = IsPlayerInCar2PurplePulseBox(player.GetHitboxCenter(), playerHitboxSize);
+    const bool trainEnemyUndetect = isPlayerHiding || inCar2PulseBox;
     player.SetHiding(isPlayerHiding);
+    player.SetTrainEnemyUndetectable(trainEnemyUndetect);
 
-    UpdateCarTransportDrones(fdt, player, playerHitboxSize, isPlayerHiding);
+    UpdateCarTransportDrones(fdt, player, playerHitboxSize, trainEnemyUndetect);
 
     UpdateTrainDeckPatrolRobots(fdt, player, player.GetHitboxCenter(), playerHitboxSize);
 
     if (m_droneManager)
-        m_droneManager->Update(fdt, player, playerHitboxSize, isPlayerHiding, true, 1.f);
+        m_droneManager->Update(fdt, player, playerHitboxSize, trainEnemyUndetect, true, 1.f);
 
     if (m_car5EncounterActive)
         UpdateTrainEncounterScript(fdt, player);
     else if (m_droneManager)
     {
-        // 인카운터 전: 1·2호차·3호차(사이렌 칸) 드론은 사이렌 높이 근처 + 칸 안 X 추적, 4호차 저공 호버, 5호차 성형
+        // 인카운터 전: 1·2·3호차 전투 드론은 Drone::Update만 사용(칸 간 추적·Q 넉백). 4호차 저공 호버, 5호차 성형.
         auto&          drones = m_droneManager->GetDrones();
         const float    baseY = Train::MIN_Y + 95.f + 82.f;
         const float    tl    = MIN_X + m_trainOffset;
@@ -2995,7 +3010,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         /// 히딩 중: 플레이어 X 추적 대신 칸 안에서 좌우 왕복(레이더 흔들림 + 배회)
         const auto trackXInRange = [&](float left, float right, float wanderFreq, size_t idx) -> float
         {
-            if (!isPlayerHiding)
+            if (!trainEnemyUndetect)
                 return std::clamp(pTarget.x, left, right);
             const float mid  = 0.5f * (left + right);
             const float half = 0.5f * (right - left) - 40.f;
@@ -3003,12 +3018,9 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                 return mid;
             return mid + std::sin(m_encounterScriptTime * wanderFreq + static_cast<float>(idx) * 0.91f) * half * 0.88f;
         };
-        constexpr float kCar12DroneTrackSpeed = 42.f;
-        const float     car12DroneHoverBase =
+        const float car12DroneHoverBase =
             m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f)
                                : (Train::MIN_Y + kTrainFlatbedDeckTopLocalY + 380.f);
-        const float car3DroneHoverBase =
-            m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f) : car12DroneHoverBase;
 
         for (size_t i = 0; i < drones.size(); ++i)
         {
@@ -3018,60 +3030,6 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             if (d.IsHit() || d.IsStunned())
                 continue;
             const int seg = d.GetTrainCarSegment();
-            if (seg == 1)
-            {
-                const float car1L = tl + 120.f;
-                const float car1R = tl + m_car1Width - 120.f;
-                const float hoverY =
-                    car12DroneHoverBase
-                    + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 14.f;
-                Math::Vec2 p = d.GetPosition();
-                const float desiredX = trackXInRange(car1L, car1R, 2.85f, i);
-                p.x                  = std::clamp(
-                    p.x + std::clamp(desiredX - p.x, -kCar12DroneTrackSpeed * fdt, kCar12DroneTrackSpeed * fdt),
-                    car1L, car1R);
-                p.y = hoverY;
-                d.SetPosition(p);
-                d.SetVelocity({ 0.f, 0.f });
-                d.SetBaseSpeed(95.f);
-                continue;
-            }
-            if (seg == 2)
-            {
-                const float car2L = tl + m_car1Width + 120.f;
-                const float car2R = tl + m_car1Width + m_car2Width - 120.f;
-                const float hoverY =
-                    car12DroneHoverBase
-                    + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 14.f;
-                Math::Vec2 p = d.GetPosition();
-                const float desiredX = trackXInRange(car2L, car2R, 2.85f, i);
-                p.x                  = std::clamp(
-                    p.x + std::clamp(desiredX - p.x, -kCar12DroneTrackSpeed * fdt, kCar12DroneTrackSpeed * fdt),
-                    car2L, car2R);
-                p.y = hoverY;
-                d.SetPosition(p);
-                d.SetVelocity({ 0.f, 0.f });
-                d.SetBaseSpeed(95.f);
-                continue;
-            }
-            if (seg == 3)
-            {
-                const float car3L = tl + m_car1Width + m_car2Width + 120.f;
-                const float car3R = tl + m_car1Width + m_car2Width + m_car3Width - 120.f;
-                const float hoverY =
-                    car3DroneHoverBase
-                    + std::sin(m_encounterScriptTime * 2.1f + static_cast<float>(i) * 0.78f) * 14.f;
-                Math::Vec2 p = d.GetPosition();
-                const float desiredX = trackXInRange(car3L, car3R, 2.85f, i);
-                p.x                  = std::clamp(
-                    p.x + std::clamp(desiredX - p.x, -kCar12DroneTrackSpeed * fdt, kCar12DroneTrackSpeed * fdt),
-                    car3L, car3R);
-                p.y = hoverY;
-                d.SetPosition(p);
-                d.SetVelocity({ 0.f, 0.f });
-                d.SetBaseSpeed(95.f);
-                continue;
-            }
             if (seg == 4)
             {
                 Math::Vec2 p = d.GetPosition();
@@ -3115,6 +3073,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     // --- Train hitbox collision ---
     const float trainWorldLeft = MIN_X + m_trainOffset;
     bool playerOnTrainSurface = false;
+    bool playerOnStaticRail    = false;
     bool playerOnJumpThroughSurface = false;
 
     const bool crouchHeld = player.IsCrouching();
@@ -3209,14 +3168,40 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         }
     }
 
+    // --- 월드 고정 레일 발판 (rail.png, 열차 이동과 무관) ---
+    for (const auto& hb : m_staticWorldHitboxes)
+    {
+        if (!hb.collision)
+            continue;
+        const Math::Vec2 hbWorld = { MIN_X + hb.localCenter.x, MIN_Y + hb.localCenter.y };
+        const bool       landed  = ResolveAABB(player, currentHbCenter, playerHalfSize, hbWorld, hb.size);
+        if (landed)
+            playerOnStaticRail = true;
+    }
+    if (!playerOnStaticRail)
+    {
+        for (const auto& hb : m_staticWorldHitboxes)
+        {
+            if (!hb.collision)
+                continue;
+            const Math::Vec2 hbWorld = { MIN_X + hb.localCenter.x, MIN_Y + hb.localCenter.y };
+            if (SnapToTopSupport(player, currentHbCenter, playerHalfSize, hbWorld, hb.size,
+                                 Train::TrainHitboxKind::Solid, crouchHeld))
+            {
+                playerOnStaticRail = true;
+                break;
+            }
+        }
+    }
+
     // 드롭은 위쪽에서 이미 처리됨. 여기서는 prev 상태만 갱신.
     m_prevCrouchHeld = crouchHeld;
 
     // Track whether player is on train this frame
     m_playerOnTrain = playerOnTrainSurface;
 
-    // 발판에서 벗어났으면 지면 플래그 해제 — 다음 프레임부터 중력 적용 (걷다가 낭떠러지)
-    if (!playerOnTrainSurface)
+    // 발판에서 벗어났으면 지면 플래그 해제 — 단 정적 레일 위에서는 점프 가능하도록 유지
+    if (!playerOnTrainSurface && !playerOnStaticRail)
         player.SetOnGround(false);
 
     UpdateCarTransport(fdt, player, currentHbCenter, carTransportInjectHeld, ignoreCarInjectPulseCost,
@@ -3234,6 +3219,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             m_trainStartSound.Play();
             m_trainRunLoopSound.Play();
             m_trainRunLoopSound.SetVolume(0.08f); // start quietly at departure
+            RequestTrainCameraShake(6.f);
             Logger::Instance().Log(Logger::Severity::Info, "Train: Train is now moving!");
         }
     }
@@ -3263,7 +3249,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         const float twLeft = MIN_X + m_trainOffset - move;
         const bool inCarryBand = HitboxInTrainCarryBand(twLeft, m_totalTrainWidth, hc, hh);
 
-        if (inCarryBand)
+        if (m_playerOnTrain && inCarryBand)
             player.SetPosition(player.GetPosition() + Math::Vec2{ move, 0.0f });
     }
 
@@ -3618,30 +3604,32 @@ void Train::DrawValveWaterVFX(Shader& colorShader, const Math::Matrix& worldProj
 // ---------------------------------------------------------------------------
 // Draw – draws rail tiles and train car images
 // ---------------------------------------------------------------------------
+void Train::DrawRailTrack(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
+{
+    if (!m_railTile || m_railTileW <= 0.0f)
+        return;
+
+    const float safeHalfW  = (viewHalfW > 300.0f) ? viewHalfW : 300.0f;
+    const float railMargin = 600.0f;
+    const float leftX      = cameraPos.x - safeHalfW - railMargin;
+    const float rightX     = cameraPos.x + safeHalfW + railMargin;
+    const float tileLeft0  = MIN_X;
+    const int minTile = static_cast<int>(std::floor((leftX - tileLeft0) / m_railTileW)) - 1;
+    const int maxTile = static_cast<int>(std::ceil((rightX - tileLeft0) / m_railTileW)) + 1;
+    const float cy = MIN_Y + m_railTileH * 0.5f;
+
+    for (int i = minTile; i <= maxTile; ++i)
+    {
+        float cx = MIN_X + i * m_railTileW + m_railTileW * 0.5f;
+        Math::Matrix model =
+            Math::Matrix::CreateTranslation({ cx, cy }) *
+            Math::Matrix::CreateScale({ m_railTileW, m_railTileH });
+        m_railTile->Draw(shader, model);
+    }
+}
+
 void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
 {
-    // ── Rail tiles (static world position; draw only visible tile range) ──
-    if (m_railTile && m_railTileW > 0.0f)
-    {
-        const float safeHalfW  = (viewHalfW > 300.0f) ? viewHalfW : 300.0f;
-        const float railMargin = 600.0f;
-        const float leftX      = cameraPos.x - safeHalfW - railMargin;
-        const float rightX     = cameraPos.x + safeHalfW + railMargin;
-        const float tileLeft0  = MIN_X;
-        const int minTile = static_cast<int>(std::floor((leftX - tileLeft0) / m_railTileW)) - 1;
-        const int maxTile = static_cast<int>(std::ceil((rightX - tileLeft0) / m_railTileW)) + 1;
-        const float cy = MIN_Y + m_railTileH * 0.5f;
-
-        for (int i = minTile; i <= maxTile; ++i)
-        {
-            float cx = MIN_X + i * m_railTileW + m_railTileW * 0.5f;
-            Math::Matrix model =
-                Math::Matrix::CreateTranslation({ cx, cy }) *
-                Math::Matrix::CreateScale({ m_railTileW, m_railTileH });
-            m_railTile->Draw(shader, model);
-        }
-    }
-
     // ── Train car images (move with trainOffset) ───────────────────────────
     const float trainLeft = MIN_X + m_trainOffset;
 
@@ -3766,6 +3754,13 @@ void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
     // Config obstacle boxes (red)
     for (const auto& obs : m_obstacles)
         debugRenderer.DrawBox(colorShader, obs.pos, obs.size, { 1.0f, 0.0f });
+
+    // 월드 고정 레일 발판 (orange)
+    for (const auto& hb : m_staticWorldHitboxes)
+    {
+        const Math::Vec2 worldPos = { MIN_X + hb.localCenter.x, MIN_Y + hb.localCenter.y };
+        debugRenderer.DrawBox(colorShader, worldPos, hb.size, 1.0f, 0.55f, 0.2f);
+    }
 
     // Hiding spots (green) — move with train, same as Hallway display convention
     {

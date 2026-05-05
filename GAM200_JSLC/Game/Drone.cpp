@@ -236,7 +236,7 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
             m_velocity       = { 0.f, 0.f };
             // Fall through to m_isHit block next frame
         }
-        else if (m_stunTimer <= 0.f && m_isTracer)
+        else if (m_stunTimer <= 0.f && (m_isTracer || (m_trainCarSegment >= 1 && m_trainCarSegment <= 3)))
         {
             m_lostTimer                  = 0.f;
             m_isChasing                  = true;
@@ -459,8 +459,10 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         m_attackCooldown -= static_cast<float>(dt);
     }
 
+    const bool trainCars123Chase =
+        !m_isTracer && m_trainCarSegment >= 1 && m_trainCarSegment <= 3;
     Math::Vec2 toPlayer;
-    if (m_isTracer)
+    if (m_isTracer || trainCars123Chase)
     {
         Math::Vec2 target = player.GetHitboxCenter();
         target.x += std::sin(m_spawnPos.x * 0.031f + m_spawnPos.y * 0.019f) * 44.f;
@@ -548,7 +550,7 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     }
     else
     {
-        if (m_isTracer)
+        if (m_isTracer || trainCars123Chase)
         {
             Math::Vec2 targetVelocity;
             if (canDetectPlayer)

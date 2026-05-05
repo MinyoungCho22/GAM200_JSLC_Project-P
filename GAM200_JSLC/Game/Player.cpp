@@ -80,6 +80,7 @@ void Player::Init(Math::Vec2 startPos)
     position = startPos;
     velocity = Math::Vec2(0.0f, 0.0f);
     m_currentGroundLevel = GROUND_LEVEL;
+    m_trainEnemyUndetectable = false;
     can_double_jump = false;
     is_double_jumping = false;
 

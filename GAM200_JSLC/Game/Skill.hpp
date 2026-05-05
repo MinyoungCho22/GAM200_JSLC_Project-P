@@ -65,7 +65,7 @@ private:
     CachedTextureInfo m_cooldownText{};
 
     static constexpr float SKILL_COST     = 8.f;
-    static constexpr float SKILL_RADIUS   = 535.f;
+    static constexpr float SKILL_RADIUS   = 535.f * 0.7f;
     static constexpr float SKILL_COOLDOWN = 3.f;
     static constexpr float STUN_DURATION  = 2.0f;
 };

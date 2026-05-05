@@ -152,6 +152,10 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     m_trainDetectAlertTimer = std::max(0.f, m_trainDetectAlertTimer - fDt);
 
     Math::Vec2 playerPos = player.GetPosition();
+    const bool trainNoDetect = player.IsTrainEnemyUndetectable() && m_trainCarSegment > 0;
+    if (trainNoDetect && m_state == RobotState::Chase)
+        m_state = RobotState::Patrol;
+
     float distToPlayer = std::abs(playerPos.x - m_position.x);
     float heightDiff = std::abs(playerPos.y - m_position.y);
     const float detHeight = (m_trainDeckPatrol || m_trainCarSegment > 0) ? 520.f : 300.f;
@@ -160,7 +164,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     switch (m_state)
     {
     case RobotState::Patrol:
-        if (m_trainBlindAggro)
+        if (m_trainBlindAggro && !trainNoDetect)
         {
             m_directionX = (playerPos.x > m_position.x) ? 1.0f : -1.0f;
             m_velocity.x = m_directionX * m_chaseSpeed;
@@ -196,7 +200,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         m_velocity.x = m_directionX * m_patrolSpeed;
 
         // Transition to Chase if player is detected
-        if (distToPlayer < DETECTION_RANGE && heightDiff < detHeight)
+        if (!trainNoDetect && distToPlayer < DETECTION_RANGE && heightDiff < detHeight)
         {
             m_state                     = RobotState::Chase;
             m_trainDetectAlertTimer     = 0.95f;
@@ -225,7 +229,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         }
         else
         {
-            if (m_trainBlindAggro)
+            if (m_trainBlindAggro && !trainNoDetect)
             {
                 m_trainBlindSweepTimer -= fDt;
                 if (m_trainBlindSweepTimer <= 0.f && m_attackCooldownTimer <= 0.f)
@@ -381,7 +385,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             // Only block movement if we're not currently colliding but would collide
             if (!currentlyColliding && wouldCollide)
             {
-                const bool trainVault = m_trainCarSegment > 0 && obs.size.y >= 95.f
+                const bool trainVault = m_trainCarSegment == 0 && obs.size.y >= 95.f
                                         && (m_state == RobotState::Chase || m_state == RobotState::Patrol);
                 if (trainVault)
                 {

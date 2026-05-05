@@ -69,6 +69,9 @@ public:
 
     void Revive(float newPulse);
     void SetHiding(bool hiding) { m_isHiding = hiding; }
+    /// Train 전용: 히딩 스폿·Car2 펄스 충전 컨테이너 등에서 드론/로봇 AI가 플레이어를 추적하지 않도록 함
+    void SetTrainEnemyUndetectable(bool v) { m_trainEnemyUndetectable = v; }
+    bool IsTrainEnemyUndetectable() const { return m_trainEnemyUndetectable; }
     void SetGodMode(bool godMode) { m_godMode = godMode; }
     bool IsGodMode() const { return m_godMode; }
     /// Train 컨테이너 연출 등 — 입력 물리 업데이트 스킵 (위치는 Train 등에서 직접 설정).
@@ -143,6 +146,7 @@ private:
     bool can_double_jump = false;
     bool is_double_jumping = false;
     bool m_isHiding = false;
+    bool m_trainEnemyUndetectable = false;
     bool m_godMode = false;
     float m_sizeScale = 1.0f;
     bool m_movementLockedByTrain = false;

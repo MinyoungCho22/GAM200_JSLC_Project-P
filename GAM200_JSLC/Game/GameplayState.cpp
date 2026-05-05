@@ -708,10 +708,19 @@ void GameplayState::Update(double dt)
         && m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
 
     bool isPressingInteract = ctl.IsActionPressed(ControlAction::PulseAbsorb, input);
-    const bool isPlayerHidingInRoomForAttack = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
-    const bool isPlayerHidingInHallwayForAttack = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
-    const bool crouchHidingBlocksAttack = player.IsCrouching() &&
-        (isPlayerHidingInRoomForAttack || isPlayerHidingInHallwayForAttack);
+    const bool isPlayerHidingInRoomForAttack =
+        m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool isPlayerHidingInHallwayForAttack =
+        m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool isPlayerHidingInUndergroundForAttack =
+        m_undergroundAccessed && m_underground
+        && m_underground->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool isPlayerHidingInTrainForAttack =
+        m_trainAccessed && m_train && m_train->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool crouchHidingBlocksAttack =
+        player.IsCrouching()
+        && (isPlayerHidingInRoomForAttack || isPlayerHidingInHallwayForAttack || isPlayerHidingInUndergroundForAttack
+            || isPlayerHidingInTrainForAttack);
     bool isPressingAttack = ctl.IsActionPressed(ControlAction::Attack, input) && !crouchHidingBlocksAttack;
 
     // Get mouse world position
@@ -997,6 +1006,8 @@ void GameplayState::Update(double dt)
     bool isPlayerHiding = isPlayerHidingInRoom || isPlayerHidingInHallway;
 
     player.SetHiding(isPlayerHiding);
+    if (!m_trainAccessed)
+        player.SetTrainEnemyUndetectable(false);
 
     droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding, true, 1.f);
 
@@ -1139,21 +1150,17 @@ void GameplayState::Update(double dt)
     m_rooftop->Update(dt, player, playerHitboxSize, input, mouseWorldPos,
                       ctl.IsActionTriggered(ControlAction::Attack, input));
 
-    // Q-skill: Pulse Resonance Burst
-    {
+    auto runPulseResonanceBurst = [&]() {
         const bool isGodMode = [&]() -> bool {
             auto* im = gsm.GetEngine().GetImguiManager();
             return im && im->IsPlayerGodMode();
         }();
-        Math::Vec2 trainPulseAnchor{};
-        const bool trainPulseAnchorOk =
-            m_trainAccessed && m_train && m_train->TryGetCarTransportSkillAnchor(playerHbCenter, trainPulseAnchor);
         std::vector<std::pair<Math::Vec2, Math::Vec2>> trainStaticChainArcs;
         if (m_trainAccessed && m_train)
             m_train->AppendCarTransportStraightChainArcs(trainStaticChainArcs);
 
-        // 플레이어 중심은 스프라이트 위치보다 히트박스 중심이 펄스/판정과 일치
-        m_pulseDetonateSkill.Update(dt, player, playerHbCenter,
+        // 최신 히트박스 중심 사용. Train은 m_train->Update에서 캐리 후에 호출해야 원이 플레이어와 일치.
+        m_pulseDetonateSkill.Update(dt, player, player.GetHitboxCenter(),
             m_rooftop->GetDroneManager(),
             (m_undergroundAccessed && m_underground) ? m_underground->GetDroneManager() : nullptr,
             droneManager.get(),
@@ -1161,12 +1168,15 @@ void GameplayState::Update(double dt)
             m_isGameOver, m_rooftopAccessed || m_undergroundAccessed, isGodMode,
             (m_trainAccessed && m_train) ? m_train->GetDroneManager() : nullptr,
             (m_trainAccessed && m_train) ? m_train->GetSirenDroneManager() : nullptr,
-            trainPulseAnchorOk ? &trainPulseAnchor : nullptr,
+            nullptr,
             &trainStaticChainArcs,
             (m_trainAccessed && m_train) ? m_train->GetCarTransportDroneManager() : nullptr,
             (m_trainAccessed && m_train) ? m_train.get() : nullptr,
             (m_undergroundAccessed && m_underground) ? m_underground.get() : nullptr);
-    }
+    };
+
+    if (!m_trainAccessed)
+        runPulseResonanceBurst();
 
     if (m_storyDialogue && m_rooftopAccessed && !m_undergroundAccessed && m_rooftop && !m_blockAmbientStoryForSession
         && !suppressAmbientStoryThisFrame)
@@ -1204,6 +1214,8 @@ void GameplayState::Update(double dt)
         const bool carTransportInjectHeld = isPressingInteract || injectViaStartIcon;
         m_train->Update(dt, player, playerHitboxSize, isPressingInteract, carTransportInjectHeld, trainCarInjectGodMode,
                         attackHeld, attackTriggered, mouseWorldPos, injectViaStartIcon ? carInjectForced : -1);
+
+        runPulseResonanceBurst();
 
         const float shakePx = m_train->ConsumeTrainCameraShakeRequest();
         if (shakePx > 0.f)
@@ -1289,12 +1301,6 @@ void GameplayState::Update(double dt)
         {
             if (!drone.IsDead() && drone.ShouldDealDamage())
             {
-                const int ds = drone.GetTrainCarSegment();
-                if (ds != 0 && ds != trainPlayerCar)
-                {
-                    drone.ResetDamageFlag();
-                    continue;
-                }
                 if (!isPlayerHidingInTrain)
                 {
                     auto* imguiManager = gsm.GetEngine().GetImguiManager();
@@ -1345,11 +1351,6 @@ void GameplayState::Update(double dt)
             {
                 if (!drone.IsDead() && drone.ShouldDealDamage())
                 {
-                    if (trainPlayerCar != 3)
-                    {
-                        drone.ResetDamageFlag();
-                        continue;
-                    }
                     if (!m_train->IsSirenDroneDamageBlocked(playerHbCenter, playerHitboxSize, player.IsCrouching()))
                     {
                         auto* imguiManager = gsm.GetEngine().GetImguiManager();
@@ -2059,6 +2060,8 @@ void GameplayState::DrawMainLayer()
         textureShader.setMat4("projection", worldProjection);
         textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
         textureShader.setBool("flipX", false);
+        // 레일은 Rail.png가 장면 최하단 레이어이므로 하늘 바로 다음·다른 맵·기차 본체보다 먼저 그린다.
+        m_train->DrawRailTrack(textureShader, m_camera.GetPosition(), viewHalfW);
     }
 
     // 1b) World maps (post-processed: exposure / hallway overlay)
