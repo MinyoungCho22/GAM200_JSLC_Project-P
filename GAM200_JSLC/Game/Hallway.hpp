@@ -54,6 +54,8 @@ public:
 
     const std::vector<PulseSource>& GetPulseSources() const;
     std::vector<PulseSource>& GetPulseSources();
+    /// 게임 오버 후 이 구역 체크포인트로 리스폰 시 펄스 충전소를 다시 사용 가능하게 함
+    void RefillPulseSourcesAfterCheckpointRespawn();
     const std::vector<Drone>& GetDrones() const;
     std::vector<Drone>& GetDrones();
     DroneManager* GetDroneManager() { return m_droneManager.get(); }

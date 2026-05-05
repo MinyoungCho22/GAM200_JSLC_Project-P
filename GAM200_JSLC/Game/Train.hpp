@@ -413,5 +413,4 @@ private:
     std::vector<bool> m_trainDeckRobotUsedLandingShake;
     std::vector<float> m_droneWaterCd;
     std::vector<float> m_carTransportDroneWaterCd;
-    std::vector<float> m_robotWaterCd;
 };

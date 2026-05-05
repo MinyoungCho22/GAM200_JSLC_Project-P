@@ -92,8 +92,14 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
     for (const auto& spawn : cfg.robotSpawns)
     {
         m_robots.emplace_back();
-        m_robots.back().Init(spawn);
-        m_robots.back().ApplyUndergroundDifficultyBoost();
+        Robot& r = m_robots.back();
+        r.Init(spawn);
+        r.ApplyUndergroundDifficultyBoost();
+        const float floorY = MIN_Y + 75.0f;
+        r.SetGroundLimitY(floorY);
+        const Math::Vec2 p = r.GetPosition();
+        r.SetPosition({ p.x, floorY + r.GetSize().y * 0.5f });
+        r.SetSpawnPosition(r.GetPosition());
     }
 
     for (const auto& o : cfg.lights)
@@ -541,6 +547,12 @@ bool Underground::IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHit
             return true;
     }
     return false;
+}
+
+void Underground::RefillPulseSourcesAfterCheckpointRespawn()
+{
+    for (auto& s : m_pulseSources)
+        s.RefillStock();
 }
 
 void Underground::Shutdown()

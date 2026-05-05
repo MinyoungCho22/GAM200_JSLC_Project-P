@@ -247,6 +247,12 @@ std::vector<PulseSource>& Hallway::GetPulseSources()
     return m_pulseSources;
 }
 
+void Hallway::RefillPulseSourcesAfterCheckpointRespawn()
+{
+    for (auto& s : m_pulseSources)
+        s.RefillStock();
+}
+
 const std::vector<Hallway::HidingSpot>& Hallway::GetHidingSpots() const
 {
     return m_hidingSpots;

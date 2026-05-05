@@ -1703,6 +1703,8 @@ void GameplayState::RespawnAtCheckpoint()
         player.SetOnGround(false);
         ApplyHallwayCameraBounds();
         m_camera.SetPosition(player.GetPosition());
+        if (m_hallway)
+            m_hallway->RefillPulseSourcesAfterCheckpointRespawn();
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Hallway");
         break;
     }
@@ -1731,6 +1733,8 @@ void GameplayState::RespawnAtCheckpoint()
         m_camera.SetBounds({ Underground::MIN_X, Underground::MIN_Y },
                            { Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y + Underground::HEIGHT });
         m_camera.SetPosition(player.GetPosition());
+        if (m_underground)
+            m_underground->RefillPulseSourcesAfterCheckpointRespawn();
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Underground");
         break;
     }

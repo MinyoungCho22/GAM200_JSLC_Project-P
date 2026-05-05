@@ -223,6 +223,7 @@ bool SoundSystem::Initialize()
     }
 
     Logger::Instance().Log(Logger::Severity::Info, "FMOD Audio System Initialized.");
+    SetMasterVolume(m_masterVolume);
     return true;
 }
 

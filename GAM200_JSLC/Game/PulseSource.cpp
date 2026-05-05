@@ -53,6 +53,14 @@ float PulseSource::Drain(float amount)
     return drained_amount;
 }
 
+void PulseSource::RefillStock()
+{
+    if (!m_sharedCurrent || !m_sharedMax) return;
+    *m_sharedCurrent = *m_sharedMax;
+    if (m_sharedGaugeUnlocked)
+        *m_sharedGaugeUnlocked = false;
+}
+
 void PulseSource::Draw(Shader& shader) const
 {
     Math::Matrix scale = Math::Matrix::CreateScale(m_size);

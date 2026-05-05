@@ -61,6 +61,7 @@ public:
     void ClearAllDrones();
 
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
+    void RefillPulseSourcesAfterCheckpointRespawn();
 
     const std::vector<Robot>& GetRobots() const { return m_robots; }
     std::vector<Robot>& GetRobots() { return m_robots; }

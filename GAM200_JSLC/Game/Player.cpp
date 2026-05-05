@@ -604,12 +604,17 @@ void Player::Jump()
         is_on_ground = false;
         can_double_jump = true;
         is_double_jumping = false;
+        // D(오른쪽) 입력이 있을 때 점프에 수평 보조 — 열차/지면 공통
+        if (last_move_direction > 0)
+            velocity.x = (std::max)(velocity.x, 300.f);
     }
     else if (can_double_jump && !is_crouching)
     {
         velocity.y = jump_velocity;
         can_double_jump = false;
         is_double_jumping = true;
+        if (last_move_direction > 0)
+            velocity.x = (std::max)(velocity.x, 280.f);
     }
 }
 

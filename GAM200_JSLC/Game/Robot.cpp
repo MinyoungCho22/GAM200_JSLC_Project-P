@@ -351,8 +351,8 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
     }
 
-    // Apply gravity
-    m_velocity.y += GRAVITY * fDt;
+    // Ground-only movement (no gravity, vault jump, or climbing onto obstacles).
+    m_velocity.y = 0.0f;
 
     // Map boundary constraints
     Math::Vec2 nextPos = m_position;
@@ -368,96 +368,28 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         if (m_state == RobotState::Patrol || m_state == RobotState::Retreat) m_directionX = -1.0f;
     }
 
-    // Obstacle collision detection (horizontal)
-    // Only check if we're actually moving and not already colliding
-    bool canMove = true;
+    // Obstacle collision detection (horizontal only)
     if (std::abs(m_velocity.x) > 0.1f)
     {
         for (const auto& obs : obstacles)
         {
-            // Check if current position is NOT colliding
             bool currentlyColliding = Collision::CheckAABB(m_position, m_size, obs.pos, obs.size);
-            
-            // Check if next position WOULD collide
             Math::Vec2 testPos = { nextPos.x, m_position.y };
             bool wouldCollide = Collision::CheckAABB(testPos, m_size, obs.pos, obs.size);
-            
-            // Only block movement if we're not currently colliding but would collide
+
             if (!currentlyColliding && wouldCollide)
             {
-                const bool trainVault = m_trainCarSegment == 0 && obs.size.y >= 95.f
-                                        && (m_state == RobotState::Chase || m_state == RobotState::Patrol);
-                if (trainVault)
-                {
-                    const float toObsX = obs.pos.x - m_position.x;
-                    const float pushX =
-                        (std::abs(toObsX) < 18.f) ? (m_directionX * 460.f) : (std::copysign(460.f, toObsX));
-                    const float vy = 1620.f + std::min(400.f, obs.size.y * 1.8f);
-                    m_velocity.y = std::max(m_velocity.y, vy);
-                    m_velocity.x += pushX * 1.06f;
-                    canMove      = false;
-                    nextPos.x    = m_position.x;
-                    break;
-                }
-
-                canMove = false;
                 nextPos.x = m_position.x;
-
-                // Reverse direction if in Patrol or Retreat state
                 if (m_state == RobotState::Patrol || m_state == RobotState::Retreat)
-                {
                     m_directionX = -m_directionX;
-                }
                 break;
             }
         }
     }
 
     m_position.x = nextPos.x;
-
-    // Ground collision
-    m_isOnGround = false;
-    nextPos = m_position;
-    nextPos.y += m_velocity.y * fDt;
-
-    const float groundLimit = m_groundLimitY;
-    if (nextPos.y - m_size.y / 2.0f < groundLimit)
-    {
-        nextPos.y = groundLimit + m_size.y / 2.0f;
-        m_velocity.y = 0.0f;
-        m_isOnGround = true;
-    }
-
-    // Obstacle collision detection (vertical)
-    for (const auto& obs : obstacles)
-    {
-        // Use a slightly smaller hitbox for vertical collision to prevent jittering
-        Math::Vec2 adjustedSize = { m_size.x * 0.9f, m_size.y };
-        
-        if (Collision::CheckAABB(nextPos, adjustedSize, obs.pos, obs.size))
-        {
-            // Check if robot is falling onto obstacle (landing on top)
-            if (m_velocity.y < 0.0f && m_position.y > obs.pos.y + obs.size.y / 2.0f)
-            {
-                // Land on top of obstacle with small buffer
-                float buffer = 1.0f;
-                nextPos.y = obs.pos.y + obs.size.y / 2.0f + m_size.y / 2.0f + buffer;
-                m_velocity.y = 0.0f;
-                m_isOnGround = true;
-            }
-            // Check if robot is jumping into obstacle from below
-            else if (m_velocity.y > 0.0f && m_position.y < obs.pos.y - obs.size.y / 2.0f)
-            {
-                // Hit obstacle from below with small buffer
-                float buffer = 1.0f;
-                nextPos.y = obs.pos.y - obs.size.y / 2.0f - m_size.y / 2.0f - buffer;
-                m_velocity.y = 0.0f;
-            }
-            break;
-        }
-    }
-
-    m_position.y = nextPos.y;
+    m_position.y = m_groundLimitY + m_size.y / 2.0f;
+    m_isOnGround = true;
 }
 
 void Robot::DecideAttackPattern()
@@ -639,14 +571,13 @@ void Robot::DrawTrainDetectAlert(Shader& colorShader, DebugRenderer& debugRender
     debugRenderer.DrawBox(colorShader, { markCenter.x, markCenter.y - 12.f }, { 11.f, 11.f }, 1.0f, 0.85f, 0.05f);
 }
 
-void Robot::TakeDamage(float amount)
+void Robot::TakeDamage(float amount, bool applyStagger)
 {
     if (m_state == RobotState::Dead) return;
 
     m_hp -= amount;
 
-    // Apply stagger if not on cooldown
-    if (m_staggerCooldown <= 0.0f)
+    if (applyStagger && m_staggerCooldown <= 0.0f)
     {
         m_state = RobotState::Stagger;
         m_stateTimer = 0.3f;
@@ -666,7 +597,8 @@ void Robot::ApplyPulseImpact(Math::Vec2 impulse, float damage)
 {
     if (m_state == RobotState::Dead)
         return;
-    m_velocity += impulse;
+    m_velocity.x += impulse.x;
+    m_velocity.y = 0.f;
     m_horzExternalImpulseTimer = 0.58f;
     m_hp -= damage;
     if (m_hp <= 0.0f)
@@ -713,11 +645,12 @@ void Robot::Reset()
     m_trainBlindAggro          = false;
     m_trainBlindSweepTimer     = 0.f;
 
+    m_groundLimitY = trainGround;
+
     if (trainSeg > 0)
     {
         m_trainCarSegment         = trainSeg;
         m_trainDeckPatrol         = deckPatrol;
-        m_groundLimitY            = trainGround;
         m_allowTrainCombatVsPlayer = true;
         m_trainBlindAggro          = blindKeep;
         if (blindKeep)

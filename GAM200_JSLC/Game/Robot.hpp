@@ -54,7 +54,7 @@ public:
     Math::Vec2 GetPosition() const { return m_position; }
     Math::Vec2 GetSize() const { return m_size; }
     bool IsDead() const { return m_state == RobotState::Dead; }
-    void TakeDamage(float amount);
+    void TakeDamage(float amount, bool applyStagger = true);
     
     // Debug setters for ImGui
     void SetPosition(const Math::Vec2& pos) { m_position = pos; }
@@ -135,7 +135,6 @@ private:
     Math::Vec2 m_spawnPos{};
     const float PATROL_RANGE = 1000.0f;
 
-    const float GRAVITY = -2200.0f;
     float m_patrolSpeed = 140.0f;
     float m_chaseSpeed = 350.0f;
     float m_groundLimitY = -1910.0f;

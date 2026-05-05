@@ -30,7 +30,7 @@ static constexpr float ASSUMED_IMG_HEIGHT = 1080.0f; // expected car image heigh
 // Flatbed deck surface: art row py=804 → world offset above Train::MIN_Y (see MakeHitbox for [84,804,2472,45]).
 static constexpr float kTrainFlatbedDeckTopLocalY = ASSUMED_IMG_HEIGHT - 804.f;
 // rail.png: DrawRailTrack는 타일 전체(MIN_Y ~ MIN_Y+m_railTileH)에 맞추지만, 궤도 픽셀은 대부분 타일 하단에 있다.
-// 물리 슬랩 윗면 = MIN_Y + m_railTileH * 이 값 (아트와 맞지 않으면 0.32~0.48 사이에서만 조정).
+// 물리 슬랩 윗면 = MIN_Y + m_railTileH * 이 값 (현재 아트 기준 0.08).
 static constexpr float kRailWalkSurfaceFractionOfTileH = 0.08f;
 static constexpr float kTrainCombatEnemyScale      = 0.75f;
 
@@ -1431,7 +1431,6 @@ void Train::Initialize()
         m_trainDeckRobotUsedLandingShake.assign(m_robots.size(), false);
 
         m_droneWaterCd.assign(m_droneManager->GetDrones().size(), 0.f);
-        m_robotWaterCd.assign(m_robots.size(), 0.f);
 
         if (m_carTransportDroneManager)
         {
@@ -1839,6 +1838,8 @@ void Train::ApplyValveWaterDamageToEnemies(float dt)
     if (m_valvePressureT <= 0.01f && m_valveWaterParticles.empty())
         return;
 
+    const float fdt = static_cast<float>(dt);
+
     const float valveY = MIN_Y + m_valveLocalCenter.y;
     const float tl       = MIN_X + m_trainOffset;
     const float valveX   = tl + m_valveLocalCenter.x;
@@ -1964,21 +1965,15 @@ void Train::ApplyValveWaterDamageToEnemies(float dt)
         if (r.IsDead())
             continue;
 
-        if (i < m_robotWaterCd.size() && m_robotWaterCd[i] > 0.0f)
-            m_robotWaterCd[i] -= dt;
-
-        if (i < m_robotWaterCd.size() && m_robotWaterCd[i] > 0.0f)
-            continue;
-
         const bool wet = hitsWater(r.GetPosition(), r.GetSize(), 28.0f)
                          || inSprayBand(r.GetPosition(), r.GetSize());
         if (!wet)
             continue;
 
-        r.SetPosition(r.GetPosition() + Math::Vec2{ 220.f, 0.f });
-        r.TakeDamage(r.GetMaxHP() * 2.0f);
-        if (i < m_robotWaterCd.size())
-            m_robotWaterCd[i] = 0.22f;
+        Math::Vec2 p = r.GetPosition();
+        p.x += 240.f * fdt;
+        r.SetPosition(p);
+        r.TakeDamage(r.GetMaxHP() * 0.5f * fdt, false);
     }
 }
 
@@ -3207,6 +3202,20 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     UpdateCarTransport(fdt, player, currentHbCenter, carTransportInjectHeld, ignoreCarInjectPulseCost,
                        carTransportInjectForcedSlot);
 
+    // 점프 직후 공중이어도 캐리 밴드 안이면 열차 속도에 맞춰 같이 이동(지면처럼 느껴지게 함)
+    {
+        const Math::Vec2 hcL  = player.GetHitboxCenter();
+        const Math::Vec2 hhL  = playerHitboxSize * 0.5f;
+        const float     tlNow = MIN_X + m_trainOffset;
+        const bool      inBand = HitboxInTrainCarryBand(tlNow, m_totalTrainWidth, hcL, hhL);
+        if (playerOnTrainSurface)
+            m_airborneFromTrain = false;
+        else if (!player.IsOnGround() && inBand && (m_prevPlayerOnTrain || m_airborneFromTrain))
+            m_airborneFromTrain = true;
+        else if (!inBand || (player.IsOnGround() && !playerOnTrainSurface))
+            m_airborneFromTrain = false;
+    }
+
     // --- Entry countdown → automatic departure ---
     if (m_entryTimer >= 0.0f && m_trainState == TrainState::Stationary)
     {
@@ -3249,7 +3258,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         const float twLeft = MIN_X + m_trainOffset - move;
         const bool inCarryBand = HitboxInTrainCarryBand(twLeft, m_totalTrainWidth, hc, hh);
 
-        if (m_playerOnTrain && inCarryBand)
+        if ((m_playerOnTrain || m_airborneFromTrain) && inCarryBand)
             player.SetPosition(player.GetPosition() + Math::Vec2{ move, 0.0f });
     }
 
@@ -3315,8 +3324,6 @@ void Train::StartEntryTimer()
             std::fill(m_droneWaterCd.begin(), m_droneWaterCd.end(), 0.f);
         if (!m_carTransportDroneWaterCd.empty())
             std::fill(m_carTransportDroneWaterCd.begin(), m_carTransportDroneWaterCd.end(), 0.f);
-        if (!m_robotWaterCd.empty())
-            std::fill(m_robotWaterCd.begin(), m_robotWaterCd.end(), 0.f);
         m_car2HidePhase        = Car2HidePhase::None;
         m_car2HideSeqTime      = 0.f;
         m_car2InsideCharge     = 0.f;

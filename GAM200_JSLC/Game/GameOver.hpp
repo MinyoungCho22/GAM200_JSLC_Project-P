@@ -40,6 +40,6 @@ private:
     unsigned int m_quadVAO = 0;
     unsigned int m_quadVBO = 0;
 
-    float m_prevMasterVolume = 0.8f;
+    float m_prevMasterVolume = 0.4f;
     bool  m_mutedOnEnter = false;
 };
