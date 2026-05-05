@@ -376,6 +376,9 @@ private:
         float alpha = 0.0f;
     };
     std::vector<ValveWaterParticle> m_valveWaterParticles;
+    /// 스플래시 스폰용(프레임마다 vector 재할당 방지)
+    std::vector<ValveWaterParticle> m_valveSplashScratch;
+    static constexpr std::size_t kMaxValveWaterParticles = 720;
 
     // GPU-instanced valve water rendering (single draw call; avoids CPU quad loops)
     struct ValveWaterGpuInstance

@@ -204,7 +204,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         {
             m_state                     = RobotState::Chase;
             m_trainDetectAlertTimer     = 0.95f;
-            Logger::Instance().Log(Logger::Severity::Event, "Robot detected Player! Starting Chase.");
+            Logger::Instance().Log(Logger::Severity::Verbose, "Robot detected Player! Starting Chase.");
         }
         break;
 
@@ -264,7 +264,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             m_state = RobotState::Attack;
             m_stateTimer = ATTACK_DURATION;
             m_hasPlayedAttackSound = false;
-            Logger::Instance().Log(Logger::Severity::Event, "Robot Attack! Type: %d", (int)m_currentAttack);
+            Logger::Instance().Log(Logger::Severity::Verbose, "Robot Attack! Type: %d", (int)m_currentAttack);
         }
         break;
 
@@ -306,7 +306,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             {
                 player.TakeDamage(20.0f);
                 m_hasDealtDamage = true;
-                Logger::Instance().Log(Logger::Severity::Event, "Player Hit by Robot (Inside Attack Box)!");
+                Logger::Instance().Log(Logger::Severity::Verbose, "Player Hit by Robot (Inside Attack Box)!");
             }
         }
 
@@ -582,14 +582,14 @@ void Robot::TakeDamage(float amount, bool applyStagger)
         m_state = RobotState::Stagger;
         m_stateTimer = 0.3f;
         m_staggerCooldown = STAGGER_COOLDOWN_DURATION;
-        Logger::Instance().Log(Logger::Severity::Event, "Robot Staggered!");
+        Logger::Instance().Log(Logger::Severity::Verbose, "Robot Staggered!");
     }
 
     if (m_hp <= 0.0f)
     {
         m_hp = 0.0f;
         m_state = RobotState::Dead;
-        Logger::Instance().Log(Logger::Severity::Event, "Sweep Stalker Destroyed!");
+        Logger::Instance().Log(Logger::Severity::Verbose, "Sweep Stalker Destroyed!");
     }
 }
 
@@ -606,7 +606,7 @@ void Robot::ApplyPulseImpact(Math::Vec2 impulse, float damage)
         m_hp                = 0.0f;
         m_state             = RobotState::Dead;
         m_horzExternalImpulseTimer = 0.f;
-        Logger::Instance().Log(Logger::Severity::Event, "Sweep Stalker Destroyed!");
+        Logger::Instance().Log(Logger::Severity::Verbose, "Sweep Stalker Destroyed!");
         return;
     }
     m_state             = RobotState::Stagger;

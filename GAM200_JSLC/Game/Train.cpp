@@ -894,7 +894,7 @@ void Train::UpdateValveWaterParticles(float dt)
     const float gravityY = -1200.0f;
     const float floorY = MIN_Y - 80.0f;
     const Math::Vec2 valveWorld = { MIN_X + m_trainOffset + m_valveLocalCenter.x, MIN_Y + m_valveLocalCenter.y };
-    std::vector<ValveWaterParticle> splashSpawn;
+    m_valveSplashScratch.clear();
 
     // 1) update existing particles
     for (auto& p : m_valveWaterParticles)
@@ -921,7 +921,7 @@ void Train::UpdateValveWaterParticles(float dt)
                 sp.maxLife = 0.22f + m_valvePressureT * 0.22f;
                 sp.life = sp.maxLife;
                 sp.alpha = 0.30f + m_valvePressureT * 0.35f;
-                splashSpawn.push_back(sp);
+                m_valveSplashScratch.push_back(sp);
             }
             p.life = 0.0f;
         }
@@ -930,8 +930,9 @@ void Train::UpdateValveWaterParticles(float dt)
         std::remove_if(m_valveWaterParticles.begin(), m_valveWaterParticles.end(),
             [floorY](const ValveWaterParticle& p) { return p.life <= 0.0f || p.pos.y < floorY; }),
         m_valveWaterParticles.end());
-    if (!splashSpawn.empty())
-        m_valveWaterParticles.insert(m_valveWaterParticles.end(), splashSpawn.begin(), splashSpawn.end());
+    if (!m_valveSplashScratch.empty())
+        m_valveWaterParticles.insert(m_valveWaterParticles.end(), m_valveSplashScratch.begin(),
+                                     m_valveSplashScratch.end());
 
     // ApplyValveWaterDamageToEnemies는 Train::Update 끝에서 호출 — 스크립트가 SetPosition으로
     // 드론/로봇을 배치한 뒤에 넉백·데미지가 적용되도록 한다.
@@ -986,27 +987,36 @@ void Train::UpdateValveWaterParticles(float dt)
 
         m_valveWaterParticles.push_back(p);
     }
+
+    if (m_valveWaterParticles.size() > kMaxValveWaterParticles)
+    {
+        const std::size_t drop = m_valveWaterParticles.size() - kMaxValveWaterParticles;
+        m_valveWaterParticles.erase(
+            m_valveWaterParticles.begin(),
+            m_valveWaterParticles.begin() + static_cast<std::ptrdiff_t>(drop));
+    }
 }
 
 void Train::ApplyMooreConnectedPulseShare(Player& player, float dt)
 {
     bool visited[kCarTransportCount] = {};
     float bonus                       = 0.f;
+    int  q[kCarTransportCount];
 
     for (int i = 0; i < kCarTransportCount; ++i)
     {
         if (!m_carTransportSlots[static_cast<size_t>(i)].engineOn || visited[i])
             continue;
 
-        std::vector<int> q;
-        q.push_back(i);
+        std::size_t head = 0;
+        std::size_t tail = 0;
+        q[tail++] = i;
         visited[i] = true;
-        size_t qi = 0;
         int cluster = 0;
 
-        while (qi < q.size())
+        while (head < tail)
         {
-            const int u = q[qi++];
+            const int u = q[head++];
             ++cluster;
             for (int v = 0; v < kCarTransportCount; ++v)
             {
@@ -1015,7 +1025,7 @@ void Train::ApplyMooreConnectedPulseShare(Player& player, float dt)
                 if (!IsMooreAdjacentCarSlots(u, v))
                     continue;
                 visited[v] = true;
-                q.push_back(v);
+                q[tail++] = v;
             }
         }
 
@@ -1847,6 +1857,8 @@ void Train::ApplyValveWaterDamageToEnemies(float dt)
 
     auto hitsWater = [&](const Math::Vec2& enemyCenter, const Math::Vec2& enemySize, float extraEnemyPadding) -> bool
     {
+        if (m_valveWaterParticles.empty())
+            return false;
         for (const auto& p : m_valveWaterParticles)
         {
             if (p.life <= 0.0f)

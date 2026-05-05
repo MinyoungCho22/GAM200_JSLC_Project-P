@@ -532,7 +532,7 @@ void Player::TakeDamage(float amount)
     m_isInvincible = true;
     m_invincibilityTimer = m_invincibilityDuration;
 
-    Logger::Instance().Log(Logger::Severity::Event, "Player took %.1f damage! Remaining pulse: %.1f",
+    Logger::Instance().Log(Logger::Severity::Verbose, "Player took %.1f damage! Remaining pulse: %.1f",
         amount, m_pulseCore.getPulse().Value());
 }
 

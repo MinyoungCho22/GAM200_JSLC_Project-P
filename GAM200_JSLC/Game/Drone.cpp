@@ -449,7 +449,7 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
             m_hitRotation        = 0.f;
             m_corpseRestTimer    = 3.0f;
             m_corpseFadeAlpha    = 1.0f;
-            Logger::Instance().Log(Logger::Severity::Event, "Drone destroyed and landed on ground!");
+            Logger::Instance().Log(Logger::Severity::Verbose, "Drone destroyed and landed on ground!");
         }
         return;
     }
@@ -545,7 +545,7 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
 
         m_attackDirection = (player.GetPosition().x > m_position.x) ? 1 : -1;
 
-        Logger::Instance().Log(Logger::Severity::Event, "Drone attacking! Distance: %.1f, Effective Range: %.1f",
+        Logger::Instance().Log(Logger::Severity::Verbose, "Drone attacking! Distance: %.1f, Effective Range: %.1f",
             std::sqrt(distSq), effectiveDetectionRange);
     }
     else
@@ -877,7 +877,7 @@ void Drone::StartDeathSequence()
         m_hitWindSign = (drone_distribution(drone_generator) >= 0.f) ? 1 : -1;
     m_isAttacking = false;
 
-    Logger::Instance().Log(Logger::Severity::Event, "Drone hit! Starting death sequence.");
+    Logger::Instance().Log(Logger::Severity::Verbose, "Drone hit! Starting death sequence.");
 }
 
 bool Drone::ApplyDamage(float dt)

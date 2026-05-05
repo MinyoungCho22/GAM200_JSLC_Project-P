@@ -14,7 +14,7 @@ void TraceSystem::Initialize()
 void TraceSystem::OnDroneKilled(DroneManager& droneManager, Math::Vec2 spawnOrigin)
 {
     m_killCount++;
-    Logger::Instance().Log(Logger::Severity::Event, "Drone kill count: %d", m_killCount);
+    Logger::Instance().Log(Logger::Severity::Verbose, "Drone kill count: %d", m_killCount);
 
     // Progression Logic: Level 1 starts after the 1st kill
     if (m_killCount == 1 && m_warningLevel == 0)
@@ -27,13 +27,13 @@ void TraceSystem::OnDroneKilled(DroneManager& droneManager, Math::Vec2 spawnOrig
     {
         m_warningLevel = 2;
         SpawnTracerWave(droneManager, m_warningLevel, spawnOrigin);
-        Logger::Instance().Log(Logger::Severity::Event, "Warning Level 2 Reached!");
+        Logger::Instance().Log(Logger::Severity::Verbose, "Warning Level 2 Reached!");
     }
 }
 
 void TraceSystem::SpawnTracerWave(DroneManager& droneManager, int warningLevel, Math::Vec2 origin)
 {
-    Logger::Instance().Log(Logger::Severity::Event, "Spawning tracer wave! (Level %d) at (%.1f, %.1f)", warningLevel,
+    Logger::Instance().Log(Logger::Severity::Verbose, "Spawning tracer wave! (Level %d) at (%.1f, %.1f)", warningLevel,
                             origin.x, origin.y);
 
     constexpr float PI = 3.14159265359f;
