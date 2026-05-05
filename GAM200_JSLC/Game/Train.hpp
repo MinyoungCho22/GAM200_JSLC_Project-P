@@ -206,6 +206,8 @@ public:
     void DrawRobotTrainAlerts(Shader& colorShader, DebugRenderer& debugRenderer) const;
 
     float      GetTrainOffset() const { return m_trainOffset; }
+    /// 현재 열차 이동 속도(월드 유닛/초) — 추적 드론 보조 등에 사용
+    float      GetTrainCurrentSpeed() const { return m_trainCurrentSpeed; }
     TrainState GetTrainState()  const { return m_trainState; }
 
     // Total world width of all train car images (1 px = 1 world unit)

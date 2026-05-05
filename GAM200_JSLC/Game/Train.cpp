@@ -2240,7 +2240,7 @@ void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter,
     const float chaseMul = m_car3SirenActive ? 1.f : kPostSirenChaseMul;
     const float speedRatio =
         (TRAIN_SPEED > 0.f) ? std::clamp(m_trainCurrentSpeed / TRAIN_SPEED, 0.f, 1.f) : 0.f;
-    constexpr float kSirenTracerTrainAssistK = 0.42f;
+    constexpr float kSirenTracerTrainAssistK = 0.22f;
     const float     trainAssist              = 1.f + kSirenTracerTrainAssistK * speedRatio;
     m_sirenDroneManager->Update(dt, player, playerHitboxSize, hideForSiren, true, chaseMul, trainAssist);
 }
@@ -3412,17 +3412,18 @@ void Train::DrawFilledQuad(Shader& colorShader,
 // ---------------------------------------------------------------------------
 void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
 {
-    // Only draw when the train area is potentially visible
-    const float mapTop    = MIN_Y + HEIGHT;
-    const float mapBottom = MIN_Y;
-    if (cameraPos.y + HEIGHT < mapBottom || cameraPos.y - HEIGHT > mapTop) return;
-
     // Camera-visible interval (with safety margin) for dynamic repetition.
     // This keeps the draw count low while still preventing background seams.
     viewHalfW = (viewHalfW > 300.0f) ? viewHalfW : 300.0f;
     const float drawMargin = 1400.0f;
     const float visibleLeft  = cameraPos.x - viewHalfW - drawMargin;
     const float visibleRight = cameraPos.x + viewHalfW + drawMargin;
+
+    // When the camera follows the player upward (car 4 stacks), shift the sky vertically with the camera
+    // so the sunset bands still fill the frame instead of leaving cleared black at the top.
+    const float skyAnchorY = MIN_Y + HEIGHT * 0.5f;
+    const float skyLift    = cameraPos.y - skyAnchorY;
+    const auto  relY       = [&](float t) { return MIN_Y + HEIGHT * t + skyLift; };
 
     // Sky gradient only needs to cover current visible area.
     const float spanW = (visibleRight - visibleLeft) + 1200.0f;
@@ -3436,18 +3437,18 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
     const float nearPx = centerX + camDx * 0.34f;
 
     // Smoother sunset gradient (many soft layers instead of hard 3 bands)
-    DrawFilledQuad(colorShader, { skyPx, MIN_Y + HEIGHT * 0.90f }, { spanW, HEIGHT * 0.22f }, 0.13f, 0.05f, 0.19f, 1.0f);
-    DrawFilledQuad(colorShader, { skyPx, MIN_Y + HEIGHT * 0.75f }, { spanW, HEIGHT * 0.22f }, 0.22f, 0.08f, 0.20f, 0.95f);
-    DrawFilledQuad(colorShader, { skyPx, MIN_Y + HEIGHT * 0.60f }, { spanW, HEIGHT * 0.20f }, 0.38f, 0.11f, 0.18f, 0.90f);
-    DrawFilledQuad(colorShader, { skyPx, MIN_Y + HEIGHT * 0.47f }, { spanW, HEIGHT * 0.18f }, 0.58f, 0.17f, 0.14f, 0.88f);
-    DrawFilledQuad(colorShader, { skyPx, MIN_Y + HEIGHT * 0.36f }, { spanW, HEIGHT * 0.16f }, 0.80f, 0.28f, 0.11f, 0.85f);
-    DrawFilledQuad(colorShader, { skyPx, MIN_Y + HEIGHT * 0.25f }, { spanW, HEIGHT * 0.18f }, 0.53f, 0.18f, 0.10f, 0.70f);
-    DrawFilledQuad(colorShader, { skyPx, MIN_Y + HEIGHT * 0.11f }, { spanW, HEIGHT * 0.22f }, 0.10f, 0.07f, 0.08f, 1.0f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.90f) }, { spanW, HEIGHT * 0.22f }, 0.13f, 0.05f, 0.19f, 1.0f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.75f) }, { spanW, HEIGHT * 0.22f }, 0.22f, 0.08f, 0.20f, 0.95f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.60f) }, { spanW, HEIGHT * 0.20f }, 0.38f, 0.11f, 0.18f, 0.90f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.47f) }, { spanW, HEIGHT * 0.18f }, 0.58f, 0.17f, 0.14f, 0.88f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.36f) }, { spanW, HEIGHT * 0.16f }, 0.80f, 0.28f, 0.11f, 0.85f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.25f) }, { spanW, HEIGHT * 0.18f }, 0.53f, 0.18f, 0.10f, 0.70f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.11f) }, { spanW, HEIGHT * 0.22f }, 0.10f, 0.07f, 0.08f, 1.0f);
 
     // Sun + glow
     // Mild parallax for sun only (0.9x): keeps stability while adding depth.
     const float sunX = centerX + camDx * 0.9f + 320.0f;
-    const float sunY = MIN_Y + HEIGHT * 0.37f;
+    const float sunY = relY(0.37f);
     DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.34f, HEIGHT * 0.34f }, 1.00f, 0.48f, 0.18f, 0.28f);
     DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.18f, HEIGHT * 0.18f }, 1.00f, 0.62f, 0.24f, 0.58f);
     DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.09f, HEIGHT * 0.09f }, 1.00f, 0.79f, 0.35f, 0.95f);
@@ -3460,9 +3461,9 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
     for (int i = cloudMinI; i <= cloudMaxI; ++i)
     {
         const float x = cloudBase + i * 620.0f;
-        const float y1 = MIN_Y + HEIGHT * (0.78f - 0.02f * ((i + 30) % 4));
-        const float y2 = MIN_Y + HEIGHT * (0.66f - 0.02f * ((i + 11) % 5));
-        const float y3 = MIN_Y + HEIGHT * (0.56f - 0.015f * ((i + 7) % 6));
+        const float y1 = relY(0.78f - 0.02f * static_cast<float>((i + 30) % 4));
+        const float y2 = relY(0.66f - 0.02f * static_cast<float>((i + 11) % 5));
+        const float y3 = relY(0.56f - 0.015f * static_cast<float>((i + 7) % 6));
 
         DrawFilledQuad(colorShader, { x,          y1 }, { 520.0f, 52.0f }, 0.40f, 0.17f, 0.27f, 0.26f);
         DrawFilledQuad(colorShader, { x + 120.0f, y1 - 24.0f }, { 360.0f, 38.0f }, 0.33f, 0.13f, 0.24f, 0.20f);
@@ -3482,7 +3483,7 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
         const float x = midPx + i * 360.0f;
         const float h = 110.0f + static_cast<float>((i + 60) % 7) * 26.0f;
         const float w = 130.0f + static_cast<float>((i + 60) % 4) * 22.0f;
-        DrawFilledQuad(colorShader, { x, MIN_Y + HEIGHT * 0.13f + h * 0.5f }, { w, h }, 0.10f, 0.06f, 0.09f, 0.95f);
+        DrawFilledQuad(colorShader, { x, relY(0.13f) + h * 0.5f }, { w, h }, 0.10f, 0.06f, 0.09f, 0.95f);
     }
 
     // Near dark silhouette strip (foreground city/yard)
@@ -3493,7 +3494,7 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
     {
         const float x = nearPx + i * 210.0f;
         const float h = 86.0f + static_cast<float>((i + 100) % 5) * 20.0f;
-        DrawFilledQuad(colorShader, { x, MIN_Y + HEIGHT * 0.07f + h * 0.5f }, { 150.0f, h }, 0.07f, 0.05f, 0.06f, 1.0f);
+        DrawFilledQuad(colorShader, { x, relY(0.07f) + h * 0.5f }, { 150.0f, h }, 0.07f, 0.05f, 0.06f, 1.0f);
     }
 
     // Poles / masts
@@ -3503,7 +3504,7 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
     for (int i = poleMinI; i <= poleMaxI; ++i)
     {
         const float x = nearPx + i * 160.0f;
-        DrawFilledQuad(colorShader, { x, MIN_Y + HEIGHT * 0.22f },
+        DrawFilledQuad(colorShader, { x, relY(0.22f) },
                        { 10.0f, 170.0f + static_cast<float>((i + 80) % 3) * 36.0f },
                        0.06f, 0.04f, 0.05f, 0.94f);
     }

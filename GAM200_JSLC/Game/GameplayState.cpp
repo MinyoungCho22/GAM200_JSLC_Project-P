@@ -1009,7 +1009,15 @@ void GameplayState::Update(double dt)
     if (!m_trainAccessed)
         player.SetTrainEnemyUndetectable(false);
 
-    droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding, true, 1.f);
+    float tracerTrainAssist = 1.f;
+    if (m_trainAccessed && m_train)
+    {
+        constexpr float refSp = Train::TRAIN_SPEED;
+        const float     ratio =
+            (refSp > 0.f) ? std::clamp(m_train->GetTrainCurrentSpeed() / refSp, 0.f, 1.f) : 0.f;
+        tracerTrainAssist = 1.f + 0.22f * ratio;
+    }
+    droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding, true, 1.f, tracerTrainAssist);
 
     if (m_rooftopAccessed && !m_undergroundAccessed && !m_trainAccessed)
     {
@@ -1168,7 +1176,6 @@ void GameplayState::Update(double dt)
             m_isGameOver, m_rooftopAccessed || m_undergroundAccessed, isGodMode,
             (m_trainAccessed && m_train) ? m_train->GetDroneManager() : nullptr,
             (m_trainAccessed && m_train) ? m_train->GetSirenDroneManager() : nullptr,
-            nullptr,
             &trainStaticChainArcs,
             (m_trainAccessed && m_train) ? m_train->GetCarTransportDroneManager() : nullptr,
             (m_trainAccessed && m_train) ? m_train.get() : nullptr,
@@ -1229,9 +1236,19 @@ void GameplayState::Update(double dt)
         const float playerDrivenRight = player.GetPosition().x + playerLeadMargin;
         const float dynamicRight = (trainDrivenRight > playerDrivenRight) ? trainDrivenRight : playerDrivenRight;
 
-        m_camera.SetBounds(
-            { Train::MIN_X, Train::MIN_Y },
-            { dynamicRight, Train::MIN_Y + Train::HEIGHT });
+        // Match Camera::Update: it clamps using view half-height (GAME_HEIGHT/2), not zoom.
+        // Third_ThirdTrain (car index 4) only: allow vertical follow on container stacks / upper pipe.
+        constexpr float trainCamHalfH = GAME_HEIGHT * 0.5f;
+        const float     py              = player.GetPosition().y;
+        float           boundMinY       = Train::MIN_Y;
+        float           boundMaxY       = Train::MIN_Y + Train::HEIGHT;
+        if (m_train->GetPlayerTrainCarIndex(playerHbCenter) == 4)
+        {
+            boundMinY = std::min(Train::MIN_Y, py - trainCamHalfH);
+            boundMaxY = std::max(Train::MIN_Y + Train::HEIGHT, py + trainCamHalfH);
+        }
+
+        m_camera.SetBounds({ Train::MIN_X, boundMinY }, { dynamicRight, boundMaxY });
     }
 
     auto& hallwayDrones = m_hallway->GetDrones();
@@ -1367,6 +1384,9 @@ void GameplayState::Update(double dt)
             }
         }
     }
+
+    if (pulseManager)
+        pulseManager->SyncDetonationOriginToPlayer(player.GetHitboxCenter());
 
     // Update camera animation
     if (m_camera.IsAnimating())

@@ -572,6 +572,12 @@ void PulseManager::StartDetonationVFX(Math::Vec2 origin, float maxRadius,
         m_chainArcs.push_back({ from, to, 0.f });
 }
 
+void PulseManager::SyncDetonationOriginToPlayer(Math::Vec2 playerHitboxCenter)
+{
+    if (m_detonationActive)
+        m_detonationOrigin = playerHitboxCenter;
+}
+
 void PulseManager::DrawDetonationVFX(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     if (!m_detonationActive && m_chainArcs.empty())

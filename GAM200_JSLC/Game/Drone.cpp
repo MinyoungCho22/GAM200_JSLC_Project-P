@@ -441,9 +441,17 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         m_fallSpeed += 800.0f * static_cast<float>(dt);
         m_position.y -= m_fallSpeed * static_cast<float>(dt);
 
-        if (m_position.y < m_groundLevel + m_size.y / 2.0f)
+        float floorY = m_groundLevel + m_size.y / 2.0f;
+        // 기차 맵에서 스폰 지 m_groundLevel이 방/복도 값이면 즉시 엉뚱한 높이로 스냅됨 — 덱 높이로 착지.
+        if (m_position.x >= Train::MIN_X - 300.f && m_position.x < Train::MIN_X + 52000.f
+            && m_position.y >= Train::MIN_Y - 400.f && m_position.y <= Train::MIN_Y + Train::HEIGHT + 500.f)
         {
-            m_position.y = m_groundLevel + m_size.y / 2.0f;
+            floorY = Train::MIN_Y + 95.f + m_size.y / 2.0f;
+        }
+
+        if (m_position.y < floorY)
+        {
+            m_position.y = floorY;
             m_isHit              = false;
             m_isDead             = true;
             m_hitRotation        = 0.f;
@@ -562,8 +570,24 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
                 const float dist      = std::sqrt(std::max(1.f, distSq));
                 const float distBoost = 1.f + std::clamp((dist - 40.f) / 400.f, 0.f, 2.35f);
                 const float heatBoost = 1.f + 0.30f * static_cast<float>(m_tracerHeatLevel);
+                float       trainCatchUp = 1.f;
+                if (m_isTracer || trainCars123Chase)
+                {
+                    const Math::Vec2 ph       = player.GetHitboxCenter();
+                    const bool       onTrainW = ph.x >= Train::MIN_X - 400.f && ph.x <= Train::MIN_X + 52000.f
+                                          && ph.y >= Train::MIN_Y - 300.f
+                                          && ph.y <= Train::MIN_Y + Train::HEIGHT + 500.f
+                                          && m_position.x >= Train::MIN_X - 800.f
+                                          && m_position.x <= Train::MIN_X + 52000.f;
+                    if (onTrainW)
+                    {
+                        const float dx = ph.x - m_position.x;
+                        if (dx > 180.f)
+                            trainCatchUp += std::clamp((dx - 180.f) / 720.f, 0.f, 1.35f);
+                    }
+                }
                 m_direction           = toPlayer.GetNormalized();
-                targetVelocity        = m_direction * m_currentSpeed * chaseMul * distBoost * heatBoost;
+                targetVelocity        = m_direction * m_currentSpeed * chaseMul * distBoost * heatBoost * trainCatchUp;
 
                 m_searchRotation = 0.0f;
                 m_searchDir      = 1;

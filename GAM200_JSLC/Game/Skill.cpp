@@ -40,7 +40,6 @@ void PulseDetonateSkill::Update(
     bool                   isGodMode,
     DroneManager*          trainDM,
     DroneManager*          trainSirenDM,
-    const Math::Vec2*      trainDetonationOrigin,
     const std::vector<std::pair<Math::Vec2, Math::Vec2>>* extraChainArcs,
     DroneManager*          trainCarTransportDM,
     Train*                 trainMapForBranchArcs,
@@ -89,50 +88,40 @@ void PulseDetonateSkill::Update(
         allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
     }
 
-    // Train 드론은 전용 DroneManager에만 들어 있음. 차량 앵커가 없어도 항상 적용해야 함 (예전엔 앵커 없으면 스킵됐음).
-    Math::Vec2 vfxOrigin = playerCenter;
+    // Train 드론: 충격파·VFX는 항상 플레이어 중심(월드). 열차 앵커로 밀리면 이동 중 원이 어긋남.
     if (trainDM)
     {
-        const Math::Vec2 trainOrigin = trainDetonationOrigin ? *trainDetonationOrigin : playerCenter;
-        auto arcs = trainDM->ApplyDetonation(trainOrigin, SKILL_RADIUS, STUN_DURATION);
+        auto arcs = trainDM->ApplyDetonation(playerCenter, SKILL_RADIUS, STUN_DURATION);
         allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
-        if (trainDetonationOrigin)
-            vfxOrigin = *trainDetonationOrigin;
     }
     if (trainSirenDM)
     {
-        const Math::Vec2 trainOrigin = trainDetonationOrigin ? *trainDetonationOrigin : playerCenter;
-        auto arcs = trainSirenDM->ApplyDetonation(trainOrigin, SKILL_RADIUS, STUN_DURATION);
+        auto arcs = trainSirenDM->ApplyDetonation(playerCenter, SKILL_RADIUS, STUN_DURATION);
         allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
-        if (trainDetonationOrigin)
-            vfxOrigin = *trainDetonationOrigin;
     }
     if (trainCarTransportDM)
     {
-        const Math::Vec2 trainOrigin = trainDetonationOrigin ? *trainDetonationOrigin : playerCenter;
-        auto arcs = trainCarTransportDM->ApplyDetonation(trainOrigin, SKILL_RADIUS, STUN_DURATION);
+        auto arcs = trainCarTransportDM->ApplyDetonation(playerCenter, SKILL_RADIUS, STUN_DURATION);
         allArcs.insert(allArcs.end(), arcs.begin(), arcs.end());
-        if (trainDetonationOrigin)
-            vfxOrigin = *trainDetonationOrigin;
     }
 
     if (extraChainArcs && !extraChainArcs->empty())
         allArcs.insert(allArcs.end(), extraChainArcs->begin(), extraChainArcs->end());
 
     if (undergroundForPulseRobots)
-        undergroundForPulseRobots->ApplyPulseToRobots(vfxOrigin, SKILL_RADIUS);
+        undergroundForPulseRobots->ApplyPulseToRobots(playerCenter, SKILL_RADIUS);
 
     if (trainMapForBranchArcs)
     {
-        trainMapForBranchArcs->AppendCarTransportPulseBranchArcs(allArcs, vfxOrigin, SKILL_RADIUS);
-        trainMapForBranchArcs->ApplyPulseToTrainRobots(vfxOrigin, SKILL_RADIUS);
+        trainMapForBranchArcs->AppendCarTransportPulseBranchArcs(allArcs, playerCenter, SKILL_RADIUS);
+        trainMapForBranchArcs->ApplyPulseToTrainRobots(playerCenter, SKILL_RADIUS);
     }
 
-    pulseManager.StartDetonationVFX(vfxOrigin, SKILL_RADIUS, allArcs);
+    pulseManager.StartDetonationVFX(playerCenter, SKILL_RADIUS, allArcs);
 
     Logger::Instance().Log(Logger::Severity::Info,
         "Pulse Resonance Burst activated at (%.1f, %.1f)",
-        vfxOrigin.x, vfxOrigin.y);
+        playerCenter.x, playerCenter.y);
 }
 
 // ── UI text ──────────────────────────────────────────────────────────────────

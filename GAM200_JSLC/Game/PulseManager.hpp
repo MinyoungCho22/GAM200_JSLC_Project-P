@@ -31,6 +31,8 @@ public:
 
     void StartDetonationVFX(Math::Vec2 origin, float maxRadius,
                             const std::vector<std::pair<Math::Vec2, Math::Vec2>>& chainArcs = {});
+    /// 매 프레임 플레이어 중심에 맞춤(기차 이동·점프 중에도 원이 플레이어에 붙음)
+    void SyncDetonationOriginToPlayer(Math::Vec2 playerHitboxCenter);
     void DrawDetonationVFX(Shader& colorShader, DebugRenderer& debugRenderer) const;
 
 private:
