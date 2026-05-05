@@ -256,6 +256,16 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     Math::Vec2 currentHitboxCenter = player.GetHitboxCenter();
     Math::Vec2 playerHalfSize = playerHitboxSize / 2.0f;
 
+    auto resolveObsHorizontal = [&](const Math::Vec2& obsCenter, const Math::Vec2& obsMin,
+                                    const Math::Vec2& obsMax) {
+        Math::Vec2 n = currentHitboxCenter;
+        if (currentHitboxCenter.x < obsCenter.x)
+            n.x = obsMin.x - playerHalfSize.x;
+        else
+            n.x = obsMax.x + playerHalfSize.x;
+        return n;
+    };
+
     for (const auto& obs : m_obstacles)
     {
         if (Collision::CheckAABB(currentHitboxCenter, playerHitboxSize, obs.pos, obs.size))
@@ -276,10 +286,7 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
             // Resolve along the axis with the smallest overlap
             if (overlapX < overlapY)
             {
-                if (currentHitboxCenter.x < obs.pos.x)
-                    newHitboxCenter.x = obsMin.x - playerHalfSize.x;
-                else
-                    newHitboxCenter.x = obsMax.x + playerHalfSize.x;
+                newHitboxCenter = resolveObsHorizontal(obs.pos, obsMin, obsMax);
             }
             else
             {
@@ -287,14 +294,36 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
                 {
                     // Hit ceiling
                     newHitboxCenter.y = obsMin.y - playerHalfSize.y;
-                    player.ResetVelocity();
+                    player.ResetVerticalVelocity();
                 }
                 else
                 {
-                    // Landed on top
-                    newHitboxCenter.y = obsMax.y + playerHalfSize.y;
-                    player.ResetVelocity();
-                    player.SetOnGround(true);
+                    // Potential “land on top” — at ledge corners overlapY can beat overlapX and
+                    // snap the player forever; require enough foot width on the platform surface.
+                    const float platTop    = obsMax.y;
+                    const float feetY      = playerMin.y;
+                    const float horizOnObs = std::min(playerMax.x, obsMax.x) - std::max(playerMin.x, obsMin.x);
+                    constexpr float kMinTopSupportW = 22.0f;
+                    constexpr float kFeetAboveTopMax  = 60.0f;
+                    constexpr float kFeetBelowTopMax  = 28.0f;
+
+                    const bool nearTopSurface =
+                        feetY <= platTop + kFeetBelowTopMax && feetY >= platTop - kFeetAboveTopMax;
+
+                    if (nearTopSurface && horizOnObs >= kMinTopSupportW)
+                    {
+                        newHitboxCenter.y = platTop + playerHalfSize.y;
+                        player.SetOnGround(true);
+                    }
+                    else if (nearTopSurface && horizOnObs < kMinTopSupportW)
+                    {
+                        newHitboxCenter = resolveObsHorizontal(obs.pos, obsMin, obsMax);
+                    }
+                    else
+                    {
+                        newHitboxCenter.y = obsMax.y + playerHalfSize.y;
+                        player.SetOnGround(true);
+                    }
                 }
             }
 
@@ -335,7 +364,6 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
                 Math::Vec2 shift = { 0.0f, newCenterY - currentHitboxCenter.y };
                 player.SetPosition(player.GetPosition() + shift);
 
-                player.ResetVelocity();
                 player.SetOnGround(true);
                 currentHitboxCenter.y = newCenterY;
             }

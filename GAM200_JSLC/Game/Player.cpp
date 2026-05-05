@@ -356,8 +356,8 @@ void Player::Draw(const Shader& shader) const
     // Draw Sandevistan afterimage ghosts before the player (they appear behind)
     if (!m_afterimageGhosts.empty())
     {
-        // Purple tint
-        shader.setVec3("colorTint", 0.6f, 0.0f, 1.0f);
+        // Cyberpunk electric cyan tint
+        shader.setVec3("colorTint", 0.0f, 0.85f, 1.0f);
 
         for (const auto& ghost : m_afterimageGhosts)
         {

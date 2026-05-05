@@ -62,6 +62,8 @@ public:
     void SetCurrentGroundLevel(float newGroundLevel);
     float GetCurrentGroundLevel() const { return m_currentGroundLevel; }
     void ResetVelocity();
+    /// Stops vertical motion only (keeps horizontal speed — used after ledge/platform corrections).
+    void ResetVerticalVelocity() { velocity.y = 0.0f; }
     void SetOnGround(bool onGround);
     bool IsOnGround() const { return is_on_ground; }
 
