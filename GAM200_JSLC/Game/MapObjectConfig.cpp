@@ -259,7 +259,7 @@ MapObjectConfigData MapObjectConfig::DefaultData()
         { {0.0f, 0.0f}, {0.0f, 0.0f}, "Asset/Light.png", {} }
     };
 
-    data.subway.pulseSources = {
+    data.train.pulseSources = {
         { {1400.0f, 171.0f}, {270.0f, 258.0f}, "", {} },
         { {3759.0f, 84.0f}, {350.0f, 114.0f}, "", {} }
     };
@@ -399,25 +399,39 @@ bool MapObjectConfig::ParseFile()
             for (auto it = begin; it != end; ++it)
                 next.underground.robotSpawns.push_back(ParseVec2Direct(it->str(), {}));
         }
+
+        const std::string undergroundHidingArray = ExtractArrayByKey(undergroundObj, "hiding_spots");
+        if (!undergroundHidingArray.empty())
+        {
+            next.underground.hidingSpots.clear();
+            for (const auto& obj : SplitTopLevelObjectsInArray(undergroundHidingArray))
+            {
+                SpriteRectConfig fallback{};
+                fallback.spritePath = "Asset/HidingSpot.png";
+                next.underground.hidingSpots.push_back(ParseSpriteRect(obj, fallback));
+            }
+        }
     }
 
-    const std::string subwayObj = ExtractObjectByKey(text, "subway");
-    if (!subwayObj.empty())
+    const std::string trainObj = ExtractObjectByKey(text, "train");
+    const std::string legacySubwayObj = ExtractObjectByKey(text, "subway");
+    const std::string& trainObjRef = !trainObj.empty() ? trainObj : legacySubwayObj;
+    if (!trainObjRef.empty())
     {
-        const std::string obstacleArray = ExtractArrayByKey(subwayObj, "obstacles");
+        const std::string obstacleArray = ExtractArrayByKey(trainObjRef, "obstacles");
         if (!obstacleArray.empty())
         {
-            next.subway.obstacles.clear();
+            next.train.obstacles.clear();
             for (const auto& obj : SplitTopLevelObjectsInArray(obstacleArray))
-                next.subway.obstacles.push_back(ParseSpriteRect(obj, SpriteRectConfig{}));
+                next.train.obstacles.push_back(ParseSpriteRect(obj, SpriteRectConfig{}));
         }
 
-        const std::string pulseArray = ExtractArrayByKey(subwayObj, "pulse_sources");
+        const std::string pulseArray = ExtractArrayByKey(trainObjRef, "pulse_sources");
         if (!pulseArray.empty())
         {
-            next.subway.pulseSources.clear();
+            next.train.pulseSources.clear();
             for (const auto& obj : SplitTopLevelObjectsInArray(pulseArray))
-                next.subway.pulseSources.push_back(ParseSpriteRect(obj, SpriteRectConfig{}));
+                next.train.pulseSources.push_back(ParseSpriteRect(obj, SpriteRectConfig{}));
         }
     }
 

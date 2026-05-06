@@ -80,6 +80,7 @@ void Player::Init(Math::Vec2 startPos)
     position = startPos;
     velocity = Math::Vec2(0.0f, 0.0f);
     m_currentGroundLevel = GROUND_LEVEL;
+    m_trainEnemyUndetectable = false;
     can_double_jump = false;
     is_double_jumping = false;
 
@@ -136,6 +137,33 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
         return;
     }
 
+    if (m_movementLockedByTrain)
+    {
+        velocity                 = { 0.0f, 0.0f };
+        m_currentHorizontalSpeed = 0.0f;
+        if (m_trainForcedCar2Crouch)
+        {
+            is_crouching       = true;
+            m_currentAnimState = AnimationState::Crouching;
+            if (!m_crouchAnimationFinished)
+            {
+                m_animations[static_cast<int>(AnimationState::Crouching)].Update(fdt);
+                if (m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame >= 1)
+                {
+                    m_crouchAnimationFinished = true;
+                    m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame = 1;
+                    m_animations[static_cast<int>(AnimationState::Crouching)].timer = 0.0f;
+                }
+            }
+            else
+            {
+                m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame = 1;
+                m_animations[static_cast<int>(AnimationState::Crouching)].timer        = 0.0f;
+            }
+        }
+        return;
+    }
+
     if (velocity.y < 0.0f)
     {
         is_on_ground = false;
@@ -143,11 +171,14 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
 
     const float moveAxis = controls.GetMoveHorizontalAxis(input);
 
-    if (controls.IsActionTriggered(ControlAction::Jump, input)) Jump();
+    if (controls.IsActionTriggered(ControlAction::Jump, input) && !m_car2LeaveWalk) Jump();
 
-    if (input.IsCrouchHeld()) Crouch();
-    else StopCrouch();
-    if (controls.IsActionPressed(ControlAction::Dash, input)) Dash();
+    if (!m_car2LeaveWalk)
+    {
+        if (input.IsCrouchHeld()) Crouch();
+        else StopCrouch();
+    }
+    if (controls.IsActionPressed(ControlAction::Dash, input) && !m_car2LeaveWalk) Dash();
 
     if (m_isInvincible)
     {
@@ -184,7 +215,14 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
     // Horizontal movement with acceleration/deceleration.
     if (!is_dashing)
     {
-        if (moveAxis != 0.0f && !is_crouching)
+        if (m_car2LeaveWalk)
+        {
+            m_currentHorizontalSpeed = -m_car2LeaveWalkSpeed;
+            velocity.x               = m_currentHorizontalSpeed;
+            last_move_direction      = -1;
+            m_is_flipped             = true;
+        }
+        else if (moveAxis != 0.0f && !is_crouching)
         {
             float targetSpeed = moveAxis * m_maxSpeed;
             if (m_currentHorizontalSpeed < targetSpeed)
@@ -211,13 +249,18 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
                 m_currentHorizontalSpeed = (std::min)(0.0f, m_currentHorizontalSpeed + m_friction * fdt);
         }
 
-        velocity.x = m_currentHorizontalSpeed;
+        if (!m_car2LeaveWalk)
+            velocity.x = m_currentHorizontalSpeed;
     }
 
-    velocity.y += GRAVITY * fdt;
+    // 지면에 있을 때는 중력을 넣지 않음 — 그대로 두면 매 프레임 살짝 가라앉았다가 맵 충돌이 다시 올려 통통 튐 (열차 파이프 등)
+    if (!is_on_ground)
+        velocity.y += GRAVITY * fdt;
+    else
+        velocity.y = 0.0f;
 
     Math::Vec2 final_velocity = velocity;
-    if (is_dashing)
+    if (is_dashing && !m_car2LeaveWalk)
     {
         final_velocity.x = last_move_direction * dash_speed;
     }
@@ -341,6 +384,15 @@ void Player::Draw(const Shader& shader) const
                 ghostSize.x *= 0.7f;
             }
 
+            // Apply train-map size scale with bottom-align
+            if (m_sizeScale != 1.0f)
+            {
+                float oldHeight = ghostSize.y;
+                ghostSize.x *= m_sizeScale;
+                ghostSize.y *= m_sizeScale;
+                ghostPos.y -= (oldHeight - ghostSize.y) * 0.5f;
+            }
+
             Math::Matrix ghostModel = Math::Matrix::CreateTranslation(ghostPos) *
                                       Math::Matrix::CreateScale(ghostSize);
             shader.setMat4("model", ghostModel);
@@ -372,6 +424,15 @@ void Player::Draw(const Shader& shader) const
     Math::Vec2 drawPosition{};
     GetCurrentDrawTransform(drawPosition, drawSize);
 
+    // Apply train-map size scale with bottom-align
+    if (m_sizeScale != 1.0f)
+    {
+        float oldHeight = drawSize.y;
+        drawSize.x *= m_sizeScale;
+        drawSize.y *= m_sizeScale;
+        drawPosition.y -= (oldHeight - drawSize.y) * 0.5f;
+    }
+
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(drawSize);
     Math::Matrix transMatrix = Math::Matrix::CreateTranslation(drawPosition);
     Math::Matrix model = transMatrix * scaleMatrix;
@@ -380,14 +441,8 @@ void Player::Draw(const Shader& shader) const
     shader.setMat4("model", model);
     shader.setBool("flipX", m_is_flipped);
 
-    if (m_isHiding)
-    {
-        shader.setFloat("alpha", 0.5f);
-    }
-    else
-    {
-        shader.setFloat("alpha", 1.0f);
-    }
+    const float baseAlpha = m_isHiding ? 0.5f : 1.0f;
+    shader.setFloat("alpha", baseAlpha * m_spriteAlphaMul);
 
     const AnimationData& currentAnim = m_animations[static_cast<int>(m_currentAnimState)];
 
@@ -423,12 +478,21 @@ void Player::DrawOutline(const Shader& outlineShader) const
     Math::Vec2 drawPosition{};
     GetCurrentDrawTransform(drawPosition, drawSize);
 
+    // Apply train-map size scale with bottom-align
+    if (m_sizeScale != 1.0f)
+    {
+        float oldHeight = drawSize.y;
+        drawSize.x *= m_sizeScale;
+        drawSize.y *= m_sizeScale;
+        drawPosition.y -= (oldHeight - drawSize.y) * 0.5f;
+    }
+
     Math::Matrix model = Math::Matrix::CreateTranslation(drawPosition) * Math::Matrix::CreateScale(drawSize);
 
     outlineShader.use();
     outlineShader.setMat4("model", model);
     outlineShader.setBool("flipX", m_is_flipped);
-    outlineShader.setFloat("alpha", m_isHiding ? 0.5f : 1.0f);
+    outlineShader.setFloat("alpha", (m_isHiding ? 0.5f : 1.0f) * m_spriteAlphaMul);
     outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
     outlineShader.setFloat("outlineWidthTexels", 2.0f);
     outlineShader.setVec2("texelSize", 1.0f / static_cast<float>(currentAnim.frameWidth),
@@ -468,7 +532,7 @@ void Player::TakeDamage(float amount)
     m_isInvincible = true;
     m_invincibilityTimer = m_invincibilityDuration;
 
-    Logger::Instance().Log(Logger::Severity::Event, "Player took %.1f damage! Remaining pulse: %.1f",
+    Logger::Instance().Log(Logger::Severity::Verbose, "Player took %.1f damage! Remaining pulse: %.1f",
         amount, m_pulseCore.getPulse().Value());
 }
 
@@ -540,12 +604,17 @@ void Player::Jump()
         is_on_ground = false;
         can_double_jump = true;
         is_double_jumping = false;
+        // D(오른쪽) 입력이 있을 때 점프에 수평 보조 — 열차/지면 공통
+        if (last_move_direction > 0)
+            velocity.x = (std::max)(velocity.x, 300.f);
     }
     else if (can_double_jump && !is_crouching)
     {
         velocity.y = jump_velocity;
         can_double_jump = false;
         is_double_jumping = true;
+        if (last_move_direction > 0)
+            velocity.x = (std::max)(velocity.x, 280.f);
     }
 }
 
@@ -555,6 +624,9 @@ void Player::Crouch()
     {
         is_crouching = true;
         m_crouchAnimationFinished = false;
+
+        m_currentHorizontalSpeed = 0.0f;
+        velocity.x = 0.0f;
 
         m_currentAnimState = AnimationState::Crouching;
         m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame = 0;
@@ -567,6 +639,29 @@ void Player::StopCrouch()
     if (is_crouching)
     {
         is_crouching = false;
+        m_crouchAnimationFinished = false;
+    }
+}
+
+void Player::SetTrainCar2ForcedCrouch(bool on)
+{
+    if (on)
+    {
+        if (m_trainForcedCar2Crouch)
+            return;
+        m_trainForcedCar2Crouch = true;
+        is_crouching              = true;
+        m_crouchAnimationFinished = false;
+        m_currentAnimState        = AnimationState::Crouching;
+        m_animations[static_cast<int>(AnimationState::Crouching)].currentFrame = 0;
+        m_animations[static_cast<int>(AnimationState::Crouching)].timer        = 0.0f;
+    }
+    else
+    {
+        if (!m_trainForcedCar2Crouch)
+            return;
+        m_trainForcedCar2Crouch = false;
+        is_crouching              = false;
         m_crouchAnimationFinished = false;
     }
 }
@@ -590,6 +685,8 @@ void Player::Revive(float newPulse)
     m_pulseCore.getPulse().set(newPulse);
     velocity = { 0.0f, 0.0f };
     m_currentHorizontalSpeed = 0.0f;
+    m_car2LeaveWalk           = false;
+    m_trainForcedCar2Crouch   = false;
     is_dashing = false;
     dash_timer = 0.0f;
     is_crouching = false;
@@ -615,7 +712,8 @@ void Player::SetCurrentGroundLevel(float newGroundLevel)
 
 void Player::ResetVelocity()
 {
-    velocity = Math::Vec2(0.0f, 0.0f);
+    velocity                 = Math::Vec2(0.0f, 0.0f);
+    m_currentHorizontalSpeed = 0.0f;
 }
 
 void Player::SetOnGround(bool onGround)

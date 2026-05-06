@@ -10,6 +10,7 @@
 #include "../Engine/Collision.hpp"
 #include "MapObjectConfig.hpp"
 #include <algorithm>
+#include <cmath>
 #include <unordered_map>
 #include <vector>
 
@@ -31,6 +32,7 @@ void Underground::ReapplyEntryTracerDroneAfterLiveState()
     Drone& entryTracer = drones[0];
     entryTracer.SetMaxHP(kUndergroundEntryTracerMaxHp);
     entryTracer.SetHP(kUndergroundEntryTracerMaxHp);
+    entryTracer.SetTracerHeatLevel(0);
 }
 
 void Underground::Initialize()
@@ -51,6 +53,7 @@ void Underground::Initialize()
         entryTracer.SetBaseSpeed(55.0f);
         entryTracer.SetMaxHP(kUndergroundEntryTracerMaxHp);
         entryTracer.SetHP(kUndergroundEntryTracerMaxHp);
+        entryTracer.SetTracerHeatLevel(0);
     }
     // First patrol drone: shifted left toward robot patrol (~18.2k)
     m_droneManager->SpawnDrone({ 18470.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(180.0f);
@@ -84,12 +87,19 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
     m_lights.clear();
     m_ramps.clear();
     m_robots.clear();
+    m_hidingSpots.clear();
 
     for (const auto& spawn : cfg.robotSpawns)
     {
         m_robots.emplace_back();
-        m_robots.back().Init(spawn);
-        m_robots.back().ApplyUndergroundDifficultyBoost();
+        Robot& r = m_robots.back();
+        r.Init(spawn);
+        r.ApplyUndergroundDifficultyBoost();
+        const float floorY = MIN_Y + 75.0f;
+        r.SetGroundLimitY(floorY);
+        const Math::Vec2 p = r.GetPosition();
+        r.SetPosition({ p.x, floorY + r.GetSize().y * 0.5f });
+        r.SetSpawnPosition(r.GetPosition());
     }
 
     for (const auto& o : cfg.lights)
@@ -137,6 +147,13 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
             obs.sprite->Initialize(o.spritePath.c_str());
         }
         m_obstacles.push_back(std::move(obs));
+    }
+
+    for (const auto& h : cfg.hidingSpots)
+    {
+        float cx = MIN_X + h.topLeft.x + h.size.x * 0.5f;
+        float cy = MIN_Y + (HEIGHT - h.topLeft.y) - h.size.y * 0.5f;
+        m_hidingSpots.push_back({ { cx, cy }, h.size });
     }
 
     const auto& pulses = cfg.pulseSources;
@@ -223,7 +240,9 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
 
 void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
 {
-    m_droneManager->Update(dt, player, playerHitboxSize, false);
+    const bool hide =
+        IsPlayerHiding(player.GetHitboxCenter(), playerHitboxSize, player.IsCrouching());
+    m_droneManager->Update(dt, player, playerHitboxSize, hide, true, 1.f);
 
     // Prep obstacle info for robot AI pathfinding/collision
     std::vector<ObstacleInfo> obstacleInfos;
@@ -242,6 +261,16 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     // --- Player vs Obstacle Collision Resolution (AABB) ---
     Math::Vec2 currentHitboxCenter = player.GetHitboxCenter();
     Math::Vec2 playerHalfSize = playerHitboxSize / 2.0f;
+
+    auto resolveObsHorizontal = [&](const Math::Vec2& obsCenter, const Math::Vec2& obsMin,
+                                    const Math::Vec2& obsMax) {
+        Math::Vec2 n = currentHitboxCenter;
+        if (currentHitboxCenter.x < obsCenter.x)
+            n.x = obsMin.x - playerHalfSize.x;
+        else
+            n.x = obsMax.x + playerHalfSize.x;
+        return n;
+    };
 
     for (const auto& obs : m_obstacles)
     {
@@ -263,10 +292,7 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
             // Resolve along the axis with the smallest overlap
             if (overlapX < overlapY)
             {
-                if (currentHitboxCenter.x < obs.pos.x)
-                    newHitboxCenter.x = obsMin.x - playerHalfSize.x;
-                else
-                    newHitboxCenter.x = obsMax.x + playerHalfSize.x;
+                newHitboxCenter = resolveObsHorizontal(obs.pos, obsMin, obsMax);
             }
             else
             {
@@ -274,14 +300,36 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
                 {
                     // Hit ceiling
                     newHitboxCenter.y = obsMin.y - playerHalfSize.y;
-                    player.ResetVelocity();
+                    player.ResetVerticalVelocity();
                 }
                 else
                 {
-                    // Landed on top
-                    newHitboxCenter.y = obsMax.y + playerHalfSize.y;
-                    player.ResetVelocity();
-                    player.SetOnGround(true);
+                    // Potential “land on top” — at ledge corners overlapY can beat overlapX and
+                    // snap the player forever; require enough foot width on the platform surface.
+                    const float platTop    = obsMax.y;
+                    const float feetY      = playerMin.y;
+                    const float horizOnObs = std::min(playerMax.x, obsMax.x) - std::max(playerMin.x, obsMin.x);
+                    constexpr float kMinTopSupportW = 22.0f;
+                    constexpr float kFeetAboveTopMax  = 60.0f;
+                    constexpr float kFeetBelowTopMax  = 28.0f;
+
+                    const bool nearTopSurface =
+                        feetY <= platTop + kFeetBelowTopMax && feetY >= platTop - kFeetAboveTopMax;
+
+                    if (nearTopSurface && horizOnObs >= kMinTopSupportW)
+                    {
+                        newHitboxCenter.y = platTop + playerHalfSize.y;
+                        player.SetOnGround(true);
+                    }
+                    else if (nearTopSurface && horizOnObs < kMinTopSupportW)
+                    {
+                        newHitboxCenter = resolveObsHorizontal(obs.pos, obsMin, obsMax);
+                    }
+                    else
+                    {
+                        newHitboxCenter.y = obsMax.y + playerHalfSize.y;
+                        player.SetOnGround(true);
+                    }
                 }
             }
 
@@ -322,11 +370,62 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
                 Math::Vec2 shift = { 0.0f, newCenterY - currentHitboxCenter.y };
                 player.SetPosition(player.GetPosition() + shift);
 
-                player.ResetVelocity();
                 player.SetOnGround(true);
                 currentHitboxCenter.y = newCenterY;
             }
         }
+    }
+
+    if (player.IsOnGround() && player.GetVelocity().y <= 1.f)
+    {
+        currentHitboxCenter = player.GetHitboxCenter();
+        playerHalfSize      = playerHitboxSize * 0.5f;
+        const float footY   = currentHitboxCenter.y - playerHalfSize.y;
+        const float footX   = currentHitboxCenter.x;
+        const float footL   = currentHitboxCenter.x - playerHalfSize.x;
+        const float footR   = currentHitboxCenter.x + playerHalfSize.x;
+        constexpr float kTol = 20.f;
+
+        bool supported = false;
+        const float     gl = player.GetCurrentGroundLevel();
+        if (footY >= gl - 28.f && footY <= gl + 32.f)
+            supported = true;
+
+        for (const auto& obs : m_obstacles)
+        {
+            const float halfW = obs.size.x * 0.5f;
+            const float halfH = obs.size.y * 0.5f;
+            const float top   = obs.pos.y + halfH;
+            const float ol    = obs.pos.x - halfW;
+            const float orr   = obs.pos.x + halfW;
+            if (footR > ol + 4.f && footL < orr - 4.f && std::abs(footY - top) <= kTol)
+            {
+                supported = true;
+                break;
+            }
+        }
+
+        for (const auto& ramp : m_ramps)
+        {
+            float        rampHalfW = ramp.size.x / 2.0f;
+            float        rampHalfH = ramp.size.y / 2.0f;
+            const float  rampLeft  = ramp.pos.x - rampHalfW;
+            const float  rampRight = ramp.pos.x + rampHalfW;
+            const float  rampBottom = ramp.pos.y - rampHalfH;
+            if (footX >= rampLeft && footX <= rampRight && ramp.size.x > 1.f)
+            {
+                const float localX   = (footX - rampLeft) / ramp.size.x;
+                const float targetY  = rampBottom + (localX * ramp.size.y);
+                if (std::abs(footY - targetY) <= kTol + 12.f)
+                {
+                    supported = true;
+                    break;
+                }
+            }
+        }
+
+        if (!supported)
+            player.SetOnGround(false);
     }
 }
 
@@ -407,6 +506,53 @@ void Underground::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) c
         debugRenderer.DrawBox(colorShader, ramp.pos, ramp.size, { 1.0f, 1.0f });
     }
 
+}
+
+void Underground::ApplyPulseToRobots(Math::Vec2 pulseWorldCenter, float radius)
+{
+    constexpr float kDamage            = 14.f;
+    constexpr float kImpulseCenter     = 900.f;
+    constexpr float kImpulseEdge       = 400.f;
+    constexpr float kRobotImpulseScale = 0.48f;
+    constexpr float kLift              = 135.f;
+
+    const float rSq = radius * radius;
+    for (auto& robot : m_robots)
+    {
+        if (robot.IsDead())
+            continue;
+        const Math::Vec2 pos = robot.GetPosition();
+        Math::Vec2       d   = pos - pulseWorldCenter;
+        const float      dSq = d.LengthSq();
+        if (dSq > rSq)
+            continue;
+        const float dist = std::sqrt(dSq);
+        float       t    = (dist < 0.1f) ? 1.f : (1.f - dist / (radius + 1.f));
+        t                = (std::max)(0.f, t);
+        const float      impulseMag = t * (kImpulseCenter - kImpulseEdge) + kImpulseEdge;
+        const Math::Vec2 dir        = (dist > 0.1f) ? (d * (1.f / dist)) : Math::Vec2{ 1.f, 0.f };
+        const Math::Vec2 impulse    = dir * (impulseMag * kRobotImpulseScale) + Math::Vec2{ 0.f, kLift };
+        robot.ApplyPulseImpact(impulse, kDamage);
+    }
+}
+
+bool Underground::IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize,
+                                 bool isPlayerCrouching) const
+{
+    if (!isPlayerCrouching || m_hidingSpots.empty())
+        return false;
+    for (const auto& hv : m_hidingSpots)
+    {
+        if (Collision::CheckAABB(playerHbCenter, playerHitboxSize, hv.center, hv.size))
+            return true;
+    }
+    return false;
+}
+
+void Underground::RefillPulseSourcesAfterCheckpointRespawn()
+{
+    for (auto& s : m_pulseSources)
+        s.RefillStock();
 }
 
 void Underground::Shutdown()

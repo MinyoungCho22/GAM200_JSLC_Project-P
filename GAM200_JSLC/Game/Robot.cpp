@@ -118,6 +118,24 @@ void Robot::ApplyUndergroundDifficultyBoost()
     m_windupTime = (std::max)(0.05f, m_windupTime - kWindupReduction);
 }
 
+void Robot::ApplyTrainEncounterDifficulty()
+{
+    constexpr float kHpMul = 3.0f;
+    m_maxHp *= kHpMul;
+    m_hp *= kHpMul;
+    m_patrolSpeed = 92.f;
+    m_chaseSpeed  = 168.f;
+    m_windupTime  = (std::max)(0.05f, m_windupTime - 0.3f);
+}
+
+void Robot::ApplyTrainBerserkerProfile()
+{
+    m_chaseSpeed           = 252.f;
+    m_patrolSpeed          = 120.f;
+    m_trainBlindAggro      = true;
+    m_trainBlindSweepTimer = 0.55f;
+}
+
 void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& obstacles, float mapMinX, float mapMaxX)
 {
     if (m_state == RobotState::Dead) return;
@@ -131,16 +149,47 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         m_staggerCooldown -= fDt;
     }
 
+    m_trainDetectAlertTimer = std::max(0.f, m_trainDetectAlertTimer - fDt);
+
     Math::Vec2 playerPos = player.GetPosition();
+    const bool trainNoDetect = player.IsTrainEnemyUndetectable() && m_trainCarSegment > 0;
+    if (trainNoDetect && m_state == RobotState::Chase)
+        m_state = RobotState::Patrol;
+
     float distToPlayer = std::abs(playerPos.x - m_position.x);
     float heightDiff = std::abs(playerPos.y - m_position.y);
+    const float detHeight = (m_trainDeckPatrol || m_trainCarSegment > 0) ? 520.f : 300.f;
 
     // FSM State Logic
     switch (m_state)
     {
     case RobotState::Patrol:
+        if (m_trainBlindAggro && !trainNoDetect)
+        {
+            m_directionX = (playerPos.x > m_position.x) ? 1.0f : -1.0f;
+            m_velocity.x = m_directionX * m_chaseSpeed;
+
+            m_trainBlindSweepTimer -= fDt;
+            if (m_trainBlindSweepTimer <= 0.f && m_attackCooldownTimer <= 0.f)
+            {
+                m_trainBlindSweepTimer = 1.9f;
+                DecideAttackPattern();
+                m_state            = RobotState::Windup;
+                m_stateTimer       = m_windupTime;
+                m_velocity.x       = 0.f;
+                m_hasDealtDamage   = false;
+            }
+            break;
+        }
         // Reverse direction at patrol boundaries
-        if (m_position.x > m_spawnX + PATROL_RANGE)
+        if (m_usePatrolWorldClamp)
+        {
+            if (m_position.x >= m_patrolWorldMaxX - 35.f)
+                m_directionX = -1.0f;
+            else if (m_position.x <= m_patrolWorldMinX + 35.f)
+                m_directionX = 1.0f;
+        }
+        else if (m_position.x > m_spawnX + PATROL_RANGE)
         {
             m_directionX = -1.0f;
         }
@@ -151,10 +200,11 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         m_velocity.x = m_directionX * m_patrolSpeed;
 
         // Transition to Chase if player is detected
-        if (distToPlayer < DETECTION_RANGE && heightDiff < 300.0f)
+        if (!trainNoDetect && distToPlayer < DETECTION_RANGE && heightDiff < detHeight)
         {
-            m_state = RobotState::Chase;
-            Logger::Instance().Log(Logger::Severity::Event, "Robot detected Player! Starting Chase.");
+            m_state                     = RobotState::Chase;
+            m_trainDetectAlertTimer     = 0.95f;
+            Logger::Instance().Log(Logger::Severity::Verbose, "Robot detected Player! Starting Chase.");
         }
         break;
 
@@ -177,9 +227,25 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
                 m_velocity.x = 0.0f;
             }
         }
-        else if (distToPlayer > DETECTION_RANGE)
+        else
         {
-            m_state = RobotState::Patrol;
+            if (m_trainBlindAggro && !trainNoDetect)
+            {
+                m_trainBlindSweepTimer -= fDt;
+                if (m_trainBlindSweepTimer <= 0.f && m_attackCooldownTimer <= 0.f)
+                {
+                    m_trainBlindSweepTimer = 1.45f;
+                    DecideAttackPattern();
+                    m_state          = RobotState::Windup;
+                    m_stateTimer     = m_windupTime;
+                    m_velocity.x     = 0.f;
+                    m_hasDealtDamage = false;
+                }
+            }
+            else if (distToPlayer > DETECTION_RANGE)
+            {
+                m_state = RobotState::Patrol;
+            }
         }
         break;
 
@@ -198,7 +264,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             m_state = RobotState::Attack;
             m_stateTimer = ATTACK_DURATION;
             m_hasPlayedAttackSound = false;
-            Logger::Instance().Log(Logger::Severity::Event, "Robot Attack! Type: %d", (int)m_currentAttack);
+            Logger::Instance().Log(Logger::Severity::Verbose, "Robot Attack! Type: %d", (int)m_currentAttack);
         }
         break;
 
@@ -235,11 +301,12 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
                 attackBoxPos = { m_position.x, m_position.y + m_size.y / 2.0f - 75.0f };
             }
 
-            if (Collision::CheckAABB(player.GetHitboxCenter(), player.GetHitboxSize(), attackBoxPos, attackBoxSize))
+            if (m_allowTrainCombatVsPlayer
+                && Collision::CheckAABB(player.GetHitboxCenter(), player.GetHitboxSize(), attackBoxPos, attackBoxSize))
             {
                 player.TakeDamage(20.0f);
                 m_hasDealtDamage = true;
-                Logger::Instance().Log(Logger::Severity::Event, "Player Hit by Robot (Inside Attack Box)!");
+                Logger::Instance().Log(Logger::Severity::Verbose, "Player Hit by Robot (Inside Attack Box)!");
             }
         }
 
@@ -260,7 +327,18 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
 
     case RobotState::Stagger:
-        m_velocity.x = 0.0f;
+        if (m_horzExternalImpulseTimer > 0.0f)
+        {
+            m_horzExternalImpulseTimer -= fDt;
+            const float drag = std::pow(0.11f, fDt / 0.58f);
+            m_velocity.x *= drag;
+            if (std::abs(m_velocity.x) < 12.f)
+                m_velocity.x = 0.0f;
+        }
+        else
+        {
+            m_velocity.x = 0.0f;
+        }
         if (m_stateTimer <= 0.0f)
         {
             m_state = RobotState::Chase;
@@ -273,8 +351,8 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
     }
 
-    // Apply gravity
-    m_velocity.y += GRAVITY * fDt;
+    // Ground-only movement (no gravity, vault jump, or climbing onto obstacles).
+    m_velocity.y = 0.0f;
 
     // Map boundary constraints
     Math::Vec2 nextPos = m_position;
@@ -290,81 +368,28 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         if (m_state == RobotState::Patrol || m_state == RobotState::Retreat) m_directionX = -1.0f;
     }
 
-    // Obstacle collision detection (horizontal)
-    // Only check if we're actually moving and not already colliding
-    bool canMove = true;
+    // Obstacle collision detection (horizontal only)
     if (std::abs(m_velocity.x) > 0.1f)
     {
         for (const auto& obs : obstacles)
         {
-            // Check if current position is NOT colliding
             bool currentlyColliding = Collision::CheckAABB(m_position, m_size, obs.pos, obs.size);
-            
-            // Check if next position WOULD collide
             Math::Vec2 testPos = { nextPos.x, m_position.y };
             bool wouldCollide = Collision::CheckAABB(testPos, m_size, obs.pos, obs.size);
-            
-            // Only block movement if we're not currently colliding but would collide
+
             if (!currentlyColliding && wouldCollide)
             {
-                canMove = false;
                 nextPos.x = m_position.x;
-                
-                // Reverse direction if in Patrol or Retreat state
                 if (m_state == RobotState::Patrol || m_state == RobotState::Retreat)
-                {
                     m_directionX = -m_directionX;
-                }
                 break;
             }
         }
     }
 
     m_position.x = nextPos.x;
-
-    // Ground collision
-    m_isOnGround = false;
-    nextPos = m_position;
-    nextPos.y += m_velocity.y * fDt;
-
-    float groundLimit = -1910.0f;
-    if (nextPos.y - m_size.y / 2.0f < groundLimit)
-    {
-        nextPos.y = groundLimit + m_size.y / 2.0f;
-        m_velocity.y = 0.0f;
-        m_isOnGround = true;
-    }
-
-    // Obstacle collision detection (vertical)
-    for (const auto& obs : obstacles)
-    {
-        // Use a slightly smaller hitbox for vertical collision to prevent jittering
-        Math::Vec2 adjustedSize = { m_size.x * 0.9f, m_size.y };
-        
-        if (Collision::CheckAABB(nextPos, adjustedSize, obs.pos, obs.size))
-        {
-            // Check if robot is falling onto obstacle (landing on top)
-            if (m_velocity.y < 0.0f && m_position.y > obs.pos.y + obs.size.y / 2.0f)
-            {
-                // Land on top of obstacle with small buffer
-                float buffer = 1.0f;
-                nextPos.y = obs.pos.y + obs.size.y / 2.0f + m_size.y / 2.0f + buffer;
-                m_velocity.y = 0.0f;
-                m_isOnGround = true;
-            }
-            // Check if robot is jumping into obstacle from below
-            else if (m_velocity.y > 0.0f && m_position.y < obs.pos.y - obs.size.y / 2.0f)
-            {
-                // Hit obstacle from below with small buffer
-                float buffer = 1.0f;
-                nextPos.y = obs.pos.y - obs.size.y / 2.0f - m_size.y / 2.0f - buffer;
-                m_velocity.y = 0.0f;
-            }
-            break;
-        }
-    }
-
-    m_position.y = nextPos.y;
+    m_position.y = m_groundLimitY + m_size.y / 2.0f;
+    m_isOnGround = true;
 }
 
 void Robot::DecideAttackPattern()
@@ -532,31 +557,71 @@ void Robot::DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const
     }
 }
 
-void Robot::TakeDamage(float amount)
+void Robot::DrawTrainDetectAlert(Shader& colorShader, DebugRenderer& debugRenderer) const
+{
+    if (m_state == RobotState::Dead || m_trainDetectAlertTimer <= 0.f)
+        return;
+
+    const float bob  = std::sin(m_trainDetectAlertTimer * 14.f) * 6.f;
+    const float topY = m_position.y + m_size.y * 0.5f + 95.f + bob;
+    const Math::Vec2 markCenter{ m_position.x, topY };
+
+    debugRenderer.DrawBox(colorShader, markCenter, { 40.f, 46.f }, 0.1f, 0.1f, 0.1f);
+    debugRenderer.DrawBox(colorShader, { markCenter.x, markCenter.y + 10.f }, { 9.f, 26.f }, 1.0f, 0.85f, 0.05f);
+    debugRenderer.DrawBox(colorShader, { markCenter.x, markCenter.y - 12.f }, { 11.f, 11.f }, 1.0f, 0.85f, 0.05f);
+}
+
+void Robot::TakeDamage(float amount, bool applyStagger)
 {
     if (m_state == RobotState::Dead) return;
 
     m_hp -= amount;
 
-    // Apply stagger if not on cooldown
-    if (m_staggerCooldown <= 0.0f)
+    if (applyStagger && m_staggerCooldown <= 0.0f)
     {
         m_state = RobotState::Stagger;
         m_stateTimer = 0.3f;
         m_staggerCooldown = STAGGER_COOLDOWN_DURATION;
-        Logger::Instance().Log(Logger::Severity::Event, "Robot Staggered!");
+        Logger::Instance().Log(Logger::Severity::Verbose, "Robot Staggered!");
     }
 
     if (m_hp <= 0.0f)
     {
         m_hp = 0.0f;
         m_state = RobotState::Dead;
-        Logger::Instance().Log(Logger::Severity::Event, "Sweep Stalker Destroyed!");
+        Logger::Instance().Log(Logger::Severity::Verbose, "Sweep Stalker Destroyed!");
     }
+}
+
+void Robot::ApplyPulseImpact(Math::Vec2 impulse, float damage)
+{
+    if (m_state == RobotState::Dead)
+        return;
+    m_velocity.x += impulse.x;
+    m_velocity.y = 0.f;
+    m_horzExternalImpulseTimer = 0.58f;
+    m_hp -= damage;
+    if (m_hp <= 0.0f)
+    {
+        m_hp                = 0.0f;
+        m_state             = RobotState::Dead;
+        m_horzExternalImpulseTimer = 0.f;
+        Logger::Instance().Log(Logger::Severity::Verbose, "Sweep Stalker Destroyed!");
+        return;
+    }
+    m_state             = RobotState::Stagger;
+    m_stateTimer        = 0.55f;
+    m_staggerCooldown   = STAGGER_COOLDOWN_DURATION;
 }
 
 void Robot::Reset()
 {
+    const int   trainSeg    = m_trainCarSegment;
+    const bool  deckPatrol  = m_trainDeckPatrol;
+    const float trainGround = m_groundLimitY;
+    const bool  blindKeep   = m_trainBlindAggro;
+
+    m_groundLimitY          = -1910.0f;
     m_position              = m_spawnPos;
     m_velocity              = { 0.0f, 0.0f };
     m_hp                    = m_maxHp;  // preserves difficulty boost
@@ -569,7 +634,28 @@ void Robot::Reset()
     m_attackCooldownTimer   = 0.0f;
     m_staggerCooldown       = 0.0f;
     m_hasDealtDamage        = false;
+    m_horzExternalImpulseTimer = 0.f;
     m_isOnGround            = false;
+    m_hasPlayedAttackSound  = false;
+    m_trainCarSegment          = 0;
+    m_trainDeckPatrol          = false;
+    m_usePatrolWorldClamp      = false;
+    m_allowTrainCombatVsPlayer = true;
+    m_trainDetectAlertTimer    = 0.f;
+    m_trainBlindAggro          = false;
+    m_trainBlindSweepTimer     = 0.f;
+
+    m_groundLimitY = trainGround;
+
+    if (trainSeg > 0)
+    {
+        m_trainCarSegment         = trainSeg;
+        m_trainDeckPatrol         = deckPatrol;
+        m_allowTrainCombatVsPlayer = true;
+        m_trainBlindAggro          = blindKeep;
+        if (blindKeep)
+            m_trainBlindSweepTimer = 0.55f;
+    }
 }
 
 void Robot::Shutdown()

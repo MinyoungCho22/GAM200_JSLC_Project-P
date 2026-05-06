@@ -47,12 +47,14 @@ struct UndergroundObjectConfig
     std::vector<SpriteRectConfig> obstacles{};
     std::vector<SpriteRectConfig> pulseSources{};
     std::vector<SpriteRectConfig> ramps{};
+    /// 웅크리고 안에 있으면 추적 드론이 플레이어를 감지하지 못함 (맵 좌표는 obstacles와 동일 규칙)
+    std::vector<SpriteRectConfig> hidingSpots{};
     /// Decorative sprites (e.g. top light strip); same `top_left` / `size` / `sprite` as obstacles.
     std::vector<SpriteRectConfig> lights{};
     std::vector<Math::Vec2> robotSpawns{};
 };
 
-struct SubwayObjectConfig
+struct TrainObjectConfig
 {
     std::vector<SpriteRectConfig> obstacles{};
     std::vector<SpriteRectConfig> pulseSources{};
@@ -64,6 +66,6 @@ struct MapObjectConfigData
     HallwayObjectConfig hallway{};
     RooftopObjectConfig rooftop{};
     UndergroundObjectConfig underground{};
-    SubwayObjectConfig subway{};
+    TrainObjectConfig train{};
 };
 

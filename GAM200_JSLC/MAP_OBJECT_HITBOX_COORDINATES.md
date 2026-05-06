@@ -80,18 +80,18 @@ Top-Left 기준
 | Drone Spawn 2 | (22203.0, -1450.0) | 드론 스폰 |
 | Drone Spawn 3 | (22787.0, -1450.0) | 드론 스폰 |
 
-## Subway
+## Train
 
 <!-- 지하철 맵: 현재 펄스 소스만 배치, 장애물은 코드상 미배치 -->
 
 | 오브젝트 | Raw Position (x, y) | Size (w, h) | 비고 |
 |---|---:|---:|---|
-| Subway Map Bounds | (24180.0, -3500.0) | (7920.0, 1080.0) | `Subway::MIN_X`, `Subway::MIN_Y` |
+| Train Map Bounds | (24180.0, -3500.0) | (7920.0, 1080.0) | `Train::MIN_X`, `Train::MIN_Y` |
 | Pulse Source 1 | (1400.0, 171.0) | (270.0, 258.0) | `AddPulseSource` 입력값 |
 | Pulse Source 2 | (3759.0, 84.0) | (350.0, 114.0) | `AddPulseSource` 입력값 |
 
-### Subway Enemy Spawn Reference
+### Train Enemy Spawn Reference
 
 <!-- 현재 코드 기준 로봇/드론 스폰 없음 -->
 
-- 현재 `Subway::Initialize()`에서 로봇/드론 스폰 코드는 없음.
+- 현재 `Train::Initialize()`에서 로봇/드론 스폰 코드는 없음.

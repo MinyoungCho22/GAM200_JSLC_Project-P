@@ -21,7 +21,8 @@
 #include "Tutorial.hpp"
 #include "StoryDialogue.hpp"
 #include "Underground.hpp"
-#include "Subway.hpp"
+#include "Train.hpp"
+#include "Skill.hpp"
 #include <memory>
 #include <vector>
 
@@ -31,10 +32,10 @@ class Background;
 class Shader;
 class GameStateManager;
 
-enum class MapZone { Room, Hallway, Rooftop, Underground, Subway };
+enum class MapZone { Room, Hallway, Rooftop, Underground, Train };
 
 enum class FadeState { None, FadingOut, FadingIn };
-enum class PendingTransition { None, RoomToHallway, HallwayToRooftop, RooftopToUnderground, UndergroundToSubway };
+enum class PendingTransition { None, RoomToHallway, HallwayToRooftop, RooftopToUnderground, UndergroundToTrain };
 
 class GameplayState : public GameState
 {
@@ -58,7 +59,7 @@ private:
     void ApplyHallwayCameraBounds();
     void HandleHallwayToRooftopTransition();
     void HandleRooftopToUndergroundTransition();
-    void HandleUndergroundToSubwayTransition();
+    void HandleUndergroundToTrainTransition();
     Math::Vec2 ScreenToWorldCoordinates(double screenX, double screenY) const;
     void WorldToFramebuffer(Math::Vec2 world, double& outFbX, double& outFbY) const;
     void ApplyGamepadDroneTargetingAssist(double dt, Input::Input& input, Math::Vec2& inOutMouseWorldPos);
@@ -103,14 +104,15 @@ private:
     bool m_rooftopLiftStoryDone = false;
     bool m_hallwayFaradayBoxStoryDone = false;
     std::unique_ptr<Underground> m_underground;
-    std::unique_ptr<Subway> m_subway;
+    std::unique_ptr<Train> m_train;
+    std::unique_ptr<Background> m_mouseIdleCursor;
     std::unique_ptr<Background> m_mouseLeftCursor;
     std::unique_ptr<Background> m_mouseRightCursor;
     std::unique_ptr<Background> m_hudFrame;
     std::unique_ptr<Background> m_hallwayHidingPromptS;
     Math::Vec2 m_lastMouseWorldPos{};
     bool m_undergroundAccessed = false;
-    bool m_subwayAccessed = false;
+    bool m_trainAccessed = false;
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;
@@ -126,4 +128,18 @@ private:
     bool m_blockAmbientStoryForSession = false;
     float m_cameraSmoothSpeed = 0.1f;
     Sound m_bgm;
+
+    // Q-skill hint on first Rooftop visit — plain on-screen text (no Conversion backdrop)
+    PulseDetonateSkill m_pulseDetonateSkill;
+    bool               m_prevRooftopForQHint  = false;
+    bool               m_skipRooftopQHintByCheat = false;
+
+    // Train zoom transition: camera zooms in when entering train map, then eases out
+    float m_cameraZoom = 1.0f;
+    bool m_trainZoomTransition = false;
+    float m_trainZoomTimer = 0.0f;
+    static constexpr float TRAIN_ZOOM_DURATION = 3.0f;
+    static constexpr float TRAIN_ZOOM_START    = 2.8f; // strong zoom-in; eases out as player shrinks to 0.6
+    /// Underground→Train 자연 진입: 페이드·카메라 줌이 끝난 뒤 출발 카운트다운 시작
+    bool m_trainDeferEntryUntilIntroDone = false;
 };

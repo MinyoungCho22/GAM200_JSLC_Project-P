@@ -2,6 +2,7 @@
 
 #pragma once
 #include "../Engine/GameState.hpp"
+#include "../Engine/Sound.hpp"
 #include "../Game/Font.hpp"
 #include <functional>
 #include <memory>
@@ -38,4 +39,7 @@ private:
 
     unsigned int m_quadVAO = 0;
     unsigned int m_quadVBO = 0;
+
+    float m_prevMasterVolume = 0.4f;
+    bool  m_mutedOnEnter = false;
 };

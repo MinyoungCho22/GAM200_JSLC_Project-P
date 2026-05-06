@@ -23,6 +23,10 @@
     "pulse_absorb": [
       { "type": "mouse", "button": 1 },
       { "type": "gamepad_button", "button": 4 }
+    ],
+    "pulse_detonate": [
+      { "type": "key", "key": 81 },
+      { "type": "gamepad_button", "button": 3 }
     ]
   }
 }

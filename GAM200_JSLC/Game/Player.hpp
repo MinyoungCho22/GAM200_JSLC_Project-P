@@ -60,13 +60,41 @@ public:
     void TakeDamage(float amount);
     void SetPosition(Math::Vec2 new_pos);
     void SetCurrentGroundLevel(float newGroundLevel);
+    float GetCurrentGroundLevel() const { return m_currentGroundLevel; }
     void ResetVelocity();
+    /// Stops vertical motion only (keeps horizontal speed — used after ledge/platform corrections).
+    void ResetVerticalVelocity() { velocity.y = 0.0f; }
     void SetOnGround(bool onGround);
+    bool IsOnGround() const { return is_on_ground; }
 
     void Revive(float newPulse);
     void SetHiding(bool hiding) { m_isHiding = hiding; }
+    /// Train 전용: 히딩 스폿·Car2 펄스 충전 컨테이너 등에서 드론/로봇 AI가 플레이어를 추적하지 않도록 함
+    void SetTrainEnemyUndetectable(bool v) { m_trainEnemyUndetectable = v; }
+    bool IsTrainEnemyUndetectable() const { return m_trainEnemyUndetectable; }
     void SetGodMode(bool godMode) { m_godMode = godMode; }
     bool IsGodMode() const { return m_godMode; }
+    /// Train 컨테이너 연출 등 — 입력 물리 업데이트 스킵 (위치는 Train 등에서 직접 설정).
+    void SetMovementLockedByTrain(bool locked) { m_movementLockedByTrain = locked; }
+    bool IsMovementLockedByTrain() const { return m_movementLockedByTrain; }
+    /// SecondTrain 보라 컨테이너 Leave 시 왼쪽으로 자동 걸음 (Train에서만 사용).
+    void SetCar2LeaveWalk(bool active, float speed = 175.f)
+    {
+        m_car2LeaveWalk     = active;
+        m_car2LeaveWalkSpeed = speed;
+        if (!active)
+            m_car2LeaveWalkSpeed = 175.f;
+    }
+    /// Train 보라 컨테이너 안 — 웅크리기 연출 (이동 잠금 중에도 애니 갱신).
+    void SetTrainCar2ForcedCrouch(bool on);
+    void SetSpriteAlphaMul(float m)
+    {
+        if (m < 0.f) m_spriteAlphaMul = 0.f;
+        else if (m > 1.f) m_spriteAlphaMul = 1.f;
+        else m_spriteAlphaMul = m;
+    }
+    void SetSizeScale(float scale) { m_sizeScale = scale; }
+    float GetSizeScale() const { return m_sizeScale; }
 
     Math::Vec2 GetPosition() const { return position; }
     Math::Vec2 GetSize() const { return size; }
@@ -77,6 +105,7 @@ public:
     bool IsDashing() const { return is_dashing; }
     bool IsFacingRight() const;
     bool IsCrouching() const { return is_crouching; }
+    bool IsCrouchTriggered() const { return m_crouchTriggered; }  // S 한 번 눌린 프레임만 true
     bool IsDead() const;
 
 private:
@@ -93,6 +122,7 @@ private:
     PulseCore m_pulseCore{ 100.f, 20.f };
     bool is_crouching = false;
     bool m_crouchAnimationFinished = false;
+    bool m_crouchTriggered = false;  // S 키가 이번 프레임에 처음 눌린 순간만 true
     Math::Vec2 original_size{};
     bool is_dashing = false;
     float dash_timer = 0.0f;
@@ -116,7 +146,14 @@ private:
     bool can_double_jump = false;
     bool is_double_jumping = false;
     bool m_isHiding = false;
+    bool m_trainEnemyUndetectable = false;
     bool m_godMode = false;
+    float m_sizeScale = 1.0f;
+    bool m_movementLockedByTrain = false;
+    bool  m_car2LeaveWalk      = false;
+    float m_car2LeaveWalkSpeed = 175.f;
+    bool  m_trainForcedCar2Crouch = false;
+    float m_spriteAlphaMul = 1.0f;
 
     // Sandevistan afterimage effect
     std::vector<AfterimageGhost> m_afterimageGhosts;

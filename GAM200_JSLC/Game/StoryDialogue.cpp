@@ -51,7 +51,8 @@ void StoryDialogue::ResetForNewRun()
     m_pending.clear();
     m_onSequenceComplete = nullptr;
     m_preTypeDelayRemaining = 0.0f;
-    m_active = false;
+    m_active                  = false;
+    m_useConversionBackdrop   = true;
     m_lineIndex = 0;
     m_visibleChars = 0;
     m_charAccum = 0.0f;
@@ -78,16 +79,18 @@ void StoryDialogue::RebuildLineTexture(Font& font, Shader& fontShader)
     m_lineTex = font.CreateTextTexture(fontShader, sub);
 }
 
-void StoryDialogue::BeginSequence(std::vector<std::string> lines, std::function<void()> onComplete, float preTypeDelay)
+void StoryDialogue::BeginSequence(std::vector<std::string> lines, std::function<void()> onComplete, float preTypeDelay,
+                                  bool useConversionBackdrop)
 {
     ClearLineTexture();
-    m_lines = std::move(lines);
-    m_lineIndex = 0;
-    m_visibleChars = 0;
-    m_charAccum = 0.0f;
-    m_preTypeDelayRemaining = preTypeDelay;
-    m_onSequenceComplete = std::move(onComplete);
-    m_active = true;
+    m_lines                   = std::move(lines);
+    m_lineIndex               = 0;
+    m_visibleChars            = 0;
+    m_charAccum               = 0.0f;
+    m_preTypeDelayRemaining   = preTypeDelay;
+    m_onSequenceComplete      = std::move(onComplete);
+    m_useConversionBackdrop   = useConversionBackdrop;
+    m_active                  = true;
 }
 
 void StoryDialogue::FinishSequence(Font& font, Shader& fontShader)
@@ -100,7 +103,8 @@ void StoryDialogue::FinishSequence(Font& font, Shader& fontShader)
     m_lineIndex = 0;
     m_visibleChars = 0;
     m_preTypeDelayRemaining = 0.0f;
-    m_active = false;
+    m_active                  = false;
+    m_useConversionBackdrop   = true;
 
     if (done)
         done();
@@ -109,22 +113,23 @@ void StoryDialogue::FinishSequence(Font& font, Shader& fontShader)
     {
         QueuedSequence next = std::move(m_pending.front());
         m_pending.pop_front();
-        BeginSequence(std::move(next.lines), std::move(next.onComplete), next.preTypeDelay);
+        BeginSequence(std::move(next.lines), std::move(next.onComplete), next.preTypeDelay,
+                      next.useConversionBackdrop);
         RebuildLineTexture(font, fontShader);
     }
 }
 
 void StoryDialogue::EnqueueLines(const std::vector<std::string>& lines, Font& font, Shader& fontShader,
-    std::function<void()> onSequenceComplete)
+    std::function<void()> onSequenceComplete, bool useConversionBackdrop)
 {
     if (lines.empty() || !s_dialogueEnabled)
         return;
     if (m_active)
     {
-        m_pending.push_back({ lines, std::move(onSequenceComplete), 0.0f });
+        m_pending.push_back({ lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop });
         return;
     }
-    BeginSequence(lines, std::move(onSequenceComplete), 0.0f);
+    BeginSequence(lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop);
     RebuildLineTexture(font, fontShader);
 }
 
@@ -143,7 +148,7 @@ void StoryDialogue::EnqueueOpening(Font& font, Shader& fontShader)
         m_pending.push_back(std::move(q));
         return;
     }
-    BeginSequence(std::move(q.lines), std::move(q.onComplete), q.preTypeDelay);
+    BeginSequence(std::move(q.lines), std::move(q.onComplete), q.preTypeDelay, q.useConversionBackdrop);
     RebuildLineTexture(font, fontShader);
 }
 
@@ -210,26 +215,30 @@ void StoryDialogue::Update(float dt, const Input::Input& input, const ControlBin
 
 void StoryDialogue::Draw(Font& font, Shader& textureShader, Shader& fontShader, const Math::Matrix& screenProjection)
 {
-    if (!s_dialogueEnabled || !m_active || !m_boxImage || m_boxImage->GetWidth() <= 0)
+    if (!s_dialogueEnabled || !m_active)
         return;
-
-    GL::Enable(GL_BLEND);
-    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    textureShader.use();
-    textureShader.setMat4("projection", screenProjection);
-    textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
-    textureShader.setBool("flipX", false);
-    textureShader.setFloat("alpha", 1.0f);
-    textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
-    textureShader.setFloat("tintStrength", 0.0f);
 
     const float boxCenterX = GAME_WIDTH * 0.5f;
     const float boxCenterY = BOX_BOTTOM_MARGIN + BOX_HEIGHT * 0.5f;
-    Math::Matrix boxModel = Math::Matrix::CreateTranslation({ boxCenterX, boxCenterY })
-        * Math::Matrix::CreateScale({ BOX_WIDTH, BOX_HEIGHT });
-    textureShader.setMat4("model", boxModel);
-    m_boxImage->Draw(textureShader, boxModel);
+
+    if (m_useConversionBackdrop && m_boxImage && m_boxImage->GetWidth() > 0)
+    {
+        GL::Enable(GL_BLEND);
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        textureShader.use();
+        textureShader.setMat4("projection", screenProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        textureShader.setFloat("tintStrength", 0.0f);
+
+        Math::Matrix boxModel = Math::Matrix::CreateTranslation({ boxCenterX, boxCenterY })
+            * Math::Matrix::CreateScale({ BOX_WIDTH, BOX_HEIGHT });
+        textureShader.setMat4("model", boxModel);
+        m_boxImage->Draw(textureShader, boxModel);
+    }
 
     if (m_lineTex.textureID != 0 && m_lineTex.height > 0)
     {

@@ -18,6 +18,8 @@
 #include <sstream>
 #include <cmath>
 #include <algorithm>
+#include <utility>
+#include <vector>
 
 #include "../Engine/Sound.hpp"
 
@@ -108,7 +110,6 @@ void GameplayState::Initialize()
 
     droneManager = std::make_unique<DroneManager>();
 
-    // Left-middle gauge position
     m_pulseGauge.Initialize();
     m_debugRenderer = std::make_unique<DebugRenderer>();
     m_debugRenderer->Initialize();
@@ -135,10 +136,12 @@ void GameplayState::Initialize()
     m_underground->Initialize();
     m_undergroundAccessed = false;
 
-    m_subway = std::make_unique<Subway>();
-    m_subway->Initialize();
-    m_subwayAccessed = false;
+    m_train = std::make_unique<Train>();
+    m_train->Initialize();
+    m_trainAccessed = false;
+    m_trainDeferEntryUntilIntroDone = false;
     m_rooftopAccessed = false;
+    m_pulseDetonateSkill.Initialize();
 
     // Apply JSON config once at startup (the same path used by hot-reload).
     {
@@ -147,7 +150,7 @@ void GameplayState::Initialize()
         m_hallway->ApplyConfig(cfg.hallway);
         m_rooftop->ApplyConfig(cfg.rooftop);
         m_underground->ApplyConfig(cfg.underground);
-        m_subway->ApplyConfig(cfg.subway);
+        m_train->ApplyConfig(cfg.train);
     }
 
     m_camera.Initialize({ GAME_WIDTH / 2.0f, GAME_HEIGHT / 2.0f }, GAME_WIDTH, GAME_HEIGHT);
@@ -160,6 +163,8 @@ void GameplayState::Initialize()
     m_fpsText = m_font->PrintToTexture(*m_fontShader, "FPS: ...");
 
     // Custom cursor sprites
+    m_mouseIdleCursor = std::make_unique<Background>();
+    m_mouseIdleCursor->InitializeWithBlackKeyTransparency("Asset/MouseIdle.png");
     m_mouseLeftCursor = std::make_unique<Background>();
     m_mouseLeftCursor->InitializeWithBlackKeyTransparency("Asset/MouseLeft.png");
     m_mouseRightCursor = std::make_unique<Background>();
@@ -211,6 +216,8 @@ void GameplayState::Initialize()
     m_doorOpened = false;
     m_currentCheckpoint = MapZone::Room;
     m_pendingTransition = PendingTransition::None;
+    m_prevRooftopForQHint = false;
+    m_skipRooftopQHintByCheat = false;
     m_fadeAlpha = 1.0f;                // start fully black
     m_fadeState = FadeState::FadingIn; // fade in from black on game start
 
@@ -251,7 +258,7 @@ void GameplayState::Initialize()
         imguiManager->AddMapDroneManager("Hallway", m_hallway->GetDroneManager());
         imguiManager->AddMapDroneManager("Rooftop", m_rooftop->GetDroneManager());
         imguiManager->AddMapDroneManager("Underground", m_underground->GetDroneManager());
-        imguiManager->AddMapDroneManager("Subway", m_subway->GetDroneManager());
+        imguiManager->AddMapDroneManager("Train", m_train->GetDroneManager());
 
         // Set main drone manager (for backwards compatibility)
         if (droneManager)
@@ -295,10 +302,10 @@ void GameplayState::Initialize()
             }
             m_underground->ReapplyEntryTracerDroneAfterLiveState();
 
-            auto& subwayDrones = m_subway->GetDrones();
-            for (size_t i = 0; i < subwayDrones.size(); ++i)
+            auto& trainDrones = m_train->GetDrones();
+            for (size_t i = 0; i < trainDrones.size(); ++i)
             {
-                configManager->ApplyLiveStateToDrone("Subway", static_cast<int>(i), subwayDrones[i]);
+                configManager->ApplyLiveStateToDrone("Train", static_cast<int>(i), trainDrones[i]);
             }
         }
 
@@ -342,6 +349,26 @@ void GameplayState::Update(double dt)
     {
         gsm.PushState(std::make_unique<SettingState>(gsm));
         return;
+    }
+
+    // Train zoom-out + player shrink transition (runs every frame, including during fade)
+    if (m_trainZoomTransition)
+    {
+        const float zoomFdt = std::min(static_cast<float>(dt), 1.0f / 30.0f);
+        m_trainZoomTimer += zoomFdt;
+        float t = std::min(m_trainZoomTimer / TRAIN_ZOOM_DURATION, 1.0f);
+        // Ease-in-out
+        float easedT = t < 0.5f
+            ? 2.0f * t * t
+            : 1.0f - std::pow(-2.0f * t + 2.0f, 2.0f) / 2.0f;
+        m_cameraZoom = TRAIN_ZOOM_START + (1.0f - TRAIN_ZOOM_START) * easedT;
+        player.SetSizeScale(1.0f + (0.6f - 1.0f) * easedT);
+        if (m_trainZoomTimer >= TRAIN_ZOOM_DURATION)
+        {
+            m_trainZoomTransition = false;
+            m_cameraZoom = 1.0f;
+            player.SetSizeScale(0.6f);
+        }
     }
 
     // Map transition fade update: freeze player input but keep camera alive
@@ -401,6 +428,18 @@ void GameplayState::Update(double dt)
     }
 
     bool suppressAmbientStoryThisFrame = false;
+
+    if (m_trainDeferEntryUntilIntroDone)
+    {
+        if (!m_trainAccessed || !m_train)
+            m_trainDeferEntryUntilIntroDone = false;
+        else if (!m_trainZoomTransition)
+        {
+            m_train->StartEntryTimer();
+            m_trainDeferEntryUntilIntroDone = false;
+        }
+    }
+
     const auto silenceStoryForMapCheat = [&]() {
         m_blockAmbientStoryForSession = true;
         suppressAmbientStoryThisFrame = true;
@@ -415,13 +454,17 @@ void GameplayState::Update(double dt)
         m_doorOpened = false;
         m_rooftopAccessed = false;
         m_undergroundAccessed = false;
-        m_subwayAccessed = false;
+        m_trainAccessed = false;
+        m_trainDeferEntryUntilIntroDone = false;
         m_room->SetRightBoundaryActive(true);
         m_door->ResetMapTransition();
         m_rooftopDoor->ResetMapTransition();
         m_camera.StopAnimation();
         m_camera.SetBounds({ 0.0f, 0.0f }, { GAME_WIDTH, GAME_HEIGHT });
         m_cameraSmoothSpeed = 0.1f;
+        m_cameraZoom = 1.0f;
+        m_trainZoomTransition = false;
+        player.SetSizeScale(1.0f);
         player.SetCurrentGroundLevel(GROUND_LEVEL);
         player.SetPosition({
             ROOM_LEFT_BOUNDARY + player.GetSize().x * 0.5f,
@@ -441,6 +484,7 @@ void GameplayState::Update(double dt)
         m_hallwayEntryStoryPending = false;
         m_hallwayEntryStoryDelayRemaining = 0.0f;
         m_openingStoryDelayRemaining = 0.0f;
+        m_currentCheckpoint = MapZone::Room;
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleported to Room (Ctrl+1)");
     }
 
@@ -449,6 +493,10 @@ void GameplayState::Update(double dt)
         silenceStoryForMapCheat();
         m_hallwayEntryStoryPending = false;
         m_hallwayEntryStoryDelayRemaining = 0.0f;
+        m_cameraZoom = 1.0f;
+        m_trainZoomTransition = false;
+        player.SetSizeScale(1.0f);
+        m_currentCheckpoint = MapZone::Hallway;
 
         const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
         const float hallwaySpawnY = HALLWAY_GROUND_LEVEL + player.GetSize().y * 0.5f;
@@ -500,8 +548,13 @@ void GameplayState::Update(double dt)
         m_tutorial->DisableAll();
         m_camera.StopAnimation();
         m_undergroundAccessed = false;
-        m_subwayAccessed = false;
+        m_trainAccessed = false;
+        m_trainDeferEntryUntilIntroDone = false;
+        m_cameraZoom = 1.0f;
+        m_trainZoomTransition = false;
+        player.SetSizeScale(1.0f);
         HandleHallwayToRooftopTransition();
+        m_currentCheckpoint = MapZone::Rooftop;
         m_camera.SetPosition(player.GetPosition());
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Rooftop (Ctrl+3)");
     }
@@ -509,13 +562,19 @@ void GameplayState::Update(double dt)
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num4))
     {
         silenceStoryForMapCheat();
+        m_skipRooftopQHintByCheat = true;
         m_tutorial->DisableAll();
         m_camera.StopAnimation();
-        if (m_subwayAccessed)
+        m_cameraZoom = 1.0f;
+        m_trainZoomTransition = false;
+        player.SetSizeScale(1.0f);
+        if (m_trainAccessed)
         {
-            m_subwayAccessed = false;
+            m_trainAccessed = false;
+            m_trainDeferEntryUntilIntroDone = false;
             m_rooftopAccessed = true;
             m_undergroundAccessed = true;
+            m_currentCheckpoint = MapZone::Underground;
 
             float playerStartX = Underground::MIN_X + 100.0f;
             float playerStartY = Underground::MIN_Y + 270.0f;
@@ -530,11 +589,12 @@ void GameplayState::Update(double dt)
                 { Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y + Underground::HEIGHT });
             m_cameraSmoothSpeed = 0.05f;
             m_camera.SetPosition(player.GetPosition());
-            Logger::Instance().Log(Logger::Severity::Event, "Cheat: Subway -> Underground (Ctrl+4)");
+            Logger::Instance().Log(Logger::Severity::Event, "Cheat: Train -> Underground (Ctrl+4)");
         }
         else
         {
             HandleRooftopToUndergroundTransition();
+            m_currentCheckpoint = MapZone::Underground;
             m_camera.SetPosition(player.GetPosition());
             Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Underground (Ctrl+4)");
         }
@@ -543,28 +603,57 @@ void GameplayState::Update(double dt)
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num5))
     {
         silenceStoryForMapCheat();
+        m_skipRooftopQHintByCheat = true;
         m_tutorial->DisableAll();
         m_camera.StopAnimation();
         m_rooftopAccessed = true;
         m_undergroundAccessed = true;
-        m_subwayAccessed = true;
+        m_trainAccessed = true;
+        m_cameraZoom = 1.0f;
+        m_trainZoomTransition = false;
+        player.SetSizeScale(0.6f);
 
         m_underground->ClearAllDrones();
 
-        float playerStartX = Subway::MIN_X + 300.0f;
-        float playerStartY = Subway::MIN_Y + 540.0f;
-        float newGroundLevel = Subway::MIN_Y + 90.0f;
+        float playerStartX = Train::MIN_X + 300.0f;
+        float playerStartY = Train::MIN_Y + 540.0f;
+        float newGroundLevel = Train::MIN_Y + 90.0f;
         player.SetCurrentGroundLevel(newGroundLevel);
         player.SetPosition({ playerStartX, playerStartY });
         player.ResetVelocity();
         player.SetOnGround(false);
 
         m_camera.SetBounds(
-            { Subway::MIN_X, Subway::MIN_Y },
-            { Subway::MIN_X + Subway::WIDTH, Subway::MIN_Y + Subway::HEIGHT });
+            { Train::MIN_X, Train::MIN_Y },
+            { Train::MIN_X + m_train->GetMapWidth(), Train::MIN_Y + Train::HEIGHT });
         m_cameraSmoothSpeed = 0.05f;
-        m_camera.SetPosition({ Subway::MIN_X + GAME_WIDTH / 2.0f, Subway::MIN_Y + GAME_HEIGHT / 2.0f });
-        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Subway (Ctrl+5)");
+        m_camera.SetPosition({ Train::MIN_X + GAME_WIDTH / 2.0f, Train::MIN_Y + GAME_HEIGHT / 2.0f });
+        m_trainDeferEntryUntilIntroDone = false;
+        if (m_train)
+            m_train->StartEntryTimer();
+        m_currentCheckpoint = MapZone::Train;
+        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Train (Ctrl+5)");
+    }
+
+    if (m_trainAccessed && m_train
+        && (input.IsGlfwKeyPressed(GLFW_KEY_LEFT_ALT) || input.IsGlfwKeyPressed(GLFW_KEY_RIGHT_ALT)))
+    {
+        auto warpTrainCarIf = [&](Input::Key numKey, int car1to5) {
+            if (!input.IsKeyTriggered(numKey))
+                return;
+            const float    cx = m_train->GetTrainCarCenterWorldX(car1to5);
+            const Math::Vec2 p0 = player.GetPosition();
+            const Math::Vec2 hc = player.GetHitboxCenter();
+            player.SetPosition({ p0.x + (cx - hc.x), p0.y });
+            player.ResetVelocity();
+            m_train->SetTrainCarCheatUnlock(true);
+            Logger::Instance().Log(Logger::Severity::Event, "Cheat: Train warp carIdx %d (Alt key)", car1to5);
+        };
+        warpTrainCarIf(Input::Key::Num1, 1);
+        warpTrainCarIf(Input::Key::Num2, 2);
+        warpTrainCarIf(Input::Key::Num3, 3);
+        warpTrainCarIf(Input::Key::Num4, 5);
+        warpTrainCarIf(Input::Key::Num5, 4);
     }
 
     const float delayTick = std::min(static_cast<float>(dt), STORY_DELAY_DT_CAP);
@@ -599,15 +688,39 @@ void GameplayState::Update(double dt)
 
     Math::Vec2 playerCenter = player.GetPosition();
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
+    Math::Vec2 playerHbCenter = player.GetHitboxCenter();
+
+    if (m_rooftopAccessed && !m_prevRooftopForQHint && !m_skipRooftopQHintByCheat && m_font && m_fontShader
+        && m_storyDialogue && !m_blockAmbientStoryForSession && !suppressAmbientStoryThisFrame
+        && !m_storyDialogue->IsBlocking())
+    {
+        if (StoryDialogue::IsDialogueEnabled())
+        {
+            m_storyDialogue->EnqueueLines(
+                { "Can't attack all at once? Try using Q" }, *m_font, *m_fontShader, nullptr, false);
+        }
+        m_prevRooftopForQHint = true;
+    }
+    else if (!m_rooftopAccessed)
+        m_prevRooftopForQHint = false;
 
     const bool hallwayHidingBlocksDroneAttack = m_doorOpened && !m_rooftopAccessed
         && m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
 
     bool isPressingInteract = ctl.IsActionPressed(ControlAction::PulseAbsorb, input);
-    const bool isPlayerHidingInRoomForAttack = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
-    const bool isPlayerHidingInHallwayForAttack = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
-    const bool crouchHidingBlocksAttack = player.IsCrouching() &&
-        (isPlayerHidingInRoomForAttack || isPlayerHidingInHallwayForAttack);
+    const bool isPlayerHidingInRoomForAttack =
+        m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool isPlayerHidingInHallwayForAttack =
+        m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool isPlayerHidingInUndergroundForAttack =
+        m_undergroundAccessed && m_underground
+        && m_underground->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool isPlayerHidingInTrainForAttack =
+        m_trainAccessed && m_train && m_train->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+    const bool crouchHidingBlocksAttack =
+        player.IsCrouching()
+        && (isPlayerHidingInRoomForAttack || isPlayerHidingInHallwayForAttack || isPlayerHidingInUndergroundForAttack
+            || isPlayerHidingInTrainForAttack);
     bool isPressingAttack = ctl.IsActionPressed(ControlAction::Attack, input) && !crouchHidingBlocksAttack;
 
     // Get mouse world position
@@ -626,7 +739,7 @@ void GameplayState::Update(double dt)
         m_hallway->ApplyConfig(cfg.hallway);
         m_rooftop->ApplyConfig(cfg.rooftop);
         m_underground->ApplyConfig(cfg.underground);
-        m_subway->ApplyConfig(cfg.subway);
+        m_train->ApplyConfig(cfg.train);
     }
 
     auto configManager = gsm.GetEngine().GetDroneConfigManager();
@@ -651,9 +764,9 @@ void GameplayState::Update(double dt)
                 configManager->ApplyLiveStateToDrone("Underground", static_cast<int>(i), undergroundDrones[i]);
             m_underground->ReapplyEntryTracerDroneAfterLiveState();
 
-            auto& subwayDrones = m_subway->GetDrones();
-            for (size_t i = 0; i < subwayDrones.size(); ++i)
-                configManager->ApplyLiveStateToDrone("Subway", static_cast<int>(i), subwayDrones[i]);
+            auto& trainDrones = m_train->GetDrones();
+            for (size_t i = 0; i < trainDrones.size(); ++i)
+                configManager->ApplyLiveStateToDrone("Train", static_cast<int>(i), trainDrones[i]);
         }
     }
 
@@ -664,9 +777,9 @@ void GameplayState::Update(double dt)
         for (size_t i = 0; i < undergroundRobots.size(); ++i)
             robotConfigManager->ApplyLiveStateToRobot("Underground", static_cast<int>(i), undergroundRobots[i]);
 
-        auto& subwayRobots = m_subway->GetRobots();
-        for (size_t i = 0; i < subwayRobots.size(); ++i)
-            robotConfigManager->ApplyLiveStateToRobot("Subway", static_cast<int>(i), subwayRobots[i]);
+        auto& trainRobots = m_train->GetRobots();
+        for (size_t i = 0; i < trainRobots.size(); ++i)
+            robotConfigManager->ApplyLiveStateToRobot("Train", static_cast<int>(i), trainRobots[i]);
     }
 
     const float PULSE_COST_PER_SECOND = 1.0f;
@@ -682,7 +795,7 @@ void GameplayState::Update(double dt)
 
     pulseManager->Update(playerCenter, playerHitboxSize, player, m_room->GetPulseSources(),
         m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(),
-        m_subway->GetPulseSources(), isPressingInteract, dt, mouseWorldPos);
+        m_train->GetPulseSources(), isPressingInteract, dt, mouseWorldPos);
 
     Drone* targetDrone = nullptr;
     Robot* targetRobot = nullptr;
@@ -726,7 +839,11 @@ void GameplayState::Update(double dt)
                 checkDrones(m_hallway->GetDrones());
             checkDrones(m_rooftop->GetDrones());
             if (m_undergroundAccessed) checkDrones(m_underground->GetDrones());
-            if (m_subwayAccessed) checkDrones(m_subway->GetDrones());
+            if (m_trainAccessed) checkDrones(m_train->GetDrones());
+            if (m_trainAccessed && m_train && m_train->GetCarTransportDroneManager())
+                checkDrones(m_train->GetCarTransportDroneManager()->GetDrones());
+            if (m_trainAccessed && m_train && m_train->GetSirenDroneManager())
+                checkDrones(m_train->GetSirenDroneManager()->GetDrones());
 
             if (m_undergroundAccessed)
             {
@@ -755,9 +872,9 @@ void GameplayState::Update(double dt)
                 }
             }
 
-            if (m_subwayAccessed)
+            if (m_trainAccessed)
             {
-                auto& robots = m_subway->GetRobots();
+                auto& robots = m_train->GetRobots();
                 const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
 
                 for (auto& robot : robots)
@@ -842,13 +959,9 @@ void GameplayState::Update(double dt)
         if (ctl.IsActionTriggered(ControlAction::Attack, input))
         {
             if (m_room->IsBlindOpen())
-            {
                 m_door->Update(player, true, mouseWorldPos);
-            }
             else
-            {
                 m_door->Update(player, false, mouseWorldPos);
-            }
 
             m_rooftopDoor->Update(player, true, mouseWorldPos);
         }
@@ -879,12 +992,12 @@ void GameplayState::Update(double dt)
         }
     }
 
-    if (m_undergroundAccessed && !m_subwayAccessed)
+    if (m_undergroundAccessed && !m_trainAccessed)
     {
         float transitionX = Underground::MIN_X + Underground::WIDTH - 50.0f;
         if (player.GetPosition().x > transitionX)
         {
-            StartTransition(PendingTransition::UndergroundToSubway);
+            StartTransition(PendingTransition::UndergroundToTrain);
         }
     }
 
@@ -893,10 +1006,20 @@ void GameplayState::Update(double dt)
     bool isPlayerHiding = isPlayerHidingInRoom || isPlayerHidingInHallway;
 
     player.SetHiding(isPlayerHiding);
+    if (!m_trainAccessed)
+        player.SetTrainEnemyUndetectable(false);
 
-    droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
+    float tracerTrainAssist = 1.f;
+    if (m_trainAccessed && m_train)
+    {
+        constexpr float refSp = Train::TRAIN_SPEED;
+        const float     ratio =
+            (refSp > 0.f) ? std::clamp(m_train->GetTrainCurrentSpeed() / refSp, 0.f, 1.f) : 0.f;
+        tracerTrainAssist = 1.f + 0.22f * ratio;
+    }
+    droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding, true, 1.f, tracerTrainAssist);
 
-    if (m_rooftopAccessed && !m_undergroundAccessed && !m_subwayAccessed)
+    if (m_rooftopAccessed && !m_undergroundAccessed && !m_trainAccessed)
     {
         m_rooftop->SyncGroundLevelForPlayer(player, playerHitboxSize);
     }
@@ -1035,6 +1158,33 @@ void GameplayState::Update(double dt)
     m_rooftop->Update(dt, player, playerHitboxSize, input, mouseWorldPos,
                       ctl.IsActionTriggered(ControlAction::Attack, input));
 
+    auto runPulseResonanceBurst = [&]() {
+        const bool isGodMode = [&]() -> bool {
+            auto* im = gsm.GetEngine().GetImguiManager();
+            return im && im->IsPlayerGodMode();
+        }();
+        std::vector<std::pair<Math::Vec2, Math::Vec2>> trainStaticChainArcs;
+        if (m_trainAccessed && m_train)
+            m_train->AppendCarTransportStraightChainArcs(trainStaticChainArcs);
+
+        // 최신 히트박스 중심 사용. Train은 m_train->Update에서 캐리 후에 호출해야 원이 플레이어와 일치.
+        m_pulseDetonateSkill.Update(dt, player, player.GetHitboxCenter(),
+            m_rooftop->GetDroneManager(),
+            (m_undergroundAccessed && m_underground) ? m_underground->GetDroneManager() : nullptr,
+            droneManager.get(),
+            *pulseManager, ctl, input,
+            m_isGameOver, m_rooftopAccessed || m_undergroundAccessed, isGodMode,
+            (m_trainAccessed && m_train) ? m_train->GetDroneManager() : nullptr,
+            (m_trainAccessed && m_train) ? m_train->GetSirenDroneManager() : nullptr,
+            &trainStaticChainArcs,
+            (m_trainAccessed && m_train) ? m_train->GetCarTransportDroneManager() : nullptr,
+            (m_trainAccessed && m_train) ? m_train.get() : nullptr,
+            (m_undergroundAccessed && m_underground) ? m_underground.get() : nullptr);
+    };
+
+    if (!m_trainAccessed)
+        runPulseResonanceBurst();
+
     if (m_storyDialogue && m_rooftopAccessed && !m_undergroundAccessed && m_rooftop && !m_blockAmbientStoryForSession
         && !suppressAmbientStoryThisFrame)
     {
@@ -1055,9 +1205,50 @@ void GameplayState::Update(double dt)
         m_underground->Update(dt, player, playerHitboxSize);
     }
 
-    if (m_subwayAccessed)
+    if (m_trainAccessed)
     {
-        m_subway->Update(dt, player, playerHitboxSize);
+        const bool trainCarInjectGodMode = [&]() -> bool {
+            auto* im = gsm.GetEngine().GetImguiManager();
+            return im && im->IsPlayerGodMode();
+        }();
+        const bool attackHeld = ctl.IsActionPressed(ControlAction::Attack, input);
+        const bool attackTriggered = ctl.IsActionTriggered(ControlAction::Attack, input);
+        int        carInjectForced = -1;
+        if (m_train)
+            carInjectForced =
+                m_train->TryGetCarTransportStartInjectSlot(player.GetHitboxCenter(), playerHitboxSize, mouseWorldPos);
+        const bool injectViaStartIcon = carInjectForced >= 0 && attackHeld;
+        const bool carTransportInjectHeld = isPressingInteract || injectViaStartIcon;
+        m_train->Update(dt, player, playerHitboxSize, isPressingInteract, carTransportInjectHeld, trainCarInjectGodMode,
+                        attackHeld, attackTriggered, mouseWorldPos, injectViaStartIcon ? carInjectForced : -1);
+
+        runPulseResonanceBurst();
+
+        const float shakePx = m_train->ConsumeTrainCameraShakeRequest();
+        if (shakePx > 0.f)
+            m_camera.AddScreenShake(0.48f, shakePx);
+
+        // Keep right bound expanding while player advances.
+        // This prevents camera lock when the player leaves the train and keeps moving right.
+        const float visibleW = GAME_WIDTH / m_cameraZoom;
+        const float playerLeadMargin = visibleW * 0.75f;
+        const float trainDrivenRight = m_train->GetEffectiveRightBound();
+        const float playerDrivenRight = player.GetPosition().x + playerLeadMargin;
+        const float dynamicRight = (trainDrivenRight > playerDrivenRight) ? trainDrivenRight : playerDrivenRight;
+
+        // Match Camera::Update: it clamps using view half-height (GAME_HEIGHT/2), not zoom.
+        // Third_ThirdTrain (car index 4) only: allow vertical follow on container stacks / upper pipe.
+        constexpr float trainCamHalfH = GAME_HEIGHT * 0.5f;
+        const float     py              = player.GetPosition().y;
+        float           boundMinY       = Train::MIN_Y;
+        float           boundMaxY       = Train::MIN_Y + Train::HEIGHT;
+        if (m_train->GetPlayerTrainCarIndex(playerHbCenter) == 4)
+        {
+            boundMinY = std::min(Train::MIN_Y, py - trainCamHalfH);
+            boundMaxY = std::max(Train::MIN_Y + Train::HEIGHT, py + trainCamHalfH);
+        }
+
+        m_camera.SetBounds({ Train::MIN_X, boundMinY }, { dynamicRight, boundMaxY });
     }
 
     auto& hallwayDrones = m_hallway->GetDrones();
@@ -1095,15 +1286,20 @@ void GameplayState::Update(double dt)
 
     if (m_undergroundAccessed)
     {
+        const bool isPlayerHidingInUnderground =
+            m_underground->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
         auto& undergroundDrones = m_underground->GetDrones();
         for (auto& drone : undergroundDrones)
         {
             if (!drone.IsDead() && drone.ShouldDealDamage())
             {
-                auto* imguiManager = gsm.GetEngine().GetImguiManager();
-                if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                if (!isPlayerHidingInUnderground)
                 {
-                    player.TakeDamage(20.0f);
+                    auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                    if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                    {
+                        player.TakeDamage(20.0f);
+                    }
                 }
                 drone.ResetDamageFlag();
                 break;
@@ -1111,23 +1307,86 @@ void GameplayState::Update(double dt)
         }
     }
 
-    if (m_subwayAccessed)
+    if (m_trainAccessed)
     {
-        auto& subwayDrones = m_subway->GetDrones();
-        for (auto& drone : subwayDrones)
+        const bool isPlayerHidingInTrain =
+            m_train->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+
+        auto&     trainDrones      = m_train->GetDrones();
+        const int trainPlayerCar   = m_train->GetPlayerTrainCarIndex(playerHbCenter);
+        for (auto& drone : trainDrones)
         {
             if (!drone.IsDead() && drone.ShouldDealDamage())
             {
-                auto* imguiManager = gsm.GetEngine().GetImguiManager();
-                if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                if (!isPlayerHidingInTrain)
                 {
-                    player.TakeDamage(25.0f);
+                    auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                    if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                    {
+                        player.TakeDamage(25.0f);
+                        if (m_train)
+                            m_train->NotifyCarTransportInjectionInterrupted();
+                    }
                 }
                 drone.ResetDamageFlag();
                 break;
             }
         }
+
+        if (m_train->GetCarTransportDroneManager())
+        {
+            auto& ctDrones = m_train->GetCarTransportDroneManager()->GetDrones();
+            for (auto& drone : ctDrones)
+            {
+                if (!drone.IsDead() && drone.ShouldDealDamage())
+                {
+                    if (trainPlayerCar != 4)
+                    {
+                        drone.ResetDamageFlag();
+                        continue;
+                    }
+                    if (!isPlayerHidingInTrain)
+                    {
+                        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                        if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                        {
+                            player.TakeDamage(25.0f);
+                            if (m_train)
+                                m_train->NotifyCarTransportInjectionInterrupted();
+                        }
+                    }
+                    drone.ResetDamageFlag();
+                    break;
+                }
+            }
+        }
+
+        if (m_train->GetSirenDroneManager())
+        {
+            auto& sirenDrones = m_train->GetSirenDroneManager()->GetDrones();
+            for (auto& drone : sirenDrones)
+            {
+                if (!drone.IsDead() && drone.ShouldDealDamage())
+                {
+                    if (!m_train->IsSirenDroneDamageBlocked(playerHbCenter, playerHitboxSize, player.IsCrouching()))
+                    {
+                        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                        if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                        {
+                            player.TakeDamage(25.0f);
+                            if (m_train)
+                                m_train->NotifyCarTransportInjectionInterrupted();
+                        }
+                    }
+                    drone.ResetDamageFlag();
+                    break;
+                }
+            }
+        }
     }
+
+    if (pulseManager)
+        pulseManager->SyncDetonationOriginToPlayer(player.GetHitboxCenter());
 
     // Update camera animation
     if (m_camera.IsAnimating())
@@ -1138,6 +1397,7 @@ void GameplayState::Update(double dt)
     {
         m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
     }
+    m_camera.UpdateScreenShake(static_cast<float>(dt));
 
     if (m_hallwayEntryStoryPending && m_storyDialogue && m_font && m_fontShader && !m_blockAmbientStoryForSession
         && !suppressAmbientStoryThisFrame)
@@ -1161,7 +1421,8 @@ void GameplayState::Update(double dt)
 
     static double cameraLogTimer = 0.0f;
     cameraLogTimer += dt;
-    if (cameraLogTimer > 1.0f && m_rooftopAccessed)
+    // 모든 맵에서 동일하게 좌표 로그 (루프탑 전용이면 Train/언더그라운드·치트 이동 시 콘솔이 비어 보임)
+    if (cameraLogTimer > 1.0f)
     {
         Math::Vec2 camPos = m_camera.GetPosition();
         Logger::Instance().Log(Logger::Severity::Debug,
@@ -1197,6 +1458,8 @@ void GameplayState::Update(double dt)
     ss_pulse << std::fixed << "Pulse: " << pulse.Value() << " / " << pulse.Max();
     m_pulseText = m_font->PrintToTexture(*m_fontShader, ss_pulse.str());
 
+    m_pulseDetonateSkill.UpdateCooldownText(*m_font, *m_fontShader);
+
     std::stringstream ss_warning;
     ss_warning << "Warning Level: " << m_traceSystem->GetWarningLevel();
     m_warningLevelText = m_font->PrintToTexture(*m_fontShader, ss_warning.str());
@@ -1208,6 +1471,18 @@ void GameplayState::Update(double dt)
 
     if (player.IsDead())
     {
+        // Sync checkpoint with the currently active map before opening GameOver.
+        if (m_trainAccessed)
+            m_currentCheckpoint = MapZone::Train;
+        else if (m_undergroundAccessed)
+            m_currentCheckpoint = MapZone::Underground;
+        else if (m_rooftopAccessed)
+            m_currentCheckpoint = MapZone::Rooftop;
+        else if (m_doorOpened)
+            m_currentCheckpoint = MapZone::Hallway;
+        else
+            m_currentCheckpoint = MapZone::Room;
+
         engine.GetPostProcess().Settings().exposure = 1.0f;
         gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver,
             [this]() { RespawnAtCheckpoint(); }));
@@ -1307,44 +1582,51 @@ void GameplayState::HandleRooftopToUndergroundTransition()
         "Transition to Underground! Player=(%.1f, %.1f)", playerStartX, playerStartY);
 }
 
-void GameplayState::HandleUndergroundToSubwayTransition()
+void GameplayState::HandleUndergroundToTrainTransition()
 {
     Logger::Instance().Log(Logger::Severity::Event,
-        "Transition to Subway! Starting descent animation...");
+        "Transition to Train! Starting descent animation...");
 
     m_undergroundAccessed = true;
-    m_subwayAccessed = true;
-    m_currentCheckpoint = MapZone::Subway;
+    m_trainAccessed = true;
+    m_currentCheckpoint = MapZone::Train;
 
     m_underground->ClearAllDrones();
 
-    float playerStartX = Subway::MIN_X + 300.0f;
-    float playerStartY = Subway::MIN_Y + 540.0f;
-    float newGroundLevel = Subway::MIN_Y + 90.0f;
+    float playerStartX = Train::MIN_X + 300.0f;
+    float playerStartY = Train::MIN_Y + 540.0f;
+    float newGroundLevel = Train::MIN_Y + 90.0f;
 
     player.SetCurrentGroundLevel(newGroundLevel);
     player.SetPosition({ playerStartX, playerStartY });
     player.ResetVelocity();
     player.SetOnGround(false);
 
-    float worldMinX = Subway::MIN_X;
-    float worldMaxX = Subway::MIN_X + Subway::WIDTH;
-    float worldMinY = Subway::MIN_Y;
-    float worldMaxY = Subway::MIN_Y + Subway::HEIGHT;
+    float worldMinX = Train::MIN_X;
+    float worldMaxX = Train::MIN_X + m_train->GetMapWidth();
+    float worldMinY = Train::MIN_Y;
+    float worldMaxY = Train::MIN_Y + Train::HEIGHT;
 
     m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
 
-    Math::Vec2 cameraStartPos = m_camera.GetPosition();
-    Math::Vec2 cameraEndPos = { Subway::MIN_X + GAME_WIDTH / 2.0f, Subway::MIN_Y + GAME_HEIGHT / 2.0f };
+    // Snap camera directly to train-map center — no pan animation, only zoom effect
+    Math::Vec2 cameraTargetPos = { Train::MIN_X + GAME_WIDTH / 2.0f, Train::MIN_Y + GAME_HEIGHT / 2.0f };
+    m_camera.SetPosition(cameraTargetPos);
 
-    m_camera.StartAnimation(cameraStartPos, cameraEndPos, 2.0f);
+    // Start zoom-out + player shrink transition: begins zoomed in, eases out to normal
+    m_cameraZoom            = TRAIN_ZOOM_START;
+    m_trainZoomTransition  = true;
+    m_trainZoomTimer       = 0.0f;
+    player.SetSizeScale(1.0f); // will animate toward 0.6 over TRAIN_ZOOM_DURATION
 
     m_cameraSmoothSpeed = 0.05f;
 
+    // 출발 카운트다운은 페이드 인 + 카메라 줌(플레이어 축소)이 끝난 뒤 시작
+    m_trainDeferEntryUntilIntroDone = true;
+
     Logger::Instance().Log(Logger::Severity::Event,
-        "Subway Transition! Camera: (%.1f, %.1f) -> (%.1f, %.1f), Player: (%.1f, %.1f)",
-        cameraStartPos.x, cameraStartPos.y, cameraEndPos.x, cameraEndPos.y,
-        playerStartX, playerStartY);
+        "Train Transition! Camera snapped to (%.1f, %.1f), Player: (%.1f, %.1f)",
+        cameraTargetPos.x, cameraTargetPos.y, playerStartX, playerStartY);
 }
 
 void GameplayState::StartTransition(PendingTransition t)
@@ -1374,8 +1656,8 @@ void GameplayState::ExecutePendingTransition()
     case PendingTransition::RooftopToUnderground:
         HandleRooftopToUndergroundTransition();
         break;
-    case PendingTransition::UndergroundToSubway:
-        HandleUndergroundToSubwayTransition();
+    case PendingTransition::UndergroundToTrain:
+        HandleUndergroundToTrainTransition();
         break;
     default:
         break;
@@ -1398,16 +1680,28 @@ void GameplayState::RespawnAtCheckpoint()
         m_underground->GetDroneManager()->ResetAllDrones();
         for (auto& robot : m_underground->GetRobots()) robot.Reset();
     }
-    if (m_subway)
+    if (m_train)
     {
-        m_subway->GetDroneManager()->ResetAllDrones();
-        for (auto& robot : m_subway->GetRobots()) robot.Reset();
+        m_train->GetDroneManager()->ResetAllDrones();
+        if (m_train->GetCarTransportDroneManager())
+            m_train->GetCarTransportDroneManager()->ResetAllDrones();
+        if (m_train->GetSirenDroneManager())
+            m_train->GetSirenDroneManager()->ResetAllDrones();
+        for (auto& robot : m_train->GetRobots()) robot.Reset();
     }
+
+    m_pulseDetonateSkill.ResetCooldown(); // unlock persists
+
+    // Reset camera zoom and player scale (will be set per-zone below)
+    m_cameraZoom = 1.0f;
+    m_trainZoomTransition = false;
+    m_camera.StopAnimation();
 
     switch (m_currentCheckpoint)
     {
     case MapZone::Room:
     {
+        player.SetSizeScale(1.0f);
         player.SetCurrentGroundLevel(GROUND_LEVEL);
         player.SetPosition({
             ROOM_LEFT_BOUNDARY + player.GetSize().x * 0.5f,
@@ -1421,6 +1715,7 @@ void GameplayState::RespawnAtCheckpoint()
     }
     case MapZone::Hallway:
     {
+        player.SetSizeScale(1.0f);
         const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
         const float hallwaySpawnY = HALLWAY_GROUND_LEVEL + player.GetSize().y * 0.5f;
         player.SetCurrentGroundLevel(HALLWAY_GROUND_LEVEL);
@@ -1428,11 +1723,14 @@ void GameplayState::RespawnAtCheckpoint()
         player.SetOnGround(false);
         ApplyHallwayCameraBounds();
         m_camera.SetPosition(player.GetPosition());
+        if (m_hallway)
+            m_hallway->RefillPulseSourcesAfterCheckpointRespawn();
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Hallway");
         break;
     }
     case MapZone::Rooftop:
     {
+        player.SetSizeScale(1.0f);
         float playerStartX = Rooftop::MIN_X + 1550.0f;
         float playerStartY = Rooftop::MIN_Y + (Rooftop::HEIGHT / 2.0f + 200.0f) + 50.0f;
         player.SetCurrentGroundLevel(Rooftop::FLOOR_SURFACE_Y);
@@ -1446,6 +1744,7 @@ void GameplayState::RespawnAtCheckpoint()
     }
     case MapZone::Underground:
     {
+        player.SetSizeScale(1.0f);
         float playerStartX = Underground::MIN_X + 100.0f;
         float playerStartY = Underground::MIN_Y + 270.0f;
         player.SetCurrentGroundLevel(Underground::MIN_Y + 75.0f);
@@ -1454,20 +1753,31 @@ void GameplayState::RespawnAtCheckpoint()
         m_camera.SetBounds({ Underground::MIN_X, Underground::MIN_Y },
                            { Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y + Underground::HEIGHT });
         m_camera.SetPosition(player.GetPosition());
+        if (m_underground)
+            m_underground->RefillPulseSourcesAfterCheckpointRespawn();
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Underground");
         break;
     }
-    case MapZone::Subway:
+    case MapZone::Train:
     {
-        float playerStartX = Subway::MIN_X + 300.0f;
-        float playerStartY = Subway::MIN_Y + 540.0f;
-        player.SetCurrentGroundLevel(Subway::MIN_Y + 90.0f);
+        // Keep zone flags consistent after returning from GameOver stack.
+        m_rooftopAccessed = true;
+        m_undergroundAccessed = true;
+        m_trainAccessed = true;
+
+        player.SetSizeScale(0.6f);
+        float playerStartX = Train::MIN_X + 300.0f;
+        float playerStartY = Train::MIN_Y + 540.0f;
+        player.SetCurrentGroundLevel(Train::MIN_Y + 90.0f);
         player.SetPosition({ playerStartX, playerStartY });
         player.SetOnGround(false);
-        m_camera.SetBounds({ Subway::MIN_X, Subway::MIN_Y },
-                           { Subway::MIN_X + Subway::WIDTH, Subway::MIN_Y + Subway::HEIGHT });
-        m_camera.SetPosition(player.GetPosition());
-        Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Subway");
+        m_camera.SetBounds({ Train::MIN_X, Train::MIN_Y },
+                           { Train::MIN_X + m_train->GetMapWidth(), Train::MIN_Y + Train::HEIGHT });
+        // Force immediate camera snap to player so respawn frame never renders off-screen.
+        m_camera.Update(player.GetPosition(), 1.0f);
+        if (m_train)
+            m_train->RestartEntryTimer(); // reset offset/speed/countdown/sounds to first-entry state
+        Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Train");
         break;
     }
     }
@@ -1578,10 +1888,20 @@ void GameplayState::ApplyGamepadDroneTargetingAssist(double dt, Input::Input& in
         for (const auto& d : m_underground->GetDrones())
             considerMagnet(d);
     }
-    if (m_subwayAccessed)
+    if (m_trainAccessed)
     {
-        for (const auto& d : m_subway->GetDrones())
+        for (const auto& d : m_train->GetDrones())
             considerMagnet(d);
+        if (m_train && m_train->GetCarTransportDroneManager())
+        {
+            for (const auto& d : m_train->GetCarTransportDroneManager()->GetDrones())
+                considerMagnet(d);
+        }
+        if (m_train && m_train->GetSirenDroneManager())
+        {
+            for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
+                considerMagnet(d);
+        }
     }
 
     // R3: snap cursor to nearest drone within world distance (LB is pulse absorb).
@@ -1616,10 +1936,20 @@ void GameplayState::ApplyGamepadDroneTargetingAssist(double dt, Input::Input& in
             for (const auto& d : m_underground->GetDrones())
                 considerManual(d);
         }
-        if (m_subwayAccessed)
+        if (m_trainAccessed)
         {
-            for (const auto& d : m_subway->GetDrones())
+            for (const auto& d : m_train->GetDrones())
                 considerManual(d);
+            if (m_train && m_train->GetCarTransportDroneManager())
+            {
+                for (const auto& d : m_train->GetCarTransportDroneManager()->GetDrones())
+                    considerManual(d);
+            }
+            if (m_train && m_train->GetSirenDroneManager())
+            {
+                for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
+                    considerManual(d);
+            }
         }
 
         if (best)
@@ -1690,9 +2020,10 @@ void GameplayState::DrawMainLayer()
     {
         r = 70.0f / 255.0f; g = 68.0f / 255.0f; b = 71.0f / 255.0f;
     }
-    else if (playerPos.y <= Subway::MIN_Y + Subway::HEIGHT)
+    else if (playerPos.y <= Train::MIN_Y + Train::HEIGHT)
     {
-        r = 15.0f / 255.0f; g = 15.0f / 255.0f; b = 20.0f / 255.0f;
+        // Sunset sky base colour (deep dark blue at very top – gradient drawn by DrawBackground)
+        r = 7.0f / 255.0f; g = 5.0f / 255.0f; b = 18.0f / 255.0f;
     }
     else if (playerPos.y <= Underground::MIN_Y + Underground::HEIGHT)
     {
@@ -1721,25 +2052,85 @@ void GameplayState::DrawMainLayer()
 
     Shader& textureShader = engine.GetTextureShader();
 
-    Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
-        0.0f, GAME_WIDTH,
-        0.0f, GAME_HEIGHT,
-        -1.0f, 1.0f
-    );
-    Math::Matrix view = m_camera.GetViewMatrix();
-    Math::Matrix projection = baseProjection * view;
+    // Zoom-aware world projection: effectiveWidth/Height shrink as zoom increases (zoom-in effect)
+    const float effectiveWidth  = GAME_WIDTH  / m_cameraZoom;
+    const float effectiveHeight = GAME_HEIGHT / m_cameraZoom;
+    const float viewHalfW = effectiveWidth * 0.5f;
+    Math::Matrix worldProjection;
+    {
+        Math::Vec2 camPos   = m_camera.GetPosition();
+        Math::Vec2 camShake = m_camera.GetScreenShakeOffset();
+        float      offsetX  = std::round(effectiveWidth * 0.5f - camPos.x + camShake.x);
+        float      offsetY  = std::round(effectiveHeight * 0.5f - camPos.y + camShake.y);
+        Math::Matrix zoomedOrtho = Math::Matrix::CreateOrtho(
+            0.0f, effectiveWidth, 0.0f, effectiveHeight, -1.0f, 1.0f);
+        Math::Matrix zoomedView = Math::Matrix::CreateTranslation({ offsetX, offsetY });
+        worldProjection = zoomedOrtho * zoomedView;
 
-    textureShader.use();
-    textureShader.setMat4("projection", projection);
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+    }
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
 
-    // 1) World maps (post-processed: exposure / hallway overlay)
+    // 1a) Train sunset sky gradient (drawn before everything else so it sits behind all sprites)
+    if (m_trainAccessed)
+    {
+        colorShader->use();
+        colorShader->setMat4("projection", worldProjection);
+        m_train->DrawBackground(*colorShader, m_camera.GetPosition(), viewHalfW);
+        // Restore texture shader state
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        // 레일은 Rail.png가 장면 최하단 레이어이므로 하늘 바로 다음·다른 맵·기차 본체보다 먼저 그린다.
+        m_train->DrawRailTrack(textureShader, m_camera.GetPosition(), viewHalfW);
+    }
+
+    // 1b) World maps (post-processed: exposure / hallway overlay)
     m_room->Draw(textureShader);
     m_hallway->Draw(textureShader);
     m_rooftop->Draw(textureShader);
     m_underground->Draw(textureShader);
-    m_subway->Draw(textureShader);
+    m_train->Draw(textureShader, m_camera.GetPosition(), viewHalfW);
+    if (m_trainAccessed)
+    {
+        colorShader->use();
+        colorShader->setMat4("projection", worldProjection);
+        colorShader->setFloat("uAlpha", 1.0f);
+        m_train->DrawRobotTrainAlerts(*colorShader, *m_debugRenderer);
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        m_train->DrawCar2EnterLeavePrompt(textureShader, m_camera.GetPosition(), viewHalfW);
+    }
+
+    if (m_trainAccessed)
+    {
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        m_train->DrawCarTransportOverlays(textureShader, m_camera.GetPosition(), viewHalfW);
+    }
+
+    if (m_trainAccessed)
+    {
+        colorShader->use();
+        colorShader->setMat4("projection", worldProjection);
+        GL::Enable(GL_BLEND);
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        m_train->DrawCar3SirenWaves(*colorShader, m_camera.GetPosition(), viewHalfW);
+        m_train->DrawCarTransportVFX(*colorShader, m_camera.GetPosition(), viewHalfW);
+        m_train->DrawValveWaterVFX(*colorShader, worldProjection, m_camera.GetPosition(), viewHalfW);
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+    }
 
     // Hallway railings: DrawForegroundLayer (after player / VFX) so Railing.png sits in front.
 
@@ -1767,13 +2158,22 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
     GL::Disable(GL_DEPTH_TEST);
 
+    // Screen-space projection (for HUD, fonts, pulse gauge — not zoom-affected)
     Math::Matrix baseProjection = Math::Matrix::CreateOrtho(
         0.0f, GAME_WIDTH,
         0.0f, GAME_HEIGHT,
         -1.0f, 1.0f
     );
-    Math::Matrix view = m_camera.GetViewMatrix();
-    Math::Matrix projection = baseProjection * view;
+    // Zoom-aware world projection
+    const float fgEffectiveWidth  = GAME_WIDTH  / m_cameraZoom;
+    const float fgEffectiveHeight = GAME_HEIGHT / m_cameraZoom;
+    Math::Vec2 fgCamPos = m_camera.GetPosition();
+    float fgOffsetX = std::round(fgEffectiveWidth  * 0.5f - fgCamPos.x);
+    float fgOffsetY = std::round(fgEffectiveHeight * 0.5f - fgCamPos.y);
+    Math::Matrix fgZoomedOrtho = Math::Matrix::CreateOrtho(
+        0.0f, fgEffectiveWidth, 0.0f, fgEffectiveHeight, -1.0f, 1.0f);
+    Math::Matrix fgZoomedView = Math::Matrix::CreateTranslation({ fgOffsetX, fgOffsetY });
+    Math::Matrix projection = fgZoomedOrtho * fgZoomedView;
 
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1799,7 +2199,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
                 robot.DrawOutline(*m_outlineShader);
             }
         }
-        for (const auto& robot : m_subway->GetRobots())
+        for (const auto& robot : m_train->GetRobots())
         {
             if (!robot.IsDead())
             {
@@ -1821,7 +2221,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     m_hallway->DrawDrones(textureShader);
     m_rooftop->DrawDrones(textureShader);
     m_underground->DrawDrones(textureShader);
-    m_subway->DrawDrones(textureShader);
+    m_train->DrawDrones(textureShader);
     droneManager->Draw(textureShader);
 
     // Pulse charger "remain" bars: draw before the player so the gauge sits behind the character.
@@ -1836,8 +2236,13 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         src.DrawRemainGauge(*colorShader);
     for (const auto& src : m_underground->GetPulseSources())
         src.DrawRemainGauge(*colorShader);
-    for (const auto& src : m_subway->GetPulseSources())
+    for (const auto& src : m_train->GetPulseSources())
         src.DrawRemainGauge(*colorShader);
+    if (m_trainAccessed && m_train)
+    {
+        m_train->DrawCar3SirenProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
+        m_train->DrawCarTransportInjectProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
+    }
     colorShader->setFloat("uAlpha", 1.0f);
 
     textureShader.use();
@@ -1901,13 +2306,15 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
     m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
     m_underground->DrawRadars(*colorShader, *m_debugRenderer);
-    m_subway->DrawRadars(*colorShader, *m_debugRenderer);
+    m_train->DrawRadars(*colorShader, *m_debugRenderer);
 
     droneManager->DrawGauges(*colorShader, *m_debugRenderer);
     m_hallway->DrawGauges(*colorShader, *m_debugRenderer);
     m_rooftop->DrawGauges(*colorShader, *m_debugRenderer);
     m_underground->DrawGauges(*colorShader, *m_debugRenderer);
-    m_subway->DrawGauges(*colorShader, *m_debugRenderer);
+    m_train->DrawGauges(*colorShader, *m_debugRenderer);
+
+    pulseManager->DrawDetonationVFX(*colorShader, *m_debugRenderer);
 
     // 7) Fullscreen frame overlay (1920x1080), camera-locked in world space
     if (m_hudFrame && m_hudFrame->GetWidth() > 0)
@@ -1924,15 +2331,15 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         textureShader.setFloat("tintStrength", 0.0f);
 
         Math::Vec2 camCenter = m_camera.GetPosition();
+        // Scale HUD frame to effective view size so it always fills the screen regardless of zoom
         Math::Matrix hudModel = Math::Matrix::CreateTranslation(camCenter)
-            * Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
+            * Math::Matrix::CreateScale({ fgEffectiveWidth, fgEffectiveHeight });
         m_hudFrame->Draw(textureShader, hudModel);
 
         GL::Disable(GL_BLEND);
     }
 
     // 8) Screen-space HUD (pulse gauge)
-
     GL::Enable(GL_BLEND);
     GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -1952,11 +2359,39 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
     m_font->DrawBakedText(*m_fontShader, m_fpsText, { 20.f, GAME_HEIGHT - 40.f }, 32.0f);
 
+    m_pulseDetonateSkill.DrawCooldownUI(*m_font, *m_fontShader, GAME_HEIGHT - 80.f);
+
     std::string countdownText = m_rooftop->GetLiftCountdownText();
     if (!countdownText.empty())
     {
         CachedTextureInfo countdownTexture = m_font->PrintToTexture(*m_fontShader, countdownText);
         m_font->DrawBakedText(*m_fontShader, countdownTexture, { GAME_WIDTH / 2.0f - 250.0f, 100.0f }, 50.0f);
+    }
+
+    // Train departure countdown / status — always plain text (not tied to narrative backdrop / Conversion art).
+    if (m_trainAccessed && m_train)
+    {
+        std::string trainMsg = m_train->GetDepartureAnnouncementText();
+        if (!trainMsg.empty())
+        {
+            constexpr float kTrainBannerFontH = 44.0f;
+            CachedTextureInfo trainMsgTex = m_font->PrintToTexture(*m_fontShader, trainMsg);
+            const float rw =
+                static_cast<float>(trainMsgTex.width) * (kTrainBannerFontH / static_cast<float>(m_font->m_fontHeight));
+            m_font->DrawBakedText(*m_fontShader, trainMsgTex,
+                { GAME_WIDTH * 0.5f - rw * 0.5f, GAME_HEIGHT - 120.0f }, kTrainBannerFontH);
+        }
+
+        std::string valveHint = m_train->GetCar5ValveHintBannerText();
+        if (!valveHint.empty())
+        {
+            constexpr float kValveHintFontH = 38.0f;
+            CachedTextureInfo valveTex = m_font->PrintToTexture(*m_fontShader, valveHint);
+            const float rw =
+                static_cast<float>(valveTex.width) * (kValveHintFontH / static_cast<float>(m_font->m_fontHeight));
+            m_font->DrawBakedText(*m_fontShader, valveTex, { GAME_WIDTH * 0.5f - rw * 0.5f, 125.0f },
+                                  kValveHintFontH);
+        }
     }
 
     m_tutorial->Draw(*m_font, *m_fontShader);
@@ -2028,14 +2463,12 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     colorShader->use();
     colorShader->setMat4("projection", baseProjection);
 
-    const float cursorSize = 16.0f;
-    const float cursorThick = 2.5f;
     Math::Vec2 cursorPos = { mouseGameX, mouseGameY };
 
     // Cursor sprite mode:
     // - Hover a left-click target => MouseLeft.png
     // - Hover a right-click (pulse charger) target => MouseRight.png
-    // - Otherwise => keep the original neon cross
+    // - Otherwise => MouseIdle.png
     bool overLeftClickTarget = false;
     bool overRightClickTarget = false;
 
@@ -2068,6 +2501,10 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             Collision::CheckPointInAABB(mouseWorldPosForHover, m_rooftop->GetLiftButtonPos(), m_rooftop->GetLiftButtonSize()))
             overLeftClickTarget = true;
 
+        if (!overLeftClickTarget && m_trainAccessed && m_train && m_train->GetCar3SirenActive() &&
+            m_train->IsCar3SirenMouseHoverForPulseInject(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
+            overLeftClickTarget = true;
+
         // Right-click targets (pulse chargers): player overlaps AND cursor is inside the source
         auto checkPulseSources = [&](const std::vector<PulseSource>& sources) {
             for (const auto& src : sources)
@@ -2084,7 +2521,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             checkPulseSources(m_hallway->GetPulseSources()) ||
             checkPulseSources(m_rooftop->GetPulseSources()) ||
             checkPulseSources(m_underground->GetPulseSources()) ||
-            checkPulseSources(m_subway->GetPulseSources()))
+            checkPulseSources(m_train->GetPulseSources()))
         {
             overRightClickTarget = true;
         }
@@ -2118,17 +2555,58 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         {
             for (const auto& d : m_underground->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
         }
-        if (!overLeftClickTarget && m_subwayAccessed)
+        if (!overLeftClickTarget && m_trainAccessed)
         {
-            for (const auto& d : m_subway->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
+            for (const auto& d : m_train->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
         }
+        if (!overLeftClickTarget && m_trainAccessed && m_train && m_train->GetCarTransportDroneManager())
+        {
+            for (const auto& d : m_train->GetCarTransportDroneManager()->GetDrones())
+            {
+                if (isMouseOnDrone(d))
+                {
+                    overLeftClickTarget = true;
+                    break;
+                }
+            }
+        }
+        if (!overLeftClickTarget && m_trainAccessed && m_train && m_train->GetSirenDroneManager())
+        {
+            for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
+            {
+                if (isMouseOnDrone(d))
+                {
+                    overLeftClickTarget = true;
+                    break;
+                }
+            }
+        }
+        if (!overLeftClickTarget && m_trainAccessed && m_train &&
+            m_train->IsCar2EnterLeavePromptHovered(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover, fgCamPos,
+                                                   fgEffectiveWidth * 0.5f))
+            overLeftClickTarget = true;
         if (!overLeftClickTarget && m_undergroundAccessed)
         {
             for (const auto& r : m_underground->GetRobots()) { if (isMouseOnRobot(r)) { overLeftClickTarget = true; break; } }
         }
-        if (!overLeftClickTarget && m_subwayAccessed)
+        if (!overLeftClickTarget && m_trainAccessed)
         {
-            for (const auto& r : m_subway->GetRobots()) { if (isMouseOnRobot(r)) { overLeftClickTarget = true; break; } }
+            for (const auto& r : m_train->GetRobots()) { if (isMouseOnRobot(r)) { overLeftClickTarget = true; break; } }
+        }
+
+        // 운반 차량: 플레이어와 차 히트박스 겹침 + 마우스가 차 위 → 좌클릭 커서
+        if (!overLeftClickTarget && m_trainAccessed && m_train)
+        {
+            int carSlot = -1;
+            if (m_train->TryGetCarTransportClickIgniteTarget(playerHitboxCenter, playerHitboxSize,
+                                                             mouseWorldPosForHover, carSlot))
+                overLeftClickTarget = true;
+        }
+
+        if (!overLeftClickTarget && m_trainAccessed && m_train)
+        {
+            if (m_train->IsValveMouseHoverable(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
+                overLeftClickTarget = true;
         }
     }
 
@@ -2160,34 +2638,26 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         else if (showRightCursor && m_mouseRightCursor)
             m_mouseRightCursor->Draw(textureShader, iconModel);
     }
-    else
+    else if (m_mouseIdleCursor)
     {
-        // Additive blending: cursor adds light to the scene, always visible in darkness
-        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE);
+        // Draw idle cursor sprite in normal state
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Outer glow (neon cyan: R=0, G=1, B=0.8 via DrawCircle / B=0.2 via DrawBox)
-    colorShader->setFloat("uAlpha", 0.07f);
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 3.2f, cursorThick * 6.0f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 6.0f, cursorSize * 3.2f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 24.0f, { 0.0f, 1.0f });
+        textureShader.use();
+        textureShader.setMat4("projection", baseProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        textureShader.setFloat("tintStrength", 0.0f);
 
-    // Mid glow
-    colorShader->setFloat("uAlpha", 0.18f);
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.5f, cursorThick * 3.5f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick * 3.5f, cursorSize * 2.5f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 15.0f, { 0.0f, 1.0f });
-
-    // Sharp core (full brightness, neon cyan)
-    colorShader->setFloat("uAlpha", 1.0f);
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorSize * 2.0f, cursorThick }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawBox(*colorShader, cursorPos, { cursorThick, cursorSize * 2.0f }, { 0.0f, 1.0f });
-    m_debugRenderer->DrawCircle(*colorShader, cursorPos, 4.5f, { 0.5f, 1.0f });
-
-    // Restore normal blending and reset alpha
-    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    colorShader->setFloat("uAlpha", 1.0f);
-
-    } // end cursor cross (else branch)
+        const float iconSize = 32.0f;
+        Math::Matrix iconModel =
+            Math::Matrix::CreateTranslation(cursorPos) *
+            Math::Matrix::CreateRotation(15.0f) *
+            Math::Matrix::CreateScale({ iconSize, iconSize });
+        m_mouseIdleCursor->Draw(textureShader, iconModel);
+    }
 
     // 11) Debug overlay
     if (m_isDebugDraw)
@@ -2234,12 +2704,36 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             }
         }
 
-        for (const auto& drone : m_subway->GetDrones())
+        for (const auto& drone : m_train->GetDrones())
         {
             if (!drone.IsDead())
             {
                 m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
                 m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+            }
+        }
+
+        if (m_train && m_train->GetCarTransportDroneManager())
+        {
+            for (const auto& drone : m_train->GetCarTransportDroneManager()->GetDrones())
+            {
+                if (!drone.IsDead())
+                {
+                    m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+                    m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+                }
+            }
+        }
+
+        if (m_train && m_train->GetSirenDroneManager())
+        {
+            for (const auto& drone : m_train->GetSirenDroneManager()->GetDrones())
+            {
+                if (!drone.IsDead())
+                {
+                    m_debugRenderer->DrawBox(*colorShader, drone.GetPosition(), drone.GetSize() * 0.8f, { 1.0f, 1.0f });
+                    m_debugRenderer->DrawCircle(*colorShader, drone.GetPosition(), Drone::DETECTION_RANGE, { 1.0f, 0.5f });
+                }
             }
         }
 
@@ -2257,7 +2751,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_hallway->DrawDebug(*colorShader, *m_debugRenderer);
         m_rooftop->DrawDebug(*colorShader, *m_debugRenderer);
         m_underground->DrawDebug(*colorShader, *m_debugRenderer);
-        m_subway->DrawDebug(*colorShader, *m_debugRenderer);
+        m_train->DrawDebug(*colorShader, *m_debugRenderer);
         m_door->DrawDebug(*colorShader);
         m_rooftopDoor->DrawDebug(*colorShader);
     }
@@ -2298,7 +2792,7 @@ void GameplayState::Shutdown()
     m_hallway->Shutdown();
     m_rooftop->Shutdown();
     m_underground->Shutdown();
-    m_subway->Shutdown();
+    m_train->Shutdown();
     player.Shutdown();
     droneManager->Shutdown();
     m_pulseGauge.Shutdown();
@@ -2307,6 +2801,7 @@ void GameplayState::Shutdown()
     m_rooftopDoor->Shutdown();
     pulseManager->Shutdown();
 
+    if (m_mouseIdleCursor) m_mouseIdleCursor->Shutdown();
     if (m_mouseLeftCursor) m_mouseLeftCursor->Shutdown();
     if (m_mouseRightCursor) m_mouseRightCursor->Shutdown();
     if (m_hudFrame) m_hudFrame->Shutdown();

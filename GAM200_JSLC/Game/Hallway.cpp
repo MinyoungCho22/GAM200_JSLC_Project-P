@@ -74,7 +74,7 @@ void Hallway::ApplyConfig(const HallwayObjectConfig& cfg)
 
 void Hallway::Update(double dt, Math::Vec2 playerCenter, Math::Vec2 playerHitboxSize, Player& player, bool isPlayerHiding)
 {
-    m_droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding);
+    m_droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding, true, 1.f);
 
     Math::Vec2 playerPos = player.GetPosition();
 
@@ -245,6 +245,12 @@ const std::vector<PulseSource>& Hallway::GetPulseSources() const
 std::vector<PulseSource>& Hallway::GetPulseSources()
 {
     return m_pulseSources;
+}
+
+void Hallway::RefillPulseSourcesAfterCheckpointRespawn()
+{
+    for (auto& s : m_pulseSources)
+        s.RefillStock();
 }
 
 const std::vector<Hallway::HidingSpot>& Hallway::GetHidingSpots() const

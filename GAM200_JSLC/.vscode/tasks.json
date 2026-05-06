@@ -6,10 +6,8 @@
             "type": "shell",
             "command": "cmake",
             "args": [
-                "-S",
-                ".",
-                "-B",
-                "build"
+                "--preset",
+                "vs2022-x64"
             ],
             "group": {
                 "kind": "build",
@@ -27,7 +25,8 @@
             "command": "cmake",
             "args": [
                 "--build",
-                "build"
+                "--preset",
+                "vs2022-debug"
             ],
             "group": {
                 "kind": "build",
@@ -38,7 +37,7 @@
                 "panel": "dedicated"
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile"
             ],
             "dependsOn": "CMake: Configure"
         },
@@ -48,7 +47,8 @@
             "command": "cmake",
             "args": [
                 "--build",
-                "build",
+                "--preset",
+                "vs2022-debug",
                 "--target",
                 "clean"
             ],
@@ -65,7 +65,8 @@
             "command": "cmake",
             "args": [
                 "--build",
-                "build",
+                "--preset",
+                "vs2022-debug",
                 "--",
                 "--clean-first"
             ],
@@ -75,9 +76,43 @@
                 "panel": "dedicated"
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile"
             ],
             "dependsOn": "CMake: Configure"
+        },
+        {
+            "label": "MSBuild: Debug x64 (vcxproj)",
+            "type": "process",
+            "command": "${env:ProgramFiles}\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+            "args": [
+                "${workspaceFolder}\\GAM200_JSLC.vcxproj",
+                "/p:Configuration=Debug",
+                "/p:Platform=x64",
+                "/v:minimal"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "MSBuild: Release x64 (vcxproj)",
+            "type": "process",
+            "command": "${env:ProgramFiles}\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+            "args": [
+                "${workspaceFolder}\\GAM200_JSLC.vcxproj",
+                "/p:Configuration=Release",
+                "/p:Platform=x64",
+                "/v:minimal"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": "$msCompile"
         }
     ]
 }

@@ -4,6 +4,7 @@
 #include "DroneManager.hpp"
 #include "../Engine/Logger.hpp"
 #include <algorithm>
+#include <cmath>
 
 void TraceSystem::Initialize()
 {
@@ -13,7 +14,7 @@ void TraceSystem::Initialize()
 void TraceSystem::OnDroneKilled(DroneManager& droneManager, Math::Vec2 spawnOrigin)
 {
     m_killCount++;
-    Logger::Instance().Log(Logger::Severity::Event, "Drone kill count: %d", m_killCount);
+    Logger::Instance().Log(Logger::Severity::Verbose, "Drone kill count: %d", m_killCount);
 
     // Progression Logic: Level 1 starts after the 1st kill
     if (m_killCount == 1 && m_warningLevel == 0)
@@ -26,32 +27,40 @@ void TraceSystem::OnDroneKilled(DroneManager& droneManager, Math::Vec2 spawnOrig
     {
         m_warningLevel = 2;
         SpawnTracerWave(droneManager, m_warningLevel, spawnOrigin);
-        Logger::Instance().Log(Logger::Severity::Event, "Warning Level 2 Reached!");
+        Logger::Instance().Log(Logger::Severity::Verbose, "Warning Level 2 Reached!");
     }
 }
 
 void TraceSystem::SpawnTracerWave(DroneManager& droneManager, int warningLevel, Math::Vec2 origin)
 {
-    Logger::Instance().Log(Logger::Severity::Event, "Spawning tracer wave! (Level %d) at (%.1f, %.1f)", warningLevel, origin.x, origin.y);
+    Logger::Instance().Log(Logger::Severity::Verbose, "Spawning tracer wave! (Level %d) at (%.1f, %.1f)", warningLevel,
+                            origin.x, origin.y);
 
-    // Reinforcements appear at an offset from the original kill site
-    float offsetX = 600.0f;
-    float offsetY = 300.0f;
+    constexpr float PI = 3.14159265359f;
+
+    auto spawnOne = [&](float ang, float radius, float speed, float angJitter) {
+        const float a  = ang + angJitter;
+        const float rx = std::cos(a) * radius;
+        const float ry = std::sin(a) * radius * 0.62f;
+        Drone&      d  = droneManager.SpawnDrone({ origin.x + rx, origin.y + ry }, "Asset/Drone.png", true);
+        d.SetBaseSpeed(speed);
+        d.SetTracerHeatLevel(warningLevel);
+    };
 
     if (warningLevel == 1)
     {
-        // More varied: slow / medium / fast mix.
-        droneManager.SpawnDrone({ origin.x + offsetX, origin.y + offsetY }, "Asset/Drone.png", true).SetBaseSpeed(55.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX + 50.0f, origin.y + offsetY + 100.0f }, "Asset/Drone.png", true).SetBaseSpeed(95.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX - 50.0f, origin.y + offsetY + 200.0f }, "Asset/Drone.png", true).SetBaseSpeed(145.0f);
+        const float r0 = 560.f;
+        spawnOne(-0.15f * PI, r0 + 40.f, 58.f, 0.04f);
+        spawnOne(0.10f * PI, r0 + 10.f, 98.f, -0.05f);
+        spawnOne(0.38f * PI, r0 + 70.f, 138.f, 0.03f);
     }
     else if (warningLevel == 2)
     {
-        // Broad variation: very slow to quite fast tracers.
-        droneManager.SpawnDrone({ origin.x + offsetX, origin.y + offsetY }, "Asset/Drone.png", true).SetBaseSpeed(50.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX + 50.0f, origin.y + offsetY + 100.0f }, "Asset/Drone.png", true).SetBaseSpeed(80.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX - 50.0f, origin.y + offsetY + 200.0f }, "Asset/Drone.png", true).SetBaseSpeed(165.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX + 100.0f, origin.y + offsetY + 50.0f }, "Asset/Drone.png", true).SetBaseSpeed(70.0f);
-        droneManager.SpawnDrone({ origin.x + offsetX - 100.0f, origin.y + offsetY + 250.0f }, "Asset/Drone.png", true).SetBaseSpeed(130.0f);
+        const float r0 = 520.f;
+        spawnOne(-0.22f * PI, r0 + 90.f, 52.f, 0.02f);
+        spawnOne(-0.02f * PI, r0 + 20.f, 78.f, -0.04f);
+        spawnOne(0.18f * PI, r0 + 55.f, 108.f, 0.05f);
+        spawnOne(0.42f * PI, r0 + 35.f, 68.f, -0.03f);
+        spawnOne(0.62f * PI, r0 + 80.f, 152.f, 0.04f);
     }
 }

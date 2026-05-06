@@ -50,7 +50,7 @@ private:
     int   m_fpsIndex     = 1;      // 0=30, 1=60, 2=144, 3=240, 4=No Limit
     bool  m_vsyncEnabled = false;
     bool  m_fullscreenEnabled = false;
-    float m_masterVolume = 0.8f;   // 0.0 to 1.0
+    float m_masterVolume = 0.4f;   // 0.0 to 1.0
     float m_padAimSensitivity = 1.0f;
     bool  m_dialogueEnabled = true;
 

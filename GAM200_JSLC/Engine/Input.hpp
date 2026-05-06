@@ -27,6 +27,7 @@ namespace Input
         J = 74,
         K = 75,
         L = 76,
+        Q = 81,
         S = 83,
         W = 87,
         Escape = 256,

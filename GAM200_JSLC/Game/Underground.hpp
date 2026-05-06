@@ -61,9 +61,15 @@ public:
     void ClearAllDrones();
 
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
+    void RefillPulseSourcesAfterCheckpointRespawn();
 
     const std::vector<Robot>& GetRobots() const { return m_robots; }
     std::vector<Robot>& GetRobots() { return m_robots; }
+
+    /// Q 펄스: 반경 내 스토커 로봇 넉백 + 데미지 (열차 맵과 동일 논리)
+    void ApplyPulseToRobots(Math::Vec2 pulseWorldCenter, float radius);
+
+    bool IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
 
 private:
     std::unique_ptr<Background> m_background;
@@ -76,4 +82,11 @@ private:
     std::vector<Ramp> m_ramps;
     std::vector<PulseSource> m_pulseSources;
     std::vector<Robot> m_robots;
+
+    struct HidingVolume
+    {
+        Math::Vec2 center{};
+        Math::Vec2 size{};
+    };
+    std::vector<HidingVolume> m_hidingSpots;
 };

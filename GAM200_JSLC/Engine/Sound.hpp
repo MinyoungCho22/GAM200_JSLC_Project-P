@@ -40,7 +40,7 @@ private:
     FMOD::System* m_system         = nullptr;
     void*         m_extraDriverData = nullptr;
 #endif
-    float m_masterVolume = 0.8f;
+    float m_masterVolume = 0.4f;
 };
 
 class Sound
