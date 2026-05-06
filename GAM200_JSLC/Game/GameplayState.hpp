@@ -106,6 +106,7 @@ private:
     std::unique_ptr<Underground> m_underground;
     std::unique_ptr<Train> m_train;
     std::unique_ptr<Background> m_mouseIdleCursor;
+    std::unique_ptr<Background> m_mousePointerCursor;
     std::unique_ptr<Background> m_mouseLeftCursor;
     std::unique_ptr<Background> m_mouseRightCursor;
     std::unique_ptr<Background> m_hudFrame;

@@ -165,6 +165,8 @@ void GameplayState::Initialize()
     // Custom cursor sprites
     m_mouseIdleCursor = std::make_unique<Background>();
     m_mouseIdleCursor->InitializeWithBlackKeyTransparency("Asset/MouseIdle.png");
+    m_mousePointerCursor = std::make_unique<Background>();
+    m_mousePointerCursor->InitializeWithBlackKeyTransparency("Asset/MousePointer.png");
     m_mouseLeftCursor = std::make_unique<Background>();
     m_mouseLeftCursor->InitializeWithBlackKeyTransparency("Asset/MouseLeft.png");
     m_mouseRightCursor = std::make_unique<Background>();
@@ -2478,19 +2480,24 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     Math::Vec2 cursorPos = { mouseGameX, mouseGameY };
 
     // Cursor sprite mode:
-    // - Hover a left-click target => MouseLeft.png
-    // - Hover a right-click (pulse charger) target => MouseRight.png
-    // - Otherwise => MouseIdle.png
-    bool overLeftClickTarget = false;
-    bool overRightClickTarget = false;
+    // - Hover actionable left target => MouseLeft.png
+    // - Hover pulse charger (right) => MouseRight.png
+    // - Hover combat unit out of attack range / blocked => MouseIdle.png
+    // - Hover other world geometry without usable interaction => MouseIdle.png
+    // - Empty space / no target => MousePointer.png
+    bool overLeftClickTarget     = false;
+    bool overRightClickTarget    = false;
+    bool showCombatIdleCursor    = false;
+    bool showIdleOverWorldObject = false;
 
     const bool storyDialogueBlocking = m_storyDialogue && m_storyDialogue->IsBlocking();
 
     if (!m_isDebugDraw && !storyDialogueBlocking)
     {
         const Math::Vec2 mouseWorldPosForHover = m_lastMouseWorldPos;
-        const Math::Vec2 playerHitboxCenter = player.GetHitboxCenter();
-        const Math::Vec2 playerHitboxSize = player.GetHitboxSize();
+        const Math::Vec2 playerHitboxCenter    = player.GetHitboxCenter();
+        const Math::Vec2 playerHitboxSize      = player.GetHitboxSize();
+        const Math::Vec2 playerPosForCursor    = player.GetPosition();
 
         // Left-click targets
         if (m_door && !m_door->IsOpened() && m_door->IsPlayerNearby() &&
@@ -2538,73 +2545,105 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             overRightClickTarget = true;
         }
 
-        // Combat targets are also left-click targets: drones/robots/tracers.
+        // Combat: beam과 동일 — 사거리 안 + 입력 가능할 때만 좌클릭 커서; 그 외 호버는 Idle
+        bool combatHoverInRange    = false;
+        bool combatHoverOutOfRange = false;
+
+        const bool hallwayHidingBlocksDroneAttack =
+            m_doorOpened && !m_rooftopAccessed
+            && m_hallway->IsPlayerHiding(playerPosForCursor, playerHitboxSize, player.IsCrouching());
+        const bool hideRoom =
+            m_room->IsPlayerHiding(playerPosForCursor, playerHitboxSize, player.IsCrouching());
+        const bool hideHall =
+            m_hallway->IsPlayerHiding(playerPosForCursor, playerHitboxSize, player.IsCrouching());
+        const bool hideUg =
+            m_undergroundAccessed && m_underground
+            && m_underground->IsPlayerHiding(playerPosForCursor, playerHitboxSize, player.IsCrouching());
+        const bool hideTrain =
+            m_trainAccessed && m_train
+            && m_train->IsPlayerHiding(playerPosForCursor, playerHitboxSize, player.IsCrouching());
+        const bool cursorCombatAttackAllowed =
+            !(player.IsCrouching() && (hideRoom || hideHall || hideUg || hideTrain));
+
         const float droneHoverScale =
             inputForCursor.IsGamepadConnected() ? kGamepadDroneAimHitboxScale : 0.8f;
-        auto isMouseOnDrone = [&](const Drone& drone) {
+        const Math::Vec2 kCursorHitboxCombat{ 32.0f, 32.0f };
+        auto isMouseOnDroneForCursor = [&](const Drone& drone) {
             if (drone.IsDead() || drone.IsHit()) return false;
-            return Collision::CheckPointInAABB(mouseWorldPosForHover, drone.GetPosition(),
-                                               drone.GetSize() * droneHoverScale);
+            const Math::Vec2 hb = drone.GetSize() * droneHoverScale;
+            return Collision::CheckPointInAABB(mouseWorldPosForHover, drone.GetPosition(), hb)
+                || Collision::CheckAABB(mouseWorldPosForHover, kCursorHitboxCombat, drone.GetPosition(), hb);
         };
-        auto isMouseOnRobot = [&](const Robot& robot) {
+        auto isMouseOnRobotForCursor = [&](const Robot& robot) {
             if (robot.IsDead()) return false;
-            return Collision::CheckPointInAABB(mouseWorldPosForHover, robot.GetPosition(), robot.GetSize());
+            const Math::Vec2 sz = robot.GetSize();
+            return Collision::CheckPointInAABB(mouseWorldPosForHover, robot.GetPosition(), sz)
+                || Collision::CheckAABB(mouseWorldPosForHover, kCursorHitboxCombat, robot.GetPosition(), sz);
         };
 
-        if (!overLeftClickTarget)
+        auto droneInAttackRangeForCursor = [&](const Drone& drone) {
+            const float      distSq = (playerHitboxCenter - drone.GetPosition()).LengthSq();
+            const Math::Vec2 hb     = drone.GetSize() * droneHoverScale;
+            const float      rad    = (hb.x + hb.y) * 0.25f;
+            const float      limitSq = (ATTACK_RANGE + rad) * (ATTACK_RANGE + rad);
+            return distSq < limitSq;
+        };
+        auto robotInAttackRangeForCursor = [&](const Robot& robot) {
+            const float      distSq = (playerHitboxCenter - robot.GetPosition()).LengthSq();
+            const Math::Vec2 sz     = robot.GetSize();
+            const float      rad    = (sz.x + sz.y) * 0.25f;
+            const float      limitSq = (ATTACK_RANGE + rad) * (ATTACK_RANGE + rad);
+            return distSq < limitSq;
+        };
+        auto considerDroneCombatCursor = [&](const Drone& drone, bool groupAllowsAttack) {
+            if (drone.IsDead() || drone.IsHit()) return;
+            if (!isMouseOnDroneForCursor(drone)) return;
+            const bool ok =
+                cursorCombatAttackAllowed && groupAllowsAttack && droneInAttackRangeForCursor(drone);
+            if (ok) combatHoverInRange = true;
+            else combatHoverOutOfRange = true;
+        };
+        auto considerRobotCombatCursor = [&](const Robot& robot, bool groupAllowsAttack) {
+            if (robot.IsDead()) return;
+            if (!isMouseOnRobotForCursor(robot)) return;
+            const bool ok =
+                cursorCombatAttackAllowed && groupAllowsAttack && robotInAttackRangeForCursor(robot);
+            if (ok) combatHoverInRange = true;
+            else combatHoverOutOfRange = true;
+        };
+
+        for (const auto& d : droneManager->GetDrones())
+            considerDroneCombatCursor(d, true);
+        for (const auto& d : m_hallway->GetDrones())
+            considerDroneCombatCursor(d, !hallwayHidingBlocksDroneAttack);
+        for (const auto& d : m_rooftop->GetDrones()) considerDroneCombatCursor(d, true);
+        if (m_undergroundAccessed)
         {
-            for (const auto& d : droneManager->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
+            for (const auto& d : m_underground->GetDrones()) considerDroneCombatCursor(d, true);
+            for (const auto& r : m_underground->GetRobots()) considerRobotCombatCursor(r, true);
         }
-        if (!overLeftClickTarget)
+        if (m_trainAccessed && m_train)
         {
-            for (const auto& d : m_hallway->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
-        }
-        if (!overLeftClickTarget)
-        {
-            for (const auto& d : m_rooftop->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
-        }
-        if (!overLeftClickTarget && m_undergroundAccessed)
-        {
-            for (const auto& d : m_underground->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
-        }
-        if (!overLeftClickTarget && m_trainAccessed)
-        {
-            for (const auto& d : m_train->GetDrones()) { if (isMouseOnDrone(d)) { overLeftClickTarget = true; break; } }
-        }
-        if (!overLeftClickTarget && m_trainAccessed && m_train && m_train->GetCarTransportDroneManager())
-        {
-            for (const auto& d : m_train->GetCarTransportDroneManager()->GetDrones())
+            for (const auto& d : m_train->GetDrones()) considerDroneCombatCursor(d, true);
+            if (m_train->GetCarTransportDroneManager())
             {
-                if (isMouseOnDrone(d))
-                {
-                    overLeftClickTarget = true;
-                    break;
-                }
+                for (const auto& d : m_train->GetCarTransportDroneManager()->GetDrones())
+                    considerDroneCombatCursor(d, true);
             }
-        }
-        if (!overLeftClickTarget && m_trainAccessed && m_train && m_train->GetSirenDroneManager())
-        {
-            for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
+            if (m_train->GetSirenDroneManager())
             {
-                if (isMouseOnDrone(d))
-                {
-                    overLeftClickTarget = true;
-                    break;
-                }
+                for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
+                    considerDroneCombatCursor(d, true);
             }
+            for (const auto& r : m_train->GetRobots()) considerRobotCombatCursor(r, true);
         }
+
+        if (combatHoverInRange) overLeftClickTarget = true;
+
         if (!overLeftClickTarget && m_trainAccessed && m_train &&
             m_train->IsCar2EnterLeavePromptHovered(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover, fgCamPos,
                                                    fgEffectiveWidth * 0.5f))
             overLeftClickTarget = true;
-        if (!overLeftClickTarget && m_undergroundAccessed)
-        {
-            for (const auto& r : m_underground->GetRobots()) { if (isMouseOnRobot(r)) { overLeftClickTarget = true; break; } }
-        }
-        if (!overLeftClickTarget && m_trainAccessed)
-        {
-            for (const auto& r : m_train->GetRobots()) { if (isMouseOnRobot(r)) { overLeftClickTarget = true; break; } }
-        }
 
         // 운반 차량: 플레이어와 차 히트박스 겹침 + 마우스가 차 위 → 좌클릭 커서
         if (!overLeftClickTarget && m_trainAccessed && m_train)
@@ -2620,10 +2659,187 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             if (m_train->IsValveMouseHoverable(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
                 overLeftClickTarget = true;
         }
+
+        showCombatIdleCursor =
+            combatHoverOutOfRange && !combatHoverInRange && !overLeftClickTarget && !overRightClickTarget;
+
+        if (!overLeftClickTarget && !overRightClickTarget && !showCombatIdleCursor)
+        {
+            const Math::Vec2 mpos = mouseWorldPosForHover;
+            auto pointOnAabb = [&](Math::Vec2 center, Math::Vec2 size) {
+                return Collision::CheckPointInAABB(mpos, center, size)
+                    || Collision::CheckAABB(mpos, kCursorHitboxCombat, center, size);
+            };
+
+            auto anyPulseGeom = [&](const std::vector<PulseSource>& sources) {
+                for (const auto& src : sources)
+                {
+                    if (pointOnAabb(src.GetPosition(), src.GetHitboxSize()))
+                        return true;
+                }
+                return false;
+            };
+
+            auto geomOnDrone = [&](const Drone& drone) {
+                const Math::Vec2 hb = drone.GetSize() * droneHoverScale;
+                return Collision::CheckPointInAABB(mpos, drone.GetPosition(), hb)
+                    || Collision::CheckAABB(mpos, kCursorHitboxCombat, drone.GetPosition(), hb);
+            };
+            auto tryDroneList = [&](const std::vector<Drone>& ds) {
+                for (const auto& d : ds)
+                {
+                    if (geomOnDrone(d))
+                        return true;
+                }
+                return false;
+            };
+            auto geomOnRobot = [&](const Robot& robot) {
+                const Math::Vec2 sz = robot.GetSize();
+                return Collision::CheckPointInAABB(mpos, robot.GetPosition(), sz)
+                    || Collision::CheckAABB(mpos, kCursorHitboxCombat, robot.GetPosition(), sz);
+            };
+            auto tryRobotList = [&](const std::vector<Robot>& rs) {
+                for (const auto& r : rs)
+                {
+                    if (geomOnRobot(r))
+                        return true;
+                }
+                return false;
+            };
+
+            if (anyPulseGeom(m_room->GetPulseSources()) || anyPulseGeom(m_hallway->GetPulseSources())
+                || anyPulseGeom(m_rooftop->GetPulseSources()) || anyPulseGeom(m_underground->GetPulseSources())
+                || anyPulseGeom(m_train->GetPulseSources()))
+                showIdleOverWorldObject = true;
+
+            if (!showIdleOverWorldObject && m_door && pointOnAabb(m_door->GetPosition(), m_door->GetSize()))
+                showIdleOverWorldObject = true;
+            if (!showIdleOverWorldObject && m_rooftopDoor && pointOnAabb(m_rooftopDoor->GetPosition(), m_rooftopDoor->GetSize()))
+                showIdleOverWorldObject = true;
+            if (!showIdleOverWorldObject && m_room && pointOnAabb(m_room->GetBlindPos(), m_room->GetBlindSize()))
+                showIdleOverWorldObject = true;
+            if (!showIdleOverWorldObject && m_rooftop && pointOnAabb(m_rooftop->GetHolePos(), m_rooftop->GetHoleSize()))
+                showIdleOverWorldObject = true;
+            if (!showIdleOverWorldObject && m_rooftop
+                && pointOnAabb(m_rooftop->GetLiftButtonPos(), m_rooftop->GetLiftButtonSize()))
+                showIdleOverWorldObject = true;
+
+            if (!showIdleOverWorldObject && m_hallway
+                && pointOnAabb(m_hallway->GetObstacleCenter(), m_hallway->GetObstacleSize()))
+                showIdleOverWorldObject = true;
+            if (!showIdleOverWorldObject && m_hallway)
+            {
+                for (const auto& spot : m_hallway->GetHidingSpots())
+                {
+                    if (pointOnAabb(spot.pos, spot.size))
+                    {
+                        showIdleOverWorldObject = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!showIdleOverWorldObject && m_undergroundAccessed && m_underground
+                && m_underground->IsPointOverConfiguredGeometry(mpos, kCursorHitboxCombat))
+                showIdleOverWorldObject = true;
+
+            if (!showIdleOverWorldObject && m_train && m_train->IsPointOverWorldCollisionAABB(mpos, kCursorHitboxCombat))
+                showIdleOverWorldObject = true;
+            if (!showIdleOverWorldObject && m_trainAccessed && m_train)
+            {
+                const float tl = Train::MIN_X + m_train->GetTrainOffset();
+                for (const auto& hs : m_train->GetHidingSpots())
+                {
+                    const Math::Vec2 wc = { tl + hs.localCenter.x, Train::MIN_Y + hs.localCenter.y };
+                    if (pointOnAabb(wc, hs.size))
+                    {
+                        showIdleOverWorldObject = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!showIdleOverWorldObject && tryDroneList(droneManager->GetDrones()))
+                showIdleOverWorldObject = true;
+            if (!showIdleOverWorldObject)
+            {
+                for (const auto& d : m_hallway->GetDrones())
+                {
+                    if (geomOnDrone(d))
+                    {
+                        showIdleOverWorldObject = true;
+                        break;
+                    }
+                }
+            }
+            if (!showIdleOverWorldObject)
+            {
+                for (const auto& d : m_rooftop->GetDrones())
+                {
+                    if (geomOnDrone(d))
+                    {
+                        showIdleOverWorldObject = true;
+                        break;
+                    }
+                }
+            }
+            if (!showIdleOverWorldObject && m_undergroundAccessed)
+            {
+                for (const auto& d : m_underground->GetDrones())
+                {
+                    if (geomOnDrone(d))
+                    {
+                        showIdleOverWorldObject = true;
+                        break;
+                    }
+                }
+            }
+            if (!showIdleOverWorldObject && m_trainAccessed && m_train)
+            {
+                for (const auto& d : m_train->GetDrones())
+                {
+                    if (geomOnDrone(d))
+                    {
+                        showIdleOverWorldObject = true;
+                        break;
+                    }
+                }
+                if (!showIdleOverWorldObject && m_train->GetCarTransportDroneManager())
+                {
+                    for (const auto& d : m_train->GetCarTransportDroneManager()->GetDrones())
+                    {
+                        if (geomOnDrone(d))
+                        {
+                            showIdleOverWorldObject = true;
+                            break;
+                        }
+                    }
+                }
+                if (!showIdleOverWorldObject && m_train->GetSirenDroneManager())
+                {
+                    for (const auto& d : m_train->GetSirenDroneManager()->GetDrones())
+                    {
+                        if (geomOnDrone(d))
+                        {
+                            showIdleOverWorldObject = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!showIdleOverWorldObject && m_undergroundAccessed && tryRobotList(m_underground->GetRobots()))
+                showIdleOverWorldObject = true;
+            if (!showIdleOverWorldObject && m_trainAccessed && m_train && tryRobotList(m_train->GetRobots()))
+                showIdleOverWorldObject = true;
+        }
     }
 
     const bool showLeftCursor = overLeftClickTarget && !overRightClickTarget;
     const bool showRightCursor = overRightClickTarget && !overLeftClickTarget;
+    const bool showMouseIdleCursor =
+        storyDialogueBlocking
+        || (!m_isDebugDraw && (showCombatIdleCursor || showIdleOverWorldObject));
 
     if (showLeftCursor || showRightCursor)
     {
@@ -2650,9 +2866,46 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         else if (showRightCursor && m_mouseRightCursor)
             m_mouseRightCursor->Draw(textureShader, iconModel);
     }
+    else if (m_mouseIdleCursor && showMouseIdleCursor)
+    {
+        // 스토리, 전투 호버 불가, 또는 상호작용 없는 월드 오브젝트 위
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        textureShader.use();
+        textureShader.setMat4("projection", baseProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        textureShader.setFloat("tintStrength", 0.0f);
+
+        const float iconSize = 32.0f;
+        Math::Matrix iconModel =
+            Math::Matrix::CreateTranslation(cursorPos) *
+            Math::Matrix::CreateRotation(15.0f) *
+            Math::Matrix::CreateScale({ iconSize, iconSize });
+        m_mouseIdleCursor->Draw(textureShader, iconModel);
+    }
+    else if (!storyDialogueBlocking && m_mousePointerCursor && m_mousePointerCursor->GetWidth() > 0)
+    {
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        textureShader.use();
+        textureShader.setMat4("projection", baseProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        textureShader.setFloat("tintStrength", 0.0f);
+
+        const float iconSize = 50.0f;
+        Math::Matrix iconModel =
+            Math::Matrix::CreateTranslation(cursorPos) *
+            Math::Matrix::CreateScale({ iconSize, iconSize });
+        m_mousePointerCursor->Draw(textureShader, iconModel);
+    }
     else if (m_mouseIdleCursor)
     {
-        // Draw idle cursor sprite in normal state
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         textureShader.use();
@@ -2814,6 +3067,7 @@ void GameplayState::Shutdown()
     pulseManager->Shutdown();
 
     if (m_mouseIdleCursor) m_mouseIdleCursor->Shutdown();
+    if (m_mousePointerCursor) m_mousePointerCursor->Shutdown();
     if (m_mouseLeftCursor) m_mouseLeftCursor->Shutdown();
     if (m_mouseRightCursor) m_mouseRightCursor->Shutdown();
     if (m_hudFrame) m_hudFrame->Shutdown();

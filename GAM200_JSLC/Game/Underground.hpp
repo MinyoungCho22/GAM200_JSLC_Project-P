@@ -70,6 +70,8 @@ public:
     void ApplyPulseToRobots(Math::Vec2 pulseWorldCenter, float radius);
 
     bool IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
+    /// 커서용: JSON 장애물·라이트·램프 위(상호작용 없어도 오브젝트로 간주)
+    bool IsPointOverConfiguredGeometry(Math::Vec2 worldPos, Math::Vec2 cursorHitboxSize) const;
 
 private:
     std::unique_ptr<Background> m_background;

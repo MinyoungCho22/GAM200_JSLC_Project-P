@@ -893,6 +893,32 @@ bool Train::IsValveMouseHoverable(Math::Vec2 playerHbCenter, Math::Vec2 playerHb
         || Collision::CheckAABB(mouseWorldPos, { 32.0f, 32.0f }, valveWorld, m_valveVisualSize);
 }
 
+bool Train::IsPointOverWorldCollisionAABB(Math::Vec2 worldPos, Math::Vec2 cursorHitboxSize) const
+{
+    auto test = [&](const Math::Vec2& wc, const Math::Vec2& sz) {
+        return Collision::CheckPointInAABB(worldPos, wc, sz)
+            || Collision::CheckAABB(worldPos, cursorHitboxSize, wc, sz);
+    };
+    const float tl = MIN_X + m_trainOffset;
+    for (const auto& hb : m_trainHitboxes)
+    {
+        if (!hb.collision)
+            continue;
+        const Math::Vec2 wc = { tl + hb.localCenter.x, MIN_Y + hb.localCenter.y };
+        if (test(wc, hb.size))
+            return true;
+    }
+    for (const auto& hb : m_staticWorldHitboxes)
+    {
+        if (!hb.collision)
+            continue;
+        const Math::Vec2 wc = { MIN_X + hb.localCenter.x, MIN_Y + hb.localCenter.y };
+        if (test(wc, hb.size))
+            return true;
+    }
+    return false;
+}
+
 void Train::UpdateValveWaterParticles(float dt)
 {
     const float gravityY = -1200.0f;

@@ -549,6 +549,35 @@ bool Underground::IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHit
     return false;
 }
 
+bool Underground::IsPointOverConfiguredGeometry(Math::Vec2 worldPos, Math::Vec2 cursorHitboxSize) const
+{
+    auto test = [&](const Math::Vec2& c, const Math::Vec2& sz) {
+        return Collision::CheckPointInAABB(worldPos, c, sz)
+            || Collision::CheckAABB(worldPos, cursorHitboxSize, c, sz);
+    };
+    for (const auto& o : m_obstacles)
+    {
+        if (test(o.pos, o.size))
+            return true;
+    }
+    for (const auto& lit : m_lights)
+    {
+        if (test(lit.pos, lit.size))
+            return true;
+    }
+    for (const auto& r : m_ramps)
+    {
+        if (test(r.pos, r.size))
+            return true;
+    }
+    for (const auto& hv : m_hidingSpots)
+    {
+        if (test(hv.center, hv.size))
+            return true;
+    }
+    return false;
+}
+
 void Underground::RefillPulseSourcesAfterCheckpointRespawn()
 {
     for (auto& s : m_pulseSources)

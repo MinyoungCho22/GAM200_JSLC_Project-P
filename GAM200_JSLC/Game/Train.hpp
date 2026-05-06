@@ -190,6 +190,8 @@ public:
     /// Q 스킬: FourthTrain 전투 로봇에게 반경 내 넉백 + 데미지
     void ApplyPulseToTrainRobots(Math::Vec2 pulseWorldCenter, float radius);
     bool IsValveMouseHoverable(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorldPos) const;
+    /// 커서용: 솔리드/파이프 열차 히트박스·정적 궤도 박스 위(상호작용 여부 무관)
+    bool IsPointOverWorldCollisionAABB(Math::Vec2 worldPos, Math::Vec2 cursorHitboxSize) const;
 
     /// 플레이어 히트박스 X 기준 현재 칸 (1~5, 밖이면 0)
     int GetPlayerTrainCarIndex(Math::Vec2 worldHbCenter) const;

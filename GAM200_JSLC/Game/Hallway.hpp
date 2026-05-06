@@ -63,6 +63,9 @@ public:
     const std::vector<HidingSpot>& GetHidingSpots() const;
     bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
 
+    Math::Vec2 GetObstacleCenter() const { return m_obstaclePos; }
+    Math::Vec2 GetObstacleSize() const { return m_obstacleSize; }
+
 private:
     std::unique_ptr<Background> m_background;
 
