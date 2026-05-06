@@ -1019,6 +1019,18 @@ void GameplayState::Update(double dt)
     }
     droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding, true, 1.f, tracerTrainAssist);
 
+    if (m_trainAccessed)
+    {
+        for (auto& d : droneManager->GetDrones())
+        {
+            if (d.IsDead() || !d.IsTracer())
+                continue;
+            // 기본 텍스처 폭 ≈120 — 이미 기차 전투용으로 줄인 드론(~90)은 건너뜀
+            if (d.GetSize().x > 110.f)
+                Train::ApplyCombatDroneVisualScale(d);
+        }
+    }
+
     if (m_rooftopAccessed && !m_undergroundAccessed && !m_trainAccessed)
     {
         m_rooftop->SyncGroundLevelForPlayer(player, playerHitboxSize);

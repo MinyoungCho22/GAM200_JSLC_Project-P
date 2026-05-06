@@ -32,18 +32,22 @@ static constexpr float kTrainFlatbedDeckTopLocalY = ASSUMED_IMG_HEIGHT - 804.f;
 // rail.png: DrawRailTrack는 타일 전체(MIN_Y ~ MIN_Y+m_railTileH)에 맞추지만, 궤도 픽셀은 대부분 타일 하단에 있다.
 // 물리 슬랩 윗면 = MIN_Y + m_railTileH * 이 값 (현재 아트 기준 0.08).
 static constexpr float kRailWalkSurfaceFractionOfTileH = 0.08f;
-static constexpr float kTrainCombatEnemyScale      = 0.75f;
+
+void Train::ApplyCombatDroneVisualScale(Drone& d)
+{
+    const Math::Vec2 s = d.GetSize();
+    d.SetSize({ s.x * kCombatDroneVisualScale, s.y * kCombatDroneVisualScale });
+}
 
 static void ScaleTrainCombatDrone(Drone& d)
 {
-    const Math::Vec2 s = d.GetSize();
-    d.SetSize({ s.x * kTrainCombatEnemyScale, s.y * kTrainCombatEnemyScale });
+    Train::ApplyCombatDroneVisualScale(d);
 }
 
 static void ScaleTrainCombatRobot(Robot& r)
 {
     const Math::Vec2 s = r.GetSize();
-    r.SetSize({ s.x * kTrainCombatEnemyScale, s.y * kTrainCombatEnemyScale });
+    r.SetSize({ s.x * Train::kCombatDroneVisualScale, s.y * Train::kCombatDroneVisualScale });
 }
 
 static float WrapAnglePi(float a)

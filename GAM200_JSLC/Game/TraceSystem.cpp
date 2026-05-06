@@ -2,6 +2,7 @@
 
 #include "TraceSystem.hpp"
 #include "DroneManager.hpp"
+#include "Train.hpp"
 #include "../Engine/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -31,6 +32,15 @@ void TraceSystem::OnDroneKilled(DroneManager& droneManager, Math::Vec2 spawnOrig
     }
 }
 
+namespace
+{
+bool IsTracerSpawnOnTrainWorld(Math::Vec2 worldPos)
+{
+    return worldPos.x >= Train::MIN_X - 400.f && worldPos.x <= Train::MIN_X + 52000.f
+        && worldPos.y >= Train::MIN_Y - 120.f && worldPos.y <= Train::MIN_Y + Train::HEIGHT + 200.f;
+}
+} // namespace
+
 void TraceSystem::SpawnTracerWave(DroneManager& droneManager, int warningLevel, Math::Vec2 origin)
 {
     Logger::Instance().Log(Logger::Severity::Verbose, "Spawning tracer wave! (Level %d) at (%.1f, %.1f)", warningLevel,
@@ -45,6 +55,8 @@ void TraceSystem::SpawnTracerWave(DroneManager& droneManager, int warningLevel, 
         Drone&      d  = droneManager.SpawnDrone({ origin.x + rx, origin.y + ry }, "Asset/Drone.png", true);
         d.SetBaseSpeed(speed);
         d.SetTracerHeatLevel(warningLevel);
+        if (IsTracerSpawnOnTrainWorld({ origin.x + rx, origin.y + ry }))
+            Train::ApplyCombatDroneVisualScale(d);
     };
 
     if (warningLevel == 1)

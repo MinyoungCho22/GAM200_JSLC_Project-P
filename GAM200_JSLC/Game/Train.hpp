@@ -42,6 +42,10 @@ public:
     static constexpr float TRAIN_ACCEL        = 90.0f;  // acceleration (world units per second^2)
     static constexpr float TRAIN_DEPART_DELAY = 3.0f;   // seconds after map entry before departure
 
+    /// Init 직후 드론 크기 기준(120×비율 등)에 곱하는 값 — 전투/추적 드론이 동일한 작은 실루엣을 쓰게
+    static constexpr float kCombatDroneVisualScale = 0.75f;
+    static void            ApplyCombatDroneVisualScale(Drone& d);
+
     struct Obstacle
     {
         Math::Vec2 pos;
