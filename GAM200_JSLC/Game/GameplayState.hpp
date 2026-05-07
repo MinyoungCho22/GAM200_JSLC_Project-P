@@ -142,4 +142,9 @@ private:
     static constexpr float TRAIN_ZOOM_START    = 2.8f; // strong zoom-in; eases out as player shrinks to 0.6
     /// Underground→Train 자연 진입: 페이드·카메라 줌이 끝난 뒤 출발 카운트다운 시작
     bool m_trainDeferEntryUntilIntroDone = false;
+
+    Drone* m_lockedAttackDrone = nullptr;
+    Robot* m_lockedAttackRobot = nullptr;
+    float m_lockedAttackSide = 1.0f;
+    float side = 1.0f;
 };

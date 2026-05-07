@@ -44,13 +44,22 @@ constexpr float kPadMagnetInnerGame = 42.0f;
 constexpr float kPadMagnetOuterGame = 125.0f;
 constexpr float kPadManualSnapMaxWorld = 3000.0f;
 
+constexpr float PLAYER_INSET = 20.0f;
+constexpr float DRONE_TARGET_INSET = 16.0f;
+constexpr float ROBOT_CORE_INSET_X = 100.0f;
+constexpr float ROBOT_CORE_OFFSET_Y = 34.0f;
+
+constexpr float TRAIN_PLAYER_INSET = 30.0f;
+constexpr float TRAIN_DRONE_TARGET_INSET = 8.0f;
+constexpr float TRAIN_ROBOT_CORE_INSET_X = 80.0f;
+constexpr float TRAIN_ROBOT_CORE_OFFSET_Y = 18.0f;
+
 namespace
 {
-Math::Vec2 DronePulseTargetCenter(const Drone& d)
-{
-    const Math::Vec2 hb = d.GetSize() * 0.8f;
-    return d.GetPosition() + hb * 0.5f;
-}
+    Math::Vec2 DronePulseTargetCenter(const Drone& d)
+    {
+        return d.GetPosition();
+    }
 } // namespace
 
 // Hallway hiding-box S.png: only while hall post-process is on; fades by player distance to spot top.
@@ -799,104 +808,257 @@ void GameplayState::Update(double dt)
 
     Drone* targetDrone = nullptr;
     Robot* targetRobot = nullptr;
+    float side = 1.0f;
+
+    auto GetHorizontalRelationByAABB = [](Math::Vec2 playerCenter, Math::Vec2 playerSize,
+        Math::Vec2 targetCenter, Math::Vec2 targetSize) -> float
+        {
+            float playerLeft = playerCenter.x - playerSize.x * 0.5f;
+            float targetLeft = targetCenter.x - targetSize.x * 0.5f;
+
+            return (playerLeft < targetLeft) ? 1.0f : -1.0f;
+        };
+    if (!isPressingAttack)
+    {
+        m_lockedAttackDrone = nullptr;
+        m_lockedAttackRobot = nullptr;
+        m_lockedAttackSide = 1.0f;
+    }
 
     if (isPressingAttack)
     {
-        // Check for god mode (infinite pulse)
-        auto* imguiManager = gsm.GetEngine().GetImguiManager();
-        bool isGodMode = imguiManager && imguiManager->IsPlayerGodMode();
-
-        if (isGodMode || player.GetPulseCore().getPulse().Value() > PULSE_COST_PER_SECOND * dt)
+        if (m_lockedAttackDrone && !m_lockedAttackDrone->IsDead() && !m_lockedAttackDrone->IsHit())
         {
-            float closestDistSq = ATTACK_RANGE_SQ;
+            targetDrone = m_lockedAttackDrone;
+            targetRobot = nullptr;
 
-            auto checkDrones = [&](std::vector<Drone>& drones) {
-                const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
-                for (auto& drone : drones)
-                {
-                    if (drone.IsDead() || drone.IsHit()) continue;
-                    float distSq = (playerCenter - drone.GetPosition()).LengthSq();
-                    Math::Vec2 droneHitboxSize = drone.GetSize() *
-                        (input.IsGamepadConnected() ? kGamepadDroneAimHitboxScale : 0.8f);
-                    float droneHitboxRadius = (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
-                    float effectiveAttackRange = ATTACK_RANGE + droneHitboxRadius;
-                    float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+            side = m_lockedAttackSide;
+        }
+        else if (m_lockedAttackRobot && !m_lockedAttackRobot->IsDead())
+        {
+            targetRobot = m_lockedAttackRobot;
+            targetDrone = nullptr;
 
-                    bool isMouseOnDrone = Collision::CheckPointInAABB(mouseWorldPos, drone.GetPosition(), droneHitboxSize)
-                        || Collision::CheckAABB(mouseWorldPos, cursorHitbox, drone.GetPosition(), droneHitboxSize);
+            side = m_lockedAttackSide;
+        }
+        else
+        {
+            m_lockedAttackDrone = nullptr;
+            m_lockedAttackRobot = nullptr;
 
-                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnDrone)
+            auto* imguiManager = gsm.GetEngine().GetImguiManager();
+            bool isGodMode = imguiManager && imguiManager->IsPlayerGodMode();
+
+            if (isGodMode || player.GetPulseCore().getPulse().Value() > PULSE_COST_PER_SECOND * dt)
+            {
+                float closestDistSq = ATTACK_RANGE_SQ;
+
+                auto checkDrones = [&](std::vector<Drone>& drones)
                     {
-                        closestDistSq = distSq;
-                        targetDrone = &drone;
-                        targetRobot = nullptr;
+                        const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
+
+                        for (auto& drone : drones)
+                        {
+                            if (drone.IsDead() || drone.IsHit())
+                                continue;
+
+                            float distSq = (playerCenter - drone.GetPosition()).LengthSq();
+
+                            Math::Vec2 droneHitboxSize =
+                                drone.GetSize() *
+                                (input.IsGamepadConnected()
+                                    ? kGamepadDroneAimHitboxScale
+                                    : 0.8f);
+
+                            float droneHitboxRadius =
+                                (droneHitboxSize.x + droneHitboxSize.y) * 0.25f;
+
+                            float effectiveAttackRange =
+                                ATTACK_RANGE + droneHitboxRadius;
+
+                            float effectiveAttackRangeSq =
+                                effectiveAttackRange * effectiveAttackRange;
+
+                            bool isMouseOnDrone =
+                                Collision::CheckPointInAABB(
+                                    mouseWorldPos,
+                                    drone.GetPosition(),
+                                    droneHitboxSize)
+                                ||
+                                Collision::CheckAABB(
+                                    mouseWorldPos,
+                                    cursorHitbox,
+                                    drone.GetPosition(),
+                                    droneHitboxSize);
+
+                            if (distSq < effectiveAttackRangeSq &&
+                                distSq < closestDistSq &&
+                                isMouseOnDrone)
+                            {
+                                closestDistSq = distSq;
+
+                                targetDrone = &drone;
+                                targetRobot = nullptr;
+                            }
+                        }
+                    };
+
+                checkDrones(droneManager->GetDrones());
+
+                if (!hallwayHidingBlocksDroneAttack)
+                    checkDrones(m_hallway->GetDrones());
+
+                checkDrones(m_rooftop->GetDrones());
+
+                if (m_undergroundAccessed)
+                    checkDrones(m_underground->GetDrones());
+
+                if (m_trainAccessed)
+                    checkDrones(m_train->GetDrones());
+
+                if (m_trainAccessed &&
+                    m_train &&
+                    m_train->GetCarTransportDroneManager())
+                {
+                    checkDrones(
+                        m_train->GetCarTransportDroneManager()->GetDrones());
+                }
+
+                if (m_trainAccessed &&
+                    m_train &&
+                    m_train->GetSirenDroneManager())
+                {
+                    checkDrones(
+                        m_train->GetSirenDroneManager()->GetDrones());
+                }
+
+                if (m_undergroundAccessed)
+                {
+                    auto& robots = m_underground->GetRobots();
+
+                    const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
+
+                    for (auto& robot : robots)
+                    {
+                        if (robot.IsDead())
+                            continue;
+
+                        float distSq =
+                            (playerCenter - robot.GetPosition()).LengthSq();
+
+                        Math::Vec2 robotSize = robot.GetSize();
+
+                        float robotRadius =
+                            (robotSize.x + robotSize.y) * 0.25f;
+
+                        float effectiveAttackRange =
+                            ATTACK_RANGE + robotRadius;
+
+                        float effectiveAttackRangeSq =
+                            effectiveAttackRange * effectiveAttackRange;
+
+                        bool isMouseOnRobot =
+                            Collision::CheckPointInAABB(
+                                mouseWorldPos,
+                                robot.GetPosition(),
+                                robotSize)
+                            ||
+                            Collision::CheckAABB(
+                                mouseWorldPos,
+                                cursorHitbox,
+                                robot.GetPosition(),
+                                robotSize);
+
+                        if (distSq < effectiveAttackRangeSq &&
+                            distSq < closestDistSq &&
+                            isMouseOnRobot)
+                        {
+                            closestDistSq = distSq;
+
+                            targetRobot = &robot;
+                            targetDrone = nullptr;
+                        }
                     }
                 }
-            };
 
-            checkDrones(droneManager->GetDrones());
-            if (!hallwayHidingBlocksDroneAttack)
-                checkDrones(m_hallway->GetDrones());
-            checkDrones(m_rooftop->GetDrones());
-            if (m_undergroundAccessed) checkDrones(m_underground->GetDrones());
-            if (m_trainAccessed) checkDrones(m_train->GetDrones());
-            if (m_trainAccessed && m_train && m_train->GetCarTransportDroneManager())
-                checkDrones(m_train->GetCarTransportDroneManager()->GetDrones());
-            if (m_trainAccessed && m_train && m_train->GetSirenDroneManager())
-                checkDrones(m_train->GetSirenDroneManager()->GetDrones());
-
-            if (m_undergroundAccessed)
-            {
-                auto& robots = m_underground->GetRobots();
-                const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
-
-                for (auto& robot : robots)
+                if (m_trainAccessed)
                 {
-                    if (robot.IsDead()) continue;
+                    auto& robots = m_train->GetRobots();
 
-                    float distSq = (playerCenter - robot.GetPosition()).LengthSq();
-                    Math::Vec2 robotSize = robot.GetSize();
-                    float robotRadius = (robotSize.x + robotSize.y) * 0.25f;
-                    float effectiveAttackRange = ATTACK_RANGE + robotRadius;
-                    float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+                    const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
 
-                    bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize)
-                        || Collision::CheckAABB(mouseWorldPos, cursorHitbox, robot.GetPosition(), robotSize);
-
-                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnRobot)
+                    for (auto& robot : robots)
                     {
-                        closestDistSq = distSq;
-                        targetRobot = &robot;
-                        targetDrone = nullptr;
+                        if (robot.IsDead())
+                            continue;
+
+                        float distSq =
+                            (playerCenter - robot.GetPosition()).LengthSq();
+
+                        Math::Vec2 robotSize = robot.GetSize();
+
+                        float robotRadius =
+                            (robotSize.x + robotSize.y) * 0.25f;
+
+                        float effectiveAttackRange =
+                            ATTACK_RANGE + robotRadius;
+
+                        float effectiveAttackRangeSq =
+                            effectiveAttackRange * effectiveAttackRange;
+
+                        bool isMouseOnRobot =
+                            Collision::CheckPointInAABB(
+                                mouseWorldPos,
+                                robot.GetPosition(),
+                                robotSize)
+                            ||
+                            Collision::CheckAABB(
+                                mouseWorldPos,
+                                cursorHitbox,
+                                robot.GetPosition(),
+                                robotSize);
+
+                        if (distSq < effectiveAttackRangeSq &&
+                            distSq < closestDistSq &&
+                            isMouseOnRobot)
+                        {
+                            closestDistSq = distSq;
+
+                            targetRobot = &robot;
+                            targetDrone = nullptr;
+                        }
                     }
                 }
             }
-
-            if (m_trainAccessed)
+            if (targetDrone)
             {
-                auto& robots = m_train->GetRobots();
-                const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
+                m_lockedAttackDrone = targetDrone;
+                m_lockedAttackRobot = nullptr;
 
-                for (auto& robot : robots)
-                {
-                    if (robot.IsDead()) continue;
+                Math::Vec2 lockTargetCenter = DronePulseTargetCenter(*targetDrone);
+                Math::Vec2 lockTargetSize = targetDrone->GetSize() * 0.8f;
 
-                    float distSq = (playerCenter - robot.GetPosition()).LengthSq();
-                    Math::Vec2 robotSize = robot.GetSize();
-                    float robotRadius = (robotSize.x + robotSize.y) * 0.25f;
-                    float effectiveAttackRange = ATTACK_RANGE + robotRadius;
-                    float effectiveAttackRangeSq = effectiveAttackRange * effectiveAttackRange;
+                m_lockedAttackSide = GetHorizontalRelationByAABB(
+                    playerCenter,
+                    playerHitboxSize,
+                    lockTargetCenter,
+                    lockTargetSize
+                );
+            }
+            else if (targetRobot)
+            {
+                m_lockedAttackRobot = targetRobot;
+                m_lockedAttackDrone = nullptr;
 
-                    bool isMouseOnRobot = Collision::CheckPointInAABB(mouseWorldPos, robot.GetPosition(), robotSize)
-                        || Collision::CheckAABB(mouseWorldPos, cursorHitbox, robot.GetPosition(), robotSize);
+                Math::Vec2 lockTargetCenter = targetRobot->GetPosition();
+                Math::Vec2 lockTargetSize = targetRobot->GetSize();
 
-                    if (distSq < effectiveAttackRangeSq && distSq < closestDistSq && isMouseOnRobot)
-                    {
-                        closestDistSq = distSq;
-                        targetRobot = &robot;
-                        targetDrone = nullptr;
-                    }
-                }
+                m_lockedAttackSide = GetHorizontalRelationByAABB(
+                    playerCenter,
+                    playerHitboxSize,
+                    lockTargetCenter,
+                    lockTargetSize
+                );
             }
         }
     }
@@ -912,6 +1074,14 @@ void GameplayState::Update(double dt)
         }
 
         Math::Vec2 targetPos;
+        Math::Vec2 targetCenter;
+        Math::Vec2 targetSize;
+
+        float playerInset = m_trainAccessed ? TRAIN_PLAYER_INSET : PLAYER_INSET;
+        float droneInset = m_trainAccessed ? TRAIN_DRONE_TARGET_INSET : DRONE_TARGET_INSET;
+
+        float robotCoreInsetX = m_trainAccessed ? TRAIN_ROBOT_CORE_INSET_X : ROBOT_CORE_INSET_X;
+        float robotCoreOffsetY = m_trainAccessed ? TRAIN_ROBOT_CORE_OFFSET_Y : ROBOT_CORE_OFFSET_Y;
 
         constexpr float KILL_PULSE_REWARD = 10.0f;
 
@@ -919,7 +1089,19 @@ void GameplayState::Update(double dt)
         {
             // Cache position before potential reinforcement spawn.
             // OnDroneKilled may spawn drones and reallocate vectors, invalidating targetDrone pointer.
-            targetPos = targetDrone->GetPosition();
+
+            targetSize = targetDrone->GetSize() * 0.8f;
+            targetCenter = DronePulseTargetCenter(*targetDrone);
+
+            float targetSide = m_lockedAttackSide;
+
+            targetPos = {
+                targetCenter.x - targetSide * (targetSize.x * 0.5f - droneInset),
+                targetCenter.y
+            };
+
+            side = targetSide;
+
             bool didDroneDie = targetDrone->ApplyDamage(static_cast<float>(dt));
             if (didDroneDie)
             {
@@ -938,16 +1120,37 @@ void GameplayState::Update(double dt)
 
             bool wasAlive = !targetRobot->IsDead();
             targetRobot->TakeDamage(damagePerSecond * static_cast<float>(dt));
-            targetPos = targetRobot->GetPosition();
+
+            targetSize = targetRobot->GetSize();
+            targetCenter = targetRobot->GetPosition();
+
+            float targetSide = m_lockedAttackSide;
+
+            targetPos = {
+                targetCenter.x - targetSide * (targetSize.x * 0.5f - robotCoreInsetX),
+                targetCenter.y + robotCoreOffsetY
+            };
+
+            side = targetSide;
 
             if (wasAlive && targetRobot->IsDead())
             {
                 player.GetPulseCore().getPulse().add(KILL_PULSE_REWARD);
             }
         }
+        float playerHalfW = playerHitboxSize.x * 0.5f;
 
-        Math::Vec2 vfxStartPos = { playerCenter.x + (player.IsFacingRight() ? 1 : -1) * (playerHitboxSize.x / 2.0f), playerCenter.y };
-        pulseManager->UpdateAttackVFX(true, vfxStartPos, targetPos);
+        float safePlayerInset = std::min(playerInset, playerHalfW - 2.0f);
+        safePlayerInset = std::max(0.0f, safePlayerInset);
+
+        float playerAttachDist = playerHalfW - safePlayerInset;
+
+        Math::Vec2 vfxStartPos = {
+            playerCenter.x + side * playerAttachDist,
+            playerCenter.y
+        };
+
+        pulseManager->UpdateAttackVFX(true, vfxStartPos, targetPos, side);
 
         m_door->Update(player, false, mouseWorldPos);
         m_rooftopDoor->Update(player, false, mouseWorldPos);
