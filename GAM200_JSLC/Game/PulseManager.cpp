@@ -166,7 +166,7 @@ void PulseManager::UpdateAttackVFX(
     float dx = end.x - start.x;
     float signX = (attackSide >= 0.0f) ? 1.0f : -1.0f;
 
-    const float turnStep = 48.0f * m_vfxScale;
+   /* const float turnStep = 48.0f * m_vfxScale;
     const float minLastLeg = 16.0f * m_vfxScale;
 
     float midX = start.x + signX * std::min(std::abs(dx) * 0.5f, turnStep);
@@ -180,7 +180,8 @@ void PulseManager::UpdateAttackVFX(
     {
         midX = std::max(midX, end.x + minLastLeg);
         midX = std::min(midX, start.x); 
-    }
+    }*/
+    float midX = start.x + dx * 0.5f;
 
     m_attackC1 = { midX, start.y };
     m_attackC2 = { midX, end.y };
@@ -319,8 +320,8 @@ void PulseManager::DrawVFX(const Shader& shader) const
 
     const float s = m_vfxScale;
     const float TILE = 16.0f * s;
-    const float packetLen = 24.0f * s;
-    const float packetGap = 12.0f * s;
+    const float packetLen = 14.0f * s;
+    const float packetGap = 7.0f * s;
     const float packetThickness = 6.0f * s;
     const float packetLen2Mul = 0.75f;
     const float packetThick2Mul = 0.85f;
