@@ -25,9 +25,15 @@ public:
         std::vector<PulseSource>& trainSources,
         bool is_interact_key_pressed, double dt, Math::Vec2 mouseWorldPos);
 
-    void UpdateAttackVFX(bool isAttacking, Math::Vec2 startPos, Math::Vec2 endPos);
+    void UpdateAttackVFX(
+        bool isAttacking,
+        Math::Vec2 startPos,
+        Math::Vec2 endPos,
+        float attackSide = 1.0f
+    );
 
     void DrawVFX(const Shader& shader) const;
+    void SetVFXScale(float scale);
 
     void StartDetonationVFX(Math::Vec2 origin, float maxRadius,
                             const std::vector<std::pair<Math::Vec2, Math::Vec2>>& chainArcs = {});
@@ -97,4 +103,6 @@ private:
     };
     std::vector<ChainArc> m_chainArcs;
     static constexpr float CHAIN_ARC_DURATION = 0.40f;  // longer visibility for readability
+
+    float m_vfxScale = 1.0f;
 };

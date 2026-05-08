@@ -110,7 +110,11 @@ void PulseManager::Shutdown()
 }
 
 
-void PulseManager::UpdateAttackVFX(bool isAttacking, Math::Vec2 startPos, Math::Vec2 endPos)
+void PulseManager::UpdateAttackVFX(
+    bool isAttacking,
+    Math::Vec2 startPos,
+    Math::Vec2 endPos,
+    float attackSide)
 {
     if (!isAttacking)
     {
@@ -125,6 +129,23 @@ void PulseManager::UpdateAttackVFX(bool isAttacking, Math::Vec2 startPos, Math::
     m_isAttacking = true;
     m_attackEndLive = endPos;
 
+    float currentSide = (attackSide >= 0.0f) ? 1.0f : -1.0f;
+
+    if (m_attackPathValid)
+    {
+        float oldSide = (m_attackPrevEnd.x - m_attackStartFrozen.x >= 0.0f) ? 1.0f : -1.0f;
+
+        if (oldSide != currentSide)
+        {
+            m_attackStartFrozen = startPos;
+            m_attackPrevEnd = endPos;
+            m_attackPathUpdateTimer = 0.0f;
+
+            m_attackElapsed = 0.0f;
+            m_attackPacketActive = true;
+        }
+    }
+
     if (!m_attackPathValid)
     {
         m_attackStartFrozen = startPos;
@@ -136,49 +157,52 @@ void PulseManager::UpdateAttackVFX(bool isAttacking, Math::Vec2 startPos, Math::
         m_attackPacketActive = true;
     }
 
+    m_attackStartFrozen = startPos;
     m_attackPrevEnd = endPos;
-
-    const float UPDATE_INTERVAL = 0.15f;
-
-    float moved = (startPos - m_attackStartFrozen).Length();
-    bool shouldUpdate = (m_attackPathUpdateTimer >= UPDATE_INTERVAL) && (moved > 8.0f);
-
-    if (shouldUpdate)
-    {
-        m_attackPathUpdateTimer = 0.0f;
-        float k = 0.25f;
-        m_attackStartFrozen = m_attackStartFrozen + (startPos - m_attackStartFrozen) * k;
-    }
 
     Math::Vec2 start = m_attackStartFrozen;
     Math::Vec2 end = m_attackEndLive;
 
     float dx = end.x - start.x;
-    float dy = end.y - start.y;
+    float signX = (attackSide >= 0.0f) ? 1.0f : -1.0f;
 
-    float stepX = std::clamp(std::abs(dx) * 0.35f, 18.0f, 80.0f);
-    float signX = (dx >= 0.f) ? 1.f : -1.f;
+   /* const float turnStep = 48.0f * m_vfxScale;
+    const float minLastLeg = 16.0f * m_vfxScale;
 
-    float midY = start.y + std::clamp(dy * 0.5f, -60.f, 60.f);
+    float midX = start.x + signX * std::min(std::abs(dx) * 0.5f, turnStep);
 
-    m_attackC1 = { start.x + signX * stepX, start.y };
-    m_attackC2 = { m_attackC1.x, midY };
-    m_attackC3 = { end.x, midY };
+    if (signX > 0.0f)
+    {
+        midX = std::min(midX, end.x - minLastLeg);
+        midX = std::max(midX, start.x);
+    }
+    else
+    {
+        midX = std::max(midX, end.x + minLastLeg);
+        midX = std::min(midX, start.x); 
+    }*/
+    float midX = start.x + dx * 0.5f;
 
-    // Precompute total length for travel sync
-    auto segLen = [&](Math::Vec2 a, Math::Vec2 b) { return (b - a).Length(); };
+    m_attackC1 = { midX, start.y };
+    m_attackC2 = { midX, end.y };
+    m_attackC3 = end;
+
+    auto segLen = [&](Math::Vec2 a, Math::Vec2 b)
+        {
+            return (b - a).Length();
+        };
+
     float L0 = segLen(start, m_attackC1);
     float L1 = segLen(m_attackC1, m_attackC2);
     float L2 = segLen(m_attackC2, m_attackC3);
-    float L3 = segLen(m_attackC3, end);
+    float L3 = 0.0f;
+
     m_attackTotalLen = L0 + L1 + L2 + L3;
 
     const float packetSpeed = 350.0f;
     float ideal = (m_attackTotalLen > 1.0f) ? (m_attackTotalLen / packetSpeed) : 0.25f;
     m_attackTravelTime = std::clamp(ideal, 0.35f, 0.75f);
 }
-
-
 
 void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitboxSize,
     Player& player, std::vector<PulseSource>& roomSources,
@@ -275,6 +299,11 @@ void PulseManager::Update(Math::Vec2 playerHitboxCenter, Math::Vec2 playerHitbox
     }
 }
 
+void PulseManager::SetVFXScale(float scale)
+{
+    m_vfxScale = std::clamp(scale, 0.65f, 1.15f);
+}
+
 void PulseManager::DrawVFX(const Shader& shader) const
 {
     if (!m_isAttacking && !m_isCharging) return;
@@ -289,18 +318,18 @@ void PulseManager::DrawVFX(const Shader& shader) const
     shader.setBool("flipX", false);
     shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
 
-    const float TILE = 16.0f;                
-    const float packetLen = 24.0f;
-    const float packetGap = 12.0f;
+    const float s = m_vfxScale;
+    const float TILE = 16.0f * s;
+    const float packetLen = 14.0f * s;
+    const float packetGap = 7.0f * s;
+    const float packetThickness = 6.0f * s;
     const float packetLen2Mul = 0.75f;
     const float packetThick2Mul = 0.85f;
 
     auto snapTile = [&](Math::Vec2 p) -> Math::Vec2
-        {
-            float gx = std::round(p.x / TILE) * TILE;
-            float gy = std::round(p.y / TILE) * TILE;
-            return { gx, gy };
-        };
+    {
+        return p;
+    };
 
     auto drawSprite = [&](Math::Vec2 p, Math::Vec2 size)
         {
@@ -443,12 +472,10 @@ void PulseManager::DrawVFX(const Shader& shader) const
 
         drawSegment_Tiled(p0, p1);
         drawSegment_Tiled(p1, p2);
-        drawSegment_Tiled(p2, p3);
-        drawSegment_Tiled(p3, p4);
+        drawSegment_Tiled(p2, p4);
 
         drawCornerAuto(p0, p1, p2);
-        drawCornerAuto(p1, p2, p3);
-        drawCornerAuto(p2, p3, p4);
+        drawCornerAuto(p1, p2, p4);
 
         if (m_attackPacketActive)
         {
@@ -511,13 +538,11 @@ void PulseManager::DrawVFX(const Shader& shader) const
                             else          drawSprite(center, { thickness, visualLen });
                         };
 
-                    drawPacketRect(headS, packetLen, 6.0f);
+                    drawPacketRect(headS, packetLen, packetThickness);
 
                     if (packetGap > 0.0f)
                     {
-                        drawPacketRect(headS - packetGap,
-                            packetLen * packetLen2Mul,
-                            6.0f * packetThick2Mul);
+                        drawPacketRect(headS - packetGap, packetLen* packetLen2Mul, packetThickness* packetThick2Mul);
                     }
                 }
             }
