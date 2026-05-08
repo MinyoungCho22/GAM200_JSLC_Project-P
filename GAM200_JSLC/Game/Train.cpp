@@ -2291,7 +2291,10 @@ bool Train::IsCar3SirenMouseHoverForPulseInject(Math::Vec2 playerHbCenter, Math:
 
 bool Train::IsPlayerInCar2PurplePulseBox(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize) const
 {
-    if (!m_car2PurpleHbValid || m_car2HidePhase != Car2HidePhase::Inside)
+    if (!m_car2PurpleHbValid)
+        return false;
+    // Entering / Inside 모두 컨테이너 안으로 스냅됨 — 추적·레이더 차단은 페이드 시작부터 적용
+    if (m_car2HidePhase != Car2HidePhase::Inside && m_car2HidePhase != Car2HidePhase::Entering)
         return false;
     const float      tl    = MIN_X + m_trainOffset;
     const Math::Vec2 contC = { tl + m_car2PurpleHb.localCenter.x, MIN_Y + m_car2PurpleHb.localCenter.y };
@@ -2736,15 +2739,18 @@ void Train::ApplyConfig(const TrainObjectConfig& cfg)
 // ---------------------------------------------------------------------------
 // IsPlayerHiding – crouching inside a train hiding spot blocks drone detection
 // ---------------------------------------------------------------------------
-bool Train::IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const
+bool Train::IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const
 {
     if (!isPlayerCrouching) return false;
 
     const float trainWorldLeft = MIN_X + m_trainOffset;
+    // 스프라이트/히트박스와 JSON 박스 미세 오차 허용
+    constexpr float kHidingMargin = 36.f;
     for (const auto& spot : m_hidingSpots)
     {
         Math::Vec2 worldPos = { trainWorldLeft + spot.localCenter.x, MIN_Y + spot.localCenter.y };
-        if (Collision::CheckAABB(playerPos, playerHitboxSize, worldPos, spot.size))
+        Math::Vec2 detectSize = { spot.size.x + kHidingMargin * 2.f, spot.size.y + kHidingMargin * 2.f };
+        if (Collision::CheckAABB(playerHbCenter, playerHitboxSize, worldPos, detectSize))
             return true;
     }
     return false;

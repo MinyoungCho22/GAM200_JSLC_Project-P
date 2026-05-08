@@ -497,7 +497,8 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     float effectiveDetectionRangeSq = effectiveDetectionRange * effectiveDetectionRange;
 
     bool canDetectPlayer = !isPlayerUndetectable;
-    if (m_sirenMapDrone && m_sirenPulseRevealTimer > 0.f)
+    // 펄스 박스·히딩 등 비감지 중에는 사이렌 "공개" 타이머로도 추적하면 안 됨
+    if (m_sirenMapDrone && m_sirenPulseRevealTimer > 0.f && !isPlayerUndetectable)
         canDetectPlayer = true;
 
     float pulseAggroMul = 1.f;

@@ -163,8 +163,9 @@ public:
     const std::vector<Robot>& GetRobots() const  { return m_robots; }
     std::vector<Robot>& GetRobots()              { return m_robots; }
 
-    // Returns true when the player is crouching inside a hiding spot (drones cannot see them)
-    bool IsPlayerHiding(Math::Vec2 playerPos, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
+    // Returns true when the player is crouching inside a hiding spot (drones cannot see them).
+    // playerHbCenter: 히트박스 중심 (GetPosition()이 아님)
+    bool IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const;
     const std::vector<HidingSpot>& GetHidingSpots() const { return m_hidingSpots; }
 
     /// 드론 피격 등으로 펄스 주입이 끊겼을 때 호출 — 해당 구역 주입 진행 리셋

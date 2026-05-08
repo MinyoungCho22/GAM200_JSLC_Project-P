@@ -54,6 +54,9 @@ void PulseDetonateSkill::Update(
 
     if (!m_unlocked || isGameOver)
         return;
+    if (trainMapForBranchArcs
+        && trainMapForBranchArcs->IsPlayerInCar2PurplePulseBox(playerCenter, player.GetHitboxSize()))
+        return;
     if (m_cooldown > 0.f)
         return;
     if (!ctl.IsActionTriggered(ControlAction::PulseDetonate, input))

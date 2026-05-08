@@ -153,7 +153,9 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
 
     Math::Vec2 playerPos = player.GetPosition();
     const bool trainNoDetect = player.IsTrainEnemyUndetectable() && m_trainCarSegment > 0;
-    if (trainNoDetect && m_state == RobotState::Chase)
+    if (trainNoDetect
+        && (m_state == RobotState::Chase || m_state == RobotState::Windup
+            || m_state == RobotState::Attack || m_state == RobotState::Recover))
         m_state = RobotState::Patrol;
 
     float distToPlayer = std::abs(playerPos.x - m_position.x);

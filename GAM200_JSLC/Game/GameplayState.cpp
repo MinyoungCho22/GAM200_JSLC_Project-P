@@ -727,12 +727,16 @@ void GameplayState::Update(double dt)
         m_undergroundAccessed && m_underground
         && m_underground->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     const bool isPlayerHidingInTrainForAttack =
-        m_trainAccessed && m_train && m_train->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+        m_trainAccessed && m_train && m_train->IsPlayerHiding(playerHbCenter, playerHitboxSize, player.IsCrouching());
     const bool crouchHidingBlocksAttack =
         player.IsCrouching()
         && (isPlayerHidingInRoomForAttack || isPlayerHidingInHallwayForAttack || isPlayerHidingInUndergroundForAttack
             || isPlayerHidingInTrainForAttack);
-    bool isPressingAttack = ctl.IsActionPressed(ControlAction::Attack, input) && !crouchHidingBlocksAttack;
+    const bool car2PulseBoxBlocksAttack =
+        m_trainAccessed && m_train
+        && m_train->IsPlayerInCar2PurplePulseBox(playerHbCenter, playerHitboxSize);
+    bool isPressingAttack = ctl.IsActionPressed(ControlAction::Attack, input) && !crouchHidingBlocksAttack
+        && !car2PulseBoxBlocksAttack;
 
     // Get mouse world position
     double mouseScreenX, mouseScreenY;
@@ -1209,6 +1213,9 @@ void GameplayState::Update(double dt)
     bool isPlayerHidingInRoom = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     bool isPlayerHidingInHallway = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     bool isPlayerHiding = isPlayerHidingInRoom || isPlayerHidingInHallway;
+    if (m_trainAccessed && m_train)
+        isPlayerHiding = isPlayerHiding
+            || m_train->IsPlayerHiding(playerHbCenter, playerHitboxSize, player.IsCrouching());
 
     player.SetHiding(isPlayerHiding);
     if (!m_trainAccessed)
@@ -1222,7 +1229,11 @@ void GameplayState::Update(double dt)
             (refSp > 0.f) ? std::clamp(m_train->GetTrainCurrentSpeed() / refSp, 0.f, 1.f) : 0.f;
         tracerTrainAssist = 1.f + 0.22f * ratio;
     }
-    droneManager->Update(dt, player, playerHitboxSize, isPlayerHiding, true, 1.f, tracerTrainAssist);
+    bool mainMapDroneUndetectable = isPlayerHiding;
+    if (m_trainAccessed && m_train)
+        mainMapDroneUndetectable = mainMapDroneUndetectable
+            || m_train->IsPlayerInCar2PurplePulseBox(playerHbCenter, playerHitboxSize);
+    droneManager->Update(dt, player, playerHitboxSize, mainMapDroneUndetectable, true, 1.f, tracerTrainAssist);
 
     if (m_trainAccessed)
     {
@@ -1527,7 +1538,7 @@ void GameplayState::Update(double dt)
     if (m_trainAccessed)
     {
         const bool isPlayerHidingInTrain =
-            m_train->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
+            m_train->IsPlayerHiding(playerHbCenter, playerHitboxSize, player.IsCrouching());
 
         auto&     trainDrones      = m_train->GetDrones();
         const int trainPlayerCar   = m_train->GetPlayerTrainCarIndex(playerHbCenter);
@@ -2764,9 +2775,12 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             && m_underground->IsPlayerHiding(playerPosForCursor, playerHitboxSize, player.IsCrouching());
         const bool hideTrain =
             m_trainAccessed && m_train
-            && m_train->IsPlayerHiding(playerPosForCursor, playerHitboxSize, player.IsCrouching());
+            && m_train->IsPlayerHiding(playerHitboxCenter, playerHitboxSize, player.IsCrouching());
+        const bool inCar2PulseBoxForCursor =
+            m_trainAccessed && m_train
+            && m_train->IsPlayerInCar2PurplePulseBox(playerHitboxCenter, playerHitboxSize);
         const bool cursorCombatAttackAllowed =
-            !(player.IsCrouching() && (hideRoom || hideHall || hideUg || hideTrain));
+            !(player.IsCrouching() && (hideRoom || hideHall || hideUg || hideTrain)) && !inCar2PulseBoxForCursor;
 
         const float droneHoverScale =
             inputForCursor.IsGamepadConnected() ? kGamepadDroneAimHitboxScale : 0.8f;
