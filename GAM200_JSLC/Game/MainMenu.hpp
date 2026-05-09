@@ -2,7 +2,6 @@
 
 #pragma once
 #include "../Engine/GameState.hpp"
-#include "../Game/Font.hpp"
 #include <memory>
 
 class GameStateManager;
@@ -20,23 +19,32 @@ public:
 private:
     GameStateManager& gsm;
 
-    std::unique_ptr<Font> m_font;
-    std::unique_ptr<Shader> m_fontShader;
+    // Texture shader (simple.vert / simple.frag) – pos+UV quad
+    std::unique_ptr<Shader> m_texShader;
+    unsigned int m_texVAO = 0;
+    unsigned int m_texVBO = 0;
 
-    CachedTextureInfo m_promptText;
+    // Background: Asset/MainMenu.png
+    unsigned int m_bgTexID = 0;
+    int          m_bgTexW  = 0;
+    int          m_bgTexH  = 0;
 
-    std::unique_ptr<Shader> m_shapeShader;
-    unsigned int m_shapeVAO = 0;
-    unsigned int m_shapeVBO = 0;
+    // Selection indicator: Asset/MainMenu_Click.png
+    unsigned int m_clickTexID = 0;
+    int          m_clickTexW  = 0;
+    int          m_clickTexH  = 0;
 
-    double m_glitchTimer = 0.0;
-    bool m_enterPressed = false;
+    // Menu navigation: 0=Play  1=Settings  2=Credits  3=Exit
+    int  m_selectedItem        = 0;
     bool m_waitForEnterRelease = false;
+    bool m_waitForNavRelease   = false;
 
-    // Fade-out before launching gameplay
-    bool  m_isFadingOut  = false;
-    float m_fadeAlpha    = 0.0f;
-    static constexpr float FADE_OUT_DURATION = 0.2f;
-    unsigned int m_fadeVAO = 0;
-    unsigned int m_fadeVBO = 0;
+    // Fade-out overlay
+    std::unique_ptr<Shader> m_fadeShader;
+    unsigned int m_fadeVAO    = 0;
+    unsigned int m_fadeVBO    = 0;
+    bool  m_isFadingOut       = false;
+    float m_fadeAlpha         = 0.0f;
+    int   m_pendingAction     = -1;
+
 };

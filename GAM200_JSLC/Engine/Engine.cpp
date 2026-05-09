@@ -7,6 +7,7 @@
 #include "DroneConfig.hpp"
 #include "RobotConfig.hpp"
 #include "../Game/SplashState.hpp"
+#include "../Game/MainMenu.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 #include "../OpenGL/Shader.hpp"
 
@@ -263,6 +264,21 @@ void Engine::Step()
         {
             m_gameStateManager->Clear();
             m_gameStateManager->PushState(std::make_unique<SplashState>(*m_gameStateManager));
+        }
+    }
+
+    if (m_returnToMainMenuRequested)
+    {
+        m_returnToMainMenuRequested = false;
+        if (m_postProcess)
+        {
+            m_postProcess->Settings() = PostProcessSettings{};
+            m_postProcess->SetPassthrough(false);
+        }
+        if (m_gameStateManager)
+        {
+            m_gameStateManager->Clear();
+            m_gameStateManager->PushState(std::make_unique<MainMenu>(*m_gameStateManager));
         }
     }
 
@@ -558,6 +574,11 @@ void Engine::SetFpsCap(int cap)
 void Engine::RequestReturnToSplash()
 {
     m_returnToSplashRequested = true;
+}
+
+void Engine::RequestReturnToMainMenu()
+{
+    m_returnToMainMenuRequested = true;
 }
 
 void Engine::RequestShutdown()

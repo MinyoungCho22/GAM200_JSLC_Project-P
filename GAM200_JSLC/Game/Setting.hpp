@@ -17,7 +17,8 @@ class Shader;
 class SettingState : public GameState
 {
 public:
-    SettingState(GameStateManager& gsm);
+    // exitToMainMenu: true when opened from gameplay (Exit goes to MainMenu instead of shutdown)
+    explicit SettingState(GameStateManager& gsm, bool exitToMainMenu = false);
     void Initialize() override;
     void Update(double dt) override;
     void Draw() override;
@@ -41,6 +42,7 @@ private:
     static constexpr float PAD_AIM_MAX = 2.0f;
 
     GameStateManager& gsm;
+    bool m_exitToMainMenu = false;
     std::unique_ptr<Shader> m_colorShader;
     std::unique_ptr<Font>   m_font;
     std::unique_ptr<Shader> m_fontShader;

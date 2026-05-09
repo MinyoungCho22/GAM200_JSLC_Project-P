@@ -358,7 +358,7 @@ void GameplayState::Update(double dt)
 
     if (input.IsKeyTriggered(Input::Key::Escape))
     {
-        gsm.PushState(std::make_unique<SettingState>(gsm));
+        gsm.PushState(std::make_unique<SettingState>(gsm, true));
         return;
     }
 

@@ -45,8 +45,8 @@ constexpr int SettingState::FPS_VALUES[SettingState::FPS_COUNT];
 
 // -----------------------------------------------------------------------------
 
-SettingState::SettingState(GameStateManager& gsm_ref)
-    : gsm(gsm_ref)
+SettingState::SettingState(GameStateManager& gsm_ref, bool exitToMainMenu)
+    : gsm(gsm_ref), m_exitToMainMenu(exitToMainMenu)
 {
 }
 
@@ -308,8 +308,13 @@ void SettingState::Update(double /*dt*/)
     {
         if (input.IsKeyTriggered(Input::Key::Enter) || input.IsKeyTriggered(Input::Key::Space))
         {
+            if (m_exitToMainMenu)
+            {
+                // Defer the stack clear to Engine::Step() to avoid destroying 'this' mid-Update
+                engine.RequestReturnToMainMenu();
+                return;
+            }
 #ifdef __EMSCRIPTEN__
-            // Web: request a full state reset and restart from No.99 splash.
             engine.RequestReturnToSplash();
             return;
 #else

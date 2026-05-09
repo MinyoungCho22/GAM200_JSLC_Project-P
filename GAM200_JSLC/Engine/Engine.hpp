@@ -29,6 +29,7 @@ public:
     void Shutdown();
     void RequestShutdown();
     void RequestReturnToSplash();
+    void RequestReturnToMainMenu();
     double GetDeltaTime() const { return m_deltaTime; }
     GLFWwindow* GetWindow() const { return m_window; }
 
@@ -100,7 +101,8 @@ private:
     int m_windowedHeight = VIRTUAL_HEIGHT;
 
     std::unique_ptr<PostProcessManager> m_postProcess;
-    bool m_returnToSplashRequested = false;
+    bool m_returnToSplashRequested   = false;
+    bool m_returnToMainMenuRequested = false;
 
 #if defined(__linux__) && defined(GAM200_HAVE_XFIXES)
     bool m_xfixesCursorHidden = false;
