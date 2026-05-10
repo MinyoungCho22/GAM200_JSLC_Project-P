@@ -38,6 +38,9 @@ private:
     int  m_selectedItem        = 0;
     bool m_waitForEnterRelease = false;
     bool m_waitForNavRelease   = false;
+    int  m_mouseSelectedItem   = -1;
+    bool m_isConfirmBlinking   = false;
+    float m_confirmBlinkTimer  = 0.0f;
 
     // Fade-out overlay
     std::unique_ptr<Shader> m_fadeShader;

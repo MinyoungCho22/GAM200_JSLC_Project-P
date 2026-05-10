@@ -287,7 +287,7 @@ void Engine::Step()
     // immediately after Update() can still see the previous drawable (wrong letterbox).
     glfwPollEvents();
     // AppKit can restore the arrow cursor after Cmd+Tab even when focus callbacks ran.
-    if (glfwGetWindowAttrib(m_window, GLFW_FOCUSED) &&
+    if (!m_systemCursorVisible && glfwGetWindowAttrib(m_window, GLFW_FOCUSED) &&
         glfwGetInputMode(m_window, GLFW_CURSOR) != GLFW_CURSOR_HIDDEN)
     {
         ApplyCustomCursorHidden();
@@ -318,7 +318,7 @@ void Engine::Step()
     }
 
 #if defined(__linux__) && !defined(__EMSCRIPTEN__)
-    if (m_window && glfwGetWindowAttrib(m_window, GLFW_FOCUSED))
+    if (!m_systemCursorVisible && m_window && glfwGetWindowAttrib(m_window, GLFW_FOCUSED))
         ApplyCustomCursorHidden();
 #endif
 
@@ -407,7 +407,7 @@ void Engine::FramebufferSizeCallback(GLFWwindow* window, int width, int height)
 void Engine::WindowFocusCallback(GLFWwindow* window, int focused)
 {
     Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
-    if (engine && focused)
+    if (engine && focused && !engine->m_systemCursorVisible)
     {
         // macOS / WSL(X11) may re-show the system cursor after focus changes; re-apply hide.
         engine->ApplyCustomCursorHidden();
@@ -417,8 +417,23 @@ void Engine::WindowFocusCallback(GLFWwindow* window, int focused)
 void Engine::CursorEnterCallback(GLFWwindow* window, int entered)
 {
     Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
-    if (engine && entered)
+    if (engine && entered && !engine->m_systemCursorVisible)
         engine->ApplyCustomCursorHidden();
+}
+
+void Engine::SetSystemCursorVisible(bool visible)
+{
+    m_systemCursorVisible = visible;
+    if (!m_window)
+        return;
+
+    if (visible)
+    {
+        glfwSetCursor(m_window, nullptr);
+        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+    else
+        ApplyCustomCursorHidden();
 }
 
 void Engine::ApplyCustomCursorHidden()

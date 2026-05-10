@@ -61,6 +61,7 @@ public:
     void SetFpsCap(int cap);
     bool IsVSyncEnabled() const { return m_vsyncEnabled; }
     int GetFpsCap() const { return m_fpsCap; }
+    void SetSystemCursorVisible(bool visible);
 
 private:
     void Update();
@@ -103,6 +104,7 @@ private:
     std::unique_ptr<PostProcessManager> m_postProcess;
     bool m_returnToSplashRequested   = false;
     bool m_returnToMainMenuRequested = false;
+    bool m_systemCursorVisible = false;
 
 #if defined(__linux__) && defined(GAM200_HAVE_XFIXES)
     bool m_xfixesCursorHidden = false;

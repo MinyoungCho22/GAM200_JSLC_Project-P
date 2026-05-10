@@ -18,6 +18,7 @@
 #pragma warning(pop)
 
 #include <algorithm>
+#include <cmath>
 
 constexpr float GAME_WIDTH  = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
@@ -27,6 +28,8 @@ constexpr float GAME_HEIGHT = 1080.0f;
 static constexpr float ITEM_Y[4]       = { 570.0f, 470.0f, 370.0f, 270.0f };
 static constexpr float CLICK_HEIGHT    = 90.0f;
 static constexpr float kFadeOutSecs    = 0.2f;
+static constexpr float kConfirmBlinkStepSecs = 0.08f;
+static constexpr int   kConfirmBlinkSteps    = 4; // off/on/off/on -> two quick flashes
 
 // ─────────────────────────────────────────────────────────────────────────────
 static void LoadTex(const char* path, unsigned int& id, int& w, int& h)
@@ -65,11 +68,15 @@ MainMenu::MainMenu(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 void MainMenu::Initialize()
 {
     auto& input = gsm.GetEngine().GetInput();
+    gsm.GetEngine().SetSystemCursorVisible(true);
 
     m_selectedItem        = 0;
     m_isFadingOut         = false;
     m_fadeAlpha           = 0.0f;
     m_pendingAction       = -1;
+    m_mouseSelectedItem   = -1;
+    m_isConfirmBlinking   = false;
+    m_confirmBlinkTimer   = 0.0f;
     m_waitForEnterRelease = input.IsKeyPressed(Input::Key::Enter);
     m_waitForNavRelease   = input.IsKeyPressed(Input::Key::W)    ||
                             input.IsKeyPressed(Input::Key::S)    ||
@@ -135,6 +142,14 @@ void MainMenu::Update(double dt)
 {
     auto& input = gsm.GetEngine().GetInput();
 
+    auto startConfirmFeedback = [&]() {
+        m_pendingAction = m_selectedItem;
+        m_isConfirmBlinking = true;
+        m_confirmBlinkTimer = 0.0f;
+        Logger::Instance().Log(Logger::Severity::Event,
+            "MainMenu: confirmed item %d", m_selectedItem);
+    };
+
     // Wait until Enter held from the previous state is released
     if (m_waitForEnterRelease)
     {
@@ -152,6 +167,18 @@ void MainMenu::Update(double dt)
                       input.IsKeyPressed(Input::Key::Down);
         if (!anyNav)
             m_waitForNavRelease = false;
+        return;
+    }
+
+    if (m_isConfirmBlinking)
+    {
+        m_confirmBlinkTimer += static_cast<float>(dt);
+        if (m_confirmBlinkTimer >= kConfirmBlinkStepSecs * static_cast<float>(kConfirmBlinkSteps))
+        {
+            m_isConfirmBlinking = false;
+            m_isFadingOut = true;
+            m_confirmBlinkTimer = 0.0f;
+        }
         return;
     }
 
@@ -202,20 +229,76 @@ void MainMenu::Update(double dt)
 
     // W / Up  → move selection up
     // S / Down → move selection down
-    if (input.IsKeyTriggered(Input::Key::W) || input.IsKeyTriggered(Input::Key::Up))
+    if (input.IsKeyTriggered(Input::Key::W)
+        || input.IsKeyTriggered(Input::Key::Up)
+        || input.IsGlfwKeyTriggered(GLFW_KEY_UP))
+    {
         m_selectedItem = (m_selectedItem - 1 + 4) % 4;
+        m_mouseSelectedItem = -1;
+    }
 
-    if (input.IsKeyTriggered(Input::Key::S) || input.IsKeyTriggered(Input::Key::Down))
+    if (input.IsKeyTriggered(Input::Key::S)
+        || input.IsKeyTriggered(Input::Key::Down)
+        || input.IsGlfwKeyTriggered(GLFW_KEY_DOWN))
+    {
         m_selectedItem = (m_selectedItem + 1) % 4;
+        m_mouseSelectedItem = -1;
+    }
+
+    if (input.IsMouseButtonTriggered(Input::MouseButton::Left))
+    {
+        double mouseX = 0.0;
+        double mouseY = 0.0;
+        input.GetMousePosition(mouseX, mouseY);
+
+        int viewportX = 0;
+        int viewportY = 0;
+        int viewportW = 0;
+        int viewportH = 0;
+        gsm.GetEngine().GetPostProcess().GetLetterboxViewport(viewportX, viewportY, viewportW, viewportH);
+        if (viewportW <= 0 || viewportH <= 0)
+        {
+            glfwGetFramebufferSize(gsm.GetEngine().GetWindow(), &viewportW, &viewportH);
+            viewportX = 0;
+            viewportY = 0;
+        }
+
+        if (viewportW > 0 && viewportH > 0)
+        {
+            const float vx = std::clamp(static_cast<float>(mouseX - viewportX), 0.0f, static_cast<float>(viewportW));
+            const float vy = std::clamp(static_cast<float>(mouseY - viewportY), 0.0f, static_cast<float>(viewportH));
+            const float menuX = (vx / static_cast<float>(viewportW)) * GAME_WIDTH;
+            const float menuY = (1.0f - (vy / static_cast<float>(viewportH))) * GAME_HEIGHT;
+
+            int hitItem = -1;
+            if (menuX >= 0.0f && menuX <= GAME_WIDTH)
+            {
+                for (int i = 0; i < 4; ++i)
+                {
+                    if (std::abs(menuY - ITEM_Y[i]) <= CLICK_HEIGHT * 0.5f)
+                    {
+                        hitItem = i;
+                        break;
+                    }
+                }
+            }
+
+            if (hitItem >= 0)
+            {
+                if (m_mouseSelectedItem == hitItem && m_selectedItem == hitItem)
+                    startConfirmFeedback();
+                else
+                {
+                    m_selectedItem = hitItem;
+                    m_mouseSelectedItem = hitItem;
+                }
+            }
+        }
+    }
 
     // Enter → confirm selected item with fade
     if (input.IsKeyTriggered(Input::Key::Enter))
-    {
-        m_isFadingOut   = true;
-        m_pendingAction = m_selectedItem;
-        Logger::Instance().Log(Logger::Severity::Event,
-            "MainMenu: confirmed item %d", m_selectedItem);
-    }
+        startConfirmFeedback();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -250,6 +333,9 @@ void MainMenu::Draw()
     }
 
     // Selection indicator (full width, centered on selected item)
+    const int blinkStep = static_cast<int>(m_confirmBlinkTimer / kConfirmBlinkStepSecs);
+    const bool drawSelection = !m_isConfirmBlinking || (blinkStep % 2 == 1);
+    if (drawSelection)
     {
         float yCenter = ITEM_Y[m_selectedItem];
         float yBottom = yCenter - CLICK_HEIGHT * 0.5f;
@@ -287,6 +373,8 @@ void MainMenu::Draw()
 // ─────────────────────────────────────────────────────────────────────────────
 void MainMenu::Shutdown()
 {
+    gsm.GetEngine().SetSystemCursorVisible(false);
+
     if (m_texShader) m_texShader.reset();
     if (m_texVAO != 0)
     {
