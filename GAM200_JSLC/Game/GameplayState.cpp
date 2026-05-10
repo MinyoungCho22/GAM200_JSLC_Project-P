@@ -34,6 +34,7 @@ constexpr float ATTACK_RANGE = 400.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
+constexpr float TRAIN_CAMERA_LOOK_DOWN_OFFSET = 140.0f;
 constexpr float ROOM_PLAYABLE_WIDTH = 1620.0f;
 constexpr float ROOM_LEFT_BOUNDARY = (GAME_WIDTH - ROOM_PLAYABLE_WIDTH) * 0.5f;
 
@@ -1459,9 +1460,9 @@ void GameplayState::Update(double dt)
         // Match Camera::Update: it clamps using view half-height (GAME_HEIGHT/2), not zoom.
         // Train map: keep the Third_ThirdTrain vertical-follow behavior active for every car.
         constexpr float trainCamHalfH = GAME_HEIGHT * 0.5f;
-        const float     py              = player.GetPosition().y;
-        const float     boundMinY       = std::min(Train::MIN_Y, py - trainCamHalfH);
-        const float     boundMaxY       = std::max(Train::MIN_Y + Train::HEIGHT, py + trainCamHalfH);
+        const float     trainCameraTargetY = player.GetPosition().y - TRAIN_CAMERA_LOOK_DOWN_OFFSET;
+        const float     boundMinY          = std::min(Train::MIN_Y, trainCameraTargetY - trainCamHalfH);
+        const float     boundMaxY          = std::max(Train::MIN_Y + Train::HEIGHT, trainCameraTargetY + trainCamHalfH);
 
         m_camera.SetBounds({ Train::MIN_X, boundMinY }, { dynamicRight, boundMaxY });
     }
@@ -1610,7 +1611,10 @@ void GameplayState::Update(double dt)
     }
     else
     {
-        m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
+        Math::Vec2 cameraTarget = player.GetPosition();
+        if (m_trainAccessed)
+            cameraTarget.y -= TRAIN_CAMERA_LOOK_DOWN_OFFSET;
+        m_camera.Update(cameraTarget, m_cameraSmoothSpeed);
     }
     m_camera.UpdateScreenShake(static_cast<float>(dt));
 
