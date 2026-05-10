@@ -64,6 +64,8 @@ public:
     void ResetVelocity();
     /// Stops vertical motion only (keeps horizontal speed — used after ledge/platform corrections).
     void ResetVerticalVelocity() { velocity.y = 0.0f; }
+    /// Positive = up (same as jump). Train 갭 낙하 등에서 Player::Update 이후에도 같은 프레임에 아래로 떨어지게 할 때 사용.
+    void SetVerticalVelocity(float vy) { velocity.y = vy; }
     void SetOnGround(bool onGround);
     bool IsOnGround() const { return is_on_ground; }
 

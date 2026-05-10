@@ -266,6 +266,8 @@ private:
     bool       m_prevOnJumpThroughSurface = false;
     bool       m_prevCrouchHeld = false;     // edge-trigger pipe drop-through
     float      m_pipeDropCooldown = 0.0f;    // 드롭 발동 직후 잠시 파이프 충돌·스냅을 무시
+    /// 칸 사이 갭: 덱 스냅 스킵 후 중력 낙하 → 레일 착지 시 펄스 소모
+    bool       m_trainCarGapFalling = false;
 
     // Entry countdown: -1 means not yet started; counts up to TRAIN_DEPART_DELAY
     float m_entryTimer        = -1.0f;

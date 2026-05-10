@@ -220,6 +220,63 @@ static bool HitboxInTrainCarryBand(float trainWorldLeft, float totalTrainWidth,
     return true;
 }
 
+// 평판 덱 슬랩(칸마다 얇은 발판) — car1~5의 [84,804,w,45] 계열만 매칭
+static constexpr float kTrainFlatbedDeckSlabCenterLocalY = kTrainFlatbedDeckTopLocalY - 45.f * 0.5f;
+
+static bool IsTrainFlatbedDeckSlab(const Train::TrainHitbox& hb)
+{
+    if (!hb.collision || hb.kind != Train::TrainHitboxKind::Solid)
+        return false;
+    if (!IsThinHorizontalTrainSlab(hb.size))
+        return false;
+    return std::fabs(hb.localCenter.y - kTrainFlatbedDeckSlabCenterLocalY) < 2.0f;
+}
+
+static bool PlayerHitboxOverlapsAnyTrainDeckX(float trainWorldLeft, Math::Vec2 hbCenter, Math::Vec2 halfHb,
+                                              const std::vector<Train::TrainHitbox>& boxes)
+{
+    // 디버그 시안 박스와 동일한 덱 AABB — 플레이어 히트박스와 X로 한 픽셀이라도 겹치면 덱 위(갭 낙하 안 함).
+    const float pMinX = hbCenter.x - halfHb.x;
+    const float pMaxX = hbCenter.x + halfHb.x;
+    for (const auto& hb : boxes)
+    {
+        if (!IsTrainFlatbedDeckSlab(hb))
+            continue;
+        const float L = trainWorldLeft + hb.localCenter.x - hb.size.x * 0.5f;
+        const float R = trainWorldLeft + hb.localCenter.x + hb.size.x * 0.5f;
+        if (pMaxX > L && pMinX < R)
+            return true;
+    }
+    return false;
+}
+
+/// 열차 칸 사이: 캐리 밴드 안·덱 높이 근처인데 어느 덱과도 X로 겹치지 않을 때(완전히 갭 위).
+static bool PlayerStandsInTrainCarGap(float trainWorldLeft, float totalTrainWidth, Math::Vec2 hbCenter,
+                                      Math::Vec2 halfHb, const std::vector<Train::TrainHitbox>& boxes,
+                                      const Player& player)
+{
+    if (player.IsGodMode() || player.IsDead())
+        return false;
+    if (!HitboxInTrainCarryBand(trainWorldLeft, totalTrainWidth, hbCenter, halfHb))
+        return false;
+    if (PlayerHitboxOverlapsAnyTrainDeckX(trainWorldLeft, hbCenter, halfHb, boxes))
+        return false;
+
+    const float feetY = hbCenter.y - halfHb.y;
+    const float deckTop = Train::MIN_Y + kTrainFlatbedDeckTopLocalY;
+    const float vy      = player.GetVelocity().y;
+
+    // 갭 상공으로 점프해 넘어가는 경우는 제외(덱보다 발이 충분히 위이고 상승 중).
+    if (vy > 42.f && feetY > deckTop + 48.f)
+        return false;
+    // 레일 쪽으로 이미 많이 내려간 뒤엔 이 검사 제외(레일 배회·다른 로직).
+    if (feetY < deckTop - 260.f)
+        return false;
+    if (feetY > deckTop + 135.f)
+        return false;
+    return true;
+}
+
 
 // ---------------------------------------------------------------------------
 // Third_ThirdTrain — 자동차 운반 칸 6슬롯 (엔진 / 펄스 주입 / 직선 연쇄)
@@ -2814,13 +2871,6 @@ static bool SnapToTopSupport(Player& player, Math::Vec2& currentHbCenter,
     if (!horizOverlap)
         return false;
 
-    if (kind == Train::TrainHitboxKind::Solid && IsThinHorizontalTrainSlab(obsSize))
-    {
-        constexpr float kEdgeInset = 15.f;
-        if (currentHbCenter.x < obsMin.x + kEdgeInset || currentHbCenter.x > obsMax.x - kEdgeInset)
-            return false;
-    }
-
     const float platTop = obsMax.y;
     const float feet    = currentHbCenter.y - playerHalfSize.y;
     const float vy      = player.GetVelocity().y;
@@ -2884,11 +2934,8 @@ static bool ResolveAABB(Player& player, Math::Vec2& currentHbCenter,
             return false;
 
         const bool horizOverlap = pMax.x > obsMin.x && pMin.x < obsMax.x;
-        constexpr float kDeckEdgeInset = 15.f;
-        const bool      centerOnSlab =
-            currentHbCenter.x >= obsMin.x + kDeckEdgeInset && currentHbCenter.x <= obsMax.x - kDeckEdgeInset;
-        // 공중·점프 상승 중에도 덱 아래에서 넓은 범위로 착지 허용(재탑승). 덱 좌우 끝 가장자리는 자석 현상 방지.
-        if (horizOverlap && centerOnSlab && vy <= 260.0f && feet <= platTop + 64.0f && feet >= platTop - 168.0f)
+        // 덱 가로 전체: 플레이어 박스가 닿기만 하면 착지(시안 히트박스와 동일, 끝에서 떨어지는 오판 방지).
+        if (horizOverlap && vy <= 260.0f && feet <= platTop + 64.0f && feet >= platTop - 168.0f)
         {
             Math::Vec2 newHbCenter = currentHbCenter;
             newHbCenter.y          = platTop + playerHalfSize.y;
@@ -3140,38 +3187,31 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         }
     }
 
-    for (const auto& hb : m_trainHitboxes)
+    if (player.IsGodMode() || player.IsDead())
+        m_trainCarGapFalling = false;
+
+    bool skipTrainDeckPhysics = false;
+
+    const bool gapTrigger = PlayerStandsInTrainCarGap(trainWorldLeft, m_totalTrainWidth, currentHbCenter,
+                                                      playerHalfSize, m_trainHitboxes, player);
+    if (gapTrigger && !m_trainCarGapFalling)
     {
-        if (!hb.collision)
-            continue;
-        if (IsCar2PurpleHitbox(hb) && m_car2HidePhase != Car2HidePhase::None)
-            continue;
-
-        Math::Vec2 hbWorld = {
-            trainWorldLeft + hb.localCenter.x,
-            MIN_Y          + hb.localCenter.y
-        };
-
-        bool landed = false;
-        if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe)
-        {
-            if (m_pipeDropCooldown > 0.0f) continue; // 드롭 직후엔 파이프 다시 잡지 않음
-            landed = ResolveJumpThroughAABB(player, currentHbCenter, playerHalfSize, hbWorld, hb.size, crouchHeld);
-        }
-        else
-            landed = ResolveAABB(player, currentHbCenter, playerHalfSize, hbWorld, hb.size);
-
-        if (landed)
-        {
-            playerOnTrainSurface = true;
-            if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe)
-                playerOnJumpThroughSurface = true;
-        }
+        m_trainCarGapFalling   = true;
+        m_airborneFromTrain    = false;
+        player.SetOnGround(false);
+        const float vy = player.GetVelocity().y;
+        if (vy > -200.f)
+            player.SetVerticalVelocity(std::min(vy - 90.f, -400.f));
+        Logger::Instance().Log(Logger::Severity::Info, "Train: player slipping through car gap — falling to rail.");
     }
 
-    // Exact-touch stabilization pass:
-    // if collision solver didn't mark landed this frame, keep support when feet are already on a top surface.
-    if (!playerOnTrainSurface)
+    if (m_trainCarGapFalling)
+    {
+        skipTrainDeckPhysics = true;
+        player.SetOnGround(false);
+    }
+
+    if (!skipTrainDeckPhysics)
     {
         for (const auto& hb : m_trainHitboxes)
         {
@@ -3184,14 +3224,48 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                 trainWorldLeft + hb.localCenter.x,
                 MIN_Y          + hb.localCenter.y
             };
-            if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe && m_pipeDropCooldown > 0.0f)
-                continue;
-            if (SnapToTopSupport(player, currentHbCenter, playerHalfSize, hbWorld, hb.size, hb.kind, crouchHeld))
+
+            bool landed = false;
+            if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe)
+            {
+                if (m_pipeDropCooldown > 0.0f) continue; // 드롭 직후엔 파이프 다시 잡지 않음
+                landed = ResolveJumpThroughAABB(player, currentHbCenter, playerHalfSize, hbWorld, hb.size, crouchHeld);
+            }
+            else
+                landed = ResolveAABB(player, currentHbCenter, playerHalfSize, hbWorld, hb.size);
+
+            if (landed)
             {
                 playerOnTrainSurface = true;
                 if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe)
                     playerOnJumpThroughSurface = true;
-                break;
+            }
+        }
+
+        // Exact-touch stabilization pass:
+        // if collision solver didn't mark landed this frame, keep support when feet are already on a top surface.
+        if (!playerOnTrainSurface)
+        {
+            for (const auto& hb : m_trainHitboxes)
+            {
+                if (!hb.collision)
+                    continue;
+                if (IsCar2PurpleHitbox(hb) && m_car2HidePhase != Car2HidePhase::None)
+                    continue;
+
+                Math::Vec2 hbWorld = {
+                    trainWorldLeft + hb.localCenter.x,
+                    MIN_Y          + hb.localCenter.y
+                };
+                if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe && m_pipeDropCooldown > 0.0f)
+                    continue;
+                if (SnapToTopSupport(player, currentHbCenter, playerHalfSize, hbWorld, hb.size, hb.kind, crouchHeld))
+                {
+                    playerOnTrainSurface = true;
+                    if (hb.kind == Train::TrainHitboxKind::JumpThroughPipe)
+                        playerOnJumpThroughSurface = true;
+                    break;
+                }
             }
         }
     }
@@ -3222,6 +3296,15 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         }
     }
 
+    // 갭 낙하 후 레일 착지: 그때 펄스 전부 소모(기차에 치인 연출).
+    if (m_trainCarGapFalling && playerOnStaticRail && !player.IsGodMode() && !player.IsDead())
+    {
+        auto& pulse = player.GetPulseCore().getPulse();
+        pulse.spend(pulse.Value() + 1.0f);
+        m_trainCarGapFalling = false;
+        Logger::Instance().Log(Logger::Severity::Info, "Train: car gap — landed on rail, pulse depleted.");
+    }
+
     // 드롭은 위쪽에서 이미 처리됨. 여기서는 prev 상태만 갱신.
     m_prevCrouchHeld = crouchHeld;
 
@@ -3245,7 +3328,9 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             m_airborneFromTrain = false;
         else if (!player.IsOnGround() && inBand && (m_prevPlayerOnTrain || m_airborneFromTrain))
             m_airborneFromTrain = true;
-        else if (!inBand || (player.IsOnGround() && !playerOnTrainSurface))
+        else         if (!inBand || (player.IsOnGround() && !playerOnTrainSurface))
+            m_airborneFromTrain = false;
+        if (m_trainCarGapFalling)
             m_airborneFromTrain = false;
     }
 
@@ -3291,7 +3376,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         const float twLeft = MIN_X + m_trainOffset - move;
         const bool inCarryBand = HitboxInTrainCarryBand(twLeft, m_totalTrainWidth, hc, hh);
 
-        if ((m_playerOnTrain || m_airborneFromTrain) && inCarryBand)
+        if ((m_playerOnTrain || m_airborneFromTrain || m_trainCarGapFalling) && inCarryBand)
             player.SetPosition(player.GetPosition() + Math::Vec2{ move, 0.0f });
     }
 
@@ -3335,6 +3420,7 @@ void Train::StartEntryTimer()
         m_prevOnJumpThroughSurface = false;
         m_prevCrouchHeld = false;
         m_pipeDropCooldown = 0.0f;
+        m_trainCarGapFalling = false;
         m_trainStartSound.Stop();
         m_trainRunLoopSound.Stop();
         m_valveDragging = false;
