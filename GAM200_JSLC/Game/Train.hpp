@@ -299,6 +299,10 @@ private:
     void DrawFilledQuad(Shader& colorShader,
                         Math::Vec2 center, Math::Vec2 size,
                         float r, float g, float b, float a = 1.0f) const;
+    void DrawCircleLine(Shader& colorShader,
+                        Math::Vec2 center, Math::Vec2 size,
+                        float thickness,
+                        float r, float g, float b, float a = 1.0f) const;
 
     void InitValveWaterGpu();
     void ShutdownValveWaterGpu();
