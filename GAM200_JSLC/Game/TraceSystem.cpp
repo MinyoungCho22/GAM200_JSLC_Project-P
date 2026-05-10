@@ -52,7 +52,7 @@ void TraceSystem::SpawnTracerWave(DroneManager& droneManager, int warningLevel, 
         const float a  = ang + angJitter;
         const float rx = std::cos(a) * radius;
         const float ry = std::sin(a) * radius * 0.62f;
-        Drone&      d  = droneManager.SpawnDrone({ origin.x + rx, origin.y + ry }, "Asset/Drone.png", true);
+        Drone&      d  = droneManager.SpawnDrone({ origin.x + rx, origin.y + ry }, "Asset/RedDrone.png", true);
         d.SetBaseSpeed(speed);
         d.SetTracerHeatLevel(warningLevel);
         if (IsTracerSpawnOnTrainWorld({ origin.x + rx, origin.y + ry }))

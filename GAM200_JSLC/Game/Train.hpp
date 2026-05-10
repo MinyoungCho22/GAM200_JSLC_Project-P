@@ -152,6 +152,15 @@ public:
     float GetCar3SirenInjectT() const { return m_car3SirenInjectT; }
     bool  GetCar3SirenActive() const { return m_car3SirenActive; }
     float GetCar2ContainerChargePct() const { return m_car2InsideCharge; }
+    /// 펄스 박스 안에서 남은 퇴장 잠금 시간 (0이면 퇴장 가능)
+    float GetCar2InsideLockRemaining() const
+    {
+        if (m_car2HidePhase != Car2HidePhase::Inside) return 0.f;
+        return std::max(0.f, 3.f - m_car2InsideLockTimer);
+    }
+    bool  IsCar2InsideLocked() const { return GetCar2InsideLockRemaining() > 0.f; }
+    /// 잠금/재진입 쿨다운 카운트다운 바 (colorShader 사용)
+    void DrawCar2InsideLockTimer(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
 
     /// Car2 보라 펄스 박스 안(Inside) — 사이렌 드론 추적·공격 차단용
     bool IsPlayerInCar2PurplePulseBox(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize) const;
@@ -336,9 +345,10 @@ private:
 
     enum class Car2HidePhase : uint8_t { None, Entering, Inside };
     Car2HidePhase       m_car2HidePhase        = Car2HidePhase::None;
-    float               m_car2HideSeqTime    = 0.f;
+    float               m_car2HideSeqTime      = 0.f;
     float               m_car2InsideCharge     = 0.f;
-    /// Enter 클릭 직전 위치(복귀용). 열차 이동분은 m_trainOffset 차로 보정.
+    float               m_car2InsideLockTimer  = 0.f;  ///< Inside 진입 후 경과 시간 (3s 이전 퇴장 불가)
+    float               m_car2ReEnterCooldown  = 0.f;  ///< 퇴장 후 재진입 금지 쿨다운 (3s)
     bool        m_car2EnterSavedValid = false;
     Math::Vec2  m_car2EnterPlayerWorld{};
     float       m_car2EnterTrainOffset  = 0.f;

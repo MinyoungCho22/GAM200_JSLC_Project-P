@@ -171,7 +171,7 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
 
     const float moveAxis = controls.GetMoveHorizontalAxis(input);
 
-    if (controls.IsActionTriggered(ControlAction::Jump, input) && !m_car2LeaveWalk) Jump();
+    if (controls.IsActionTriggered(ControlAction::Jump, input) && !m_car2LeaveWalk && !m_trainJumpBlocked) Jump();
 
     if (!m_car2LeaveWalk)
     {

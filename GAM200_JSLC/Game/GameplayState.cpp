@@ -2470,6 +2470,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     {
         m_train->DrawCar3SirenProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
         m_train->DrawCarTransportInjectProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
+        m_train->DrawCar2InsideLockTimer(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
     }
     colorShader->setFloat("uAlpha", 1.0f);
 

@@ -89,6 +89,7 @@ public:
     }
     /// Train 보라 컨테이너 안 — 웅크리기 연출 (이동 잠금 중에도 애니 갱신).
     void SetTrainCar2ForcedCrouch(bool on);
+    void SetTrainJumpBlocked(bool blocked) { m_trainJumpBlocked = blocked; }
     void SetSpriteAlphaMul(float m)
     {
         if (m < 0.f) m_spriteAlphaMul = 0.f;
@@ -155,6 +156,7 @@ private:
     bool  m_car2LeaveWalk      = false;
     float m_car2LeaveWalkSpeed = 175.f;
     bool  m_trainForcedCar2Crouch = false;
+    bool  m_trainJumpBlocked = false;
     float m_spriteAlphaMul = 1.0f;
 
     // Sandevistan afterimage effect

@@ -29,9 +29,10 @@
 static constexpr float ASSUMED_IMG_HEIGHT = 1080.0f; // expected car image height in pixels
 // Flatbed deck surface: art row py=804 → world offset above Train::MIN_Y (see MakeHitbox for [84,804,2472,45]).
 static constexpr float kTrainFlatbedDeckTopLocalY = ASSUMED_IMG_HEIGHT - 804.f;
-// rail.png: DrawRailTrack는 타일 전체(MIN_Y ~ MIN_Y+m_railTileH)에 맞추지만, 궤도 픽셀은 대부분 타일 하단에 있다.
+// rail.png: DrawRailTrack는 타일 전체(MIN_Y ~ MIN_Y+m_railTileH)에 맞추지만, 궤도 픽셀은 대부분 타일 하단
 // 물리 슬랩 윗면 = MIN_Y + m_railTileH * 이 값 (현재 아트 기준 0.08).
 static constexpr float kRailWalkSurfaceFractionOfTileH = 0.08f;
+static constexpr const char* kTrainDroneTexturePath = "Asset/Drone.png";
 
 void Train::ApplyCombatDroneVisualScale(Drone& d)
 {
@@ -1413,7 +1414,7 @@ void Train::Initialize()
                         MIN_X + l + w * t + static_cast<float>((j * 23 + 5) % 13 - 6) * 11.f;
                     const float yExtra = behindTank ? (-18.f - static_cast<float>(sub) * 14.f)
                                                     : (12.f + static_cast<float>(sub) * 16.f);
-                    Drone& dj = m_droneManager->SpawnDrone({ xj, ySiren + yExtra }, "Asset/Drone.png", false);
+                    Drone& dj = m_droneManager->SpawnDrone({ xj, ySiren + yExtra }, kTrainDroneTexturePath, false);
                     ScaleTrainCombatDrone(dj);
                     const float spd = behindTank ? (62.f + static_cast<float>(sub) * 19.f)
                                                  : (74.f + static_cast<float>(sub) * 21.f);
@@ -1438,9 +1439,9 @@ void Train::Initialize()
                 yA                 = yAtSiren + 8.f;
                 yB                 = yAtSiren + 28.f;
             }
-            Drone& da = m_droneManager->SpawnDrone({ xA, yA }, "Asset/Drone.png", false);
+            Drone& da = m_droneManager->SpawnDrone({ xA, yA }, kTrainDroneTexturePath, false);
             ScaleTrainCombatDrone(da);
-            Drone& db = m_droneManager->SpawnDrone({ xB, yB }, "Asset/Drone.png", false);
+            Drone& db = m_droneManager->SpawnDrone({ xB, yB }, kTrainDroneTexturePath, false);
             ScaleTrainCombatDrone(db);
             if (carIdx == 1)
             {
@@ -1539,7 +1540,7 @@ void Train::Initialize()
                 const float ly = ASSUMED_IMG_HEIGHT - kCarTransportDronePixels[i].yTop;
                 const float wx = MIN_X + lx;
                 const float wy = MIN_Y + ly;
-                Drone&      dd = m_carTransportDroneManager->SpawnDrone({ wx, wy }, "Asset/Drone.png", false);
+                Drone&      dd = m_carTransportDroneManager->SpawnDrone({ wx, wy }, kTrainDroneTexturePath, false);
                 ScaleTrainCombatDrone(dd);
                 dd.SetBaseSpeed(0.f);
                 dd.SetCarTransportPersistHover(true);
@@ -1635,6 +1636,10 @@ void Train::BuildTrainHitboxes()
         m_car2PurpleHbValid = true;
         m_trainHitboxes.push_back(purple);
     }
+
+    // [Car2] 보라 컨테이너 내부 바닥 발판 — 항상 활성, 컨테이너 안에서 플레이어가 서 있는 지지면
+    // py=519 → 윗면 세계 Y = MIN_Y + 561 (dark gray 컨테이너 top과 동일한 높이)
+    m_trainHitboxes.push_back(MakeHitbox(c2, 1653, 519, 603, 30));
 
     // 우측 갈색 (2268, 519) 183×285
     m_trainHitboxes.push_back(MakeHitbox(c2, 2268, 519, 183, 285));
@@ -2274,7 +2279,7 @@ void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter,
         {
             m_car3SirenSpawnTimer = 0.f;
             const Math::Vec2 spawnPos = { sirenW.x + 25.f, sirenW.y + 55.f };
-            Drone& d = m_sirenDroneManager->SpawnDrone(spawnPos, "Asset/Drone.png", true);
+            Drone& d = m_sirenDroneManager->SpawnDrone(spawnPos, kTrainDroneTexturePath, true);
             ScaleTrainCombatDrone(d);
             d.SetBaseSpeed(185.f);
             d.SetSirenMapDrone(true);
@@ -2364,28 +2369,39 @@ bool Train::IsCar2PurpleHitbox(const TrainHitbox& hb) const
 }
 
 
-void Train::UpdateCar2PurpleContainer(float dt, Player& player, Math::Vec2 mouseWorldPos, bool attackTriggered,
+void Train::UpdateCar2PurpleContainer(float dt, Player& player, Math::Vec2 /*mouseWorldPos*/, bool /*attackTriggered*/,
                                       bool pulseAbsorbHeld, bool injectGodMode)
 {
     if (!m_car2PurpleHbValid)
         return;
 
-    const float      tl    = MIN_X + m_trainOffset;
-    const Math::Vec2 contC = { tl + m_car2PurpleHb.localCenter.x, MIN_Y + m_car2PurpleHb.localCenter.y };
+    constexpr float kLockDuration  = 3.0f;   // 진입 후 퇴장 잠금 시간
+    constexpr float kEnterFadeDur  = 0.55f;  // 페이드인 시간
+    constexpr float kInsideAlpha   = 0.38f;  // 안에 있을 때 투명도
 
-    // 플레이어 히트박스 중심을 컨테이너 중심에 고정 — 중력/걷기로 박스 아래로 떨어지지 않음
-    auto snapHitboxCenterTo = [&](Math::Vec2 worldHbCenter) {
-        const Math::Vec2 hc = player.GetHitboxCenter();
-        player.SetPosition(player.GetPosition() + (worldHbCenter - hc));
-    };
+    const float      tl     = MIN_X + m_trainOffset;
+    const Math::Vec2 contC  = { tl + m_car2PurpleHb.localCenter.x, MIN_Y + m_car2PurpleHb.localCenter.y };
+    const float      boxL   = contC.x - m_car2PurpleHb.size.x * 0.5f;
+    const float      boxR   = contC.x + m_car2PurpleHb.size.x * 0.5f;
 
-    const bool nearPurple = Collision::CheckAABB(player.GetHitboxCenter(), player.GetHitboxSize(), contC,
-                                                 { m_car2PurpleHb.size.x + 520.f, m_car2PurpleHb.size.y + 520.f });
+    const Math::Vec2 pHb    = player.GetHitboxCenter();
+    const Math::Vec2 pHalf  = player.GetHitboxSize() * 0.5f;
+    const float      pL     = pHb.x - pHalf.x;
+    const float      pR     = pHb.x + pHalf.x;
 
-    const Math::Vec2 promptCenter = { contC.x - m_car2PurpleHb.size.x * 0.5f - 115.f, contC.y + 10.f };
+    const Math::Vec2 promptCenter = { boxL - 115.f, contC.y + 10.f };
     const Math::Vec2 promptSize   = { 150.f, 78.f };
-    const bool       hoverPrompt =
-        Collision::CheckPointInAABB(mouseWorldPos, promptCenter, promptSize) && nearPurple;
+    const bool        enterPromptOverlapped = Collision::CheckAABB(pHb, pHalf * 2.f, promptCenter, promptSize);
+
+    // 진입 트리거는 Enter.png와 플레이어 히트박스가 겹칠 때만 허용한다.
+    // 위/아래/오른쪽 경계에서는 진입하지 못하고, 왼쪽 경계만 풀린다.
+    const bool nearEntry = enterPromptOverlapped;
+
+    // 왼쪽으로 완전히 나갔는지 (Inside 상태 퇴장 조건)
+    const bool exitedLeft = (pR <= boxL + 4.f);
+    // Entering 시작 직후에는 플레이어가 아직 박스 왼쪽에 있으므로 exitedLeft가 참일 수 있다.
+    // Enter.png보다 더 왼쪽으로 확실히 벗어난 경우에만 진입 취소로 본다.
+    const bool cancelledEntryLeft = (pR < promptCenter.x - promptSize.x * 0.5f - 12.f);
 
     auto smoothstep = [](float t) -> float {
         t = std::clamp(t, 0.f, 1.f);
@@ -2398,53 +2414,84 @@ void Train::UpdateCar2PurpleContainer(float dt, Player& player, Math::Vec2 mouse
         player.SetTrainCar2ForcedCrouch(false);
         player.SetMovementLockedByTrain(false);
         player.SetCar2LeaveWalk(false);
+        player.SetTrainJumpBlocked(false);
         player.SetSpriteAlphaMul(1.f);
-        if (nearPurple && attackTriggered && hoverPrompt && m_car2InsideCharge < 99.5f)
+        m_car2InsideLockTimer = 0.f;
+
+        // 재진입 쿨다운 차감
+        if (m_car2ReEnterCooldown > 0.f)
+            m_car2ReEnterCooldown = std::max(0.f, m_car2ReEnterCooldown - dt);
+
+        // A/D 키로 걸어서 박스에 접근하면 자동 진입 시작 (쿨다운 중에는 진입 불가)
+        if (nearEntry && m_car2InsideCharge < 99.5f && m_car2ReEnterCooldown <= 0.f)
         {
-            m_car2EnterSavedValid   = true;
-            m_car2EnterPlayerWorld  = player.GetPosition();
-            m_car2EnterTrainOffset  = m_trainOffset;
-            m_car2HidePhase         = Car2HidePhase::Entering;
-            m_car2HideSeqTime       = 0.f;
-            player.SetCar2LeaveWalk(false);
-            snapHitboxCenterTo(contC);
+            // 덱 레벨에서 진입 시 — 컨테이너 바닥 높이(MIN_Y+561)로 플레이어 Y 스냅
+            const float     kFloorTopWorldY = MIN_Y + 561.f;
+            const float     currentFeet     = pHb.y - pHalf.y;
+            if (currentFeet < kFloorTopWorldY - 4.f)
+            {
+                const float snapDy = kFloorTopWorldY - currentFeet;
+                player.SetPosition(player.GetPosition() + Math::Vec2{ 0.f, snapDy });
+                player.SetOnGround(true);
+                player.ResetVelocity();
+            }
+
+            m_car2HidePhase   = Car2HidePhase::Entering;
+            m_car2HideSeqTime = 0.f;
         }
         break;
 
     case Car2HidePhase::Entering:
     {
+        // 이동 잠금 없음 — 플레이어가 자유롭게 걸어 들어감
         player.SetTrainCar2ForcedCrouch(false);
-        player.SetMovementLockedByTrain(true);
+        player.SetMovementLockedByTrain(false);
         player.SetCar2LeaveWalk(false);
-        snapHitboxCenterTo(contC);
+        player.SetTrainJumpBlocked(false);
 
         m_car2HideSeqTime += dt;
-        const float dur = 0.55f;
-        float       u   = smoothstep(std::min(1.f, m_car2HideSeqTime / dur));
-        player.SetSpriteAlphaMul(1.f - 0.62f * u);
+        const float u = smoothstep(std::min(1.f, m_car2HideSeqTime / kEnterFadeDur));
+        player.SetSpriteAlphaMul(1.f - (1.f - kInsideAlpha) * u);
 
-        if (m_car2HideSeqTime >= dur)
+        // 페이드 완료 전에 Enter.png 영역보다 더 왼쪽으로 돌아가면 취소
+        if (cancelledEntryLeft && m_car2HideSeqTime < kEnterFadeDur * 0.75f)
         {
-            m_car2HidePhase   = Car2HidePhase::Inside;
-            m_car2HideSeqTime = 0.f;
-            snapHitboxCenterTo(contC);
-            player.SetSpriteAlphaMul(0.38f);
-            player.SetTrainCar2ForcedCrouch(true);
+            m_car2HidePhase = Car2HidePhase::None;
+            player.SetSpriteAlphaMul(1.f);
+            break;
+        }
+
+        if (m_car2HideSeqTime >= kEnterFadeDur)
+        {
+            m_car2HidePhase       = Car2HidePhase::Inside;
+            m_car2HideSeqTime     = 0.f;
+            m_car2InsideLockTimer = 0.f;
+            player.SetTrainJumpBlocked(true);
+            if (player.GetVelocity().y > 0.f)
+                player.ResetVerticalVelocity();
+            player.SetSpriteAlphaMul(kInsideAlpha);
         }
     }
     break;
 
     case Car2HidePhase::Inside:
     {
-        player.SetMovementLockedByTrain(true);
+        // 이동 잠금 없음 — A/D로 박스 안에서 자유 이동
+        player.SetMovementLockedByTrain(false);
         player.SetCar2LeaveWalk(false);
-        player.SetTrainCar2ForcedCrouch(true);
-        snapHitboxCenterTo(contC);
-        player.SetSpriteAlphaMul(0.38f);
+        player.SetTrainCar2ForcedCrouch(false);
+        player.SetTrainJumpBlocked(true);
+        if (player.GetVelocity().y > 0.f)
+            player.ResetVerticalVelocity();
+        player.SetSpriteAlphaMul(kInsideAlpha);
 
+        // 잠금 타이머 증가
+        m_car2InsideLockTimer = std::min(m_car2InsideLockTimer + dt, kLockDuration);
+
+        // 펄스 충전
         float chargeMeterPerSec = 30.f;
         float pulsePerSec       = 40.f;
-        if (pulseAbsorbHeld)
+        if (pulseAbsorbHeld || injectGodMode)
         {
             chargeMeterPerSec = 48.f;
             pulsePerSec       = 72.f;
@@ -2452,22 +2499,31 @@ void Train::UpdateCar2PurpleContainer(float dt, Player& player, Math::Vec2 mouse
         player.GetPulseCore().getPulse().add(pulsePerSec * static_cast<float>(dt));
         m_car2InsideCharge = std::min(100.f, m_car2InsideCharge + chargeMeterPerSec * static_cast<float>(dt));
 
-        if (nearPurple && attackTriggered && hoverPrompt && m_car2InsideCharge >= 99.5f)
+        const bool exitAllowed = (m_car2InsideLockTimer >= kLockDuration) && (m_car2InsideCharge >= 99.5f);
+
+        // 오른쪽 경계는 Inside 상태에서도 항상 유지한다.
+        if (pR > boxR)
         {
-            player.SetTrainCar2ForcedCrouch(false);
-            player.SetCar2LeaveWalk(false);
-            if (m_car2EnterSavedValid)
-            {
-                const float dOff = m_trainOffset - m_car2EnterTrainOffset;
-                player.SetPosition({ m_car2EnterPlayerWorld.x + dOff, m_car2EnterPlayerWorld.y });
-                m_car2EnterSavedValid = false;
-            }
-            player.ResetVelocity();
+            player.SetPosition(player.GetPosition() + Math::Vec2{ boxR - pR, 0.f });
             player.SetOnGround(true);
-            player.SetMovementLockedByTrain(false);
-            m_car2HidePhase    = Car2HidePhase::None;
-            m_car2InsideCharge = 0.f;
+        }
+
+        // 충전/잠금 중에는 왼쪽 경계를 유지해서 플레이어가 밖으로 나가지 못하게 함.
+        if (!exitAllowed && pL < boxL)
+        {
+            player.SetPosition(player.GetPosition() + Math::Vec2{ boxL - pL, 0.f });
+            player.SetOnGround(true);
+        }
+
+        // 퇴장: 충전 완료 + 잠금 해제 + A키로 왼쪽으로 걸어 나감
+        if (exitAllowed && exitedLeft)
+        {
             player.SetSpriteAlphaMul(1.f);
+            player.SetMovementLockedByTrain(false);
+            player.SetTrainJumpBlocked(false);
+            m_car2HidePhase       = Car2HidePhase::None;
+            m_car2InsideCharge    = 0.f;
+            m_car2ReEnterCooldown = kLockDuration;  // 3초 쿨다운 후 재진입 가능
         }
     }
     break;
@@ -2551,12 +2607,16 @@ void Train::DrawCar2EnterLeavePrompt(Shader& textureShader, Math::Vec2 cameraPos
     if (promptCenter.x < visLeft || promptCenter.x > visRight)
         return;
 
+    // Enter.png: None 상태에서 힌트용으로만 표시 (클릭 불필요, 걸어서 진입)
+    // Leave.png: Inside 상태에서 충전 완료 + 잠금 해제 시 표시 (걸어서 왼쪽으로 나가라는 힌트)
     Background* tex = nullptr;
-    if (m_car2HidePhase == Car2HidePhase::Inside && m_car2InsideCharge >= 99.5f && m_car2LeavePromptTex
-        && m_car2LeavePromptTex->GetWidth() > 0)
+    if (m_car2HidePhase == Car2HidePhase::Inside
+        && m_car2InsideCharge >= 99.5f && m_car2InsideLockTimer >= 3.f
+        && m_car2LeavePromptTex && m_car2LeavePromptTex->GetWidth() > 0)
         tex = m_car2LeavePromptTex.get();
-    else if ((m_car2HidePhase == Car2HidePhase::None || m_car2HidePhase == Car2HidePhase::Entering)
-             && m_car2InsideCharge < 99.5f && m_car2EnterPromptTex && m_car2EnterPromptTex->GetWidth() > 0)
+    else if (m_car2HidePhase == Car2HidePhase::None
+        && m_car2InsideCharge < 99.5f && m_car2ReEnterCooldown <= 0.f
+        && m_car2EnterPromptTex && m_car2EnterPromptTex->GetWidth() > 0)
         tex = m_car2EnterPromptTex.get();
 
     if (!tex)
@@ -2575,6 +2635,64 @@ void Train::DrawCar2EnterLeavePrompt(Shader& textureShader, Math::Vec2 cameraPos
     Math::Matrix model =
         Math::Matrix::CreateTranslation(promptCenter) * Math::Matrix::CreateScale({ pw * 0.85f, ph * 0.85f });
     tex->Draw(textureShader, model);
+}
+
+
+void Train::DrawCar2InsideLockTimer(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
+{
+    if (!m_car2PurpleHbValid || !m_skyVAO)
+        return;
+
+    constexpr float kLockDuration = 3.0f;
+    float           remaining     = 0.f;
+
+    if (m_car2HidePhase == Car2HidePhase::Inside)
+        remaining = std::max(0.f, kLockDuration - m_car2InsideLockTimer);
+    else if (m_car2HidePhase == Car2HidePhase::None)
+        remaining = std::max(0.f, m_car2ReEnterCooldown);
+
+    if (remaining <= 0.f)
+        return; // 잠금/쿨다운이 없으면 표시 안 함
+
+    const float      tl     = MIN_X + m_trainOffset;
+    const Math::Vec2 contC  = { tl + m_car2PurpleHb.localCenter.x, MIN_Y + m_car2PurpleHb.localCenter.y };
+
+    const float visLeft  = cameraPos.x - viewHalfW - 400.f;
+    const float visRight = cameraPos.x + viewHalfW + 400.f;
+    if (contC.x < visLeft || contC.x > visRight)
+        return;
+
+    // 박스 왼쪽 가장자리 바깥에 세로 바를 그림 (PulseSource 게이지와 유사한 스타일)
+    constexpr float kBarW      = 10.f;
+    constexpr float kBarH      = 80.f;
+    constexpr float kOffsetX   = -38.f; // 박스 왼쪽에서 왼쪽으로
+
+    const float barCenterX = contC.x - m_car2PurpleHb.size.x * 0.5f + kOffsetX;
+    const float barBotY    = contC.y - kBarH * 0.5f;
+    const float fillFrac   = std::clamp(remaining / kLockDuration, 0.f, 1.f); // 1→0 (남은 시간 비율)
+
+    // 배경 (어두운 보라)
+    DrawFilledQuad(colorShader,
+        { barCenterX, contC.y },
+        { kBarW, kBarH },
+        0.25f, 0.05f, 0.35f, 0.85f);
+
+    // 채움 바 (밝은 보라, 위에서 채움)
+    const float fillH       = kBarH * fillFrac;
+    const float fillCenterY = barBotY + kBarH - fillH * 0.5f;
+    if (fillH > 0.5f)
+    {
+        DrawFilledQuad(colorShader,
+            { barCenterX, fillCenterY },
+            { kBarW - 2.f, fillH - 1.f },
+            0.72f, 0.32f, 1.0f, 0.95f);
+    }
+
+    // 테두리
+    DrawFilledQuad(colorShader,
+        { barCenterX, contC.y },
+        { kBarW + 2.f, kBarH + 2.f },
+        0.55f, 0.20f, 0.80f, 0.55f);
 }
 
 
@@ -3483,6 +3601,8 @@ void Train::StartEntryTimer()
         m_car2HidePhase        = Car2HidePhase::None;
         m_car2HideSeqTime      = 0.f;
         m_car2InsideCharge     = 0.f;
+        m_car2InsideLockTimer  = 0.f;
+        m_car2ReEnterCooldown  = 0.f;
         m_car2EnterSavedValid  = false;
         m_car3SirenActive     = true;
         m_car3SirenInjectT    = 0.f;
