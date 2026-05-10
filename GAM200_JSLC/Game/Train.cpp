@@ -2483,18 +2483,55 @@ void Train::DrawCar3SirenWaves(Shader& colorShader, Math::Vec2 cameraPos, float 
     const float      tl    = MIN_X + m_trainOffset;
     const Math::Vec2 o = { tl + m_car3SirenHb.localCenter.x, MIN_Y + m_car3SirenHb.localCenter.y + 70.f };
 
-    const float visLeft  = cameraPos.x - viewHalfW - 400.f;
-    const float visRight = cameraPos.x + viewHalfW + 400.f;
+    const float visLeft = cameraPos.x - viewHalfW - 30000.f;
+    const float visRight = cameraPos.x + viewHalfW + 30000.f;
     if (o.x < visLeft || o.x > visRight)
         return;
 
-    for (int i = 0; i < 4; ++i)
+    constexpr int kWaveCount = 17;
+
+    for (int i = 0; i < kWaveCount; ++i)
     {
-        const float ph = m_car3SirenWaveAnim * 2.6f + static_cast<float>(i) * 1.15f;
-        const float wave = std::fmod(ph, 6.2831853f);
-        const float rad  = 90.f + static_cast<float>(i) * 68.f + std::sin(wave) * 22.f;
-        const float a    = 0.14f + static_cast<float>(i) * 0.05f;
-        DrawFilledQuad(colorShader, o, { rad * 2.2f, rad * 0.65f }, 0.55f, 0.15f, 0.95f, a * (1.f - m_car3SirenInjectT));
+        const float progress = std::fmod(
+            m_car3SirenWaveAnim * 0.010f + static_cast<float>(i) * (1.0f / static_cast<float>(kWaveCount)),
+            1.0f
+        );
+
+        const float minRad = 55.f;
+        const float maxRad = 9000.f;
+
+        const float easeOut = 1.f - (1.f - progress) * (1.f - progress); 
+        const float easedProgress = progress * 0.90f + easeOut * 0.10f;
+        const float rad = minRad + (maxRad - minRad) * easedProgress;
+
+        const float fadeStart = 0.85f;
+        const float fadeProgress = std::clamp(
+            (progress - fadeStart) / (1.f - fadeStart),
+            0.f,
+            1.f
+        );
+
+        const float slowFade = 1.f - fadeProgress * 0.25f;
+
+        const float alpha =
+            0.55f * slowFade * (1.f - m_car3SirenInjectT);
+
+        const float widthMul = 4.0f;
+        const float heightMul = 2.0f + easedProgress * 1.4f;
+
+        const float maxThickness = 5.0f;
+        const float minThickness = 0.5f;
+        const float waveThickness =
+            maxThickness + (minThickness - maxThickness) * easedProgress;
+
+        DrawCircleLine(
+            colorShader,
+            o,
+            { rad * widthMul, rad * heightMul },
+            waveThickness,
+            1.0f, 0.08f, 0.12f,
+            alpha
+        );
     }
 }
 
@@ -3510,6 +3547,75 @@ void Train::DrawFilledQuad(Shader& colorShader,
     GL::BindVertexArray(m_skyVAO);
     GL::DrawArrays(GL_TRIANGLES, 0, 6);
     GL::BindVertexArray(0);
+}
+// ---------------------------------------------------------------------------
+// DrawCircleLine
+// ---------------------------------------------------------------------------
+void Train::DrawCircleLine(Shader& colorShader,
+    Math::Vec2 center, Math::Vec2 size,
+    float thickness,
+    float r, float g, float b, float a) const {
+    
+    constexpr int kSegments = 160;
+    constexpr float kPi = 3.14159265359f;
+
+    std::vector<float> vertices;
+    vertices.reserve(kSegments * 2);
+
+    const float rx = size.x * 0.5f;
+    const float ry = size.y * 0.5f;
+
+    const float halfThickness = thickness * 0.5f;
+
+    const float outerRx = rx + halfThickness;
+    const float outerRy = ry + halfThickness;
+    const float innerRx = std::max(1.0f, rx - halfThickness);
+    const float innerRy = std::max(1.0f, ry - halfThickness);
+
+
+    for (int i = 0; i < kSegments; ++i) {
+        const float progress = static_cast<float>(i) / static_cast<float>(kSegments - 1);
+        const float angle = progress * kPi;
+        const float cosA = std::cos(angle);
+        const float sinA = std::sin(angle);
+
+        // 바깥쪽 반원 점
+        vertices.push_back(cosA * outerRx);
+        vertices.push_back(sinA * outerRy);
+
+        // 안쪽 반원 점
+        vertices.push_back(cosA * innerRx);
+        vertices.push_back(sinA * innerRy);
+    }
+
+    unsigned int vao = 0;
+    unsigned int vbo = 0;
+
+    GL::GenVertexArrays(1, &vao);
+    GL::GenBuffers(1, &vbo);
+    GL::BindVertexArray(vao);
+    GL::BindBuffer(GL_ARRAY_BUFFER, vbo);
+    GL::BufferData(GL_ARRAY_BUFFER,
+                    vertices.size() * sizeof(float),
+                    vertices.data(),
+                    GL_DYNAMIC_DRAW);
+    GL::EnableVertexAttribArray(0);
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
+        2 * sizeof(float), static_cast<void*>(nullptr));
+
+    Math::Matrix model = Math::Matrix::CreateTranslation(center);
+
+    colorShader.setMat4("model", model);
+    colorShader.setVec3("objectColor", r, g, b);
+    colorShader.setFloat("uAlpha", a);
+    
+    GL::DrawArrays(GL_TRIANGLE_STRIP, 0, kSegments * 2);
+
+    GL::BindBuffer(GL_ARRAY_BUFFER, 0);
+    GL::BindVertexArray(0);
+
+    GL::DeleteBuffers(1, &vbo);
+    GL::DeleteVertexArrays(1, &vao);
 }
 
 
