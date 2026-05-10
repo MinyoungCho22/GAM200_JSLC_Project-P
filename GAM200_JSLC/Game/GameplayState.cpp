@@ -1457,16 +1457,11 @@ void GameplayState::Update(double dt)
         const float dynamicRight = (trainDrivenRight > playerDrivenRight) ? trainDrivenRight : playerDrivenRight;
 
         // Match Camera::Update: it clamps using view half-height (GAME_HEIGHT/2), not zoom.
-        // Third_ThirdTrain (car index 4) only: allow vertical follow on container stacks / upper pipe.
+        // Train map: keep the Third_ThirdTrain vertical-follow behavior active for every car.
         constexpr float trainCamHalfH = GAME_HEIGHT * 0.5f;
         const float     py              = player.GetPosition().y;
-        float           boundMinY       = Train::MIN_Y;
-        float           boundMaxY       = Train::MIN_Y + Train::HEIGHT;
-        if (m_train->GetPlayerTrainCarIndex(playerHbCenter) == 4)
-        {
-            boundMinY = std::min(Train::MIN_Y, py - trainCamHalfH);
-            boundMaxY = std::max(Train::MIN_Y + Train::HEIGHT, py + trainCamHalfH);
-        }
+        const float     boundMinY       = std::min(Train::MIN_Y, py - trainCamHalfH);
+        const float     boundMaxY       = std::max(Train::MIN_Y + Train::HEIGHT, py + trainCamHalfH);
 
         m_camera.SetBounds({ Train::MIN_X, boundMinY }, { dynamicRight, boundMaxY });
     }
