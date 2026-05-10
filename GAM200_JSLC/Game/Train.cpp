@@ -97,7 +97,7 @@ static GLuint CompileGLShader(GLenum type, const char* src)
         Logger::Instance().Log(Logger::Severity::Error, "Train valve water shader compile failed:\n%s", log);
         GL::DeleteShader(shader);
         return 0;
-    }
+    }//
     return shader;
 }
 
