@@ -3155,11 +3155,15 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     Math::Vec2 playerPos = player.GetPosition();
 
     // Only run when player is roughly within (or near) the train region.
-    // Upper bound needs extra margin: on the 3F pipe (local top ≈ 1006)
-    // the player centre can exceed MIN_Y + HEIGHT.
+    // Keep the Y band generous: on upper containers/pipes, a forward jump can briefly put
+    // the player's draw-center above the old bound. Returning here freezes train actors.
+    constexpr float kTrainUpdateLowerMarginY = 900.0f;
+    constexpr float kTrainUpdateUpperMarginY = 1800.0f;
+    constexpr float kTrainUpdateLeftMarginX  = 200.0f;
     const bool playerInSubway =
-        playerPos.y >= MIN_Y && playerPos.y <= MIN_Y + HEIGHT + 400.0f &&
-        playerPos.x >= MIN_X - 200.0f;
+        playerPos.y >= MIN_Y - kTrainUpdateLowerMarginY
+        && playerPos.y <= MIN_Y + HEIGHT + kTrainUpdateUpperMarginY
+        && playerPos.x >= MIN_X - kTrainUpdateLeftMarginX;
 
     if (!playerInSubway) return;
 
