@@ -1899,20 +1899,39 @@ void GameplayState::RespawnAtCheckpoint()
 
     // Reset all enemies
     droneManager->ResetAllDrones();
-    if (m_hallway)    m_hallway->GetDroneManager()->ResetAllDrones();
-    if (m_rooftop)    m_rooftop->GetDroneManager()->ResetAllDrones();
+    droneManager->ClearTraceReinforcementDrones();
+    if (m_traceSystem)
+        m_traceSystem->Reset();
+    if (m_hallway)
+    {
+        m_hallway->GetDroneManager()->ResetAllDrones();
+        m_hallway->GetDroneManager()->ClearTraceReinforcementDrones();
+    }
+    if (m_rooftop)
+    {
+        m_rooftop->GetDroneManager()->ResetAllDrones();
+        m_rooftop->GetDroneManager()->ClearTraceReinforcementDrones();
+    }
     if (m_underground)
     {
         m_underground->GetDroneManager()->ResetAllDrones();
+        m_underground->GetDroneManager()->ClearTraceReinforcementDrones();
         for (auto& robot : m_underground->GetRobots()) robot.Reset();
     }
     if (m_train)
     {
         m_train->GetDroneManager()->ResetAllDrones();
+        m_train->GetDroneManager()->ClearTraceReinforcementDrones();
         if (m_train->GetCarTransportDroneManager())
+        {
             m_train->GetCarTransportDroneManager()->ResetAllDrones();
+            m_train->GetCarTransportDroneManager()->ClearTraceReinforcementDrones();
+        }
         if (m_train->GetSirenDroneManager())
+        {
             m_train->GetSirenDroneManager()->ResetAllDrones();
+            m_train->GetSirenDroneManager()->ClearTraceReinforcementDrones();
+        }
         for (auto& robot : m_train->GetRobots()) robot.Reset();
     }
 

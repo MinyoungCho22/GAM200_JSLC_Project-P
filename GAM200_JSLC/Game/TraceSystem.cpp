@@ -9,7 +9,14 @@
 
 void TraceSystem::Initialize()
 {
+    Reset();
     Logger::Instance().Log(Logger::Severity::Info, "Trace System Initialized.");
+}
+
+void TraceSystem::Reset()
+{
+    m_killCount = 0;
+    m_warningLevel = 0;
 }
 
 void TraceSystem::OnDroneKilled(DroneManager& droneManager, Math::Vec2 spawnOrigin)

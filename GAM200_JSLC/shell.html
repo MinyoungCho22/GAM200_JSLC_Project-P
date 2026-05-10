@@ -91,6 +91,9 @@
 
     var GAME_W = 1280, GAME_H = 720;
     window.gameSystemCursorVisible = false;
+    window.gameMainMenuActive = false;
+    window.gameCreditsActive = false;
+    window.gameWasFullscreen = false;
     window.gameSetSystemCursorVisible = function(visible) {
       window.gameSystemCursorVisible = !!visible;
       fitCanvas();
@@ -135,24 +138,78 @@
       fullscreenBtn.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
     }
 
+    function tryLockFullscreenEscape() {
+      if (navigator.keyboard && navigator.keyboard.lock) {
+        navigator.keyboard.lock(['Escape']).catch(function() {});
+      }
+    }
+
+    function unlockFullscreenEscape() {
+      if (navigator.keyboard && navigator.keyboard.unlock) {
+        navigator.keyboard.unlock();
+      }
+    }
+
+    function exitFullscreen() {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }
+
+    function synthesizeEscapeForGame() {
+      var target = document.getElementById('canvas') || window;
+      var down = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true });
+      var up = new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true });
+      target.dispatchEvent(down);
+      window.dispatchEvent(down);
+      setTimeout(function() {
+        target.dispatchEvent(up);
+        window.dispatchEvent(up);
+      }, 80);
+    }
+
+    function handleFullscreenStateChanged() {
+      var isFullscreen = !!document.fullscreenElement || !!document.webkitFullscreenElement;
+      updateFullscreenButton();
+      fitCanvas();
+      if (isFullscreen)
+        tryLockFullscreenEscape();
+      else
+        unlockFullscreenEscape();
+      if (!isFullscreen && window.gameWasFullscreen && window.gameCreditsActive)
+        synthesizeEscapeForGame();
+      window.gameWasFullscreen = isFullscreen;
+    }
+
+    window.addEventListener('keydown', function(e) {
+      if ((e.key === 'Escape' || e.code === 'Escape') && window.gameMainMenuActive
+          && !window.gameCreditsActive
+          && (document.fullscreenElement || document.webkitFullscreenElement)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        exitFullscreen();
+      }
+    }, true);
+
     if (fullscreenBtn) {
       fullscreenBtn.addEventListener('click', function() {
         if (document.fullscreenElement) {
-          if (document.exitFullscreen) document.exitFullscreen();
+          exitFullscreen();
           return;
         }
         var target = document.documentElement;
-        if (target.requestFullscreen) target.requestFullscreen();
-        else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+        if (target.requestFullscreen) {
+          target.requestFullscreen().then(tryLockFullscreenEscape).catch(function() {});
+        } else if (target.webkitRequestFullscreen) {
+          target.webkitRequestFullscreen();
+          setTimeout(tryLockFullscreenEscape, 0);
+        }
       });
     }
     document.addEventListener('fullscreenchange', function() {
-      updateFullscreenButton();
-      fitCanvas();
+      handleFullscreenStateChanged();
     });
     document.addEventListener('webkitfullscreenchange', function() {
-      updateFullscreenButton();
-      fitCanvas();
+      handleFullscreenStateChanged();
     });
 
     // GLFW가 canvas.style을 변경하면 다음 프레임에 복원

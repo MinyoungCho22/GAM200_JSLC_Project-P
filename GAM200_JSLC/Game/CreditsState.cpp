@@ -9,6 +9,10 @@
 #include "../OpenGL/Shader.hpp"
 #include "../OpenGL/GLWrapper.hpp"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 constexpr float CW = 1920.0f;
 constexpr float CH = 1080.0f;
 
@@ -17,6 +21,12 @@ CreditsState::CreditsState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
 void CreditsState::Initialize()
 {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        window.gameCreditsActive = true;
+    });
+#endif
+
     auto& input = gsm.GetEngine().GetInput();
     m_waitForRelease = input.IsKeyPressed(Input::Key::Enter) ||
                        input.IsKeyPressed(Input::Key::Escape);
@@ -182,6 +192,12 @@ void CreditsState::Draw()
 // ─────────────────────────────────────────────────────────────────────────────
 void CreditsState::Shutdown()
 {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        window.gameCreditsActive = false;
+    });
+#endif
+
     if (m_font)       m_font->Shutdown();
     if (m_fontShader) m_fontShader.reset();
     if (m_colorShader) m_colorShader.reset();

@@ -22,6 +22,7 @@ public:
     void Shutdown();
     void ClearAllDrones();
     void ResetAllDrones();
+    void ClearTraceReinforcementDrones();
 
     // Returns list of chain arc pairs (from→to world positions) for VFX.
     // Drones in initial radius are stunned first, then the pulse chains to

@@ -70,6 +70,15 @@ void DroneManager::ResetAllDrones()
         drone.Reset();
 }
 
+void DroneManager::ClearTraceReinforcementDrones()
+{
+    for (auto& drone : drones)
+    {
+        if (drone.IsTraceReinforcement())
+            drone.DisableForCheckpoint();
+    }
+}
+
 std::vector<std::pair<Math::Vec2, Math::Vec2>> DroneManager::ApplyDetonation(
     Math::Vec2 origin, float radius, float stunDuration,
     float chainRange, int maxChains)

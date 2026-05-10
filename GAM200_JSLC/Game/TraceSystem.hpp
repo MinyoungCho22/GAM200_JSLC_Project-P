@@ -14,6 +14,7 @@ class TraceSystem
 {
 public:
     void Initialize();
+    void Reset();
 
     /**
      * @brief Triggered when a drone is destroyed. Increases kill count and updates warning levels.

@@ -37,6 +37,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
     m_velocity = { 0.0f, 0.0f };
     m_direction = { 1.0f, 0.0f };
     m_isTracer = isTracer;
+    m_texturePath = texturePath ? texturePath : "";
     m_isChasing = false;
     m_lostTimer = 0.0f;
     m_currentSpeed = m_baseSpeed;

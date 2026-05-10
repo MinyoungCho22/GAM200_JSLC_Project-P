@@ -3,6 +3,7 @@
 #pragma once
 #include "../Engine/Vec2.hpp"
 #include "../Engine/Sound.hpp"
+#include <string>
 
 class Shader;
 class Player;
@@ -34,9 +35,21 @@ public:
     bool IsAttacking() const { return m_isAttacking; }
     bool IsDead() const { return m_isDead; }
     bool IsTracer() const { return m_isTracer; }
+    bool IsTraceReinforcement() const { return m_isTracer && m_texturePath.find("RedDrone.png") != std::string::npos; }
     bool ShouldDealDamage() const { return m_shouldDealDamage; }
     void ResetDamageFlag() { m_shouldDealDamage = false; }
     bool IsHit() const { return m_isHit; }
+    void DisableForCheckpoint()
+    {
+        m_isDead = true;
+        m_isHit = false;
+        m_isChasing = false;
+        m_isAttacking = false;
+        m_shouldDealDamage = false;
+        m_corpseRestTimer = 0.f;
+        m_corpseFadeAlpha = 0.f;
+        m_moveSound.Stop();
+    }
 
     bool IsStunned() const { return m_stunTimer > 0.f; }
     void ApplyStun(float duration);
@@ -99,7 +112,7 @@ public:
         m_hp = hp; 
         if (m_hp <= 0.0f) { 
             m_hp = 0.0f; 
-            m_isDead = true; 
+            StartDeathSequence();
         } else if (m_isDead && m_hp > 0.0f) {
             // Revive if HP is set above 0
             m_isDead = false;
@@ -153,6 +166,7 @@ private:
     float m_hp = 100.0f;
     float m_maxHP = 100.0f;
     bool m_isTracer = false;
+    std::string m_texturePath;
     bool m_isChasing = false;
     float m_lostTimer = 0.0f;
 

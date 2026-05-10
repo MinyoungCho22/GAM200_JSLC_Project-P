@@ -20,6 +20,10 @@
 #include <algorithm>
 #include <cmath>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 constexpr float GAME_WIDTH  = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
 
@@ -67,6 +71,12 @@ MainMenu::MainMenu(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
 void MainMenu::Initialize()
 {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        window.gameMainMenuActive = true;
+    });
+#endif
+
     auto& input = gsm.GetEngine().GetInput();
     gsm.GetEngine().SetSystemCursorVisible(true);
 
@@ -373,6 +383,12 @@ void MainMenu::Draw()
 // ─────────────────────────────────────────────────────────────────────────────
 void MainMenu::Shutdown()
 {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        window.gameMainMenuActive = false;
+    });
+#endif
+
     gsm.GetEngine().SetSystemCursorVisible(false);
 
     if (m_texShader) m_texShader.reset();
