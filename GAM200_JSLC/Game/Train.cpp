@@ -1532,7 +1532,7 @@ void Train::BuildTrainHitboxes()
     // ════════════════════════════════════════════════════════════════════════
     // ▣  Car 1  –  FirstTrain.png
     //    이미지 내 오브젝트 배치 (좌 → 우)
-    //    [발판] - [컨테이너A(빨강)] - [컨테이너B(황갈, A 위)] - [컨테이너C(황갈)] - [컨테이너D(은색, 우측)]
+    //    [발판] - [빨강] - [회색 대형(상단)] - [황갈] - [은색(우측, 히딩)]
     // ════════════════════════════════════════════════════════════════════════
     const float c1 = 0.0f; // Car 1 시작 X (열차 맨 앞)
 
@@ -1541,89 +1541,74 @@ void Train::BuildTrainHitboxes()
     //   ※ 세 열차 공통 – 높이(Y)나 두께(height) 조정 시 세 곳 모두 동일하게 변경
     m_trainHitboxes.push_back(MakeHitbox(c1,   84,  804, 2472,  45));
 
-    // [Car1] 컨테이너 A  ─  좌측 빨간 컨테이너 (발판 위, 낮은 층)
-    //   위치: X=363  Y=519  크기: 189 x 286
-    m_trainHitboxes.push_back(MakeHitbox(c1,  363,  519,  189, 286));
+    // [Car1] 컨테이너 A  ─  좌측 빨간 컨테이너 (발판 위, 낮은 층)  FirstTrain.png
+    //   (288, 518) 246×285
+    m_trainHitboxes.push_back(MakeHitbox(c1, 288, 518, 246, 285));
 
-    // [Car1] 컨테이너 B  ─  황갈색 대형 컨테이너 (A 위에 적재, 높은 층)
-    //   위치: X=552  Y=237  크기: 660 x 282
-    //   ※ 위에 올라갈 수 있는 가장 높은 지점 중 하나
-    m_trainHitboxes.push_back(MakeHitbox(c1,  552,  237,  660, 282));
+    // [Car1] 컨테이너 B  ─  상단 회색 대형 컨테이너 (적재 상단)
+    //   (534, 222) 549×297
+    m_trainHitboxes.push_back(MakeHitbox(c1, 534, 222, 549, 297));
 
-    // [Car1] 컨테이너 C  ─  중앙 황갈색 컨테이너 (발판 위, 낮은 층)
-    //   위치: X=635  Y=519  크기: 540 x 285
-    m_trainHitboxes.push_back(MakeHitbox(c1,  1212,  519,  540, 285));
+    // [Car1] 컨테이너 C  ─  중앙 황갈 컨테이너 (발판 위, 낮은 층)
+    //   (1083, 519) 252×285
+    m_trainHitboxes.push_back(MakeHitbox(c1, 1083, 519, 252, 285));
 
-    // [Car1] 컨테이너 D  ─  우측 은색 대형 컨테이너 (히딩박스 – 충돌 없음, 내부 진입 가능)
-    //   위치: X=1806  Y=531  크기: 705 x 273  →  m_hidingSpots에만 등록
+    // [Car1] 컨테이너 D  ─  우측 은색 컨테이너 (히딩박스 – 솔리드 히트박스 없음)
+    //   (2005, 573) 525×237  →  m_hidingSpots에만 등록
 
 
     // ════════════════════════════════════════════════════════════════════════
-    // ▣  Car 2  –  SecondTrain.png
-    //    [발판] - [컨테이너E(빨강)] - [컨테이너F(어두운 소형)] - [컨테이너G(보라, 위)] - [컨테이너H(황갈, 우측)]
+    // ▣  Car 2  –  SecondTrain.png (에셋 픽셀 기준)
+    //    [발판] - [빨강] - [하단 회색] - [상단 보라(펄스박스)] - [우측 갈색]
     // ════════════════════════════════════════════════════════════════════════
     const float c2 = m_car1Width; // Car 2 시작 X (Car 1 끝 지점)
 
-    // [Car2] 발판 (Car 1 발판과 동일 상대 위치)
-    //   위치: X=84  Y=804  크기: 2472 x 45
-    m_trainHitboxes.push_back(MakeHitbox(c2,   84,  804, 2472,  45));
+    m_trainHitboxes.push_back(MakeHitbox(c2, 84, 804, 2472, 45));
 
-    // [Car2] 컨테이너 E  ─  좌측 적갈색 컨테이너 (발판 위, 낮은 층)
-    //   위치: X=285  Y=519  크기: 621 x 285
-    m_trainHitboxes.push_back(MakeHitbox(c2,  285,  519,  621, 285));
+    // 빨강 (204, 525) 501×285
+    m_trainHitboxes.push_back(MakeHitbox(c2, 204, 525, 501, 285));
 
-    // [Car2] 컨테이너 F  ─  소형 어두운 컨테이너 (발판 위, 낮은 층)
-    //   위치: X=1197  Y=519  크기: 234 x 286
-    m_trainHitboxes.push_back(MakeHitbox(c2, 1197,  519,  234, 286));
+    // 하단 어두운 회색 (1434, 519) 207×288
+    m_trainHitboxes.push_back(MakeHitbox(c2, 1434, 519, 207, 288));
 
-    // [Car2] 컨테이너 G  ─  대형 보라색 컨테이너 (높은 층 – 가장 높은 위치 중 하나)
-    //   위치: X=1431  Y=234  크기: 795 x 285
-    //   ※ 위에 올라갈 수 있는 가장 높은 지점
+    // 보라 적재 · Car2 펄스 박스 (1653, 234) 603×285  →  m_car2PurpleHb
     {
-        TrainHitbox purple = MakeHitbox(c2, 1431, 234, 795, 285);
+        TrainHitbox purple = MakeHitbox(c2, 1653, 234, 603, 285);
         m_car2PurpleHb      = purple;
         m_car2PurpleHbValid = true;
         m_trainHitboxes.push_back(purple);
     }
 
-    // [Car2] 컨테이너 H  ─  우측 소형 황갈색 컨테이너 (발판 위, 낮은 층)
-    //   위치: X=2324  Y=519  크기: 261 x 285
-    m_trainHitboxes.push_back(MakeHitbox(c2, 2226,  519,  261, 285));
+    // 우측 갈색 (2268, 519) 183×285
+    m_trainHitboxes.push_back(MakeHitbox(c2, 2268, 519, 183, 285));
 
 
     // ════════════════════════════════════════════════════════════════════════
-    // ▣  Car 3  –  ThirdTrain.png
-    //    [발판] - [컨테이너I(은색/흰)] - [컨테이너J(어두운 대형)] - [컨테이너K(황갈, 위)] - [컨테이너L(소형, 우측)]
+    // ▣  Car 3  –  ThirdTrain.png (에셋 픽셀 기준)
+    //    [사이렌] [발판] - [좌 박스=히딩 전용] - [하단 중·우 회색] - [상단 황갈]
     // ════════════════════════════════════════════════════════════════════════
-    const float c3 = m_car1Width + m_car2Width; // Car 3 시작 X (Car 2 끝 지점)
+    const float c3 = m_car1Width + m_car2Width;
 
-    // [Car3] 사이렌 장치 — 충돌 없음 (펄스 주입 상호작용 전용)
+    // 사이렌 / 펄스 주입 (1644, 207) 126×162 — 충돌 없음
     {
-        TrainHitbox siren = MakeHitbox(c3, 1644.f, 207.f, 126.f, 163.f, false);
+        TrainHitbox siren = MakeHitbox(c3, 1644.f, 207.f, 126.f, 162.f, false);
         m_car3SirenHb      = siren;
         m_car3SirenHbValid = true;
         m_trainHitboxes.push_back(siren);
     }
 
-    // [Car3] 발판 (Car 1 발판과 동일 상대 위치)
-    //   위치: X=84  Y=804  크기: 2472 x 45
-    m_trainHitboxes.push_back(MakeHitbox(c3,   84,  804, 2472,  45));
+    m_trainHitboxes.push_back(MakeHitbox(c3, 84, 804, 2472, 45));
 
-    // [Car3] 컨테이너 I  ─  좌측 은색/흰색 컨테이너 (히딩박스 – 충돌 없음, 내부 진입 가능)
-    //   위치: X=330  Y=504  크기: 378 x 300  →  m_hidingSpots에만 등록
+    // I 좌측 밝은 회색 박스 (177, 567) 324×237  →  m_hidingSpots만 (솔리드 없음)
 
-    // [Car3] 컨테이너 J  ─  중앙 대형 어두운 컨테이너 (발판 위, 낮은 층)
-    //   위치: X=1116  Y=519  크기: 534 x 285
-    m_trainHitboxes.push_back(MakeHitbox(c3, 1116,  519,  534, 285));
+    // J 하단 중앙 어두운 회색 (1323, 516) 315×288
+    m_trainHitboxes.push_back(MakeHitbox(c3, 1323, 516, 315, 288));
 
-    // [Car3] 컨테이너 K  ─  우측 황갈색 컨테이너 (높은 층 – J 위에 적재)
-    //   위치: X=1650  Y=252  크기: 660 x 267
-    //   ※ 위에 올라갈 수 있는 높은 지점
-    m_trainHitboxes.push_back(MakeHitbox(c3, 1650,  252,  660, 267));
+    // K 상단 황갈 (1638, 231) 456×285
+    m_trainHitboxes.push_back(MakeHitbox(c3, 1638, 231, 456, 285));
 
-    // [Car3] 컨테이너 L  ─  최우측 소형 컨테이너 (발판 위, 낮은 층)
-    //   위치: X=2310  Y=519  크기: 126 x 285
-    m_trainHitboxes.push_back(MakeHitbox(c3, 2310,  519,  126, 285));
+    // L 하단 우측 어두운 회색 (2094, 516) 294×288
+    m_trainHitboxes.push_back(MakeHitbox(c3, 2094, 516, 294, 288));
 
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1681,15 +1666,15 @@ void Train::BuildTrainHitboxes()
     // ════════════════════════════════════════════════════════════════════════
     m_hidingSpots.clear();
 
-    // [Car1] 컨테이너 D  ─  우측 은색 대형 컨테이너
+    // [Car1] 컨테이너 D  ─  우측 은색 컨테이너  (2005, 573) 525×237
     {
-        auto hs = MakeHitbox(c1, 1806, 531, 705, 273);
+        auto hs = MakeHitbox(c1, 2005, 573, 525, 237);
         m_hidingSpots.push_back({ hs.localCenter, hs.size });
     }
 
-    // [Car3] 컨테이너 I  ─  좌측 은색/흰색 컨테이너
+    // [Car3] 좌측 밝은 회색 박스 (177, 567) 324×237
     {
-        auto hs = MakeHitbox(c3, 330, 504, 378, 300);
+        auto hs = MakeHitbox(c3, 177, 567, 324, 237);
         m_hidingSpots.push_back({ hs.localCenter, hs.size });
     }
 
