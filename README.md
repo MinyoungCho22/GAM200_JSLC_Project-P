@@ -1,68 +1,119 @@
+# 🌃NO.99
 
-TEAM
-      ██╗███████╗██╗      ██████╗
-      ██║██╔════╝██║     ██╔════╝
-      ██║███████╗██║     ██║     
-██    ██║╚════██║██║     ██║     
-╚█████╔╝███████║███████╗╚██████╗
- ╚════╝ ╚══════╝╚══════╝ ╚═════╝
-                                 
+> An atmospheric neon action side-scroller about an escaped experiment and the city’s stolen light.
 
-GAME 
-███╗   ██╗ ██████╗    █████╗  █████╗ 
-████╗  ██║██╔═══██╗  ██╔══██╗██╔══██╗
-██╔██╗ ██║██║   ██║  ╚██████║╚██████║
-██║╚██╗██║██║   ██║   ╚═══██║ ╚═══██║
-██║ ╚████║╚██████╔╝██╗█████╔╝ █████╔╝
-╚═╝  ╚═══╝ ╚═════╝ ╚═╝╚════╝  ╚════╝                                                          
-                
-is an atmospheric, action side-scroller where you control an escaped 
-experiment that can absorb and gear up the city’s neon energy, ”Pulse”.
-With the pulse will you share this stolen light to become a savior to 
-its citizens, or consume it all to become the perfect tool you were designed to be?
+---
 
-TEAM MEMBERS
-- RYUNGJAE LEE (PRODUCER)
-- MINYOUNG CHO (TECH LEAD)
-- SEOYOUNG JEONG (DESGIN LEAD)
-- JISU SON (QA & ART)
+#### 🎮 ABOUT THE GAME
 
-HOW TO PLAY
-  - PRESS THE EXE FILE TO OPEN THE GAME
-  - WHEN YOU OPEN THE FILE PRESS ENTER TO START THE GAME
-  - FOLLOW THE TEXT ON THE BOTTOM TO PLAY THE GAME
-  !!!!!! IMPORTANT !!!!!!
- - IN THE FIRST ROOM YOU NEED TO OPEN THE BLINDS IN ORDER TO MOVE TO NEXT STAGE
- - WHEN YOU PUT THE MOUSE CURSOR ON AN OBJECT YOU WILL SEE THE COURSOR CHANGING SHOWING WHAT KEY TO PRESS
-   (TIP)
- - IT IS USEFUL TO USE DASH(SHIFT) WHILE PLAYING THE GAME 
-   
-MAIN KEY
-  - 'A' - MOVE LEFT
-  - 'D' - MOVE RIGHT
-  - 'SPACE' - JUMP
-  - 'S' - CROUCH
-  - RIGHT CLICK - ABSORB PULSE
-  - LEFT CLICK - DEACTIVATE ENEMIES
-  - SHIFT - DASH
+**NO.99** is a 2D side-scrolling action game set in a ruined city controlled by the government.  
 
-SETTING - 
-  - PRESS ESC KEY TO OPEN THE SETTING
-  - IN THE SETTING PRESS W OR S TO GO UP AND DOWN AND PRESS ENTER TO APPLY IT
-  - YOU CAN
-          - CHANGE SCREEN SIZE 
-          - TURN ON/OFF VSYNC - WHEN YOU TURN IT ON IT SETS UR MONITOR TO BEST FRAME (DIFFERS IN EACH LAPTOP)
-          - EXIT THE GAME IN THE SETTING
-          - CHANGE VOLUME
-  - CHANGE IT TO FULL SCREEN BY ALT + ENTER
-    
-ETC
-- THIS GAME CAN BE RUN IN BOTH MAC AND WINDOWS.
-CHEAT MODE
-- YOU CAN TURN ON GOD MODE ON IMGUI
-  YOU CAN MOVE TO DIFFERENT MAPS BY PRESSING
-- PRESS CTRL + 2 HALLWAY
-             + 3 ROOFTOP
-             + 4 UNDERGROUND
-             + 5 SUBWAY
+The collapsing city has become a restricted zone patrolled by government robots and drones.  
 
+Players control an unstable experiment that must absorb **Pulse** in order to survive while escaping from the robots and drones sent to hunt them down.  
+
+**Pulse** is the core resource used for survival, combat, and environmental interaction.  
+
+By absorbing and utilizing **Pulse**, players will fight through each district and gradually uncover why they are being pursued.  
+
+### CORE FEATURES
+
+1. **Pulse Absorption** — Absorb Pulse to maintain your survival energy.  
+2. **Pulse Manipulation** — Use Pulse to disable enemies, activate devices, and overcome environmental obstacles.  
+3. **Escape the City** — Avoid government pursuit and fight your way out of the city.
+
+---
+
+## 👥TEAM (JSLC)
+
+| Role        | Member         |
+| ----------- | -------------- |
+| Producer    | RYUNGJAE LEE   |
+| Tech Lead   | MINYOUNG CHO   |
+| Design Lead | SEOYOUNG JEONG |
+| QA & Art    | JISU SON       |
+
+---
+
+## 📝PLAYTEST FEEDBACK
+
+Your feedback helps us make the game even better :)
+
+[NO.99 Feedback Form](https://docs.google.com/forms/d/e/1FAIpQLSfJBVrcsx1e3UYHOB1gPBkz3c0THgNyn1PNGIJu0rZmKIVoZw/viewform?usp=dialog)
+
+---
+
+# 🚀QUICK START
+
+1. Run `NO99.exe` or Open the link [https://jslc-no99.netlify.app/](https://jslc-no99.netlify.app/ "https://jslc-no99.netlify.app/")
+2. Press `ENTER` on the title screen
+3. Follow the tutorial text at the bottom of the screen
+
+---
+
+## 💡IMPORTANT TIPS
+
+- Open the blinds in the first room to proceed
+- Hover your mouse over objects to see interaction keys
+- Dash (`SHIFT`) is essential during combat
+- Use `Q` frequently
+
+---
+
+# 🎯CONTROLS
+
+| Key         | Action       |
+| ----------- | ------------ |
+| A / D       | Move         |
+| SPACE       | Jump         |
+| S           | Crouch       |
+| SHIFT       | Dash         |
+| Q           | Melee Skill  |
+| Left Click  | Attack       |
+| Right Click | Absorb Pulse |
+
+---
+
+# ⚙️SETTINGS
+
+Press `ESC` to open the settings menu.
+
+### Available Options
+
+- Screen Size
+- VSync ON/OFF
+- Volume Control
+- Exit Game
+
+### Menu Controls
+
+| Key   | Action   |
+| ----- | -------- |
+| W / S | Navigate |
+| ENTER | Apply    |
+
+### Fullscreen
+
+`ALT + ENTER`
+
+---
+
+# 🛠️DEBUG / CHEAT FEATURES
+
+God Mode can be enabled through ImGui.
+
+## Map Shortcuts
+
+| Shortcut | Map         |
+| -------- | ----------- |
+| CTRL + 2 | Hallway     |
+| CTRL + 3 | Rooftop     |
+| CTRL + 4 | Underground |
+| CTRL + 5 | Subway      |
+
+---
+
+# 💻PLATFORM SUPPORT
+
+- Windows
+- macOS
