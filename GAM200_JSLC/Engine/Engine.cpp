@@ -424,6 +424,12 @@ void Engine::CursorEnterCallback(GLFWwindow* window, int entered)
 void Engine::SetSystemCursorVisible(bool visible)
 {
     m_systemCursorVisible = visible;
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        if (typeof window.gameSetSystemCursorVisible === 'function')
+            window.gameSetSystemCursorVisible(!!$0);
+    }, visible ? 1 : 0);
+#endif
     if (!m_window)
         return;
 
