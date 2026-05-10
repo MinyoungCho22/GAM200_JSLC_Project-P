@@ -53,6 +53,7 @@ void StoryDialogue::ResetForNewRun()
     m_preTypeDelayRemaining = 0.0f;
     m_active                  = false;
     m_useConversionBackdrop   = true;
+    m_blocksGameplay          = true;
     m_lineIndex = 0;
     m_visibleChars = 0;
     m_charAccum = 0.0f;
@@ -80,7 +81,7 @@ void StoryDialogue::RebuildLineTexture(Font& font, Shader& fontShader)
 }
 
 void StoryDialogue::BeginSequence(std::vector<std::string> lines, std::function<void()> onComplete, float preTypeDelay,
-                                  bool useConversionBackdrop)
+                                  bool useConversionBackdrop, bool blocksGameplay)
 {
     ClearLineTexture();
     m_lines                   = std::move(lines);
@@ -90,6 +91,7 @@ void StoryDialogue::BeginSequence(std::vector<std::string> lines, std::function<
     m_preTypeDelayRemaining   = preTypeDelay;
     m_onSequenceComplete      = std::move(onComplete);
     m_useConversionBackdrop   = useConversionBackdrop;
+    m_blocksGameplay          = blocksGameplay;
     m_active                  = true;
 }
 
@@ -105,6 +107,7 @@ void StoryDialogue::FinishSequence(Font& font, Shader& fontShader)
     m_preTypeDelayRemaining = 0.0f;
     m_active                  = false;
     m_useConversionBackdrop   = true;
+    m_blocksGameplay          = true;
 
     if (done)
         done();
@@ -114,22 +117,22 @@ void StoryDialogue::FinishSequence(Font& font, Shader& fontShader)
         QueuedSequence next = std::move(m_pending.front());
         m_pending.pop_front();
         BeginSequence(std::move(next.lines), std::move(next.onComplete), next.preTypeDelay,
-                      next.useConversionBackdrop);
+                      next.useConversionBackdrop, next.blocksGameplay);
         RebuildLineTexture(font, fontShader);
     }
 }
 
 void StoryDialogue::EnqueueLines(const std::vector<std::string>& lines, Font& font, Shader& fontShader,
-    std::function<void()> onSequenceComplete, bool useConversionBackdrop)
+    std::function<void()> onSequenceComplete, bool useConversionBackdrop, bool blocksGameplay)
 {
     if (lines.empty() || !s_dialogueEnabled)
         return;
     if (m_active)
     {
-        m_pending.push_back({ lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop });
+        m_pending.push_back({ lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop, blocksGameplay });
         return;
     }
-    BeginSequence(lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop);
+    BeginSequence(lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop, blocksGameplay);
     RebuildLineTexture(font, fontShader);
 }
 
@@ -148,7 +151,7 @@ void StoryDialogue::EnqueueOpening(Font& font, Shader& fontShader)
         m_pending.push_back(std::move(q));
         return;
     }
-    BeginSequence(std::move(q.lines), std::move(q.onComplete), q.preTypeDelay, q.useConversionBackdrop);
+    BeginSequence(std::move(q.lines), std::move(q.onComplete), q.preTypeDelay, q.useConversionBackdrop, q.blocksGameplay);
     RebuildLineTexture(font, fontShader);
 }
 

@@ -32,10 +32,12 @@ public:
     static void SetDialogueEnabled(bool enabled) { s_dialogueEnabled = enabled; }
     static bool IsDialogueEnabled() { return s_dialogueEnabled; }
 
-    bool IsBlocking() const { return m_active && s_dialogueEnabled; }
+    bool IsActive() const { return m_active && s_dialogueEnabled; }
+    bool IsBlocking() const { return IsActive() && m_blocksGameplay; }
 
     void EnqueueLines(const std::vector<std::string>& lines, Font& font, Shader& fontShader,
-        std::function<void()> onSequenceComplete = nullptr, bool useConversionBackdrop = true);
+        std::function<void()> onSequenceComplete = nullptr, bool useConversionBackdrop = true,
+        bool blocksGameplay = true);
     void EnqueueOpening(Font& font, Shader& fontShader);
 
     void Update(float dt, const Input::Input& input, const ControlBindings& controls, Font& font, Shader& fontShader);
@@ -50,10 +52,11 @@ private:
         std::function<void()> onComplete;
         float preTypeDelay                = 0.0f;
         bool useConversionBackdrop        = true;
+        bool blocksGameplay               = true;
     };
 
     void BeginSequence(std::vector<std::string> lines, std::function<void()> onComplete, float preTypeDelay,
-                       bool useConversionBackdrop);
+                       bool useConversionBackdrop, bool blocksGameplay);
     void FinishSequence(Font& font, Shader& fontShader);
 
     static bool s_dialogueEnabled;
@@ -68,6 +71,7 @@ private:
 
     bool m_active                  = false;
     bool m_useConversionBackdrop   = true;
+    bool m_blocksGameplay          = true;
     std::function<void()> m_onSequenceComplete;
     std::deque<QueuedSequence> m_pending;
 

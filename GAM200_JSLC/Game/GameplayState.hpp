@@ -110,6 +110,7 @@ private:
     std::unique_ptr<Background> m_mouseLeftCursor;
     std::unique_ptr<Background> m_mouseRightCursor;
     std::unique_ptr<Background> m_hudFrame;
+    std::unique_ptr<Background> m_conversionBackdrop;
     std::unique_ptr<Background> m_hallwayHidingPromptS;
     Math::Vec2 m_lastMouseWorldPos{};
     bool m_undergroundAccessed = false;
@@ -130,10 +131,13 @@ private:
     float m_cameraSmoothSpeed = 0.1f;
     Sound m_bgm;
 
-    // Q-skill hint on first Rooftop visit — plain on-screen text (no Conversion backdrop)
+    // Q-skill hint on first Rooftop visit — delayed StoryDialogue over Conversion.png
     PulseDetonateSkill m_pulseDetonateSkill;
     bool               m_prevRooftopForQHint  = false;
     bool               m_skipRooftopQHintByCheat = false;
+    bool               m_rooftopQStoryDone = false;
+    bool               m_rooftopQStoryPending = false;
+    float              m_rooftopQStoryDelayRemaining = 0.0f;
 
     // Train zoom transition: camera zooms in when entering train map, then eases out
     float m_cameraZoom = 1.0f;

@@ -3639,11 +3639,9 @@ std::string Train::GetDepartureAnnouncementText() const
 
     if (m_entryTimer >= 0.0f && m_entryTimer < TRAIN_DEPART_DELAY)
     {
-        if (m_entryTimer < 0.55f)
-            return "The train will depart in 3 seconds. Please get on.";
         const int secsLeft =
             std::clamp(static_cast<int>(std::ceil(TRAIN_DEPART_DELAY - m_entryTimer)), 1, 3);
-        return std::to_string(secsLeft);
+        return "Departure in " + std::to_string(secsLeft) + (secsLeft == 1 ? " second." : " seconds.");
     }
 
     return "";

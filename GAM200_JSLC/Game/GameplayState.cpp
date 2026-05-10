@@ -184,6 +184,9 @@ void GameplayState::Initialize()
     m_hudFrame = std::make_unique<Background>();
     m_hudFrame->Initialize("Asset/Hud.png");
 
+    m_conversionBackdrop = std::make_unique<Background>();
+    m_conversionBackdrop->Initialize("Asset/Conversion.png");
+
     m_hallwayHidingPromptS = std::make_unique<Background>();
     m_hallwayHidingPromptS->Initialize("Asset/S.png");
 
@@ -229,6 +232,9 @@ void GameplayState::Initialize()
     m_pendingTransition = PendingTransition::None;
     m_prevRooftopForQHint = false;
     m_skipRooftopQHintByCheat = false;
+    m_rooftopQStoryDone = false;
+    m_rooftopQStoryPending = false;
+    m_rooftopQStoryDelayRemaining = 0.0f;
     m_fadeAlpha = 1.0f;                // start fully black
     m_fadeState = FadeState::FadingIn; // fade in from black on game start
 
@@ -494,6 +500,8 @@ void GameplayState::Update(double dt)
         m_hallwayFaradayBoxStoryDone = false;
         m_hallwayEntryStoryPending = false;
         m_hallwayEntryStoryDelayRemaining = 0.0f;
+        m_rooftopQStoryPending = false;
+        m_rooftopQStoryDelayRemaining = 0.0f;
         m_openingStoryDelayRemaining = 0.0f;
         m_currentCheckpoint = MapZone::Room;
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleported to Room (Ctrl+1)");
@@ -576,6 +584,8 @@ void GameplayState::Update(double dt)
         m_skipRooftopQHintByCheat = true;
         m_tutorial->DisableAll();
         m_camera.StopAnimation();
+        m_rooftopQStoryPending = false;
+        m_rooftopQStoryDelayRemaining = 0.0f;
         m_cameraZoom = 1.0f;
         m_trainZoomTransition = false;
         player.SetSizeScale(1.0f);
@@ -617,32 +627,11 @@ void GameplayState::Update(double dt)
         m_skipRooftopQHintByCheat = true;
         m_tutorial->DisableAll();
         m_camera.StopAnimation();
-        m_rooftopAccessed = true;
-        m_undergroundAccessed = true;
-        m_trainAccessed = true;
         m_cameraZoom = 1.0f;
         m_trainZoomTransition = false;
-        player.SetSizeScale(0.6f);
-
-        m_underground->ClearAllDrones();
-
-        float playerStartX = Train::MIN_X + 300.0f;
-        float playerStartY = Train::MIN_Y + 540.0f;
-        float newGroundLevel = Train::MIN_Y + 90.0f;
-        player.SetCurrentGroundLevel(newGroundLevel);
-        player.SetPosition({ playerStartX, playerStartY });
-        player.ResetVelocity();
-        player.SetOnGround(false);
-
-        m_camera.SetBounds(
-            { Train::MIN_X, Train::MIN_Y },
-            { Train::MIN_X + m_train->GetMapWidth(), Train::MIN_Y + Train::HEIGHT });
-        m_cameraSmoothSpeed = 0.05f;
-        m_camera.SetPosition({ Train::MIN_X + GAME_WIDTH / 2.0f, Train::MIN_Y + GAME_HEIGHT / 2.0f });
+        player.SetSizeScale(1.0f);
         m_trainDeferEntryUntilIntroDone = false;
-        if (m_train)
-            m_train->StartEntryTimer();
-        m_currentCheckpoint = MapZone::Train;
+        StartTransition(PendingTransition::UndergroundToTrain);
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Train (Ctrl+5)");
     }
 
@@ -678,6 +667,20 @@ void GameplayState::Update(double dt)
         }
     }
 
+    if (m_rooftopQStoryPending && m_storyDialogue && m_font && m_fontShader)
+    {
+        m_rooftopQStoryDelayRemaining -= delayTick;
+        if (m_rooftopQStoryDelayRemaining <= 0.0f)
+        {
+            m_rooftopQStoryPending = false;
+            m_rooftopQStoryDelayRemaining = 0.0f;
+            m_rooftopQStoryDone = true;
+            m_storyDialogue->EnqueueLines(
+                { "Q skill unlocked. Press Q to release a pulse burst around you." },
+                *m_font, *m_fontShader, nullptr, true, true);
+        }
+    }
+
     if (m_storyDialogue)
     {
         m_storyDialogue->Update(static_cast<float>(dt), input, ctl, *m_font, *m_fontShader);
@@ -701,18 +704,7 @@ void GameplayState::Update(double dt)
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
     Math::Vec2 playerHbCenter = player.GetHitboxCenter();
 
-    if (m_rooftopAccessed && !m_prevRooftopForQHint && !m_skipRooftopQHintByCheat && m_font && m_fontShader
-        && m_storyDialogue && !m_blockAmbientStoryForSession && !suppressAmbientStoryThisFrame
-        && !m_storyDialogue->IsBlocking())
-    {
-        if (StoryDialogue::IsDialogueEnabled())
-        {
-            m_storyDialogue->EnqueueLines(
-                { "Can't attack all at once? Try using Q" }, *m_font, *m_fontShader, nullptr, false);
-        }
-        m_prevRooftopForQHint = true;
-    }
-    else if (!m_rooftopAccessed)
+    if (!m_rooftopAccessed)
         m_prevRooftopForQHint = false;
 
     const bool hallwayHidingBlocksDroneAttack = m_doorOpened && !m_rooftopAccessed
@@ -1754,6 +1746,11 @@ void GameplayState::HandleHallwayToRooftopTransition()
     m_rooftopDoor->ResetMapTransition();
     m_rooftopAccessed = true;
     m_currentCheckpoint = MapZone::Rooftop;
+    if (!m_rooftopQStoryDone)
+    {
+        m_rooftopQStoryPending = true;
+        m_rooftopQStoryDelayRemaining = 0.5f;
+    }
 
     float newGroundLevel = Rooftop::FLOOR_SURFACE_Y;
     player.SetCurrentGroundLevel(newGroundLevel);
@@ -1815,6 +1812,7 @@ void GameplayState::HandleUndergroundToTrainTransition()
     Logger::Instance().Log(Logger::Severity::Event,
         "Transition to Train! Starting descent animation...");
 
+    m_rooftopAccessed = true;
     m_undergroundAccessed = true;
     m_trainAccessed = true;
     m_currentCheckpoint = MapZone::Train;
@@ -2597,18 +2595,40 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_font->DrawBakedText(*m_fontShader, countdownTexture, { GAME_WIDTH / 2.0f - 250.0f, 100.0f }, 50.0f);
     }
 
-    // Train departure countdown / status — always plain text (not tied to narrative backdrop / Conversion art).
+    // Train departure countdown / status — Conversion.png style, but non-blocking.
     if (m_trainAccessed && m_train)
     {
         std::string trainMsg = m_train->GetDepartureAnnouncementText();
         if (!trainMsg.empty())
         {
-            constexpr float kTrainBannerFontH = 44.0f;
+            constexpr float kTrainBoxW = 1680.0f;
+            constexpr float kTrainBoxH = 240.0f;
+            constexpr float kTrainBoxBottomMargin = 36.0f;
+            constexpr float kTrainBannerFontH = 40.0f;
+            const float boxCenterX = GAME_WIDTH * 0.5f;
+            const float boxCenterY = kTrainBoxBottomMargin + kTrainBoxH * 0.5f;
+
+            if (m_conversionBackdrop && m_conversionBackdrop->GetWidth() > 0)
+            {
+                textureShader.use();
+                textureShader.setMat4("projection", baseProjection);
+                textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+                textureShader.setBool("flipX", false);
+                textureShader.setFloat("alpha", 1.0f);
+                textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+                textureShader.setFloat("tintStrength", 0.0f);
+                Math::Matrix trainBoxModel = Math::Matrix::CreateTranslation({ boxCenterX, boxCenterY })
+                    * Math::Matrix::CreateScale({ kTrainBoxW, kTrainBoxH });
+                m_conversionBackdrop->Draw(textureShader, trainBoxModel);
+            }
+
+            m_fontShader->use();
+            m_fontShader->setMat4("projection", baseProjection);
             CachedTextureInfo trainMsgTex = m_font->PrintToTexture(*m_fontShader, trainMsg);
             const float rw =
                 static_cast<float>(trainMsgTex.width) * (kTrainBannerFontH / static_cast<float>(m_font->m_fontHeight));
             m_font->DrawBakedText(*m_fontShader, trainMsgTex,
-                { GAME_WIDTH * 0.5f - rw * 0.5f, GAME_HEIGHT - 120.0f }, kTrainBannerFontH);
+                { boxCenterX - rw * 0.5f, boxCenterY - kTrainBannerFontH * 0.35f }, kTrainBannerFontH);
         }
 
         std::string valveHint = m_train->GetCar5ValveHintBannerText();
