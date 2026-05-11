@@ -93,6 +93,7 @@
     window.gameSystemCursorVisible = false;
     window.gameMainMenuActive = false;
     window.gameCreditsActive = false;
+    window.gameSettingsActive = false;
     window.gameWasFullscreen = false;
     window.gameSetSystemCursorVisible = function(visible) {
       window.gameSystemCursorVisible = !!visible;
@@ -175,7 +176,7 @@
         tryLockFullscreenEscape();
       else
         unlockFullscreenEscape();
-      if (!isFullscreen && window.gameWasFullscreen && window.gameCreditsActive)
+      if (!isFullscreen && window.gameWasFullscreen && (window.gameCreditsActive || window.gameSettingsActive))
         synthesizeEscapeForGame();
       window.gameWasFullscreen = isFullscreen;
     }
@@ -183,6 +184,7 @@
     window.addEventListener('keydown', function(e) {
       if ((e.key === 'Escape' || e.code === 'Escape') && window.gameMainMenuActive
           && !window.gameCreditsActive
+          && !window.gameSettingsActive
           && (document.fullscreenElement || document.webkitFullscreenElement)) {
         e.preventDefault();
         e.stopImmediatePropagation();

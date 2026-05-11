@@ -34,7 +34,8 @@ constexpr float ATTACK_RANGE = 400.0f;
 constexpr float ATTACK_RANGE_SQ = ATTACK_RANGE * ATTACK_RANGE;
 constexpr float GAME_WIDTH = 1920.0f;
 constexpr float GAME_HEIGHT = 1080.0f;
-constexpr float TRAIN_CAMERA_LOOK_DOWN_OFFSET = 140.0f;
+constexpr float TRAIN_CAMERA_DEADZONE_UP = 380.0f;
+constexpr float TRAIN_CAMERA_DEADZONE_DOWN = 360.0f;
 constexpr float ROOM_PLAYABLE_WIDTH = 1620.0f;
 constexpr float ROOM_LEFT_BOUNDARY = (GAME_WIDTH - ROOM_PLAYABLE_WIDTH) * 0.5f;
 
@@ -1457,10 +1458,15 @@ void GameplayState::Update(double dt)
         const float playerDrivenRight = player.GetPosition().x + playerLeadMargin;
         const float dynamicRight = (trainDrivenRight > playerDrivenRight) ? trainDrivenRight : playerDrivenRight;
 
-        // Match Camera::Update: it clamps using view half-height (GAME_HEIGHT/2), not zoom.
-        // Train map: keep the Third_ThirdTrain vertical-follow behavior active for every car.
+        // Keep Y fixed at the normal train view unless the player is about to leave the safe screen band.
         constexpr float trainCamHalfH = GAME_HEIGHT * 0.5f;
-        const float     trainCameraTargetY = player.GetPosition().y - TRAIN_CAMERA_LOOK_DOWN_OFFSET;
+        const float     trainCameraBaseY = Train::MIN_Y + trainCamHalfH;
+        const float     playerY = player.GetPosition().y;
+        float           trainCameraTargetY = trainCameraBaseY;
+        if (playerY > trainCameraBaseY + TRAIN_CAMERA_DEADZONE_UP)
+            trainCameraTargetY = playerY - TRAIN_CAMERA_DEADZONE_UP;
+        else if (playerY < trainCameraBaseY - TRAIN_CAMERA_DEADZONE_DOWN)
+            trainCameraTargetY = playerY + TRAIN_CAMERA_DEADZONE_DOWN;
         const float     boundMinY          = std::min(Train::MIN_Y, trainCameraTargetY - trainCamHalfH);
         const float     boundMaxY          = std::max(Train::MIN_Y + Train::HEIGHT, trainCameraTargetY + trainCamHalfH);
 
@@ -1613,7 +1619,16 @@ void GameplayState::Update(double dt)
     {
         Math::Vec2 cameraTarget = player.GetPosition();
         if (m_trainAccessed)
-            cameraTarget.y -= TRAIN_CAMERA_LOOK_DOWN_OFFSET;
+        {
+            constexpr float trainCamHalfH = GAME_HEIGHT * 0.5f;
+            const float     trainCameraBaseY = Train::MIN_Y + trainCamHalfH;
+            const float     playerY = player.GetPosition().y;
+            cameraTarget.y = trainCameraBaseY;
+            if (playerY > trainCameraBaseY + TRAIN_CAMERA_DEADZONE_UP)
+                cameraTarget.y = playerY - TRAIN_CAMERA_DEADZONE_UP;
+            else if (playerY < trainCameraBaseY - TRAIN_CAMERA_DEADZONE_DOWN)
+                cameraTarget.y = playerY + TRAIN_CAMERA_DEADZONE_DOWN;
+        }
         m_camera.Update(cameraTarget, m_cameraSmoothSpeed);
     }
     m_camera.UpdateScreenShake(static_cast<float>(dt));

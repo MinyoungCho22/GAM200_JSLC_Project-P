@@ -12,6 +12,10 @@
 #include <string>
 #include <cmath>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 // Fixed logical resolution for the UI system
 constexpr float GAME_WIDTH  = static_cast<float>(VIRTUAL_WIDTH);
 constexpr float GAME_HEIGHT = static_cast<float>(VIRTUAL_HEIGHT);
@@ -145,6 +149,12 @@ void SettingState::RebuildValueTexts()
 // -----------------------------------------------------------------------------
 void SettingState::Initialize()
 {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        window.gameSettingsActive = true;
+    });
+#endif
+
     Logger::Instance().Log(Logger::Severity::Info, "SettingState Initialize");
 
     m_font = std::make_unique<Font>();
@@ -516,6 +526,12 @@ void SettingState::Draw()
 
 void SettingState::Shutdown()
 {
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        window.gameSettingsActive = false;
+    });
+#endif
+
     GL::DeleteVertexArrays(1, &m_overlayVAO);
     GL::DeleteBuffers(1, &m_overlayVBO);
     GL::DeleteVertexArrays(1, &m_barVAO);
