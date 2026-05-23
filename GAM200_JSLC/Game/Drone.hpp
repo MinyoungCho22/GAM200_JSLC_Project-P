@@ -132,7 +132,7 @@ public:
     /// Train 전용: 이 칸(1~5)에 묶인 전투 드론 — 다른 칸 플레이어에게 피해 안 줌
     void SetTrainCarSegment(int car1To5) { m_trainCarSegment = car1To5; }
     int GetTrainCarSegment() const { return m_trainCarSegment; }
-    /// TraceSystem 경고 단계(0~2): 추적 속도·거리 보정에 사용
+    /// Trace stage (0 = none, 1~2): tracer chase speed scaling
     void SetTracerHeatLevel(int level) { m_tracerHeatLevel = level < 0 ? 0 : level; }
     int GetTracerHeatLevel() const { return m_tracerHeatLevel; }
 
@@ -227,6 +227,6 @@ private:
     float      m_carTransportBobPhase       = 0.f;
 
     int m_trainCarSegment = 0;
-    /// 0 = 일반/입장 트레이서, 1~2 = TraceSystem 경고 단계
+    /// 0 = 일반/입장 트레이서, 1~2 = Trace stage
     int m_tracerHeatLevel = 0;
 };

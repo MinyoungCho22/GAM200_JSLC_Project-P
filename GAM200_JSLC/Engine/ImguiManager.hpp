@@ -33,7 +33,7 @@ public:
     void DrawDebugWindow();
     void EndFrame();
 
-    void SetWarningLevel(int level);
+    void SetTraceStage(int stage);
     void ForceDebugSwapIntervalOff();
     void SetDebugWindowVisible(bool visible);
     void SetDroneManager(DroneManager* manager) { m_droneManager = manager; }
@@ -52,7 +52,7 @@ public:
            bool IsPlayerGodMode() const { return m_playerGodMode; }
 
     int GetAverageFps() const { return m_averageFps; }
-    int GetWarningLevel() const { return m_warningLevel; }
+    int GetTraceStage() const { return m_traceStage; }
 
     // Clear pointers owned by GameplayState before the state is destroyed.
     void ClearGameplayBindings();
@@ -74,8 +74,8 @@ private:
     int m_frameCount = 0;
     int m_averageFps = 0;
 
-    int m_warningLevel = 0;
-    bool m_hasWarningLevel = false;
+    int m_traceStage = 1;
+    bool m_hasTraceStage = false;
 
     DroneManager* m_droneManager = nullptr;
     std::shared_ptr<DroneConfigManager> m_configManager;

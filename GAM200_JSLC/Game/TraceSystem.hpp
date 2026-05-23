@@ -5,10 +5,16 @@
 
 class DroneManager;
 
+enum class TraceStage
+{
+    Stage1 = 1, // Room, Hallway, Rooftop
+    Stage2 = 2  // Underground, Train, etc.
+};
+
 /**
  * @class TraceSystem
- * @brief Manages the "Warning Level" (Heat system) and spawns reinforcements 
- * based on the number of drones the player has destroyed.
+ * @brief Spawns RedDrone tracers when the player destroys map drones.
+ * Stage1 maps spawn 2 tracers per kill; Stage2 maps spawn 3.
  */
 class TraceSystem
 {
@@ -17,20 +23,14 @@ public:
     void Reset();
 
     /**
-     * @brief Triggered when a drone is destroyed. Increases kill count and updates warning levels.
-     * @param droneManager Reference to the manager to spawn new drones.
-     * @param spawnOrigin The location from which the reinforcement wave calculation starts.
+     * @brief Spawns a tracer reinforcement wave for the current map stage.
      */
-    void OnDroneKilled(DroneManager& droneManager, Math::Vec2 spawnOrigin);
-    
-    int GetWarningLevel() const { return m_warningLevel; }
+    void OnDroneKilled(DroneManager& droneManager, Math::Vec2 spawnOrigin, TraceStage stage);
+
+    int GetKillCount() const { return m_killCount; }
 
 private:
-    /**
-     * @brief Spawns a group of "Tracer" drones at the specified origin based on current heat.
-     */
-    void SpawnTracerWave(DroneManager& droneManager, int warningLevel, Math::Vec2 origin);
+    void SpawnTracerWave(DroneManager& droneManager, TraceStage stage, Math::Vec2 origin);
 
-    int m_killCount = 0;    // Total drones destroyed by the player
-    int m_warningLevel = 0; // Current escalation state (0: None, 1: Low, 2: High)
+    int m_killCount = 0;
 };

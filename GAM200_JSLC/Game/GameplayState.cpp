@@ -1105,7 +1105,8 @@ void GameplayState::Update(double dt)
             bool didDroneDie = targetDrone->ApplyDamage(static_cast<float>(dt));
             if (didDroneDie)
             {
-                m_traceSystem->OnDroneKilled(*droneManager, player.GetPosition());
+                if (!targetDrone->IsTraceReinforcement())
+                    m_traceSystem->OnDroneKilled(*droneManager, player.GetPosition(), GetCurrentTraceStage());
                 player.GetPulseCore().getPulse().add(KILL_PULSE_REWARD);
             }
         }
@@ -1695,12 +1696,12 @@ void GameplayState::Update(double dt)
     m_pulseDetonateSkill.UpdateCooldownText(*m_font, *m_fontShader);
 
     std::stringstream ss_warning;
-    ss_warning << "Warning Level: " << m_traceSystem->GetWarningLevel();
+    ss_warning << "Stage: " << static_cast<int>(GetCurrentTraceStage());
     m_warningLevelText = m_font->PrintToTexture(*m_fontShader, ss_warning.str());
 
     if (engine.GetImguiManager())
     {
-        engine.GetImguiManager()->SetWarningLevel(m_traceSystem->GetWarningLevel());
+        engine.GetImguiManager()->SetTraceStage(static_cast<int>(GetCurrentTraceStage()));
     }
 
     if (player.IsDead())
@@ -3311,6 +3312,14 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     }
 
     GL::Disable(GL_BLEND);
+}
+
+TraceStage GameplayState::GetCurrentTraceStage() const
+{
+    // Stage1: Room, Hallway, Rooftop. Stage2: Underground, Train, and beyond.
+    if (m_undergroundAccessed || m_trainAccessed)
+        return TraceStage::Stage2;
+    return TraceStage::Stage1;
 }
 
 void GameplayState::Shutdown()

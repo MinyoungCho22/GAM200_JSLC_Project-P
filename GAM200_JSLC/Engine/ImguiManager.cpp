@@ -126,10 +126,10 @@ void ImguiManager::Shutdown()
     m_initialized = false;
 }
 
-void ImguiManager::SetWarningLevel(int level)
+void ImguiManager::SetTraceStage(int stage)
 {
-    m_warningLevel = level;
-    m_hasWarningLevel = true;
+    m_traceStage = (stage < 1) ? 1 : (stage > 2 ? 2 : stage);
+    m_hasTraceStage = true;
 }
 
 void ImguiManager::ForceDebugSwapIntervalOff()
@@ -222,14 +222,13 @@ void ImguiManager::DrawDebugWindow()
     ImGui::Text("FPS: %d", m_averageFps);
     ImGui::Text("Frame Time: %.3f ms", 1000.0 / m_averageFps);
 
-    if (m_hasWarningLevel)
+    if (m_hasTraceStage)
     {
-        ImVec4 color{ 0.8f, 0.8f, 0.8f, 1.0f };
-        if (m_warningLevel >= 2) color = ImVec4{ 1.0f, 0.25f, 0.25f, 1.0f };
-        else if (m_warningLevel == 1) color = ImVec4{ 1.0f, 0.85f, 0.25f, 1.0f };
-        else color = ImVec4{ 0.45f, 1.0f, 0.45f, 1.0f };
+        ImVec4 color{ 1.0f, 0.85f, 0.25f, 1.0f };
+        if (m_traceStage >= 2)
+            color = ImVec4{ 1.0f, 0.25f, 0.25f, 1.0f };
 
-        ImGui::TextColored(color, "Warning Level: %d", m_warningLevel);
+        ImGui::TextColored(color, "Trace Stage: %d", m_traceStage);
     }
 
     ImGui::Separator();
