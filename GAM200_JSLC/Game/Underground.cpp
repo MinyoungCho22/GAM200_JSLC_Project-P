@@ -39,10 +39,12 @@ void Underground::Initialize()
 {
     // Initialize background parallax/static image
     m_background = std::make_unique<Background>();
-    m_background->Initialize("Asset/Underground.png");
+    m_background->Initialize("Asset/SubwayStation.png");
 
-    m_size = { WIDTH, HEIGHT };
-    m_position = { MIN_X + WIDTH / 2.0f, MIN_Y + HEIGHT / 2.0f };
+    m_mapWidth  = DEFAULT_WIDTH;
+    m_mapHeight = HEIGHT;
+    m_size      = { DEFAULT_WIDTH, HEIGHT };
+    m_position  = { MIN_X + DEFAULT_WIDTH * 0.5f, MIN_Y + HEIGHT * 0.5f };
 
     m_droneManager = std::make_unique<DroneManager>();
 
@@ -72,6 +74,8 @@ void Underground::Initialize()
 
 void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
 {
+    m_trainBoardingMinWorldX = MIN_X + cfg.trainBoardingLocalRightX;
+
     for (auto& source : m_pulseSources) source.Shutdown();
     for (auto& obs : m_obstacles)
     {
@@ -156,7 +160,13 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
         m_hidingSpots.push_back({ { cx, cy }, h.size });
     }
 
-    const auto& pulses = cfg.pulseSources;
+    std::vector<SpriteRectConfig> pulses;
+    pulses.reserve(cfg.pulseSources.size());
+    for (const auto& p : cfg.pulseSources)
+    {
+        if (p.spritePath.find("disco") == std::string::npos)
+            pulses.push_back(p);
+    }
     const size_t pulseCount = pulses.size();
     std::vector<Math::Vec2> effPulseSizes(pulseCount);
     std::vector<Math::Vec2> effPulseTopLeft(pulseCount);
@@ -251,7 +261,7 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     }
 
     float mapMinX = MIN_X;
-    float mapMaxX = MIN_X + WIDTH;
+    float mapMaxX = MIN_X + m_mapWidth;
 
     for (auto& robot : m_robots)
     {

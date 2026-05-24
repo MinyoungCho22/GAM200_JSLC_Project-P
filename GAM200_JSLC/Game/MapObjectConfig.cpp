@@ -237,18 +237,17 @@ MapObjectConfigData MapObjectConfig::DefaultData()
     };
     data.rooftop.liftButton = { {13598.0f, 1570.0f}, {}, "Asset/LiftBotton.png", {320.0f, 96.0f} };
 
+    data.underground.trainBoardingLocalRightX = 7121.0f;
     data.underground.robotSpawns = { {18239.0f, -1685.0f}, {21060.0f, -1685.0f} };
     data.underground.pulseSources = {
         { {1949.0f, 309.0f}, {69.0f, 255.0f}, "Asset/Underground_Pulse.png", {}, 28.0f, 0, true, -1.0f, 0.0f },
-        { {4485.0f, 309.0f}, {69.0f, 255.0f}, "Asset/Underground_Pulse.png", {}, 28.0f, 0, true, -1.0f, 0.0f },
-        { {5847.0f, 375.0f}, {0.0f, 0.0f}, "Asset/disco_part1.png", {}, 0.0f, 101, false, -1.0f, 0.0f },
-        { {5847.0f, 375.0f}, {0.0f, 0.0f}, "Asset/disco_part2.png", {}, 0.0f, 101, true, 123.0f, 0.0f }
+        { {4485.0f, 309.0f}, {69.0f, 255.0f}, "Asset/Underground_Pulse.png", {}, 28.0f, 0, true, -1.0f, 0.0f }
     };
     data.underground.obstacles = {
         { {939.0f, 834.0f}, {561.0f, 162.0f}, "", {} },
-        { {1584.0f, 627.0f}, {288.0f, 369.0f}, "Asset/Pannel1.png", {} },
+        { {1584.0f, 627.0f}, {288.0f, 369.0f}, "", {} },
         { {3471.0f, 834.0f}, {561.0f, 162.0f}, "", {} },
-        { {4116.0f, 627.0f}, {288.0f, 369.0f}, "Asset/pannel2.png", {} },
+        { {4116.0f, 627.0f}, {288.0f, 369.0f}, "", {} },
         { {5235.0f, 834.0f}, {561.0f, 162.0f}, "", {} },
         { {6825.0f, 627.0f}, {296.0f, 369.0f}, "", {} }
     };
@@ -357,6 +356,9 @@ bool MapObjectConfig::ParseFile()
     const std::string undergroundObj = ExtractObjectByKey(text, "underground");
     if (!undergroundObj.empty())
     {
+        next.underground.trainBoardingLocalRightX =
+            ParseFloatKey(undergroundObj, "train_boarding_local_right_x", next.underground.trainBoardingLocalRightX);
+
         const std::string obstacleArray = ExtractArrayByKey(undergroundObj, "obstacles");
         if (!obstacleArray.empty())
         {
@@ -370,7 +372,12 @@ bool MapObjectConfig::ParseFile()
         {
             next.underground.pulseSources.clear();
             for (const auto& obj : SplitTopLevelObjectsInArray(pulseArray))
-                next.underground.pulseSources.push_back(ParseSpriteRect(obj, SpriteRectConfig{}));
+            {
+                SpriteRectConfig pulse = ParseSpriteRect(obj, SpriteRectConfig{});
+                if (pulse.spritePath.find("disco") != std::string::npos)
+                    continue;
+                next.underground.pulseSources.push_back(pulse);
+            }
         }
 
         const std::string rampArray = ExtractArrayByKey(undergroundObj, "ramps");

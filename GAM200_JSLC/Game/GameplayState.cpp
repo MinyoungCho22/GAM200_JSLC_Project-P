@@ -607,9 +607,13 @@ void GameplayState::Update(double dt)
             player.ResetVelocity();
             player.SetOnGround(false);
 
-            m_camera.SetBounds(
-                { Underground::MIN_X, Underground::MIN_Y },
-                { Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y + Underground::HEIGHT });
+            {
+                const float ugW = m_underground ? m_underground->GetMapWidth() : Underground::WIDTH;
+                const float ugH = m_underground ? m_underground->GetMapHeight() : Underground::HEIGHT;
+                m_camera.SetBounds(
+                    { Underground::MIN_X, Underground::MIN_Y },
+                    { Underground::MIN_X + ugW, Underground::MIN_Y + ugH });
+            }
             m_cameraSmoothSpeed = 0.05f;
             m_camera.SetPosition(player.GetPosition());
             Logger::Instance().Log(Logger::Severity::Event, "Cheat: Train -> Underground (Ctrl+4)");
@@ -1196,9 +1200,9 @@ void GameplayState::Update(double dt)
         }
     }
 
-    if (m_undergroundAccessed && !m_trainAccessed)
+    if (m_undergroundAccessed && !m_trainAccessed && m_underground)
     {
-        float transitionX = Underground::MIN_X + Underground::WIDTH - 50.0f;
+        const float transitionX = m_underground->GetTrainBoardingMinWorldX();
         if (player.GetPosition().x > transitionX)
         {
             StartTransition(PendingTransition::UndergroundToTrain);
@@ -1810,9 +1814,9 @@ void GameplayState::HandleRooftopToUndergroundTransition()
     player.SetOnGround(false);
 
     float worldMinX = Underground::MIN_X;
-    float worldMaxX = Underground::MIN_X + Underground::WIDTH;
+    float worldMaxX = Underground::MIN_X + (m_underground ? m_underground->GetMapWidth() : Underground::WIDTH);
     float worldMinY = Underground::MIN_Y;
-    float worldMaxY = Underground::MIN_Y + Underground::HEIGHT;
+    float worldMaxY = Underground::MIN_Y + (m_underground ? m_underground->GetMapHeight() : Underground::HEIGHT);
 
     m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
 
@@ -2010,11 +2014,19 @@ void GameplayState::RespawnAtCheckpoint()
         player.SetCurrentGroundLevel(Underground::MIN_Y + 75.0f);
         player.SetPosition({ playerStartX, playerStartY });
         player.SetOnGround(false);
-        m_camera.SetBounds({ Underground::MIN_X, Underground::MIN_Y },
-                           { Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y + Underground::HEIGHT });
-        m_camera.SetPosition(player.GetPosition());
         if (m_underground)
+        {
+            m_camera.SetBounds({ Underground::MIN_X, Underground::MIN_Y },
+                               { Underground::MIN_X + m_underground->GetMapWidth(),
+                                 Underground::MIN_Y + m_underground->GetMapHeight() });
             m_underground->RefillPulseSourcesAfterCheckpointRespawn();
+        }
+        else
+        {
+            m_camera.SetBounds({ Underground::MIN_X, Underground::MIN_Y },
+                               { Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y + Underground::HEIGHT });
+        }
+        m_camera.SetPosition(player.GetPosition());
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Underground");
         break;
     }

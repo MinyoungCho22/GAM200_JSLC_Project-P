@@ -44,6 +44,8 @@ struct RoomObjectConfig
 
 struct UndergroundObjectConfig
 {
+    /// Map-local X of the right edge of the rightmost vending machine; train boarding starts to the right.
+    float trainBoardingLocalRightX = 7121.0f;
     std::vector<SpriteRectConfig> obstacles{};
     std::vector<SpriteRectConfig> pulseSources{};
     std::vector<SpriteRectConfig> ramps{};

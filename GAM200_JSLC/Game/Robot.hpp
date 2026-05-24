@@ -20,6 +20,7 @@ enum class RobotState {
     Retreat,
     Windup,
     Attack,
+    JumpAttack,
     Recover,
     Stagger,
     Dead
@@ -28,7 +29,15 @@ enum class RobotState {
 enum class AttackType {
     None,
     LowSweep,
-    HighSweep
+    HighSweep,
+    JumpSweep
+};
+
+enum class JumpPhase {
+    Windup,
+    Rise,
+    Strike,
+    Fall
 };
 
 class Robot
@@ -99,6 +108,11 @@ public:
 
 private:
     void DecideAttackPattern();
+    bool ShouldJumpAttack(const Math::Vec2& playerPos, const Math::Vec2& playerHbSize,
+                          const std::vector<ObstacleInfo>& obstacles) const;
+    void StartJumpAttack(const Math::Vec2& playerPos);
+    /// Avoid flipX flicker when player and robot overlap (deadzone on horizontal delta).
+    void UpdateFacingTowardPlayer(const Math::Vec2& targetPos);
 
     unsigned int LoadTexture(const char* path);
 
@@ -158,4 +172,7 @@ private:
     float m_trainDetectAlertTimer = 0.f;
     bool  m_trainBlindAggro       = false;
     float m_trainBlindSweepTimer  = 0.f;
+
+    JumpPhase m_jumpPhase = JumpPhase::Windup;
+    float m_jumpApexY = 0.f;
 };

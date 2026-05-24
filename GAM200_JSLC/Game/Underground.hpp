@@ -17,10 +17,17 @@ struct UndergroundObjectConfig;
 class Underground
 {
 public:
-    static constexpr float WIDTH = 7920.0f;
-    static constexpr float HEIGHT = 1080.0f;
-    static constexpr float MIN_X = 16260.0f;
-    static constexpr float MIN_Y = -2000.0f;
+    static constexpr float DEFAULT_WIDTH  = 7920.0f;
+    static constexpr float HEIGHT       = 1080.0f;
+    static constexpr float MIN_X        = 16260.0f;
+    static constexpr float MIN_Y        = -2000.0f;
+    /// Legacy alias — prefer GetMapWidth() after Initialize().
+    static constexpr float WIDTH = DEFAULT_WIDTH;
+
+    float GetMapWidth() const { return m_mapWidth; }
+    float GetMapHeight() const { return m_mapHeight; }
+    /// Player world X must exceed this to board the train (right of vending machine).
+    float GetTrainBoardingMinWorldX() const { return m_trainBoardingMinWorldX; }
 
     struct Obstacle
     {
@@ -77,6 +84,9 @@ private:
     std::unique_ptr<Background> m_background;
     Math::Vec2 m_position;
     Math::Vec2 m_size;
+    float m_mapWidth = DEFAULT_WIDTH;
+    float m_mapHeight = HEIGHT;
+    float m_trainBoardingMinWorldX = MIN_X + DEFAULT_WIDTH;
     std::unique_ptr<DroneManager> m_droneManager;
 
     std::vector<Obstacle> m_obstacles;

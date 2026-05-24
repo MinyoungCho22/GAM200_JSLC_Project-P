@@ -17,6 +17,87 @@
 #pragma warning(pop)
 
 constexpr float ATTACK_DASH_SPEED = 800.0f;
+constexpr float JUMP_GRAVITY = 1650.0f;
+constexpr float JUMP_WINDUP_TIME = 0.38f;
+constexpr float JUMP_STRIKE_TIME = 0.24f;
+constexpr float JUMP_STRIKE_LUNGE_SPEED = 420.0f;
+
+namespace
+{
+bool IsPlayerElevatedForJump(const Math::Vec2& playerPos, const Math::Vec2& robotPos)
+{
+    return playerPos.y > robotPos.y + 85.0f;
+}
+
+bool IsObstacleBetweenRobotAndPlayer(const Math::Vec2& robotPos, const Math::Vec2& robotSize,
+                                     const Math::Vec2& playerPos,
+                                     const std::vector<ObstacleInfo>& obstacles)
+{
+    const float spanMinX = std::min(robotPos.x, playerPos.x);
+    const float spanMaxX = std::max(robotPos.x, playerPos.x);
+    const float robotFeetY = robotPos.y - robotSize.y * 0.5f;
+
+    for (const auto& obs : obstacles)
+    {
+        const float obsL = obs.pos.x - obs.size.x * 0.5f;
+        const float obsR = obs.pos.x + obs.size.x * 0.5f;
+        const float obsB = obs.pos.y - obs.size.y * 0.5f;
+        const float obsT = obs.pos.y + obs.size.y * 0.5f;
+
+        if (obsR <= spanMinX + 20.0f || obsL >= spanMaxX - 20.0f)
+            continue;
+        if (obsT < robotFeetY + 35.0f)
+            continue;
+        if (obsB > playerPos.y + 90.0f)
+            continue;
+        return true;
+    }
+    return false;
+}
+
+bool ResolveRobotObstacleHorizontal(Math::Vec2& pos, const Math::Vec2& robotSize, const ObstacleInfo& obs)
+{
+    if (!Collision::CheckAABB(pos, robotSize, obs.pos, obs.size))
+        return false;
+
+    const float rHalfW = robotSize.x * 0.5f;
+    const float oHalfW = obs.size.x * 0.5f;
+    const float rL = pos.x - rHalfW;
+    const float rR = pos.x + rHalfW;
+    const float oL = obs.pos.x - oHalfW;
+    const float oR = obs.pos.x + oHalfW;
+
+    const float pushLeft = rR - oL;
+    const float pushRight = oR - rL;
+
+    if (pushLeft > 0.0f && pushRight > 0.0f)
+    {
+        if (pushLeft < pushRight)
+            pos.x -= pushLeft;
+        else
+            pos.x += pushRight;
+    }
+    else if (pushLeft > 0.0f)
+        pos.x -= pushLeft;
+    else if (pushRight > 0.0f)
+        pos.x += pushRight;
+
+    return true;
+}
+
+void ResolveAllObstacleOverlaps(Math::Vec2& pos, const Math::Vec2& robotSize,
+                                const std::vector<ObstacleInfo>& obstacles)
+{
+    for (int iter = 0; iter < 6; ++iter)
+    {
+        bool moved = false;
+        for (const auto& obs : obstacles)
+            moved = ResolveRobotObstacleHorizontal(pos, robotSize, obs) || moved;
+        if (!moved)
+            break;
+    }
+}
+}
 
 // Random number generation for robot behavior
 static std::default_random_engine robot_gen;
@@ -152,15 +233,20 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     m_trainDetectAlertTimer = std::max(0.f, m_trainDetectAlertTimer - fDt);
 
     Math::Vec2 playerPos = player.GetPosition();
+    const Math::Vec2 playerFaceTarget = player.GetHitboxCenter();
     const bool trainNoDetect = player.IsTrainEnemyUndetectable() && m_trainCarSegment > 0;
     if (trainNoDetect
         && (m_state == RobotState::Chase || m_state == RobotState::Windup
-            || m_state == RobotState::Attack || m_state == RobotState::Recover))
+            || m_state == RobotState::Attack || m_state == RobotState::JumpAttack
+            || m_state == RobotState::Recover))
         m_state = RobotState::Patrol;
 
     float distToPlayer = std::abs(playerPos.x - m_position.x);
     float heightDiff = std::abs(playerPos.y - m_position.y);
-    const float detHeight = (m_trainDeckPatrol || m_trainCarSegment > 0) ? 520.f : 300.f;
+    const float detHeight = 520.0f;
+    const bool elevatedBehindObstacle =
+        IsPlayerElevatedForJump(playerPos, m_position)
+        && IsObstacleBetweenRobotAndPlayer(m_position, m_size, playerPos, obstacles);
 
     // FSM State Logic
     switch (m_state)
@@ -168,7 +254,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     case RobotState::Patrol:
         if (m_trainBlindAggro && !trainNoDetect)
         {
-            m_directionX = (playerPos.x > m_position.x) ? 1.0f : -1.0f;
+            UpdateFacingTowardPlayer(playerFaceTarget);
             m_velocity.x = m_directionX * m_chaseSpeed;
 
             m_trainBlindSweepTimer -= fDt;
@@ -201,8 +287,9 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         }
         m_velocity.x = m_directionX * m_patrolSpeed;
 
-        // Transition to Chase if player is detected
-        if (!trainNoDetect && distToPlayer < DETECTION_RANGE && heightDiff < detHeight)
+        // Transition to Chase if player is detected (including elevated player behind a panel).
+        if (!trainNoDetect && distToPlayer < DETECTION_RANGE
+            && (heightDiff < detHeight || elevatedBehindObstacle))
         {
             m_state                     = RobotState::Chase;
             m_trainDetectAlertTimer     = 0.95f;
@@ -211,20 +298,41 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
 
     case RobotState::Chase:
-        m_directionX = (playerPos.x > m_position.x) ? 1.0f : -1.0f;
-        m_velocity.x = m_directionX * m_chaseSpeed;
+        UpdateFacingTowardPlayer(playerFaceTarget);
 
-        if (distToPlayer < ATTACK_RANGE)
+        if (elevatedBehindObstacle && distToPlayer < DETECTION_RANGE)
+        {
+            if (m_attackCooldownTimer <= 0.0f
+                && ShouldJumpAttack(playerPos, player.GetHitboxSize(), obstacles))
+            {
+                StartJumpAttack(playerPos);
+                break;
+            }
+            m_velocity.x = 0.0f;
+        }
+        else
+        {
+            m_velocity.x = m_directionX * m_chaseSpeed;
+        }
+
+        if (distToPlayer < ATTACK_RANGE || (heightDiff > 90.0f && distToPlayer < DETECTION_RANGE))
         {
             if (m_attackCooldownTimer <= 0.0f)
             {
-                DecideAttackPattern();
-                m_state = RobotState::Windup;
-                m_stateTimer = m_windupTime;
-                m_velocity.x = 0.0f;
-                m_hasDealtDamage = false;
+                if (ShouldJumpAttack(playerPos, player.GetHitboxSize(), obstacles))
+                {
+                    StartJumpAttack(playerPos);
+                }
+                else if (!elevatedBehindObstacle)
+                {
+                    DecideAttackPattern();
+                    m_state = RobotState::Windup;
+                    m_stateTimer = m_windupTime;
+                    m_velocity.x = 0.0f;
+                    m_hasDealtDamage = false;
+                }
             }
-            else
+            else if (elevatedBehindObstacle)
             {
                 m_velocity.x = 0.0f;
             }
@@ -244,7 +352,7 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
                     m_hasDealtDamage = false;
                 }
             }
-            else if (distToPlayer > DETECTION_RANGE)
+            else if (distToPlayer > DETECTION_RANGE && !elevatedBehindObstacle)
             {
                 m_state = RobotState::Patrol;
             }
@@ -267,6 +375,67 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
             m_stateTimer = ATTACK_DURATION;
             m_hasPlayedAttackSound = false;
             Logger::Instance().Log(Logger::Severity::Verbose, "Robot Attack! Type: %d", (int)m_currentAttack);
+        }
+        break;
+
+    case RobotState::JumpAttack:
+        UpdateFacingTowardPlayer(playerFaceTarget);
+        switch (m_jumpPhase)
+        {
+        case JumpPhase::Windup:
+            m_velocity.x = 0.0f;
+            if (m_stateTimer <= 0.0f)
+            {
+                m_jumpPhase = JumpPhase::Rise;
+                const float groundY = m_groundLimitY + m_size.y * 0.5f;
+                const float deltaY = std::max(80.0f, m_jumpApexY - groundY);
+                m_velocity.y = std::sqrt(2.0f * JUMP_GRAVITY * deltaY);
+                m_hasDealtDamage = false;
+                m_hasPlayedAttackSound = false;
+            }
+            break;
+
+        case JumpPhase::Rise:
+            m_velocity.x = 0.0f;
+            if (m_position.y >= m_jumpApexY - 8.0f || m_velocity.y <= 0.0f)
+            {
+                m_jumpPhase = JumpPhase::Strike;
+                m_stateTimer = JUMP_STRIKE_TIME;
+                m_velocity.y = 0.0f;
+            }
+            break;
+
+        case JumpPhase::Strike:
+            m_velocity.x = m_directionX * JUMP_STRIKE_LUNGE_SPEED;
+            if (!m_hasPlayedAttackSound)
+            {
+                m_soundHigh.Play();
+                m_hasPlayedAttackSound = true;
+            }
+            if (!m_hasDealtDamage)
+            {
+                const Math::Vec2 attackBoxSize = { 590.0f, 300.0f };
+                const Math::Vec2 attackBoxPos = { m_position.x, m_position.y };
+                if (m_allowTrainCombatVsPlayer
+                    && Collision::CheckAABB(player.GetHitboxCenter(), player.GetHitboxSize(),
+                                          attackBoxPos, attackBoxSize))
+                {
+                    player.TakeDamage(20.0f);
+                    m_hasDealtDamage = true;
+                    Logger::Instance().Log(Logger::Severity::Verbose, "Player Hit by Robot (Jump Sweep)!");
+                }
+            }
+            if (m_stateTimer <= 0.0f)
+            {
+                m_jumpPhase = JumpPhase::Fall;
+                m_velocity.y = -120.0f;
+                m_velocity.x = 0.0f;
+            }
+            break;
+
+        case JumpPhase::Fall:
+            m_velocity.x = 0.0f;
+            break;
         }
         break;
 
@@ -353,10 +522,62 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         break;
     }
 
-    // Ground-only movement (no gravity, vault jump, or climbing onto obstacles).
+    const float groundCenterY = m_groundLimitY + m_size.y * 0.5f;
+
+    if (m_state == RobotState::JumpAttack)
+    {
+        m_velocity.y -= JUMP_GRAVITY * fDt;
+
+        Math::Vec2 nextPos = m_position;
+        nextPos.x += m_velocity.x * fDt;
+        nextPos.y += m_velocity.y * fDt;
+
+        const float halfW = m_size.x / 4.0f;
+        if (nextPos.x - halfW < mapMinX)
+            nextPos.x = mapMinX + halfW;
+        if (nextPos.x + halfW > mapMaxX)
+            nextPos.x = mapMaxX - halfW;
+
+        bool blockedHoriz = false;
+        for (const auto& obs : obstacles)
+        {
+            if (!Collision::CheckAABB(nextPos, m_size, obs.pos, obs.size))
+                continue;
+            blockedHoriz = true;
+            nextPos.x = m_position.x;
+            if (Collision::CheckAABB(nextPos, m_size, obs.pos, obs.size))
+                ResolveRobotObstacleHorizontal(nextPos, m_size, obs);
+        }
+        if (blockedHoriz)
+            m_velocity.x = 0.0f;
+
+        if (nextPos.y <= groundCenterY)
+        {
+            nextPos.y = groundCenterY;
+            m_velocity.y = 0.0f;
+            m_velocity.x = 0.0f;
+            ResolveAllObstacleOverlaps(nextPos, m_size, obstacles);
+            m_isOnGround = true;
+            if (m_jumpPhase == JumpPhase::Fall)
+            {
+                m_state = RobotState::Recover;
+                m_stateTimer = RECOVER_TIME;
+                m_jumpPhase = JumpPhase::Windup;
+                m_attackCooldownTimer = 1.0f;
+            }
+        }
+        else
+        {
+            m_isOnGround = false;
+        }
+
+        m_position = nextPos;
+        return;
+    }
+
+    // Ground-only movement (no vault jump or climbing onto obstacles).
     m_velocity.y = 0.0f;
 
-    // Map boundary constraints
     Math::Vec2 nextPos = m_position;
     nextPos.x += m_velocity.x * fDt;
 
@@ -370,7 +591,6 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
         if (m_state == RobotState::Patrol || m_state == RobotState::Retreat) m_directionX = -1.0f;
     }
 
-    // Obstacle collision detection (horizontal only)
     if (std::abs(m_velocity.x) > 0.1f)
     {
         for (const auto& obs : obstacles)
@@ -390,8 +610,90 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
     }
 
     m_position.x = nextPos.x;
-    m_position.y = m_groundLimitY + m_size.y / 2.0f;
+    m_position.y = groundCenterY;
     m_isOnGround = true;
+}
+
+bool Robot::ShouldJumpAttack(const Math::Vec2& playerPos, const Math::Vec2& playerHbSize,
+                             const std::vector<ObstacleInfo>& obstacles) const
+{
+    if (m_trainDeckPatrol || m_trainCarSegment > 0)
+        return false;
+
+    if (!IsPlayerElevatedForJump(playerPos, m_position))
+        return false;
+
+    const float distX = std::abs(playerPos.x - m_position.x);
+    if (distX > DETECTION_RANGE * 1.2f)
+        return false;
+
+    if (IsObstacleBetweenRobotAndPlayer(m_position, m_size, playerPos, obstacles))
+        return true;
+
+    const float dx = playerPos.x - m_position.x;
+    float dirX = m_directionX;
+    constexpr float kStepDeadzone = 56.0f;
+    if (dx > kStepDeadzone)
+        dirX = 1.0f;
+    else if (dx < -kStepDeadzone)
+        dirX = -1.0f;
+    const Math::Vec2 stepPos = { m_position.x + dirX * 40.0f, m_position.y };
+
+    bool blocked = false;
+    for (const auto& obs : obstacles)
+    {
+        if (Collision::CheckAABB(m_position, m_size, obs.pos, obs.size)
+            || Collision::CheckAABB(stepPos, m_size, obs.pos, obs.size))
+        {
+            blocked = true;
+            break;
+        }
+    }
+    if (!blocked)
+        return false;
+
+    const float playerFeetY = playerPos.y - playerHbSize.y * 0.5f;
+    for (const auto& obs : obstacles)
+    {
+        if (!Collision::CheckAABB(m_position, m_size, obs.pos, obs.size)
+            && !Collision::CheckAABB(stepPos, m_size, obs.pos, obs.size))
+            continue;
+
+        const float obsTop = obs.pos.y + obs.size.y * 0.5f;
+        const float obsLeft = obs.pos.x - obs.size.x * 0.5f;
+        const float obsRight = obs.pos.x + obs.size.x * 0.5f;
+        if (playerPos.x >= obsLeft - 60.0f && playerPos.x <= obsRight + 60.0f && playerFeetY >= obsTop - 55.0f)
+            return true;
+    }
+
+    return playerPos.y > m_position.y + 120.0f;
+}
+
+void Robot::UpdateFacingTowardPlayer(const Math::Vec2& targetPos)
+{
+    constexpr float kFaceDeadzone = 56.0f;
+    const float dx = targetPos.x - m_position.x;
+    if (dx > kFaceDeadzone)
+        m_directionX = 1.0f;
+    else if (dx < -kFaceDeadzone)
+        m_directionX = -1.0f;
+}
+
+void Robot::StartJumpAttack(const Math::Vec2& playerPos)
+{
+    m_currentAttack = AttackType::JumpSweep;
+    m_state = RobotState::JumpAttack;
+    m_jumpPhase = JumpPhase::Windup;
+    m_stateTimer = JUMP_WINDUP_TIME;
+    m_velocity = { 0.0f, 0.0f };
+    m_hasDealtDamage = false;
+    m_hasPlayedAttackSound = false;
+
+    const float groundY = m_groundLimitY + m_size.y * 0.5f;
+    m_jumpApexY = std::max(playerPos.y + 40.0f, groundY + 200.0f);
+    m_jumpApexY = std::min(m_jumpApexY, groundY + 430.0f);
+
+    Logger::Instance().Log(Logger::Severity::Verbose, "Robot Jump Attack (blocked, player elevated).");
 }
 
 void Robot::DecideAttackPattern()
@@ -437,13 +739,13 @@ void Robot::Draw(const Shader& shader) const
     if (m_state == RobotState::Attack)
     {
         if (m_currentAttack == AttackType::HighSweep)
-        {
             textureToBind = m_textureHighID;
-        }
         else if (m_currentAttack == AttackType::LowSweep)
-        {
             textureToBind = m_textureLowID;
-        }
+    }
+    else if (m_state == RobotState::JumpAttack && m_jumpPhase == JumpPhase::Strike)
+    {
+        textureToBind = m_textureHighID;
     }
 
     GL::ActiveTexture(GL_TEXTURE0);
@@ -471,8 +773,14 @@ void Robot::DrawOutline(const Shader& outlineShader) const
     unsigned int textureToBind = m_textureID;
     if (m_state == RobotState::Attack)
     {
-        if (m_currentAttack == AttackType::HighSweep) textureToBind = m_textureHighID;
-        else if (m_currentAttack == AttackType::LowSweep) textureToBind = m_textureLowID;
+        if (m_currentAttack == AttackType::HighSweep)
+            textureToBind = m_textureHighID;
+        else if (m_currentAttack == AttackType::LowSweep)
+            textureToBind = m_textureLowID;
+    }
+    else if (m_state == RobotState::JumpAttack && m_jumpPhase == JumpPhase::Strike)
+    {
+        textureToBind = m_textureHighID;
     }
 
     // Robot textures are single-frame sprites.
@@ -544,6 +852,12 @@ void Robot::DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const
     if (m_state == RobotState::Dead) return;
 
     // Render the attack hitboxes visually during Windup and Attack states
+    if (m_state == RobotState::Windup
+        || (m_state == RobotState::JumpAttack && m_jumpPhase == JumpPhase::Windup))
+    {
+        debugRenderer.DrawBox(colorShader, m_position, { m_size.x * 0.5f, m_size.y * 0.35f }, { 1.0f, 0.85f });
+    }
+
     if (m_state == RobotState::Windup || m_state == RobotState::Attack)
     {
         if (m_currentAttack == AttackType::LowSweep)
@@ -556,6 +870,10 @@ void Robot::DrawAlert(Shader& colorShader, DebugRenderer& debugRenderer) const
             float yPos = m_position.y + m_size.y / 2.0f - 75.0f;
             debugRenderer.DrawBox(colorShader, { m_position.x, yPos }, { 590.0f, 150.0f }, { 1.0f, 0.0f });
         }
+    }
+    else if (m_state == RobotState::JumpAttack && m_jumpPhase == JumpPhase::Strike)
+    {
+        debugRenderer.DrawBox(colorShader, m_position, { 590.0f, 300.0f }, { 1.0f, 0.0f });
     }
 }
 
@@ -646,6 +964,8 @@ void Robot::Reset()
     m_trainDetectAlertTimer    = 0.f;
     m_trainBlindAggro          = false;
     m_trainBlindSweepTimer     = 0.f;
+    m_jumpPhase                = JumpPhase::Windup;
+    m_jumpApexY                = 0.f;
 
     m_groundLimitY = trainGround;
 
