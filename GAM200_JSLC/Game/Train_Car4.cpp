@@ -71,7 +71,7 @@ int Train::FindCarTransportInjectTarget(Math::Vec2 playerHbCenter) const
 // 6개 자동차 슬롯을 초기 픽셀 배치·시동 상태(좌상·우하 ON, 나머지 OFF)로 리셋함
 void Train::ResetCarTransportSlotsToInitialState()
 {
-    const float c4 = m_car1Width + m_car2Width + m_car3Width;
+    const float c4 = GetCar4LocalLeft();
 
     struct Def
     {
@@ -476,7 +476,7 @@ void Train::UpdateCarTransportDrones(float dt, const Player& player, Math::Vec2 
     if (!m_carTransportDroneManager)
         return;
 
-    const float        c4        = m_car1Width + m_car2Width + m_car3Width;
+    const float        c4        = GetCar4LocalLeft();
     const float        trainLeft = MIN_X + m_trainOffset;
     auto&              drones = m_carTransportDroneManager->GetDrones();
     const Math::Vec2   pHb    = player.GetHitboxCenter();

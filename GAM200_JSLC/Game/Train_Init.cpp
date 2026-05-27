@@ -44,6 +44,23 @@ void Train::Initialize()
     m_firstTrain ->Initialize("Asset/Train/FirstTrain.png");
     m_secondTrain->Initialize("Asset/Train/SecondTrain.png");
     m_thirdTrain ->Initialize("Asset/Train/ThirdTrain.png");
+    {
+        static const char* kCar3ExtPaths[kCar3ExtensionCount] = {
+            "Asset/Train/SecondTrain_1.png",
+            "Asset/Train/SecondTrain_2.png",
+            "Asset/Train/SecondTrain_3.png",
+        };
+        for (int i = 0; i < kCar3ExtensionCount; ++i)
+        {
+            m_car3ExtensionTrains[static_cast<size_t>(i)] = std::make_unique<Background>();
+            m_car3ExtensionTrains[static_cast<size_t>(i)]->Initialize(kCar3ExtPaths[i]);
+            if (m_car3ExtensionTrains[static_cast<size_t>(i)]->GetWidth() > 0)
+                m_car3ExtensionWidths[static_cast<size_t>(i)] =
+                    static_cast<float>(m_car3ExtensionTrains[static_cast<size_t>(i)]->GetWidth());
+            else
+                m_car3ExtensionWidths[static_cast<size_t>(i)] = m_car2Width;
+        }
+    }
     m_thirdThirdTrain->Initialize("Asset/Train/Third_ThirdTrain.png");
     m_fourthTrain    ->Initialize("Asset/Train/FourthTrain.png");
     // File name in request had spacing typo ("Valve. png"), so try common variants.
@@ -57,12 +74,12 @@ void Train::Initialize()
     if (m_thirdTrain->GetWidth()  > 0) m_car3Width = static_cast<float>(m_thirdTrain->GetWidth());
     if (m_thirdThirdTrain->GetWidth() > 0) m_car4Width = static_cast<float>(m_thirdThirdTrain->GetWidth());
     if (m_fourthTrain->GetWidth()     > 0) m_car5Width = static_cast<float>(m_fourthTrain->GetWidth());
-    m_totalTrainWidth = m_car1Width + m_car2Width + m_car3Width + m_car4Width + m_car5Width;
+    m_totalTrainWidth = GetCar4LocalLeft() + m_car4Width + m_car5Width;
 
     // Car5 valve anchor: centered on existing valve/pipe hitbox (c5, 894,351,317,162).
     // Keep local-space so it follows train offset automatically.
     {
-        const float c5 = m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        const float c5 = GetCar4LocalLeft() + m_car4Width;
         Train::TrainHitbox valveHb = MakeHitbox(c5, 894.0f, 351.0f, 317.0f, 162.0f);
         m_valveLocalCenter = valveHb.localCenter;
     }
@@ -137,7 +154,7 @@ void Train::Initialize()
         if (m_droneManager)
             m_droneManager->ClearAllDrones();
 
-        const float        c5   = m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        const float        c5   = GetCar4LocalLeft() + m_car4Width;
         constexpr float kLowY = Train::MIN_Y + 95.f + 88.f;
         const float     deckSurfaceY = Train::MIN_Y + kTrainFlatbedDeckTopLocalY;
         const float     highCarDroneHoverY =
@@ -293,7 +310,7 @@ void Train::Initialize()
         if (m_carTransportDroneManager)
         {
             m_carTransportDroneManager->ClearAllDrones();
-            const float c4sum = m_car1Width + m_car2Width + m_car3Width;
+            const float c4sum = GetCar4LocalLeft();
             for (int i = 0; i < kCarTransportHoverDroneCount; ++i)
             {
                 const float lx = c4sum + kCarTransportDronePixels[i].x;
@@ -435,10 +452,22 @@ void Train::BuildTrainHitboxes()
 
 
     // ════════════════════════════════════════════════════════════════════════
+    // ▣  Car 3½  –  SecondTrain_1~3 (ThirdTrain과 Third_Third 사이 연결 칸)
+    // ════════════════════════════════════════════════════════════════════════
+    float cExt = m_car1Width + m_car2Width + m_car3Width;
+    for (int i = 0; i < kCar3ExtensionCount; ++i)
+    {
+        const float w = m_car3ExtensionWidths[static_cast<size_t>(i)];
+        const float deckW = std::max(w - 168.0f, 400.0f);
+        m_trainHitboxes.push_back(MakeHitbox(cExt, 84, 804, deckW, 45));
+        cExt += w;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // ▣  Car 4  –  Third_ThirdTrain.png
     //    발판만 충돌 — 자동차 박스는 디버그 표시 전용(collision false), 앞으로 걸어 통과
     // ════════════════════════════════════════════════════════════════════════
-    const float c4 = m_car1Width + m_car2Width + m_car3Width;
+    const float c4 = cExt;
 
     // [Car4] 발판  위치: X=84  Y=804  크기: 3789 x 45
     m_trainHitboxes.push_back(MakeHitbox(c4, 84, 804, 3789, 45));
@@ -582,6 +611,11 @@ void Train::Shutdown()
     if (m_firstTrain)      m_firstTrain->Shutdown();
     if (m_secondTrain)     m_secondTrain->Shutdown();
     if (m_thirdTrain)      m_thirdTrain->Shutdown();
+    for (auto& ext : m_car3ExtensionTrains)
+    {
+        if (ext)
+            ext->Shutdown();
+    }
     if (m_thirdThirdTrain) m_thirdThirdTrain->Shutdown();
     if (m_fourthTrain)     m_fourthTrain->Shutdown();
     if (m_valveSprite)     m_valveSprite->Shutdown();

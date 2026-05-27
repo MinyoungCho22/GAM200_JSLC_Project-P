@@ -228,6 +228,8 @@ public:
 
     // Total world width of all train car images (1 px = 1 world unit)
     float GetMapWidth() const { return m_totalTrainWidth; }
+    /// Third_ThirdTrain(게임플레이 4호차) 시작 local X — Car1~3 + SecondTrain_1~3 너비 합
+    float GetCar4LocalLeft() const;
 
     // Right boundary that expands as train moves (for camera bounds)
     float GetEffectiveRightBound() const { return MIN_X + m_totalTrainWidth + m_trainOffset + 960.0f; }
@@ -237,6 +239,9 @@ private:
     std::unique_ptr<Background> m_firstTrain;
     std::unique_ptr<Background> m_secondTrain;
     std::unique_ptr<Background> m_thirdTrain;
+    static constexpr int kCar3ExtensionCount = 3;
+    std::array<std::unique_ptr<Background>, kCar3ExtensionCount> m_car3ExtensionTrains{};
+    std::array<float, kCar3ExtensionCount> m_car3ExtensionWidths{};
     std::unique_ptr<Background> m_thirdThirdTrain;
     std::unique_ptr<Background> m_fourthTrain;
     std::unique_ptr<Background> m_valveSprite;

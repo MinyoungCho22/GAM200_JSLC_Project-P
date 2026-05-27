@@ -618,7 +618,7 @@ void Train::UpdateTrainEncounterScript(float dt, Player& player)
     if (m_droneManager)
     {
         auto& drones = m_droneManager->GetDrones();
-        const float c5L = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        const float c5L = tl + GetCar4LocalLeft() + m_car4Width;
         const float c5R = c5L + m_car5Width;
         const float formationCenter =
             hidePlayer ? (c5L + c5R) * 0.5f

@@ -267,9 +267,26 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
         m_thirdTrain->Draw(shader, model);
     }
 
+    {
+        float extLeft = trainLeft + m_car1Width + m_car2Width + m_car3Width;
+        for (int i = 0; i < kCar3ExtensionCount; ++i)
+        {
+            if (!m_car3ExtensionTrains[static_cast<size_t>(i)])
+                continue;
+            const float w = m_car3ExtensionWidths[static_cast<size_t>(i)];
+            const float cx = extLeft + w * 0.5f;
+            const float cy = MIN_Y + HEIGHT * 0.5f;
+            Math::Matrix model =
+                Math::Matrix::CreateTranslation({ cx, cy }) * Math::Matrix::CreateScale({ w, HEIGHT });
+            m_car3ExtensionTrains[static_cast<size_t>(i)]->Draw(shader, model);
+            extLeft += w;
+        }
+    }
+
     if (m_thirdThirdTrain)
     {
-        float cx = trainLeft + m_car1Width + m_car2Width + m_car3Width + m_car4Width * 0.5f;
+        const float c4Left = GetCar4LocalLeft();
+        float cx = trainLeft + c4Left + m_car4Width * 0.5f;
         float cy = MIN_Y + HEIGHT * 0.5f;
         Math::Matrix model =
             Math::Matrix::CreateTranslation({ cx, cy }) *
@@ -279,7 +296,7 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
 
     if (m_fourthTrain)
     {
-        float cx = trainLeft + m_car1Width + m_car2Width + m_car3Width + m_car4Width + m_car5Width * 0.5f;
+        float cx = trainLeft + GetCar4LocalLeft() + m_car4Width + m_car5Width * 0.5f;
         float cy = MIN_Y + HEIGHT * 0.5f;
         Math::Matrix model =
             Math::Matrix::CreateTranslation({ cx, cy }) *

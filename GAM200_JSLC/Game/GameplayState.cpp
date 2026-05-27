@@ -1202,12 +1202,28 @@ void GameplayState::Update(double dt)
 
     if (m_undergroundAccessed && !m_trainAccessed && m_underground)
     {
-        const float transitionX = m_underground->GetTrainBoardingMinWorldX();
-        if (player.GetPosition().x > transitionX)
+        const bool playerOnBoardingHitbox =
+            m_underground->IsPlayerOnApproachTrain(playerHbCenter, playerHitboxSize);
+        const bool trainDocked = m_underground->IsApproachTrainDocked();
+        if (trainDocked && playerOnBoardingHitbox)
         {
-            StartTransition(PendingTransition::UndergroundToTrain);
+            if (m_undergroundTrainBoardingDelay < 0.0f)
+                m_undergroundTrainBoardingDelay = 0.1f;
+            else
+            {
+                m_undergroundTrainBoardingDelay -= static_cast<float>(dt);
+                if (m_undergroundTrainBoardingDelay <= 0.0f)
+                {
+                    StartTransition(PendingTransition::UndergroundToTrain);
+                    m_undergroundTrainBoardingDelay = -1.0f;
+                }
+            }
         }
+        else
+            m_undergroundTrainBoardingDelay = -1.0f;
     }
+    else
+        m_undergroundTrainBoardingDelay = -1.0f;
 
     bool isPlayerHidingInRoom = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     bool isPlayerHidingInHallway = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
@@ -2020,12 +2036,14 @@ void GameplayState::RespawnAtCheckpoint()
                                { Underground::MIN_X + m_underground->GetMapWidth(),
                                  Underground::MIN_Y + m_underground->GetMapHeight() });
             m_underground->RefillPulseSourcesAfterCheckpointRespawn();
+            m_underground->ResetApproachTrainMotion();
         }
         else
         {
             m_camera.SetBounds({ Underground::MIN_X, Underground::MIN_Y },
                                { Underground::MIN_X + Underground::WIDTH, Underground::MIN_Y + Underground::HEIGHT });
         }
+        m_undergroundTrainBoardingDelay = -1.0f;
         m_camera.SetPosition(player.GetPosition());
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Underground");
         break;
@@ -2358,6 +2376,19 @@ void GameplayState::DrawMainLayer()
         textureShader.setBool("flipX", false);
         // 레일은 Rail.png가 장면 최하단 레이어이므로 하늘 바로 다음·다른 맵·기차 본체보다 먼저 그린다.
         m_train->DrawRailTrack(textureShader, m_camera.GetPosition(), viewHalfW);
+    }
+
+    // Underground 패럴랙스 하늘 (SubwayStation 스프라이트보다 뒤)
+    if (m_undergroundAccessed && m_underground)
+    {
+        colorShader->use();
+        colorShader->setMat4("projection", worldProjection);
+        colorShader->setFloat("uAlpha", 1.0f);
+        m_underground->DrawParallaxBackground(*colorShader, m_camera.GetPosition(), viewHalfW);
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
     }
 
     // 1b) World maps (post-processed: exposure / hallway overlay)

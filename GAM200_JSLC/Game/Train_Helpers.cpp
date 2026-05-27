@@ -44,6 +44,14 @@ void Train::ApplyPulseToTrainRobots(Math::Vec2 pulseWorldCenter, float radius)
 }
 
 // 지정 칸(1~5)의 로컬 X 왼쪽 경계 오프셋을 반환함 (칸 6 이상이면 전체 열차 폭을 반환함)
+float Train::GetCar4LocalLeft() const
+{
+    float x = m_car1Width + m_car2Width + m_car3Width;
+    for (float w : m_car3ExtensionWidths)
+        x += w;
+    return x;
+}
+
 float Train::GetTrainCarLocalLeftEdge(int carIndex1To5) const
 {
     switch (carIndex1To5)
@@ -51,8 +59,8 @@ float Train::GetTrainCarLocalLeftEdge(int carIndex1To5) const
     case 1: return 0.f;
     case 2: return m_car1Width;
     case 3: return m_car1Width + m_car2Width;
-    case 4: return m_car1Width + m_car2Width + m_car3Width;
-    case 5: return m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+    case 4: return GetCar4LocalLeft();
+    case 5: return GetCar4LocalLeft() + m_car4Width;
     case 6: return m_totalTrainWidth;
     default: return m_totalTrainWidth;
     }
@@ -70,7 +78,9 @@ int Train::GetPlayerTrainCarIndex(Math::Vec2 worldHbCenter) const
         return 2;
     if (lx < m_car1Width + m_car2Width + m_car3Width)
         return 3;
-    if (lx < m_car1Width + m_car2Width + m_car3Width + m_car4Width)
+    if (lx < GetCar4LocalLeft())
+        return 3;
+    if (lx < GetCar4LocalLeft() + m_car4Width)
         return 4;
     return 5;
 }
@@ -434,7 +444,7 @@ void Train::TryActivateCar5Encounter(Math::Vec2 hbCenter, Math::Vec2 hbSize)
     {
         // Deck top 외에도 탱크/밸브 위에 올라탄 경우 활성화되도록 Car5 구역 체크를 허용.
         const float tl = MIN_X + m_trainOffset;
-        const float c5 = m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        const float c5 = GetCar4LocalLeft() + m_car4Width;
         const float car5L = tl + c5 - 30.f;
         const float car5R = tl + c5 + m_car5Width + 30.f;
         shouldActivate = (hbCenter.x >= car5L && hbCenter.x <= car5R &&
@@ -452,7 +462,7 @@ void Train::TryActivateCar5Encounter(Math::Vec2 hbCenter, Math::Vec2 hbSize)
     if (!m_robots.empty())
     {
         const float tl      = MIN_X + m_trainOffset;
-        const float c4Right = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        const float c4Right = tl + GetCar4LocalLeft() + m_car4Width;
         const float rail    = Train::MIN_Y + 95.f;
         int railSlot = 0;
         for (size_t i = 0; i < m_robots.size(); ++i)

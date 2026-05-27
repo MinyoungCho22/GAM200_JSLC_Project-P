@@ -323,7 +323,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         auto&          drones = m_droneManager->GetDrones();
         const float    baseY = Train::MIN_Y + 95.f + 82.f;
         const float    tl    = MIN_X + m_trainOffset;
-        const float    c5L   = tl + m_car1Width + m_car2Width + m_car3Width + m_car4Width;
+        const float    c5L   = tl + GetCar4LocalLeft() + m_car4Width;
         const float    c5R   = c5L + m_car5Width;
         const Math::Vec2 pTarget = player.GetHitboxCenter();
         /// 히딩 중: 플레이어 X 추적 대신 칸 안에서 좌우 왕복(레이더 흔들림 + 배회)

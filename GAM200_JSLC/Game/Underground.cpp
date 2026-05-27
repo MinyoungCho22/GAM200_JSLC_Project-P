@@ -9,6 +9,7 @@
 #include "../Engine/DebugRenderer.hpp"
 #include "../Engine/Collision.hpp"
 #include "MapObjectConfig.hpp"
+#include "../OpenGL/GLWrapper.hpp"
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
@@ -20,6 +21,12 @@ namespace
 // Entry tracer max HP = base * 2; must match ReapplyEntryTracerDroneAfterLiveState().
 constexpr float kUndergroundEntryTracerHpBase = 400.0f;
 constexpr float kUndergroundEntryTracerMaxHp = kUndergroundEntryTracerHpBase * 2.0f;
+constexpr float kUndergroundVendingApproxWidth = 296.0f;
+constexpr float kUndergroundTrainRevealRange = 980.0f;
+constexpr float kUndergroundTrainTargetLeftExtra = 140.0f;
+/// 감속도(월드 유닛/s²) — 낮을수록 더 천천히·길게 진입함
+constexpr float kApproachTrainBrakeAccel = 82.0f;
+constexpr float kApproachTrainAssumedImageHeight = 1080.0f;
 }
 
 void Underground::ReapplyEntryTracerDroneAfterLiveState()
@@ -41,10 +48,28 @@ void Underground::Initialize()
     m_background = std::make_unique<Background>();
     m_background->Initialize("Asset/SubwayStation.png");
 
+    // Underground 전용 연출 열차: 자판기 근처 접근 시 FirstTrain이 슬라이드 인.
+    m_approachTrain = std::make_unique<Background>();
+    m_approachTrain->Initialize("Asset/Train/FirstTrain.png");
+
     m_mapWidth  = DEFAULT_WIDTH;
     m_mapHeight = HEIGHT;
     m_size      = { DEFAULT_WIDTH, HEIGHT };
     m_position  = { MIN_X + DEFAULT_WIDTH * 0.5f, MIN_Y + HEIGHT * 0.5f };
+    m_approachTrainCenterY = m_position.y;
+    if (m_approachTrain && m_approachTrain->GetWidth() > 0 && m_approachTrain->GetHeight() > 0)
+    {
+        m_approachTrainWidth  = static_cast<float>(m_approachTrain->GetWidth());
+        m_approachTrainHeight = static_cast<float>(m_approachTrain->GetHeight());
+    }
+    else
+    {
+        m_approachTrainWidth  = 2472.0f;
+        m_approachTrainHeight = HEIGHT;
+    }
+    m_approachTrainBlend = 0.0f;
+    RecalculateApproachTrainAnchors();
+    ResetApproachTrainMotion();
 
     m_droneManager = std::make_unique<DroneManager>();
 
@@ -69,12 +94,33 @@ void Underground::Initialize()
     m_droneManager->SpawnDrone({ 22150.0f, lowDroneY }, "Asset/Drone.png", false).SetBaseSpeed(175.0f);
     m_droneManager->SpawnDrone({ 23580.0f, lowDroneY }, "Asset/Drone.png", false).SetBaseSpeed(210.0f);
 
+    InitParallaxSkyVAO();
     ApplyConfig(MapObjectConfig::Instance().GetData().underground);
+}
+
+void Underground::RecalculateApproachTrainAnchors()
+{
+    const float mapRight = MIN_X + m_mapWidth;
+    m_approachTrainHiddenCenterX = mapRight + m_approachTrainWidth * 0.5f + 120.0f;
+    const float vendingLeft = m_trainBoardingMinWorldX - kUndergroundVendingApproxWidth;
+    const float trainTargetLeft = vendingLeft - kUndergroundTrainTargetLeftExtra;
+    m_approachTrainTargetCenterX = trainTargetLeft + m_approachTrainWidth * 0.5f;
+}
+
+void Underground::ResetApproachTrainMotion()
+{
+    RecalculateApproachTrainAnchors();
+    m_approachTrainCenterX = m_approachTrainHiddenCenterX;
+    m_approachTrainTriggered = false;
+    m_approachTrainDocked = false;
+    m_approachTrainVelX = 0.0f;
+    m_approachTrainBlend = 0.0f;
 }
 
 void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
 {
     m_trainBoardingMinWorldX = MIN_X + cfg.trainBoardingLocalRightX;
+    RecalculateApproachTrainAnchors();
 
     for (auto& source : m_pulseSources) source.Shutdown();
     for (auto& obs : m_obstacles)
@@ -250,6 +296,41 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
 
 void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
 {
+    const float triggerStart = m_trainBoardingMinWorldX - kUndergroundTrainRevealRange;
+    if (!m_approachTrainTriggered && player.GetPosition().x >= triggerStart)
+    {
+        m_approachTrainTriggered = true;
+        const float travelSpan =
+            std::max(m_approachTrainHiddenCenterX - m_approachTrainTargetCenterX, 1.0f);
+        // v₀² = 2·a·d — 정지 지점에서 속도 0이 되도록 초기 속도 설정(관성 진입)
+        m_approachTrainVelX = -std::sqrt(2.0f * kApproachTrainBrakeAccel * travelSpan);
+    }
+
+    if (m_approachTrainTriggered && !m_approachTrainDocked)
+    {
+        const float fdt = static_cast<float>(dt);
+        // 브레이크: 왼쪽(-) 속도를 매 프레임 줄여 감속
+        m_approachTrainVelX += kApproachTrainBrakeAccel * fdt;
+        if (m_approachTrainVelX > 0.0f)
+            m_approachTrainVelX = 0.0f;
+
+        m_approachTrainCenterX += m_approachTrainVelX * fdt;
+
+        const float distLeft = m_approachTrainCenterX - m_approachTrainTargetCenterX;
+        if (distLeft <= 0.0f || (m_approachTrainVelX >= -8.0f && distLeft < 24.0f))
+        {
+            m_approachTrainCenterX = m_approachTrainTargetCenterX;
+            m_approachTrainVelX = 0.0f;
+            m_approachTrainDocked = true;
+            m_approachTrainBlend = 1.0f;
+        }
+    }
+    else if (!m_approachTrainTriggered)
+    {
+        m_approachTrainCenterX = m_approachTrainHiddenCenterX;
+    }
+    m_approachTrainBlend = (m_approachTrainCenterX < m_approachTrainHiddenCenterX - 2.0f) ? 1.0f : 0.0f;
+
     const bool hide =
         IsPlayerHiding(player.GetHitboxCenter(), playerHitboxSize, player.IsCrouching());
     m_droneManager->Update(dt, player, playerHitboxSize, hide, true, 1.f);
@@ -439,9 +520,143 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     }
 }
 
+void Underground::InitParallaxSkyVAO()
+{
+    float vertices[] = {
+        -0.5f,  0.5f,
+         0.5f, -0.5f,
+        -0.5f, -0.5f,
+        -0.5f,  0.5f,
+         0.5f,  0.5f,
+         0.5f, -0.5f
+    };
+    GL::GenVertexArrays(1, &m_parallaxSkyVAO);
+    GL::GenBuffers(1, &m_parallaxSkyVBO);
+    GL::BindVertexArray(m_parallaxSkyVAO);
+    GL::BindBuffer(GL_ARRAY_BUFFER, m_parallaxSkyVBO);
+    GL::BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    GL::VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    GL::EnableVertexAttribArray(0);
+    GL::BindVertexArray(0);
+}
+
+void Underground::DrawFilledQuad(Shader& colorShader, Math::Vec2 center, Math::Vec2 size, float r, float g,
+                                 float b, float a) const
+{
+    if (!m_parallaxSkyVAO)
+        return;
+
+    Math::Matrix model = Math::Matrix::CreateTranslation(center) * Math::Matrix::CreateScale(size);
+    colorShader.setMat4("model", model);
+    colorShader.setVec3("objectColor", r, g, b);
+    colorShader.setFloat("uAlpha", a);
+
+    GL::BindVertexArray(m_parallaxSkyVAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
+}
+
+void Underground::DrawParallaxBackground(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
+{
+    if (!m_parallaxSkyVAO)
+        return;
+
+    viewHalfW = (viewHalfW > 300.0f) ? viewHalfW : 300.0f;
+    const float drawMargin   = 1400.0f;
+    const float visibleLeft  = cameraPos.x - viewHalfW - drawMargin;
+    const float visibleRight = cameraPos.x + viewHalfW + drawMargin;
+
+    const float skyAnchorY = MIN_Y + HEIGHT * 0.5f;
+    const float skyLift    = cameraPos.y - skyAnchorY;
+    const auto  relY       = [&](float t) { return MIN_Y + HEIGHT * t + skyLift; };
+
+    const float spanW   = (visibleRight - visibleLeft) + 1200.0f;
+    const float centerX = MIN_X + m_mapWidth * 0.5f;
+    const float camDx   = cameraPos.x - centerX;
+    const float skyPx   = cameraPos.x;
+    const float farPx   = centerX + camDx * 0.05f;
+    const float midPx   = centerX + camDx * 0.16f;
+    const float nearPx  = centerX + camDx * 0.34f;
+
+    DrawFilledQuad(colorShader, { skyPx, relY(0.90f) }, { spanW, HEIGHT * 0.22f }, 0.13f, 0.05f, 0.19f, 1.0f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.75f) }, { spanW, HEIGHT * 0.22f }, 0.22f, 0.08f, 0.20f, 0.95f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.60f) }, { spanW, HEIGHT * 0.20f }, 0.38f, 0.11f, 0.18f, 0.90f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.47f) }, { spanW, HEIGHT * 0.18f }, 0.58f, 0.17f, 0.14f, 0.88f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.36f) }, { spanW, HEIGHT * 0.16f }, 0.80f, 0.28f, 0.11f, 0.85f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.25f) }, { spanW, HEIGHT * 0.18f }, 0.53f, 0.18f, 0.10f, 0.70f);
+    DrawFilledQuad(colorShader, { skyPx, relY(0.11f) }, { spanW, HEIGHT * 0.22f }, 0.10f, 0.07f, 0.08f, 1.0f);
+
+    const float sunX = centerX + camDx * 0.9f + 320.0f;
+    const float sunY = relY(0.37f);
+    DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.34f, HEIGHT * 0.34f }, 1.00f, 0.48f, 0.18f, 0.28f);
+    DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.18f, HEIGHT * 0.18f }, 1.00f, 0.62f, 0.24f, 0.58f);
+    DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.09f, HEIGHT * 0.09f }, 1.00f, 0.79f, 0.35f, 0.95f);
+
+    const float cloudBase = farPx;
+    const float cloudStep = 620.0f;
+    const int   cloudMinI = static_cast<int>(std::floor((visibleLeft - cloudBase - 700.0f) / cloudStep));
+    const int   cloudMaxI = static_cast<int>(std::ceil((visibleRight - cloudBase + 700.0f) / cloudStep));
+    for (int i = cloudMinI; i <= cloudMaxI; ++i)
+    {
+        const float x  = cloudBase + i * 620.0f;
+        const float y1 = relY(0.78f - 0.02f * static_cast<float>((i + 30) % 4));
+        const float y2 = relY(0.66f - 0.02f * static_cast<float>((i + 11) % 5));
+        const float y3 = relY(0.56f - 0.015f * static_cast<float>((i + 7) % 6));
+
+        DrawFilledQuad(colorShader, { x, y1 }, { 520.0f, 52.0f }, 0.40f, 0.17f, 0.27f, 0.26f);
+        DrawFilledQuad(colorShader, { x + 120.0f, y1 - 24.0f }, { 360.0f, 38.0f }, 0.33f, 0.13f, 0.24f, 0.20f);
+        DrawFilledQuad(colorShader, { x - 80.0f, y2 }, { 430.0f, 42.0f }, 0.52f, 0.21f, 0.20f, 0.18f);
+        DrawFilledQuad(colorShader, { x + 50.0f, y2 - 20.0f }, { 300.0f, 30.0f }, 0.45f, 0.17f, 0.18f, 0.14f);
+        DrawFilledQuad(colorShader, { x + 30.0f, y3 }, { 340.0f, 28.0f }, 0.68f, 0.26f, 0.16f, 0.10f);
+    }
+
+    const float midStep = 360.0f;
+    const int   midMinI = static_cast<int>(std::floor((visibleLeft - midPx - 300.0f) / midStep));
+    const int   midMaxI = static_cast<int>(std::ceil((visibleRight - midPx + 300.0f) / midStep));
+    for (int i = midMinI; i <= midMaxI; ++i)
+    {
+        const float x = midPx + i * 360.0f;
+        const float h = 110.0f + static_cast<float>((i + 60) % 7) * 26.0f;
+        const float w = 130.0f + static_cast<float>((i + 60) % 4) * 22.0f;
+        DrawFilledQuad(colorShader, { x, relY(0.13f) + h * 0.5f }, { w, h }, 0.10f, 0.06f, 0.09f, 0.95f);
+    }
+
+    const float nearStep = 210.0f;
+    const int   nearMinI = static_cast<int>(std::floor((visibleLeft - nearPx - 250.0f) / nearStep));
+    const int   nearMaxI = static_cast<int>(std::ceil((visibleRight - nearPx + 250.0f) / nearStep));
+    for (int i = nearMinI; i <= nearMaxI; ++i)
+    {
+        const float x = nearPx + i * 210.0f;
+        const float h = 86.0f + static_cast<float>((i + 100) % 5) * 20.0f;
+        DrawFilledQuad(colorShader, { x, relY(0.07f) + h * 0.5f }, { 150.0f, h }, 0.07f, 0.05f, 0.06f, 1.0f);
+    }
+
+    const float poleStep = 160.0f;
+    const int   poleMinI = static_cast<int>(std::floor((visibleLeft - nearPx - 120.0f) / poleStep));
+    const int   poleMaxI = static_cast<int>(std::ceil((visibleRight - nearPx + 120.0f) / poleStep));
+    for (int i = poleMinI; i <= poleMaxI; ++i)
+    {
+        const float x = nearPx + i * 160.0f;
+        DrawFilledQuad(colorShader, { x, relY(0.22f) },
+                       { 10.0f, 170.0f + static_cast<float>((i + 80) % 3) * 36.0f },
+                       0.06f, 0.04f, 0.05f, 0.94f);
+    }
+}
+
 void Underground::Draw(Shader& shader) const
 {
+    // 열차를 먼저 그리고, 그 위에 배경을 그려 자판기가 열차보다 위 레이어에 오도록 유지.
+    if (m_approachTrain && m_approachTrain->GetTextureID() != 0 && m_approachTrainBlend > 0.002f)
+    {
+        shader.setFloat("alpha", std::clamp(m_approachTrainBlend * 1.15f, 0.0f, 1.0f));
+        Math::Matrix trainModel = Math::Matrix::CreateTranslation({ m_approachTrainCenterX, m_approachTrainCenterY })
+                                * Math::Matrix::CreateScale({ m_approachTrainWidth, m_approachTrainHeight });
+        shader.setMat4("model", trainModel);
+        m_approachTrain->Draw(shader, trainModel);
+    }
+
     // Draw background
+    shader.setFloat("alpha", 1.0f);
     Math::Matrix model = Math::Matrix::CreateTranslation(m_position) * Math::Matrix::CreateScale(m_size);
     shader.setMat4("model", model);
     m_background->Draw(shader, model);
@@ -475,6 +690,22 @@ void Underground::Draw(Shader& shader) const
     {
         robot.Draw(shader);
     }
+}
+
+bool Underground::IsPlayerOnApproachTrain(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize) const
+{
+    if (!m_approachTrainDocked || m_approachTrainWidth <= 1.0f || m_approachTrainHeight <= 1.0f)
+        return false;
+
+    const float left = m_approachTrainCenterX - m_approachTrainWidth * 0.5f;
+    const float xScale = m_approachTrainWidth / 2640.0f;
+    const float yScale = m_approachTrainHeight / kApproachTrainAssumedImageHeight;
+    const float deckX = left + (84.0f + 2472.0f * 0.5f) * xScale;
+    const float deckY =
+        m_approachTrainCenterY + (kApproachTrainAssumedImageHeight * 0.5f - (804.0f + 45.0f * 0.5f)) * yScale + 8.0f;
+    const Math::Vec2 deckCenter = { deckX, deckY };
+    const Math::Vec2 deckSize = { 2472.0f * xScale, 85.0f * yScale };
+    return Collision::CheckAABB(playerHbCenter, playerHitboxSize, deckCenter, deckSize);
 }
 
 void Underground::DrawDrones(Shader& shader) const
@@ -596,7 +827,19 @@ void Underground::RefillPulseSourcesAfterCheckpointRespawn()
 
 void Underground::Shutdown()
 {
+    if (m_parallaxSkyVAO)
+    {
+        GL::DeleteVertexArrays(1, &m_parallaxSkyVAO);
+        m_parallaxSkyVAO = 0;
+    }
+    if (m_parallaxSkyVBO)
+    {
+        GL::DeleteBuffers(1, &m_parallaxSkyVBO);
+        m_parallaxSkyVBO = 0;
+    }
+
     if (m_background) m_background->Shutdown();
+    if (m_approachTrain) m_approachTrain->Shutdown();
     if (m_droneManager) m_droneManager->Shutdown();
 
     for (auto& obs : m_obstacles)
