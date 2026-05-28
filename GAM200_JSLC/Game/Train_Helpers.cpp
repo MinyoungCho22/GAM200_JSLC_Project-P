@@ -14,6 +14,15 @@
 #include <string>
 #include <vector>
 
+// ThirdTrain~SecondTrain 터널 블렌드(0=석양, 1=터널). Update에서 서서히 보간함.
+float Train::GetEffectiveTunnelBlend(Math::Vec2 /*cameraPos*/) const
+{
+    if (m_car3InsideViewActive || m_car3InsideTransitionActive)
+        return 1.f;
+
+    return std::clamp(m_car3TunnelBlend, 0.f, 1.f);
+}
+
 // Q 펄스 범위 내 열차 로봇 모두에게 방향성 넉백과 고정 데미지를 적용함
 void Train::ApplyPulseToTrainRobots(Math::Vec2 pulseWorldCenter, float radius)
 {
@@ -64,6 +73,16 @@ float Train::GetTrainCarLocalLeftEdge(int carIndex1To5) const
     case 6: return m_totalTrainWidth;
     default: return m_totalTrainWidth;
     }
+}
+
+// 플레이어가 SecondTrain_3(연결칸 3) 구간에 있는지 판별함
+bool Train::IsPlayerInSecondTrain3Car(Math::Vec2 worldHbCenter) const
+{
+    const float lx = worldHbCenter.x - MIN_X - m_trainOffset;
+    const float car3Left = m_car1Width + m_car2Width + m_car3Width + m_car3ExtensionWidths[0]
+                         + m_car3ExtensionWidths[1];
+    const float car3Right = car3Left + m_car3ExtensionWidths[2];
+    return lx >= car3Left && lx < car3Right;
 }
 
 // 플레이어 히트박스 중심 X로 현재 탑승 칸 번호(1~5)를 반환함 (열차 밖이면 0)

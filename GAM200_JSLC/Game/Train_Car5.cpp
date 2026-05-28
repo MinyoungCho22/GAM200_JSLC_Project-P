@@ -1,4 +1,4 @@
-﻿// Train_Car5.cpp - FourthTrain (Car5): valve interaction, water VFX, encounter script
+// Train_Car5.cpp - FourthTrain (Car5): valve interaction, water VFX, encounter script
 
 #include "Train_Internal.hpp"
 #include "DroneManager.hpp"

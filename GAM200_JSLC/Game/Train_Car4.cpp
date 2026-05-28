@@ -1,4 +1,4 @@
-﻿// Train_Car4.cpp - Third_ThirdTrain car transport (6 slots, pulse injection, chain)
+// Train_Car4.cpp - Third_ThirdTrain car transport (6 slots, pulse injection, chain)
 
 #include "Train_Internal.hpp"
 #include "DroneManager.hpp"

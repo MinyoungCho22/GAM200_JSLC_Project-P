@@ -20,7 +20,7 @@ class Player;
 class DebugRenderer;
 struct TrainObjectConfig;
 
-enum class TrainState { Stationary, Starting, Moving };
+enum class TrainState { Stationary, Starting, Moving, Stopping };
 
 /**
  * @class Train
@@ -40,6 +40,7 @@ public:
     // Train constants
     static constexpr float TRAIN_SPEED        = 280.0f; // max speed (world units per second)
     static constexpr float TRAIN_ACCEL        = 90.0f;  // acceleration (world units per second^2)
+    static constexpr float TRAIN_STOP_DECEL   = 38.0f;  // inertial deceleration (units/s^2)
     static constexpr float TRAIN_DEPART_DELAY = 3.0f;   // seconds after map entry before departure
 
     /// Init 직후 드론 크기 기준(120×비율 등)에 곱하는 값 — 전투/추적 드론이 동일한 작은 실루엣을 쓰게
@@ -115,6 +116,11 @@ public:
     // viewHalfW: half of currently visible world width (zoom-aware)
     void DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
 
+    /// ThirdTrain~SecondTrain 터널 전환 진행도(0=석양, 1=터널 완전 적용).
+    float GetCar3TunnelBlend() const { return m_car3TunnelBlend; }
+    /// 카메라·내부칸 상태를 반영한 실제 터널 블렌드(석양/터널 동시 표시 방지용).
+    float GetEffectiveTunnelBlend(Math::Vec2 cameraPos) const;
+
     // 시동된 차량 펄스 라이트(플레이스홀더). 열차 스프라이트 위에 그림.
     void DrawCarTransportVFX(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
     // PulseLine / Start 아이콘 (텍스처). 열차 스프라이트에 이미 펄스가 있는 슬롯은 skipPulseLineOverlay로 스킵.
@@ -139,6 +145,13 @@ public:
                                        Math::Vec2 cameraPos, float viewHalfW) const;
     /// ThirdTrain 사이렌: 근접 + 마우스가 사이렌 위 (좌클릭 펄스 주입 커서)
     bool IsCar3SirenMouseHoverForPulseInject(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
+    /// SecondTrain_1 좌측 인터랙션: 플레이어 근접 + 마우스 오버 시 좌클릭 커서 표시용
+    bool IsCar3ExtensionEnterHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
+    /// SecondInside 사다리: 내부에서 지붕으로, 지붕에서 내부로 이동할 때 커서 판정
+    bool IsCar3InsideLadderHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
+    bool IsCar3InsideOnRoof() const { return m_car3InsideOnRoof; }
+    /// 내부칸 전환 페이드(검은 오버레이) — DrawMainLayer에서 train sprite 위에 그림
+    void DrawCar3InsideFadeOverlay(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
     void Shutdown();
 
     const std::vector<Drone>& GetDrones() const;
@@ -242,6 +255,10 @@ private:
     static constexpr int kCar3ExtensionCount = 3;
     std::array<std::unique_ptr<Background>, kCar3ExtensionCount> m_car3ExtensionTrains{};
     std::array<float, kCar3ExtensionCount> m_car3ExtensionWidths{};
+    std::unique_ptr<Background> m_car3InsideTrainA;
+    std::unique_ptr<Background> m_car3InsideTrainB;
+    std::unique_ptr<Background> m_tunnelCeilTex;
+    std::unique_ptr<Background> m_tunnelFrontTex;
     std::unique_ptr<Background> m_thirdThirdTrain;
     std::unique_ptr<Background> m_fourthTrain;
     std::unique_ptr<Background> m_valveSprite;
@@ -369,6 +386,28 @@ private:
     float               m_car3SirenSpawnTimer    = 0.f;
     float               m_car3SirenWaveAnim      = 0.f;
     bool                m_car3SirenPendingShutdown = false;
+    TrainHitbox         m_car3ExtensionEnterHb{};
+    bool                m_car3ExtensionEnterHbValid = false;
+    bool                m_car3InsideViewActive = false;
+    bool                m_car3InsideTransitionActive = false;
+    float               m_car3InsideTransitionTimer = 0.f;
+    bool                m_car3InsideTransitionTargetInside = false;
+    float               m_car3TunnelBlend = 0.f;
+    TrainHitbox         m_car3InsideFloorHb{};
+    TrainHitbox         m_car3InsideFloor2Hb{};
+    TrainHitbox         m_car3InsideFloor3Hb{};
+    TrainHitbox         m_car3InsideRoofHb{};
+    TrainHitbox         m_car3InsideCeilingHb{};
+    TrainHitbox         m_car3InsideLadderHb{};
+    TrainHitbox         m_car3InsideLadder2Hb{};
+    bool                m_car3InsideLadderHbValid = false;
+    bool                m_car3InsideOnRoof        = false;
+    bool                m_car3ExtensionStopTriggered = false;
+    static constexpr float kCar3InsideBoundLeftPx  = 371.f;
+    static constexpr float kCar3InsideBoundRightPx = 2421.f;
+
+    bool IsPlayerInSecondTrain3Car(Math::Vec2 worldHbCenter) const;
+    void ClimbCar3InsideLadder(Player& player, Math::Vec2 playerHitboxSize);
 
     void ResetCarTransportSlotsToInitialState();
     void UpdateCarTransport(float dt, Player& player, Math::Vec2 playerHbCenter,

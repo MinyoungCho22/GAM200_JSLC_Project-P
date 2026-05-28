@@ -37,6 +37,10 @@ void Train::Initialize()
     m_firstTrain  = std::make_unique<Background>();
     m_secondTrain = std::make_unique<Background>();
     m_thirdTrain       = std::make_unique<Background>();
+    m_car3InsideTrainA = std::make_unique<Background>();
+    m_car3InsideTrainB = std::make_unique<Background>();
+    m_tunnelCeilTex    = std::make_unique<Background>();
+    m_tunnelFrontTex   = std::make_unique<Background>();
     m_thirdThirdTrain  = std::make_unique<Background>();
     m_fourthTrain      = std::make_unique<Background>();
     m_valveSprite      = std::make_unique<Background>();
@@ -44,6 +48,10 @@ void Train::Initialize()
     m_firstTrain ->Initialize("Asset/Train/FirstTrain.png");
     m_secondTrain->Initialize("Asset/Train/SecondTrain.png");
     m_thirdTrain ->Initialize("Asset/Train/ThirdTrain.png");
+    m_car3InsideTrainA->Initialize("Asset/Train/SecondInside_1.png");
+    m_car3InsideTrainB->Initialize("Asset/Train/SecondInside_2.png");
+    m_tunnelCeilTex->Initialize("Asset/Train/Turnel_Upside.png");
+    m_tunnelFrontTex->Initialize("Asset/Train/Turnel_Front.png");
     {
         static const char* kCar3ExtPaths[kCar3ExtensionCount] = {
             "Asset/Train/SecondTrain_1.png",
@@ -132,6 +140,13 @@ void Train::Initialize()
     m_entryTimer      = -1.0f; // not started until StartEntryTimer() is called
     m_departedMsgTimer = 0.0f;
     m_playerOnTrain   = false;
+    m_car3InsideViewActive = false;
+    m_car3InsideTransitionActive = false;
+    m_car3InsideTransitionTimer = 0.f;
+    m_car3InsideTransitionTargetInside = false;
+    m_car3InsideOnRoof                 = false;
+    m_car3ExtensionStopTriggered       = false;
+    m_car3TunnelBlend = 0.f;
 
     // Train departure / running sounds.
     // User requested "TrainStart.mpe" and "TrainSound.mp3". Keep .mpe first, then fallback to .mp3.
@@ -460,6 +475,29 @@ void Train::BuildTrainHitboxes()
         const float w = m_car3ExtensionWidths[static_cast<size_t>(i)];
         const float deckW = std::max(w - 168.0f, 400.0f);
         m_trainHitboxes.push_back(MakeHitbox(cExt, 84, 804, deckW, 45));
+        if (i == 0)
+        {
+            // SecondTrain_1 좌측 인터랙션 박스(디버그 표시 + 마우스 클릭 전환)
+            m_car3ExtensionEnterHb = MakeHitbox(cExt, 420.f, 280.f, 260.f, 460.f, false);
+            m_car3ExtensionEnterHbValid = true;
+
+            // SecondInside_1 — (372,351) 2049×399 내부, 좌우 경계 371 / 2421, 사다리 (1920,309) 150×444
+            const float cIn = cExt;
+            m_car3InsideFloorHb   = MakeHitbox(cIn, 372.f, 705.f, 2049.f, 45.f);
+            m_car3InsideFloor2Hb  = MakeHitbox(cIn, m_car3ExtensionWidths[0] + 372.f, 705.f, 2049.f, 45.f);
+            m_car3InsideFloor3Hb  = MakeHitbox(cIn,
+                m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1] + 372.f, 705.f, 2049.f, 45.f);
+            m_car3InsideCeilingHb = MakeHitbox(cIn, 372.f, 351.f, 2049.f, 32.f);
+            // 지붕: Inside_1~Inside_2 연속 (371 ~ car0폭+2421)
+            const float roofW = m_car3ExtensionWidths[0] + kCar3InsideBoundRightPx - kCar3InsideBoundLeftPx;
+            // 노란 지붕 바를 더 아래로 내려 열차 상단에 선 느낌으로 맞춘다.
+            m_car3InsideRoofHb    = MakeHitbox(cIn, kCar3InsideBoundLeftPx, 180.f, roofW, 48.f);
+            m_car3InsideLadderHb  = MakeHitbox(cIn, 1920.f, 309.f, 150.f, 444.f, false);
+            // SecondInside_2 사다리(지붕에서 내부로 내려오기용).
+            const float inside2LadderX = m_car3ExtensionWidths[0] + 1920.f;
+            m_car3InsideLadder2Hb = MakeHitbox(cIn, inside2LadderX, 309.f, 150.f, 444.f, false);
+            m_car3InsideLadderHbValid = true;
+        }
         cExt += w;
     }
 
@@ -611,6 +649,10 @@ void Train::Shutdown()
     if (m_firstTrain)      m_firstTrain->Shutdown();
     if (m_secondTrain)     m_secondTrain->Shutdown();
     if (m_thirdTrain)      m_thirdTrain->Shutdown();
+    if (m_car3InsideTrainA) m_car3InsideTrainA->Shutdown();
+    if (m_car3InsideTrainB) m_car3InsideTrainB->Shutdown();
+    if (m_tunnelCeilTex)   m_tunnelCeilTex->Shutdown();
+    if (m_tunnelFrontTex)  m_tunnelFrontTex->Shutdown();
     for (auto& ext : m_car3ExtensionTrains)
     {
         if (ext)

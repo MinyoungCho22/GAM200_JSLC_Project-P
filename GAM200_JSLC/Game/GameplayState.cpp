@@ -2312,8 +2312,14 @@ void GameplayState::DrawMainLayer()
     }
     else if (playerPos.y <= Train::MIN_Y + Train::HEIGHT)
     {
-        // Sunset sky base colour (deep dark blue at very top – gradient drawn by DrawBackground)
-        r = 7.0f / 255.0f; g = 5.0f / 255.0f; b = 18.0f / 255.0f;
+        // 석양 ↔ 터널 전환 시 클리어 컬러도 함께 보간함
+        const float tb = (m_trainAccessed && m_train)
+            ? m_train->GetEffectiveTunnelBlend(m_camera.GetPosition()) : 0.f;
+        const float sr = 7.0f / 255.0f, sg = 5.0f / 255.0f, sb = 18.0f / 255.0f;
+        const float tr = 5.0f / 255.0f, tg = 5.0f / 255.0f, tbC = 6.0f / 255.0f;
+        r = sr + (tr - sr) * tb;
+        g = sg + (tg - sg) * tb;
+        b = sb + (tbC - sb) * tb;
     }
     else if (playerPos.y <= Underground::MIN_Y + Underground::HEIGHT)
     {
@@ -2378,8 +2384,8 @@ void GameplayState::DrawMainLayer()
         m_train->DrawRailTrack(textureShader, m_camera.GetPosition(), viewHalfW);
     }
 
-    // Underground 패럴랙스 하늘 (SubwayStation 스프라이트보다 뒤)
-    if (m_undergroundAccessed && m_underground)
+    // Underground 패럴랙스 하늘 (SubwayStation 스프라이트보다 뒤, Train 맵에서는 Train 배경만 사용)
+    if (m_undergroundAccessed && !m_trainAccessed && m_underground)
     {
         colorShader->use();
         colorShader->setMat4("projection", worldProjection);
@@ -2429,6 +2435,7 @@ void GameplayState::DrawMainLayer()
         m_train->DrawCar3SirenWaves(*colorShader, m_camera.GetPosition(), viewHalfW);
         m_train->DrawCarTransportVFX(*colorShader, m_camera.GetPosition(), viewHalfW);
         m_train->DrawValveWaterVFX(*colorShader, worldProjection, m_camera.GetPosition(), viewHalfW);
+        m_train->DrawCar3InsideFadeOverlay(*colorShader, m_camera.GetPosition(), viewHalfW);
         textureShader.use();
         textureShader.setMat4("projection", worldProjection);
         textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
@@ -2974,6 +2981,12 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             if (m_train->IsValveMouseHoverable(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
                 overLeftClickTarget = true;
         }
+        if (!overLeftClickTarget && m_trainAccessed && m_train
+            && m_train->IsCar3ExtensionEnterHovered(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
+            overLeftClickTarget = true;
+        if (!overLeftClickTarget && m_trainAccessed && m_train
+            && m_train->IsCar3InsideLadderHovered(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
+            overLeftClickTarget = true;
 
         showCombatIdleCursor =
             combatHoverOutOfRange && !combatHoverInRange && !overLeftClickTarget && !overRightClickTarget;

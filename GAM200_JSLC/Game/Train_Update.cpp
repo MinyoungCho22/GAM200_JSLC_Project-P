@@ -13,6 +13,10 @@
 #include <cstring>
 #include <string>
 #include <vector>
+namespace
+{
+constexpr float kCar3InsideFadeHalfSec = 0.22f;
+}
 
 // 플레이어가 히딩 스팟 위에서 웅크리고 있으면 true를 반환함 (드론 탐지 차단 조건)
 bool Train::IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize, bool isPlayerCrouching) const
@@ -224,6 +228,18 @@ static bool ResolveAABB(Player& player, Math::Vec2& currentHbCenter,
     return landedOnTop;
 }
 
+static bool ResolveInsideFloorSlab(Player& player, Math::Vec2& currentHbCenter,
+                                   const Math::Vec2& playerHalfSize, const Math::Vec2& floorWorld,
+                                   const Math::Vec2& floorSize, bool crouchHeld)
+{
+    bool onFloor = ResolveAABB(player, currentHbCenter, playerHalfSize, floorWorld, floorSize);
+    if (!onFloor
+        && SnapToTopSupport(player, currentHbCenter, playerHalfSize, floorWorld, floorSize,
+                            Train::TrainHitboxKind::Solid, crouchHeld))
+        onFloor = true;
+    return onFloor;
+}
+
 
 // ---------------------------------------------------------------------------
 // 열차 맵 전체 상태를 매 프레임 갱신함
@@ -293,6 +309,49 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         if (m_valvePressureT > 0.01f)
             m_valveWaterAnimTime += fdt * (0.8f + m_valvePressureT * 2.7f);
     }
+
+    // SecondTrain_1 좌측 클릭 시 내부칸(SecondInside_1/2)으로 페이드 전환.
+    if (attackTriggered && IsCar3ExtensionEnterHovered(player.GetHitboxCenter(), playerHitboxSize, mouseWorldPos))
+    {
+        m_car3InsideTransitionActive = true;
+        m_car3InsideTransitionTimer  = 0.f;
+        m_car3InsideTransitionTargetInside = !m_car3InsideViewActive;
+    }
+    if (attackTriggered && m_car3InsideViewActive && !m_car3InsideTransitionActive
+        && IsCar3InsideLadderHovered(player.GetHitboxCenter(), playerHitboxSize, mouseWorldPos))
+    {
+        ClimbCar3InsideLadder(player, playerHitboxSize);
+    }
+    if (m_car3InsideTransitionActive)
+    {
+        const bool wasFirstHalf = m_car3InsideTransitionTimer < kCar3InsideFadeHalfSec;
+        m_car3InsideTransitionTimer += fdt;
+        if (wasFirstHalf && m_car3InsideTransitionTimer >= kCar3InsideFadeHalfSec)
+        {
+            m_car3InsideViewActive = m_car3InsideTransitionTargetInside;
+            if (!m_car3InsideViewActive)
+                m_car3InsideOnRoof = false;
+        }
+        if (m_car3InsideTransitionTimer >= kCar3InsideFadeHalfSec * 2.f)
+        {
+            m_car3InsideTransitionActive = false;
+            m_car3InsideTransitionTimer = 0.f;
+        }
+    }
+
+    {
+        const float ext1L = MIN_X + m_trainOffset + m_car1Width + m_car2Width + m_car3Width;
+        const float ext3R = ext1L + m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1] + m_car3ExtensionWidths[2];
+        const float px    = player.GetHitboxCenter().x;
+        float targetBlend = (px >= ext1L - 120.f && px <= ext3R + 120.f) ? 1.f : 0.f;
+        if (m_car3InsideViewActive || m_car3InsideTransitionActive)
+            targetBlend = 1.f;
+        const float blendSpeed = std::clamp(fdt * 1.15f, 0.f, 1.f);
+        if (targetBlend >= 1.f)
+            m_car3TunnelBlend = std::min(1.f, m_car3TunnelBlend + blendSpeed);
+        else
+            m_car3TunnelBlend = std::max(0.f, m_car3TunnelBlend - blendSpeed);
+    }
     UpdateValveWaterParticles(fdt);
 
     TryActivateCar5Encounter(player.GetHitboxCenter(), playerHitboxSize);
@@ -304,11 +363,13 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     // --- Drone / Robot: FourthTrain 스크립트 (Car5 발판 진입 전까지 정지) ---
     const bool isPlayerHiding = IsPlayerHiding(player.GetHitboxCenter(), playerHitboxSize, player.IsCrouching());
     const bool inCar2PulseBox = IsPlayerInCar2PurplePulseBox(player.GetHitboxCenter(), playerHitboxSize);
-    const bool trainEnemyUndetect = isPlayerHiding || inCar2PulseBox;
+    const bool suppressExteriorDrones = m_car3InsideViewActive || m_car3InsideTransitionActive;
+    const bool trainEnemyUndetect = isPlayerHiding || inCar2PulseBox || suppressExteriorDrones;
     player.SetHiding(isPlayerHiding);
     player.SetTrainEnemyUndetectable(trainEnemyUndetect);
 
-    UpdateCarTransportDrones(fdt, player, playerHitboxSize, trainEnemyUndetect);
+    if (!suppressExteriorDrones)
+        UpdateCarTransportDrones(fdt, player, playerHitboxSize, trainEnemyUndetect);
 
     UpdateTrainDeckPatrolRobots(fdt, player, player.GetHitboxCenter(), playerHitboxSize);
 
@@ -317,7 +378,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
 
     if (m_car5EncounterActive)
         UpdateTrainEncounterScript(fdt, player);
-    else if (m_droneManager)
+    else if (m_droneManager && !suppressExteriorDrones)
     {
         // 인카운터 전: 1·2·3호차 전투 드론은 Drone::Update만 사용(칸 간 추적·Q 넉백). 4호차 저공 호버, 5호차 성형.
         auto&          drones = m_droneManager->GetDrones();
@@ -389,6 +450,34 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     for (const auto& obs : m_obstacles)
         ResolveAABB(player, currentHbCenter, playerHalfSize, obs.pos, obs.size);
 
+    // 내부칸(SecondInside): 문 진입 후에만 적용 — 좌우 경계 + (지붕 전) 천장 점프 차단.
+    const bool useInsidePhysics = m_car3InsideViewActive && !m_car3InsideTransitionActive;
+    if (useInsidePhysics)
+    {
+        const float trainWorldLeft = MIN_X + m_trainOffset;
+        const float ext1Local      = m_car1Width + m_car2Width + m_car3Width;
+        const float boundLeft      = trainWorldLeft + ext1Local + kCar3InsideBoundLeftPx;
+        const float inside2Right   = ext1Local + m_car3ExtensionWidths[0] + kCar3InsideBoundRightPx;
+        const float inside3Right   = ext1Local + m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1]
+            + std::min(kCar3InsideBoundRightPx, std::max(400.f, m_car3ExtensionWidths[2] - 84.f));
+        // 지붕: Inside_2까지 / 내부 바닥: SecondTrain_3까지 이동 가능.
+        const float boundRight     = trainWorldLeft
+            + (m_car3InsideOnRoof ? inside2Right : inside3Right);
+        currentHbCenter            = player.GetHitboxCenter();
+        const float playerLeft     = currentHbCenter.x - playerHalfSize.x;
+        const float playerRight    = currentHbCenter.x + playerHalfSize.x;
+        float dx                   = 0.f;
+        if (playerLeft < boundLeft)
+            dx = boundLeft - playerLeft;
+        else if (playerRight > boundRight)
+            dx = boundRight - playerRight;
+        if (dx != 0.f)
+        {
+            player.SetPosition({ player.GetPosition().x + dx, player.GetPosition().y });
+            currentHbCenter = player.GetHitboxCenter();
+        }
+    }
+
     // --- Train hitbox collision ---
     const float trainWorldLeft = MIN_X + m_trainOffset;
     bool playerOnTrainSurface = false;
@@ -436,8 +525,9 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
 
     bool skipTrainDeckPhysics = false;
 
-    const bool gapTrigger = PlayerStandsInTrainCarGap(trainWorldLeft, m_totalTrainWidth, currentHbCenter,
-                                                      playerHalfSize, m_trainHitboxes, player);
+    const bool gapTrigger = !useInsidePhysics
+        && PlayerStandsInTrainCarGap(trainWorldLeft, m_totalTrainWidth, currentHbCenter,
+                                     playerHalfSize, m_trainHitboxes, player);
     if (gapTrigger && !m_trainCarGapFalling)
     {
         m_trainCarGapFalling   = true;
@@ -457,6 +547,47 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
 
     if (!skipTrainDeckPhysics)
     {
+        if (useInsidePhysics)
+        {
+            if (m_car3InsideOnRoof)
+            {
+                const Math::Vec2 hbWorld = {
+                    trainWorldLeft + m_car3InsideRoofHb.localCenter.x,
+                    MIN_Y + m_car3InsideRoofHb.localCenter.y
+                };
+                if (ResolveAABB(player, currentHbCenter, playerHalfSize, hbWorld, m_car3InsideRoofHb.size))
+                    playerOnTrainSurface = true;
+                if (!playerOnTrainSurface
+                    && SnapToTopSupport(player, currentHbCenter, playerHalfSize, hbWorld, m_car3InsideRoofHb.size,
+                                        Train::TrainHitboxKind::Solid, crouchHeld))
+                    playerOnTrainSurface = true;
+            }
+            else
+            {
+                const TrainHitbox floorHbs[] = {
+                    m_car3InsideFloorHb, m_car3InsideFloor2Hb, m_car3InsideFloor3Hb
+                };
+                for (const auto& floorHb : floorHbs)
+                {
+                    const Math::Vec2 floorWorld = {
+                        trainWorldLeft + floorHb.localCenter.x,
+                        MIN_Y + floorHb.localCenter.y
+                    };
+                    if (ResolveInsideFloorSlab(player, currentHbCenter, playerHalfSize, floorWorld,
+                                             floorHb.size, crouchHeld))
+                        playerOnTrainSurface = true;
+                }
+
+                // 사다리 올라가기 전: 천장(내부 상단) 점프 통과 차단
+                const Math::Vec2 ceilWorld = {
+                    trainWorldLeft + m_car3InsideCeilingHb.localCenter.x,
+                    MIN_Y + m_car3InsideCeilingHb.localCenter.y
+                };
+                ResolveAABB(player, currentHbCenter, playerHalfSize, ceilWorld, m_car3InsideCeilingHb.size);
+            }
+        }
+        else
+        {
         for (const auto& hb : m_trainHitboxes)
         {
             if (!hb.collision)
@@ -512,9 +643,12 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                 }
             }
         }
+        }
     }
 
     // --- 월드 고정 레일 발판 (rail.png, 열차 이동과 무관) ---
+    if (!useInsidePhysics)
+    {
     for (const auto& hb : m_staticWorldHitboxes)
     {
         if (!hb.collision)
@@ -538,6 +672,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                 break;
             }
         }
+    }
     }
 
     // 갭 낙하 후 레일 착지: 그때 펄스 전부 소모(기차에 치인 연출).
@@ -602,26 +737,62 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     if (m_car5ValveHintTimer > 0.0f)
         m_car5ValveHintTimer -= fdt;
 
+    // SecondTrain_3 도달 시 관성 감속 정지(내부 바닥에서만, 1회).
+    if (useInsidePhysics && !m_car3InsideOnRoof && m_trainState == TrainState::Moving
+        && !m_car3ExtensionStopTriggered
+        && IsPlayerInSecondTrain3Car(player.GetHitboxCenter()))
+    {
+        m_car3ExtensionStopTriggered = true;
+        m_trainState                 = TrainState::Stopping;
+        Logger::Instance().Log(Logger::Severity::Info,
+            "Train: player reached SecondTrain_3 — inertial stop engaged.");
+    }
+
     // --- Train movement ---
+    auto applyTrainCarryToPlayer = [&](float move)
+    {
+        const Math::Vec2 hc = player.GetHitboxCenter();
+        const Math::Vec2 hh = playerHitboxSize * 0.5f;
+        const float      twLeft = MIN_X + m_trainOffset - move;
+        const bool       inCarryBand = HitboxInTrainCarryBand(twLeft, m_totalTrainWidth, hc, hh);
+        if ((m_playerOnTrain || m_airborneFromTrain || m_trainCarGapFalling) && inCarryBand)
+            player.SetPosition(player.GetPosition() + Math::Vec2{ move, 0.0f });
+    };
+
     if (m_trainState == TrainState::Moving)
     {
         m_trainCurrentSpeed = std::min(TRAIN_SPEED, m_trainCurrentSpeed + TRAIN_ACCEL * fdt);
         const float move = m_trainCurrentSpeed * fdt;
         m_trainOffset += move;
 
-        // Running loop volume scales with speed ratio.
-        // Quiet right after departure, louder as acceleration approaches max speed.
         const float speedRatio = (TRAIN_SPEED > 0.0f) ? (m_trainCurrentSpeed / TRAIN_SPEED) : 1.0f;
-        const float runVol = 0.08f + speedRatio * 0.52f; // 0.08 -> 0.60
+        const float runVol     = 0.08f + speedRatio * 0.52f;
         m_trainRunLoopSound.SetVolume(runVol);
 
-        const Math::Vec2 hc = player.GetHitboxCenter();
-        const Math::Vec2 hh = playerHitboxSize * 0.5f;
-        const float twLeft = MIN_X + m_trainOffset - move;
-        const bool inCarryBand = HitboxInTrainCarryBand(twLeft, m_totalTrainWidth, hc, hh);
+        applyTrainCarryToPlayer(move);
+    }
+    else if (m_trainState == TrainState::Stopping)
+    {
+        m_trainCurrentSpeed = std::max(0.f, m_trainCurrentSpeed - TRAIN_STOP_DECEL * fdt);
+        const float move      = m_trainCurrentSpeed * fdt;
+        if (move > 0.f)
+            m_trainOffset += move;
 
-        if ((m_playerOnTrain || m_airborneFromTrain || m_trainCarGapFalling) && inCarryBand)
-            player.SetPosition(player.GetPosition() + Math::Vec2{ move, 0.0f });
+        const float speedRatio = (TRAIN_SPEED > 0.0f) ? (m_trainCurrentSpeed / TRAIN_SPEED) : 0.f;
+        const float runVol     = 0.08f + speedRatio * 0.52f;
+        m_trainRunLoopSound.SetVolume(runVol);
+
+        applyTrainCarryToPlayer(move);
+
+        if (m_trainCurrentSpeed <= 1.0f)
+        {
+            m_trainCurrentSpeed = 0.f;
+            m_trainState        = TrainState::Stationary;
+            m_trainRunLoopSound.SetVolume(0.f);
+            m_trainRunLoopSound.Stop();
+            RequestTrainCameraShake(8.f);
+            Logger::Instance().Log(Logger::Severity::Info, "Train: inertial stop complete.");
+        }
     }
 
     // --- Train combat progression: 클리어 전에는 다음 칸 경계에서 막음, 끝 칸에서는 오른쪽 낙사 방지 ---
@@ -694,6 +865,13 @@ void Train::StartEntryTimer()
         m_car3SirenInjectT    = 0.f;
         m_car3SirenSpawnTimer = 0.f;
         m_car3SirenPendingShutdown = false;
+        m_car3InsideViewActive = false;
+        m_car3InsideTransitionActive = false;
+        m_car3InsideTransitionTimer = 0.f;
+        m_car3InsideTransitionTargetInside = false;
+        m_car3InsideOnRoof = false;
+        m_car3ExtensionStopTriggered = false;
+        m_car3TunnelBlend = 0.f;
         if (m_sirenDroneManager)
             m_sirenDroneManager->ClearAllDrones();
         ResetCarTransportSlotsToInitialState();
@@ -717,7 +895,7 @@ void Train::RestartEntryTimer()
 // ---------------------------------------------------------------------------
 std::string Train::GetDepartureAnnouncementText() const
 {
-    if (m_trainState == TrainState::Moving)
+    if (m_trainState == TrainState::Moving || m_trainState == TrainState::Stopping)
     {
         if (m_departedMsgTimer > 0.0f)
             return "The train is now moving!";

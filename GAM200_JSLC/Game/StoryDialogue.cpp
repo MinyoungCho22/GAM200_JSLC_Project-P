@@ -17,7 +17,8 @@ constexpr float GAME_HEIGHT = 1080.0f;
 constexpr float BOX_WIDTH = 1680.0f;
 constexpr float BOX_HEIGHT = 240.0f;
 constexpr float BOX_BOTTOM_MARGIN = 36.0f;
-constexpr float TEXT_HEIGHT = 40.0f;
+// 대사창 텍스트를 기존 대비 1.3배 크기로 렌더링
+constexpr float TEXT_HEIGHT = 52.0f;
 } // namespace
 
 StoryDialogue::StoryDialogue() = default;

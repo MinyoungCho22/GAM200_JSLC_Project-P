@@ -13,6 +13,10 @@
 #include <cstring>
 #include <string>
 #include <vector>
+namespace
+{
+constexpr float kCar3InsideFadeHalfSec = 0.22f;
+}
 
 // 사이렌 드론 스폰·펄스 주입·추적 로직을 매 프레임 갱신함
 // — 주입 완료 시 사이렌을 비활성화하고, 이후 드론 추적 속도를 배율로 줄임
@@ -82,9 +86,11 @@ void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter,
         }
     }
 
+    const bool suppressExteriorDrones = m_car3InsideViewActive || m_car3InsideTransitionActive;
     const bool hideForSiren =
         IsPlayerHiding(playerHbCenter, playerHitboxSize, player.IsCrouching())
-        || IsPlayerInCar2PurplePulseBox(playerHbCenter, playerHitboxSize);
+        || IsPlayerInCar2PurplePulseBox(playerHbCenter, playerHitboxSize)
+        || suppressExteriorDrones;
     const float chaseMul = m_car3SirenActive ? 1.f : kPostSirenChaseMul;
     const float speedRatio =
         (TRAIN_SPEED > 0.f) ? std::clamp(m_trainCurrentSpeed / TRAIN_SPEED, 0.f, 1.f) : 0.f;
@@ -105,6 +111,92 @@ bool Train::IsCar3SirenMouseHoverForPulseInject(Math::Vec2 playerHbCenter, Math:
     if (!Collision::CheckAABB(playerHbCenter, playerHbSize, sirenW, { 380.f, 300.f }))
         return false;
     return Collision::CheckPointInAABB(mouseWorld, sirenW, m_car3SirenHb.size);
+}
+
+bool Train::IsCar3ExtensionEnterHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const
+{
+    if (!m_car3ExtensionEnterHbValid || m_car3InsideTransitionActive)
+        return false;
+    const float      tl  = MIN_X + m_trainOffset;
+    const Math::Vec2 box = { tl + m_car3ExtensionEnterHb.localCenter.x, MIN_Y + m_car3ExtensionEnterHb.localCenter.y };
+    if (!Collision::CheckAABB(playerHbCenter, playerHbSize, box, { 560.f, 380.f }))
+        return false;
+    const Math::Vec2 cursorHb = { 32.f, 32.f };
+    return Collision::CheckPointInAABB(mouseWorld, box, m_car3ExtensionEnterHb.size)
+           || Collision::CheckAABB(mouseWorld, cursorHb, box, m_car3ExtensionEnterHb.size);
+}
+
+bool Train::IsCar3InsideLadderHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const
+{
+    if (!m_car3InsideLadderHbValid || !m_car3InsideViewActive || m_car3InsideTransitionActive)
+        return false;
+    const float      tl  = MIN_X + m_trainOffset;
+    const Math::Vec2 cursorHb = { 32.f, 32.f };
+
+    auto hoveredLadder = [&](const TrainHitbox& hb, Math::Vec2 nearSize) -> bool
+    {
+        const Math::Vec2 box = { tl + hb.localCenter.x, MIN_Y + hb.localCenter.y };
+        const bool nearEnough = Collision::CheckAABB(playerHbCenter, playerHbSize, box, nearSize);
+        if (!nearEnough)
+            return false;
+        return Collision::CheckPointInAABB(mouseWorld, box, hb.size)
+               || Collision::CheckAABB(mouseWorld, cursorHb, box, hb.size);
+    };
+
+    if (m_car3InsideOnRoof)
+    {
+        // 지붕에서 내려갈 때는 SecondInside_2 사다리만 클릭 허용.
+        return hoveredLadder(m_car3InsideLadder2Hb, { 360.f, 900.f });
+    }
+
+    if (!hoveredLadder(m_car3InsideLadderHb, { 220.f, 320.f }))
+        return false;
+    return true;
+}
+
+void Train::ClimbCar3InsideLadder(Player& player, Math::Vec2 playerHitboxSize)
+{
+    if (!m_car3InsideLadderHbValid)
+        return;
+
+    const float trainWorldLeft = MIN_X + m_trainOffset;
+    const float halfH          = playerHitboxSize.y * 0.5f;
+    const Math::Vec2 oldHb = player.GetHitboxCenter();
+
+    if (!m_car3InsideOnRoof)
+    {
+        const float ladderCx = trainWorldLeft + m_car3InsideLadderHb.localCenter.x;
+        const float roofTop  = MIN_Y + m_car3InsideRoofHb.localCenter.y + m_car3InsideRoofHb.size.y * 0.5f;
+        const Math::Vec2 newHb = { ladderCx, roofTop + halfH };
+        m_car3InsideOnRoof = true;
+        player.SetCurrentGroundLevel(roofTop);
+        player.SetPosition(player.GetPosition() + (newHb - oldHb));
+    }
+    else
+    {
+        const float ladder2Cx = trainWorldLeft + m_car3InsideLadder2Hb.localCenter.x;
+        const float floorTop  = MIN_Y + m_car3InsideFloorHb.localCenter.y + m_car3InsideFloorHb.size.y * 0.5f;
+        // 지붕에서 내려올 때는 항상 SecondInside_2 사다리 앞(해당 X)으로 배치.
+        const Math::Vec2 newHb = { ladder2Cx, floorTop + halfH };
+        m_car3InsideOnRoof = false;
+        player.SetCurrentGroundLevel(floorTop);
+        player.SetPosition(player.GetPosition() + (newHb - oldHb));
+    }
+
+    player.ResetVelocity();
+    player.SetOnGround(true);
+}
+
+void Train::DrawCar3InsideFadeOverlay(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
+{
+    if (!m_skyVAO || !m_car3InsideTransitionActive)
+        return;
+    const float t = std::clamp(m_car3InsideTransitionTimer / kCar3InsideFadeHalfSec, 0.f, 2.f);
+    const float alpha = (t <= 1.f) ? t : (2.f - t);
+    if (alpha <= 0.001f)
+        return;
+    const float halfW = std::max(viewHalfW, 400.f);
+    DrawFilledQuad(colorShader, cameraPos, { halfW * 2.f + 1200.f, HEIGHT + 1800.f }, 0.f, 0.f, 0.f, alpha);
 }
 
 

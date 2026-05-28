@@ -106,6 +106,8 @@ void Train::DrawCircleLine(Shader& colorShader,
 // ---------------------------------------------------------------------------
 void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
 {
+    const float tunnelBlend = GetEffectiveTunnelBlend(cameraPos);
+    const float sunsetMul   = 1.0f - tunnelBlend;
     // Camera-visible interval (with safety margin) for dynamic repetition.
     // This keeps the draw count low while still preventing background seams.
     viewHalfW = (viewHalfW > 300.0f) ? viewHalfW : 300.0f;
@@ -130,77 +132,87 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
     const float midPx  = centerX + camDx * 0.16f;
     const float nearPx = centerX + camDx * 0.34f;
 
-    // Smoother sunset gradient (many soft layers instead of hard 3 bands)
-    DrawFilledQuad(colorShader, { skyPx, relY(0.90f) }, { spanW, HEIGHT * 0.22f }, 0.13f, 0.05f, 0.19f, 1.0f);
-    DrawFilledQuad(colorShader, { skyPx, relY(0.75f) }, { spanW, HEIGHT * 0.22f }, 0.22f, 0.08f, 0.20f, 0.95f);
-    DrawFilledQuad(colorShader, { skyPx, relY(0.60f) }, { spanW, HEIGHT * 0.20f }, 0.38f, 0.11f, 0.18f, 0.90f);
-    DrawFilledQuad(colorShader, { skyPx, relY(0.47f) }, { spanW, HEIGHT * 0.18f }, 0.58f, 0.17f, 0.14f, 0.88f);
-    DrawFilledQuad(colorShader, { skyPx, relY(0.36f) }, { spanW, HEIGHT * 0.16f }, 0.80f, 0.28f, 0.11f, 0.85f);
-    DrawFilledQuad(colorShader, { skyPx, relY(0.25f) }, { spanW, HEIGHT * 0.18f }, 0.53f, 0.18f, 0.10f, 0.70f);
-    DrawFilledQuad(colorShader, { skyPx, relY(0.11f) }, { spanW, HEIGHT * 0.22f }, 0.10f, 0.07f, 0.08f, 1.0f);
-
-    // Sun + glow
-    // Mild parallax for sun only (0.9x): keeps stability while adding depth.
-    const float sunX = centerX + camDx * 0.9f + 320.0f;
-    const float sunY = relY(0.37f);
-    DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.34f, HEIGHT * 0.34f }, 1.00f, 0.48f, 0.18f, 0.28f);
-    DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.18f, HEIGHT * 0.18f }, 1.00f, 0.62f, 0.24f, 0.58f);
-    DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.09f, HEIGHT * 0.09f }, 1.00f, 0.79f, 0.35f, 0.95f);
-
-    // Repeated cloud objects (dense, multi-row, infinite-style coverage)
-    const float cloudBase = farPx;
-    const float cloudStep = 620.0f;
-    const int cloudMinI = static_cast<int>(std::floor((visibleLeft - cloudBase - 700.0f) / cloudStep));
-    const int cloudMaxI = static_cast<int>(std::ceil((visibleRight - cloudBase + 700.0f) / cloudStep));
-    for (int i = cloudMinI; i <= cloudMaxI; ++i)
+    if (sunsetMul > 0.001f)
     {
-        const float x = cloudBase + i * 620.0f;
-        const float y1 = relY(0.78f - 0.02f * static_cast<float>((i + 30) % 4));
-        const float y2 = relY(0.66f - 0.02f * static_cast<float>((i + 11) % 5));
-        const float y3 = relY(0.56f - 0.015f * static_cast<float>((i + 7) % 6));
+        // Smoother sunset gradient (many soft layers instead of hard 3 bands)
+        DrawFilledQuad(colorShader, { skyPx, relY(0.90f) }, { spanW, HEIGHT * 0.22f }, 0.13f, 0.05f, 0.19f, 1.0f * sunsetMul);
+        DrawFilledQuad(colorShader, { skyPx, relY(0.75f) }, { spanW, HEIGHT * 0.22f }, 0.22f, 0.08f, 0.20f, 0.95f * sunsetMul);
+        DrawFilledQuad(colorShader, { skyPx, relY(0.60f) }, { spanW, HEIGHT * 0.20f }, 0.38f, 0.11f, 0.18f, 0.90f * sunsetMul);
+        DrawFilledQuad(colorShader, { skyPx, relY(0.47f) }, { spanW, HEIGHT * 0.18f }, 0.58f, 0.17f, 0.14f, 0.88f * sunsetMul);
+        DrawFilledQuad(colorShader, { skyPx, relY(0.36f) }, { spanW, HEIGHT * 0.16f }, 0.80f, 0.28f, 0.11f, 0.85f * sunsetMul);
+        DrawFilledQuad(colorShader, { skyPx, relY(0.25f) }, { spanW, HEIGHT * 0.18f }, 0.53f, 0.18f, 0.10f, 0.70f * sunsetMul);
+        DrawFilledQuad(colorShader, { skyPx, relY(0.11f) }, { spanW, HEIGHT * 0.22f }, 0.10f, 0.07f, 0.08f, 1.0f * sunsetMul);
 
-        DrawFilledQuad(colorShader, { x,          y1 }, { 520.0f, 52.0f }, 0.40f, 0.17f, 0.27f, 0.26f);
-        DrawFilledQuad(colorShader, { x + 120.0f, y1 - 24.0f }, { 360.0f, 38.0f }, 0.33f, 0.13f, 0.24f, 0.20f);
+        // Sun + glow
+        // Mild parallax for sun only (0.9x): keeps stability while adding depth.
+        const float sunX = centerX + camDx * 0.9f + 320.0f;
+        const float sunY = relY(0.37f);
+        DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.34f, HEIGHT * 0.34f }, 1.00f, 0.48f, 0.18f, 0.28f * sunsetMul);
+        DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.18f, HEIGHT * 0.18f }, 1.00f, 0.62f, 0.24f, 0.58f * sunsetMul);
+        DrawFilledQuad(colorShader, { sunX, sunY }, { HEIGHT * 0.09f, HEIGHT * 0.09f }, 1.00f, 0.79f, 0.35f, 0.95f * sunsetMul);
 
-        DrawFilledQuad(colorShader, { x - 80.0f,  y2 }, { 430.0f, 42.0f }, 0.52f, 0.21f, 0.20f, 0.18f);
-        DrawFilledQuad(colorShader, { x + 50.0f,  y2 - 20.0f }, { 300.0f, 30.0f }, 0.45f, 0.17f, 0.18f, 0.14f);
+        // Repeated cloud objects (dense, multi-row, infinite-style coverage)
+        const float cloudBase = farPx;
+        const float cloudStep = 620.0f;
+        const int cloudMinI = static_cast<int>(std::floor((visibleLeft - cloudBase - 700.0f) / cloudStep));
+        const int cloudMaxI = static_cast<int>(std::ceil((visibleRight - cloudBase + 700.0f) / cloudStep));
+        for (int i = cloudMinI; i <= cloudMaxI; ++i)
+        {
+            const float x = cloudBase + i * 620.0f;
+            const float y1 = relY(0.78f - 0.02f * static_cast<float>((i + 30) % 4));
+            const float y2 = relY(0.66f - 0.02f * static_cast<float>((i + 11) % 5));
+            const float y3 = relY(0.56f - 0.015f * static_cast<float>((i + 7) % 6));
 
-        DrawFilledQuad(colorShader, { x + 30.0f,  y3 }, { 340.0f, 28.0f }, 0.68f, 0.26f, 0.16f, 0.10f);
+            DrawFilledQuad(colorShader, { x,          y1 }, { 520.0f, 52.0f }, 0.40f, 0.17f, 0.27f, 0.26f * sunsetMul);
+            DrawFilledQuad(colorShader, { x + 120.0f, y1 - 24.0f }, { 360.0f, 38.0f }, 0.33f, 0.13f, 0.24f, 0.20f * sunsetMul);
+
+            DrawFilledQuad(colorShader, { x - 80.0f,  y2 }, { 430.0f, 42.0f }, 0.52f, 0.21f, 0.20f, 0.18f * sunsetMul);
+            DrawFilledQuad(colorShader, { x + 50.0f,  y2 - 20.0f }, { 300.0f, 30.0f }, 0.45f, 0.17f, 0.18f, 0.14f * sunsetMul);
+
+            DrawFilledQuad(colorShader, { x + 30.0f,  y3 }, { 340.0f, 28.0f }, 0.68f, 0.26f, 0.16f, 0.10f * sunsetMul);
+        }
+
+        // Mid skyline (dynamic range from current camera visibility)
+        const float midStep = 360.0f;
+        const int midMinI = static_cast<int>(std::floor((visibleLeft - midPx - 300.0f) / midStep));
+        const int midMaxI = static_cast<int>(std::ceil((visibleRight - midPx + 300.0f) / midStep));
+        for (int i = midMinI; i <= midMaxI; ++i)
+        {
+            const float x = midPx + i * 360.0f;
+            const float h = 110.0f + static_cast<float>((i + 60) % 7) * 26.0f;
+            const float w = 130.0f + static_cast<float>((i + 60) % 4) * 22.0f;
+            DrawFilledQuad(colorShader, { x, relY(0.13f) + h * 0.5f }, { w, h }, 0.10f, 0.06f, 0.09f, 0.95f * sunsetMul);
+        }
+
+        // Near dark silhouette strip (foreground city/yard)
+        const float nearStep = 210.0f;
+        const int nearMinI = static_cast<int>(std::floor((visibleLeft - nearPx - 250.0f) / nearStep));
+        const int nearMaxI = static_cast<int>(std::ceil((visibleRight - nearPx + 250.0f) / nearStep));
+        for (int i = nearMinI; i <= nearMaxI; ++i)
+        {
+            const float x = nearPx + i * 210.0f;
+            const float h = 86.0f + static_cast<float>((i + 100) % 5) * 20.0f;
+            DrawFilledQuad(colorShader, { x, relY(0.07f) + h * 0.5f }, { 150.0f, h }, 0.07f, 0.05f, 0.06f, 1.0f * sunsetMul);
+        }
+
+        // Poles / masts
+        const float poleStep = 160.0f;
+        const int poleMinI = static_cast<int>(std::floor((visibleLeft - nearPx - 120.0f) / poleStep));
+        const int poleMaxI = static_cast<int>(std::ceil((visibleRight - nearPx + 120.0f) / poleStep));
+        for (int i = poleMinI; i <= poleMaxI; ++i)
+        {
+            const float x = nearPx + i * 160.0f;
+            DrawFilledQuad(colorShader, { x, relY(0.22f) },
+                           { 10.0f, 170.0f + static_cast<float>((i + 80) % 3) * 36.0f },
+                           0.06f, 0.04f, 0.05f, 0.94f * sunsetMul);
+        }
     }
 
-    // Mid skyline (dynamic range from current camera visibility)
-    const float midStep = 360.0f;
-    const int midMinI = static_cast<int>(std::floor((visibleLeft - midPx - 300.0f) / midStep));
-    const int midMaxI = static_cast<int>(std::ceil((visibleRight - midPx + 300.0f) / midStep));
-    for (int i = midMinI; i <= midMaxI; ++i)
+    if (tunnelBlend > 0.001f)
     {
-        const float x = midPx + i * 360.0f;
-        const float h = 110.0f + static_cast<float>((i + 60) % 7) * 26.0f;
-        const float w = 130.0f + static_cast<float>((i + 60) % 4) * 22.0f;
-        DrawFilledQuad(colorShader, { x, relY(0.13f) + h * 0.5f }, { w, h }, 0.10f, 0.06f, 0.09f, 0.95f);
-    }
-
-    // Near dark silhouette strip (foreground city/yard)
-    const float nearStep = 210.0f;
-    const int nearMinI = static_cast<int>(std::floor((visibleLeft - nearPx - 250.0f) / nearStep));
-    const int nearMaxI = static_cast<int>(std::ceil((visibleRight - nearPx + 250.0f) / nearStep));
-    for (int i = nearMinI; i <= nearMaxI; ++i)
-    {
-        const float x = nearPx + i * 210.0f;
-        const float h = 86.0f + static_cast<float>((i + 100) % 5) * 20.0f;
-        DrawFilledQuad(colorShader, { x, relY(0.07f) + h * 0.5f }, { 150.0f, h }, 0.07f, 0.05f, 0.06f, 1.0f);
-    }
-
-    // Poles / masts
-    const float poleStep = 160.0f;
-    const int poleMinI = static_cast<int>(std::floor((visibleLeft - nearPx - 120.0f) / poleStep));
-    const int poleMaxI = static_cast<int>(std::ceil((visibleRight - nearPx + 120.0f) / poleStep));
-    for (int i = poleMinI; i <= poleMaxI; ++i)
-    {
-        const float x = nearPx + i * 160.0f;
-        DrawFilledQuad(colorShader, { x, relY(0.22f) },
-                       { 10.0f, 170.0f + static_cast<float>((i + 80) % 3) * 36.0f },
-                       0.06f, 0.04f, 0.05f, 0.94f);
+        const float tunnelA = tunnelBlend;
+        DrawFilledQuad(colorShader, { skyPx, relY(0.52f) }, { spanW, HEIGHT * 1.15f }, 0.03f, 0.03f, 0.04f, tunnelA);
+        DrawFilledQuad(colorShader, { skyPx, relY(0.30f) }, { spanW, HEIGHT * 0.70f }, 0.05f, 0.05f, 0.06f, tunnelA);
     }
 }
 
@@ -236,6 +248,55 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
 {
     // ── Train car images (move with trainOffset) ───────────────────────────
     const float trainLeft = MIN_X + m_trainOffset;
+    const float tunnelBlend = GetEffectiveTunnelBlend(cameraPos);
+
+    // 터널 에셋은 열차와 분리된 "배경"이므로 월드 고정으로 먼저 그린다.
+    // 즉, 기차가 이동해도 함께 이동하지 않으며 열차 스프라이트보다 뒤에 유지된다.
+    if (tunnelBlend > 0.001f && m_tunnelCeilTex && m_tunnelCeilTex->GetWidth() > 0)
+    {
+        const float tileW = static_cast<float>(m_tunnelCeilTex->GetWidth());
+        const float tileH = static_cast<float>(m_tunnelCeilTex->GetHeight());
+        const float leftX = cameraPos.x - viewHalfW - 600.f;
+        const float rightX = cameraPos.x + viewHalfW + 600.f;
+        const int startI = static_cast<int>(std::floor((leftX - MIN_X) / std::max(tileW, 1.f))) - 1;
+        const int endI = static_cast<int>(std::ceil((rightX - MIN_X) / std::max(tileW, 1.f))) + 1;
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("tintStrength", 0.0f);
+        shader.setFloat("alpha", tunnelBlend);
+        for (int i = startI; i <= endI; ++i)
+        {
+            const float cx = MIN_X + i * tileW + tileW * 0.5f;
+            Math::Matrix ceilModel =
+                Math::Matrix::CreateTranslation({ cx, MIN_Y + HEIGHT - tileH * 0.5f + 12.f })
+                * Math::Matrix::CreateScale({ tileW, tileH });
+            m_tunnelCeilTex->Draw(shader, ceilModel);
+        }
+    }
+
+    // Turnel_Front: 월드 고정(열차 m_trainOffset 미적용). 원색 alpha=1.0 — tunnelBlend 알파는 회색처럼 보이게 함.
+    if (tunnelBlend > 0.001f && m_tunnelFrontTex && m_tunnelFrontTex->GetWidth() > 0)
+    {
+        const float extStaticLeft = MIN_X + m_car1Width + m_car2Width + m_car3Width;
+        const float pW = static_cast<float>(m_tunnelFrontTex->GetWidth());
+        const float pH = static_cast<float>(m_tunnelFrontTex->GetHeight());
+        shader.setFloat("alpha", 1.0f);
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("tintStrength", 0.0f);
+        const float xA = extStaticLeft + 45.f;
+        const float xB = extStaticLeft + m_car3ExtensionWidths[0] + 20.f;
+        const float xC = extStaticLeft + m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1] + 10.f;
+        const float py = MIN_Y + HEIGHT * 0.5f;
+        Math::Matrix mA = Math::Matrix::CreateTranslation({ xA, py }) * Math::Matrix::CreateScale({ pW, pH });
+        Math::Matrix mB = Math::Matrix::CreateTranslation({ xB, py }) * Math::Matrix::CreateScale({ pW, pH });
+        Math::Matrix mC = Math::Matrix::CreateTranslation({ xC, py }) * Math::Matrix::CreateScale({ pW, pH });
+        m_tunnelFrontTex->Draw(shader, mA);
+        m_tunnelFrontTex->Draw(shader, mB);
+        m_tunnelFrontTex->Draw(shader, mC);
+    }
+
+    shader.setFloat("alpha", 1.0f);
+    shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+    shader.setFloat("tintStrength", 0.0f);
 
     if (m_firstTrain)
     {
@@ -271,14 +332,22 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
         float extLeft = trainLeft + m_car1Width + m_car2Width + m_car3Width;
         for (int i = 0; i < kCar3ExtensionCount; ++i)
         {
-            if (!m_car3ExtensionTrains[static_cast<size_t>(i)])
+            Background* tex = m_car3ExtensionTrains[static_cast<size_t>(i)].get();
+            if (m_car3InsideViewActive)
+            {
+                if (i == 0 && m_car3InsideTrainA && m_car3InsideTrainA->GetWidth() > 0)
+                    tex = m_car3InsideTrainA.get();
+                else if (i == 1 && m_car3InsideTrainB && m_car3InsideTrainB->GetWidth() > 0)
+                    tex = m_car3InsideTrainB.get();
+            }
+            if (!tex)
                 continue;
             const float w = m_car3ExtensionWidths[static_cast<size_t>(i)];
             const float cx = extLeft + w * 0.5f;
             const float cy = MIN_Y + HEIGHT * 0.5f;
             Math::Matrix model =
                 Math::Matrix::CreateTranslation({ cx, cy }) * Math::Matrix::CreateScale({ w, HEIGHT });
-            m_car3ExtensionTrains[static_cast<size_t>(i)]->Draw(shader, model);
+            tex->Draw(shader, model);
             extLeft += w;
         }
     }
@@ -329,6 +398,8 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
 // ---------------------------------------------------------------------------
 void Train::DrawDrones(Shader& shader) const
 {
+    if (m_car3InsideViewActive || m_car3InsideTransitionActive)
+        return;
     if (m_droneManager)
         m_droneManager->Draw(shader);
     if (m_carTransportDroneManager)
@@ -340,6 +411,8 @@ void Train::DrawDrones(Shader& shader) const
 // 전투·사이렌·자동차 운반 드론의 레이더 범위 원을 그림
 void Train::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const
 {
+    if (m_car3InsideViewActive || m_car3InsideTransitionActive)
+        return;
     if (m_droneManager)
         m_droneManager->DrawRadars(colorShader, debugRenderer);
     if (m_carTransportDroneManager)
@@ -403,6 +476,40 @@ void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
         Math::Vec2 worldPos = { trainLeft + hb.localCenter.x, MIN_Y + hb.localCenter.y };
         Math::Vec2 displaySize = { hb.size.x - kDebugShrink, hb.size.y - kDebugShrink };
         debugRenderer.DrawBox(colorShader, worldPos, displaySize, 0.0f, 1.0f, 1.0f);
+    }
+
+    if (m_car3ExtensionEnterHbValid)
+    {
+        const Math::Vec2 worldPos = { trainLeft + m_car3ExtensionEnterHb.localCenter.x, MIN_Y + m_car3ExtensionEnterHb.localCenter.y };
+        debugRenderer.DrawBox(colorShader, worldPos, m_car3ExtensionEnterHb.size, 1.0f, 0.2f, 1.0f);
+    }
+
+    if (m_car3InsideLadderHbValid)
+    {
+        const Math::Vec2 ladderPos = { trainLeft + m_car3InsideLadderHb.localCenter.x, MIN_Y + m_car3InsideLadderHb.localCenter.y };
+        const Math::Vec2 ladder2Pos = { trainLeft + m_car3InsideLadder2Hb.localCenter.x, MIN_Y + m_car3InsideLadder2Hb.localCenter.y };
+        debugRenderer.DrawBox(colorShader, ladderPos, m_car3InsideLadderHb.size, 0.2f, 1.0f, 0.4f);
+        debugRenderer.DrawBox(colorShader, ladder2Pos, m_car3InsideLadder2Hb.size, 0.2f, 0.9f, 0.2f);
+        const Math::Vec2 floorPos = { trainLeft + m_car3InsideFloorHb.localCenter.x, MIN_Y + m_car3InsideFloorHb.localCenter.y };
+        debugRenderer.DrawBox(colorShader, floorPos, m_car3InsideFloorHb.size, 0.3f, 0.8f, 1.0f);
+        const Math::Vec2 floor2Pos = { trainLeft + m_car3InsideFloor2Hb.localCenter.x, MIN_Y + m_car3InsideFloor2Hb.localCenter.y };
+        debugRenderer.DrawBox(colorShader, floor2Pos, m_car3InsideFloor2Hb.size, 0.3f, 0.7f, 1.0f);
+        const Math::Vec2 floor3Pos = { trainLeft + m_car3InsideFloor3Hb.localCenter.x, MIN_Y + m_car3InsideFloor3Hb.localCenter.y };
+        debugRenderer.DrawBox(colorShader, floor3Pos, m_car3InsideFloor3Hb.size, 0.3f, 0.6f, 1.0f);
+        const Math::Vec2 ceilPos = { trainLeft + m_car3InsideCeilingHb.localCenter.x, MIN_Y + m_car3InsideCeilingHb.localCenter.y };
+        debugRenderer.DrawBox(colorShader, ceilPos, m_car3InsideCeilingHb.size, 1.0f, 0.4f, 0.4f);
+        const Math::Vec2 roofPos = { trainLeft + m_car3InsideRoofHb.localCenter.x, MIN_Y + m_car3InsideRoofHb.localCenter.y };
+        debugRenderer.DrawBox(colorShader, roofPos, m_car3InsideRoofHb.size, 1.0f, 0.85f, 0.2f);
+        const float ext1Local = m_car1Width + m_car2Width + m_car3Width;
+        const float boundLeft  = trainLeft + ext1Local + kCar3InsideBoundLeftPx;
+        const float boundRightFloor = trainLeft + ext1Local + kCar3InsideBoundRightPx;
+        const float boundRightRoof  = trainLeft + ext1Local + m_car3ExtensionWidths[0] + kCar3InsideBoundRightPx;
+        const float boundRightFloor3 = trainLeft + ext1Local + m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1]
+            + std::min(kCar3InsideBoundRightPx, std::max(400.f, m_car3ExtensionWidths[2] - 84.f));
+        debugRenderer.DrawBox(colorShader, { boundLeft, MIN_Y + HEIGHT * 0.5f }, { 6.f, HEIGHT }, 1.f, 0.f, 1.f);
+        debugRenderer.DrawBox(colorShader, { boundRightFloor, MIN_Y + HEIGHT * 0.5f }, { 6.f, HEIGHT * 0.55f }, 1.f, 0.f, 1.f);
+        debugRenderer.DrawBox(colorShader, { boundRightFloor3, MIN_Y + HEIGHT * 0.5f }, { 6.f, HEIGHT * 0.55f }, 0.2f, 1.f, 0.8f);
+        debugRenderer.DrawBox(colorShader, { boundRightRoof, MIN_Y + HEIGHT * 0.5f }, { 6.f, HEIGHT * 0.45f }, 0.2f, 1.f, 0.4f);
     }
 
     // Map boundary markers (white)
