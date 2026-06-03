@@ -1,4 +1,4 @@
-﻿// Train_Internal.hpp
+// Train_Internal.hpp
 // Shared static helpers and constants used across Train_*.cpp files.
 // Do NOT include this outside of Train_*.cpp implementations.
 
@@ -18,6 +18,15 @@
 static constexpr float ASSUMED_IMG_HEIGHT = 1080.0f;
 static constexpr float kTrainFlatbedDeckTopLocalY = ASSUMED_IMG_HEIGHT - 804.f;
 static constexpr float kRailWalkSurfaceFractionOfTileH = 0.08f;
+static constexpr float kTunnelInsideBoardDelaySec           = 0.5f;
+// SecondTrain_3 덱 — MakeHitbox와 동일(이미지 좌상단 py=804, ph=45), 원래 높이인 804.f로 복원 -> raised to 700.f per user request -> lowered slightly to 740.f -> lowered further to 780.f
+static constexpr float kTunnelInsideTrainDeckImagePyFromTop = 780.f;
+static constexpr float kTunnelInsideTrainDeckImagePh        = 45.f;
+static constexpr float kTunnelInsideTrainDeckSlabHalfH      = kTunnelInsideTrainDeckImagePh * 0.5f;
+static constexpr float kTunnelInsideTrainDeckCenterLocalY =
+    ASSUMED_IMG_HEIGHT - kTunnelInsideTrainDeckImagePyFromTop - kTunnelInsideTrainDeckSlabHalfH;
+static constexpr float kTunnelInsideTrainDeckTopLocalY =
+    kTunnelInsideTrainDeckCenterLocalY + kTunnelInsideTrainDeckSlabHalfH;
 static constexpr const char* kTrainDroneTexturePath = "Asset/Drone.png";
 
 // Car4 transport constants — used in Train_Car4.cpp, Train_Init.cpp, Train_Draw.cpp

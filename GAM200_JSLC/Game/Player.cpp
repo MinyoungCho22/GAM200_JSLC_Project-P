@@ -542,11 +542,16 @@ Math::Vec2 Player::GetHitboxSize() const
     Math::Vec2 drawPosition{};
     GetCurrentDrawTransform(drawPosition, drawSize);
 
+    Math::Vec2 hbSize;
     if (is_crouching)
     {
-        return { drawSize.x * 0.75f, drawSize.y * 0.9f };
+        hbSize = { drawSize.x * 0.75f, drawSize.y * 0.9f };
     }
-    return { drawSize.x * 0.7f, drawSize.y * 0.92f };
+    else
+    {
+        hbSize = { drawSize.x * 0.7f, drawSize.y * 0.92f };
+    }
+    return hbSize * m_sizeScale;
 }
 
 Math::Vec2 Player::GetHitboxCenter() const
@@ -555,11 +560,19 @@ Math::Vec2 Player::GetHitboxCenter() const
     Math::Vec2 drawPosition{};
     GetCurrentDrawTransform(drawPosition, drawSize);
 
+    Math::Vec2 currentSize = drawSize * m_sizeScale;
+    Math::Vec2 currentPosition = drawPosition;
+    if (m_sizeScale != 1.0f)
+    {
+        float oldHeight = drawSize.y;
+        currentPosition.y -= (oldHeight - currentSize.y) * 0.5f;
+    }
+
     Math::Vec2 currentHitboxSize = GetHitboxSize();
-    float spriteFootY = drawPosition.y - (drawSize.y / 2.0f);
+    float spriteFootY = currentPosition.y - (currentSize.y / 2.0f);
     float hitboxCenterY = spriteFootY + (currentHitboxSize.y / 2.0f);
 
-    return { drawPosition.x, hitboxCenterY };
+    return { currentPosition.x, hitboxCenterY };
 }
 
 void Player::GetCurrentDrawTransform(Math::Vec2& drawPosition, Math::Vec2& drawSize) const

@@ -1,4 +1,4 @@
-﻿// Train_Init.cpp
+// Train_Init.cpp
 
 #include "Train_Internal.hpp"
 #include "DroneManager.hpp"
@@ -39,8 +39,12 @@ void Train::Initialize()
     m_thirdTrain       = std::make_unique<Background>();
     m_car3InsideTrainA = std::make_unique<Background>();
     m_car3InsideTrainB = std::make_unique<Background>();
-    m_tunnelCeilTex    = std::make_unique<Background>();
-    m_tunnelFrontTex   = std::make_unique<Background>();
+    m_tunnelCeilTex      = std::make_unique<Background>();
+    m_tunnelFrontTex     = std::make_unique<Background>();
+    m_tunnelBackTex      = std::make_unique<Background>();
+    m_tunnelInsideTrain  = std::make_unique<Background>();
+    m_tunnelObjectTex    = std::make_unique<Background>();
+    m_secondTrainFrontTex = std::make_unique<Background>();
     m_thirdThirdTrain  = std::make_unique<Background>();
     m_fourthTrain      = std::make_unique<Background>();
     m_valveSprite      = std::make_unique<Background>();
@@ -52,6 +56,13 @@ void Train::Initialize()
     m_car3InsideTrainB->Initialize("Asset/Train/SecondInside_2.png");
     m_tunnelCeilTex->Initialize("Asset/Train/Turnel_Upside.png");
     m_tunnelFrontTex->Initialize("Asset/Train/Turnel_Front.png");
+    m_tunnelBackTex->Initialize("Asset/Train/Turnel_Back.png");
+    m_tunnelInsideTrain->Initialize("Asset/Train/Turnel_Inside.png");
+    m_tunnelObjectTex->Initialize("Asset/Train/Object.png");
+    m_secondTrainFrontTex->Initialize("Asset/Train/Second_Front.png");
+    if (m_tunnelInsideTrain->GetWidth() > 0)
+        m_tunnelInsideWorldWidth = static_cast<float>(m_tunnelInsideTrain->GetWidth());
+    m_tunnelInsideWorldLeft = MIN_X;
     {
         static const char* kCar3ExtPaths[kCar3ExtensionCount] = {
             "Asset/Train/SecondTrain_1.png",
@@ -127,6 +138,7 @@ void Train::Initialize()
 
     // --- Build train hitboxes from known pixel coordinates ---
     BuildTrainHitboxes();
+    InitTunnelInsideProps();
     ResetCarTransportSlotsToInitialState();
 
     // --- Sky gradient VAO ---
@@ -146,7 +158,20 @@ void Train::Initialize()
     m_car3InsideTransitionTargetInside = false;
     m_car3InsideOnRoof                 = false;
     m_car3ExtensionStopTriggered       = false;
-    m_car3TunnelBlend = 0.f;
+    m_trainDepartedOnce                = false;
+    m_car3TunnelInsideViewActive       = false;
+    m_car3TunnelInsideTransitionActive = false;
+    m_car3TunnelInsideTransitionTimer  = 0.f;
+    m_car3TunnelInsideTransitionTargetInside = false;
+    m_car3TunnelBlend                  = 0.f;
+    m_tunnelInsideInjectT              = 0.f;
+    m_tunnelInsideInjectComplete       = false;
+    m_tunnelInsideDepartStarted        = false;
+    m_tunnelInsideTrainVisualX         = 0.f;
+    m_tunnelInsideDepartTrainOffset0   = 0.f;
+    m_tunnelInsideBoardTimer           = -1.f;
+    m_playerOnTunnelBoardingFloor        = false;
+    m_playerOnTunnelDepartWalkFloor      = false;
 
     // Train departure / running sounds.
     // User requested "TrainStart.mpe" and "TrainSound.mp3". Keep .mpe first, then fallback to .mp3.
@@ -498,6 +523,13 @@ void Train::BuildTrainHitboxes()
             m_car3InsideLadder2Hb = MakeHitbox(cIn, inside2LadderX, 309.f, 150.f, 444.f, false);
             m_car3InsideLadderHbValid = true;
         }
+        if (i == 2)
+        {
+            // SecondTrain_3 우측 터널 문(정지 후 좌클릭 → Turnel_Inside 전환)
+            const float doorX = std::max(84.f, w - 680.f);
+            m_car3TunnelEnterHb      = MakeHitbox(cExt, doorX, 280.f, 260.f, 460.f, false);
+            m_car3TunnelEnterHbValid = true;
+        }
         cExt += w;
     }
 
@@ -652,7 +684,10 @@ void Train::Shutdown()
     if (m_car3InsideTrainA) m_car3InsideTrainA->Shutdown();
     if (m_car3InsideTrainB) m_car3InsideTrainB->Shutdown();
     if (m_tunnelCeilTex)   m_tunnelCeilTex->Shutdown();
-    if (m_tunnelFrontTex)  m_tunnelFrontTex->Shutdown();
+    if (m_tunnelFrontTex)    m_tunnelFrontTex->Shutdown();
+    if (m_tunnelInsideTrain) m_tunnelInsideTrain->Shutdown();
+    if (m_tunnelObjectTex)   m_tunnelObjectTex->Shutdown();
+    if (m_secondTrainFrontTex) m_secondTrainFrontTex->Shutdown();
     for (auto& ext : m_car3ExtensionTrains)
     {
         if (ext)

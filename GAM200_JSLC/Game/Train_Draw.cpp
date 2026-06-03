@@ -1,4 +1,4 @@
-﻿// Train_Draw.cpp - All Draw* functions
+// Train_Draw.cpp - All Draw* functions
 
 #include "Train_Internal.hpp"
 #include "DroneManager.hpp"
@@ -106,6 +106,14 @@ void Train::DrawCircleLine(Shader& colorShader,
 // ---------------------------------------------------------------------------
 void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
 {
+    if (m_car3TunnelInsideViewActive)
+    {
+        viewHalfW = (viewHalfW > 300.0f) ? viewHalfW : 300.0f;
+        const float spanW = m_tunnelInsideWorldWidth + 1200.f;
+        DrawFilledQuad(colorShader, cameraPos, { spanW, HEIGHT + 1800.f }, 0.04f, 0.04f, 0.05f, 1.0f);
+        return;
+    }
+
     const float tunnelBlend = GetEffectiveTunnelBlend(cameraPos);
     const float sunsetMul   = 1.0f - tunnelBlend;
     // Camera-visible interval (with safety margin) for dynamic repetition.
@@ -221,6 +229,8 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
 // ---------------------------------------------------------------------------
 void Train::DrawRailTrack(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
 {
+    if (m_car3TunnelInsideViewActive || m_car3TunnelInsideTransitionActive)
+        return;
     if (!m_railTile || m_railTileW <= 0.0f)
         return;
 
@@ -246,6 +256,13 @@ void Train::DrawRailTrack(Shader& shader, Math::Vec2 cameraPos, float viewHalfW)
 // 열차 칸 스프라이트(Car1~5), 밸브, 로봇을 카메라 시야 내에서 그림
 void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
 {
+    // 열차만 MainLayer — Turnel_Inside·오브젝트·플레이어는 ForegroundLayer
+    if (m_car3TunnelInsideViewActive)
+    {
+        DrawTunnelInsideTrainForeground(shader);
+        return;
+    }
+
     // ── Train car images (move with trainOffset) ───────────────────────────
     const float trainLeft = MIN_X + m_trainOffset;
     const float tunnelBlend = GetEffectiveTunnelBlend(cameraPos);
@@ -292,6 +309,27 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
         m_tunnelFrontTex->Draw(shader, mA);
         m_tunnelFrontTex->Draw(shader, mB);
         m_tunnelFrontTex->Draw(shader, mC);
+    }
+
+    // Turnel_Back: 월드 고정, 각 터널 세그먼트의 출구 아치를 그린다.
+    if (tunnelBlend > 0.001f && m_tunnelBackTex && m_tunnelBackTex->GetWidth() > 0)
+    {
+        const float extStaticLeft = MIN_X + m_car1Width + m_car2Width + m_car3Width;
+        const float pW = static_cast<float>(m_tunnelBackTex->GetWidth());
+        const float pH = static_cast<float>(m_tunnelBackTex->GetHeight());
+        shader.setFloat("alpha", 1.0f);
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("tintStrength", 0.0f);
+        const float xA = extStaticLeft + m_car3ExtensionWidths[0] - 45.f;
+        const float xB = extStaticLeft + m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1] - 20.f;
+        const float xC = extStaticLeft + m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1] + m_car3ExtensionWidths[2] - 10.f;
+        const float py = MIN_Y + HEIGHT * 0.5f;
+        Math::Matrix mA = Math::Matrix::CreateTranslation({ xA, py }) * Math::Matrix::CreateScale({ pW, pH });
+        Math::Matrix mB = Math::Matrix::CreateTranslation({ xB, py }) * Math::Matrix::CreateScale({ pW, pH });
+        Math::Matrix mC = Math::Matrix::CreateTranslation({ xC, py }) * Math::Matrix::CreateScale({ pW, pH });
+        m_tunnelBackTex->Draw(shader, mA);
+        m_tunnelBackTex->Draw(shader, mB);
+        m_tunnelBackTex->Draw(shader, mC);
     }
 
     shader.setFloat("alpha", 1.0f);
@@ -398,7 +436,8 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
 // ---------------------------------------------------------------------------
 void Train::DrawDrones(Shader& shader) const
 {
-    if (m_car3InsideViewActive || m_car3InsideTransitionActive)
+    if (m_car3InsideViewActive || m_car3InsideTransitionActive || m_car3TunnelInsideViewActive
+        || m_car3TunnelInsideTransitionActive)
         return;
     if (m_droneManager)
         m_droneManager->Draw(shader);
@@ -411,7 +450,7 @@ void Train::DrawDrones(Shader& shader) const
 // 전투·사이렌·자동차 운반 드론의 레이더 범위 원을 그림
 void Train::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const
 {
-    if (m_car3InsideViewActive || m_car3InsideTransitionActive)
+    if (m_car3InsideViewActive || m_car3InsideTransitionActive || ShouldHideTrainExteriorHazards())
         return;
     if (m_droneManager)
         m_droneManager->DrawRadars(colorShader, debugRenderer);
@@ -483,6 +522,11 @@ void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
         const Math::Vec2 worldPos = { trainLeft + m_car3ExtensionEnterHb.localCenter.x, MIN_Y + m_car3ExtensionEnterHb.localCenter.y };
         debugRenderer.DrawBox(colorShader, worldPos, m_car3ExtensionEnterHb.size, 1.0f, 0.2f, 1.0f);
     }
+    if (m_car3TunnelEnterHbValid)
+    {
+        const Math::Vec2 worldPos = { trainLeft + m_car3TunnelEnterHb.localCenter.x, MIN_Y + m_car3TunnelEnterHb.localCenter.y };
+        debugRenderer.DrawBox(colorShader, worldPos, m_car3TunnelEnterHb.size, 0.9f, 0.55f, 0.15f);
+    }
 
     if (m_car3InsideLadderHbValid)
     {
@@ -510,6 +554,35 @@ void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
         debugRenderer.DrawBox(colorShader, { boundRightFloor, MIN_Y + HEIGHT * 0.5f }, { 6.f, HEIGHT * 0.55f }, 1.f, 0.f, 1.f);
         debugRenderer.DrawBox(colorShader, { boundRightFloor3, MIN_Y + HEIGHT * 0.5f }, { 6.f, HEIGHT * 0.55f }, 0.2f, 1.f, 0.8f);
         debugRenderer.DrawBox(colorShader, { boundRightRoof, MIN_Y + HEIGHT * 0.5f }, { 6.f, HEIGHT * 0.45f }, 0.2f, 1.f, 0.4f);
+    }
+
+    if (m_car3TunnelInsideViewActive)
+    {
+        for (const auto& prop : m_tunnelInsideProps)
+        {
+            const Math::Vec2 worldPos = { m_tunnelInsideWorldLeft + prop.localCenter.x,
+                                          MIN_Y + prop.localCenter.y };
+            const float r = prop.pushable ? 1.0f : 0.55f;
+            const float g = prop.pushable ? 0.85f : 0.35f;
+            const float b = prop.pushable ? 0.2f : 0.95f;
+            debugRenderer.DrawBox(colorShader, worldPos, prop.size, r, g, b);
+        }
+
+        // Always draw boarding floor debug box in TunnelInside view
+        {
+            Math::Vec2 boardC{};
+            Math::Vec2 boardS{};
+            GetTunnelInsideBoardingFloor(boardC, boardS);
+            debugRenderer.DrawBox(colorShader, boardC, boardS, 1.0f, 0.92f, 0.15f);
+        }
+
+        if (m_tunnelInsideDepartStarted)
+        {
+            Math::Vec2 walkC{};
+            Math::Vec2 walkS{};
+            GetTunnelInsideDepartWalkFloor(walkC, walkS);
+            debugRenderer.DrawBox(colorShader, walkC, walkS, 0.25f, 0.85f, 1.0f);
+        }
     }
 
     // Map boundary markers (white)

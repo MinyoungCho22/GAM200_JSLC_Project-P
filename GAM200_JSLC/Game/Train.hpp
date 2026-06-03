@@ -147,9 +147,28 @@ public:
     bool IsCar3SirenMouseHoverForPulseInject(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
     /// SecondTrain_1 좌측 인터랙션: 플레이어 근접 + 마우스 오버 시 좌클릭 커서 표시용
     bool IsCar3ExtensionEnterHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
+    /// SecondTrain_3 우측 터널 문: 정지 후 근접 + 마우스 오버 시 좌클릭 커서 표시용
+    bool IsCar3TunnelEnterHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
     /// SecondInside 사다리: 내부에서 지붕으로, 지붕에서 내부로 이동할 때 커서 판정
     bool IsCar3InsideLadderHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
     bool IsCar3InsideOnRoof() const { return m_car3InsideOnRoof; }
+    bool IsCar3TunnelInsideViewActive() const { return m_car3TunnelInsideViewActive; }
+    bool IsCar3TunnelInsideTransitionActive() const { return m_car3TunnelInsideTransitionActive; }
+    /// 터널 진입 페이드부터 인사이드 종료 전까지(사이렌 파동·레이더 등 외부 연출 차단)
+    bool ShouldHideTrainExteriorHazards() const;
+    float GetTunnelInsideWorldWidth() const { return m_tunnelInsideWorldWidth; }
+    float GetTunnelInsideWorldLeft() const { return m_tunnelInsideWorldLeft; }
+    float GetTunnelInsideTrainVisualX() const { return m_tunnelInsideTrainVisualX; }
+    float GetTunnelInsideCar3WorldWidth() const;
+    float GetTunnelInsideExteriorDeckSurfaceY() const;
+    bool ConsumeTunnelInsideCameraSnap();
+    /// Turnel_Inside 우측 오브젝트: 좌클릭 펄스 주입 커서
+    bool IsTunnelInsideInjectHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize,
+                                     Math::Vec2 mouseWorld) const;
+    void DrawTunnelInsideInjectGauge(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
+    /// Turnel_Inside.png — 열차 위·플레이어 아래 (ForegroundLayer에서 호출)
+    void DrawTunnelInsideBackground(Shader& shader) const;
+    void DrawTunnelInsideProps(Shader& shader) const;
     /// 내부칸 전환 페이드(검은 오버레이) — DrawMainLayer에서 train sprite 위에 그림
     void DrawCar3InsideFadeOverlay(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
     void Shutdown();
@@ -212,6 +231,8 @@ public:
                                            Math::Vec2 pulseWorldCenter, float pulseRadius) const;
     /// Q 스킬: FourthTrain 전투 로봇에게 반경 내 넉백 + 데미지
     void ApplyPulseToTrainRobots(Math::Vec2 pulseWorldCenter, float radius);
+    /// Q 펄스: Turnel_Inside 푸시 오브젝트(Object.png)를 오른쪽으로 넉백
+    void ApplyPulseToTunnelInsideProps(Math::Vec2 pulseWorldCenter, float radius);
     bool IsValveMouseHoverable(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorldPos) const;
     /// 커서용: 솔리드/파이프 열차 히트박스·정적 궤도 박스 위(상호작용 여부 무관)
     bool IsPointOverWorldCollisionAABB(Math::Vec2 worldPos, Math::Vec2 cursorHitboxSize) const;
@@ -228,6 +249,7 @@ public:
     std::string GetCar5ValveHintBannerText() const;
 
     void SetTrainCarCheatUnlock(bool v) { m_trainCheatCarUnlock = v; }
+    void CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize);
 
     void RequestTrainCameraShake(float maxPixelOffset);
     float ConsumeTrainCameraShakeRequest();
@@ -245,7 +267,7 @@ public:
     float GetCar4LocalLeft() const;
 
     // Right boundary that expands as train moves (for camera bounds)
-    float GetEffectiveRightBound() const { return MIN_X + m_totalTrainWidth + m_trainOffset + 960.0f; }
+    float GetEffectiveRightBound() const;
 
 private:
     // Train car textures
@@ -259,6 +281,9 @@ private:
     std::unique_ptr<Background> m_car3InsideTrainB;
     std::unique_ptr<Background> m_tunnelCeilTex;
     std::unique_ptr<Background> m_tunnelFrontTex;
+    std::unique_ptr<Background> m_tunnelBackTex;
+    std::unique_ptr<Background> m_tunnelInsideTrain;
+    std::unique_ptr<Background> m_tunnelObjectTex;
     std::unique_ptr<Background> m_thirdThirdTrain;
     std::unique_ptr<Background> m_fourthTrain;
     std::unique_ptr<Background> m_valveSprite;
@@ -286,6 +311,7 @@ private:
     TrainState m_trainState   = TrainState::Stationary;
     float      m_trainOffset  = 0.0f;
     float      m_trainCurrentSpeed = 0.0f;
+    bool       m_trainDepartedOnce = false;
     bool       m_playerOnTrain = false;
     Sound      m_trainStartSound;
     Sound      m_trainRunLoopSound;
@@ -392,7 +418,50 @@ private:
     bool                m_car3InsideTransitionActive = false;
     float               m_car3InsideTransitionTimer = 0.f;
     bool                m_car3InsideTransitionTargetInside = false;
+    TrainHitbox         m_car3TunnelEnterHb{};
+    bool                m_car3TunnelEnterHbValid = false;
+    bool                m_car3TunnelInsideViewActive = false;
+    bool                m_car3TunnelInsideTransitionActive = false;
+    float               m_car3TunnelInsideTransitionTimer = 0.f;
+    bool                m_car3TunnelInsideTransitionTargetInside = false;
+    float               m_tunnelInsideWorldLeft   = MIN_X;
+    float               m_tunnelInsideWorldWidth  = 2640.f;
+    bool                m_tunnelInsideCameraSnapPending = false;
     float               m_car3TunnelBlend = 0.f;
+
+    struct TunnelInsideProp
+    {
+        Math::Vec2 localCenter{};
+        Math::Vec2 size{};
+        Math::Vec2 velocity{};
+        bool       useObjectSprite = false;
+        bool       pushable        = false;
+        bool       injectable      = false;
+    };
+    std::vector<TunnelInsideProp> m_tunnelInsideProps;
+    float               m_tunnelInsideInjectT          = 0.f;
+    bool                m_tunnelInsideInjectComplete   = false;
+    bool                m_tunnelInsideDepartStarted    = false;
+    float               m_tunnelInsideTrainVisualX     = 0.f;
+    float               m_tunnelInsideDepartTrainOffset0 = 0.f;
+    float               m_tunnelInsideBoardTimer       = -1.f;
+    bool                m_playerOnTunnelBoardingFloor    = false;
+    bool                m_playerOnTunnelDepartWalkFloor    = false;
+    std::unique_ptr<Background> m_secondTrainFrontTex;
+
+    void InitTunnelInsideProps();
+    void UpdateTunnelInsideProps(float dt, Player& player, Math::Vec2 playerHitboxSize);
+    void UpdateTunnelInsideInject(float dt, Player& player, Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize,
+                                  Math::Vec2 mouseWorldPos, bool attackHeld, bool injectGodMode);
+    bool IsPlayerOnTunnelInsideBoardingSlice(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize,
+                                             bool onGround) const;
+    void GetTunnelInsideBoardingFloor(Math::Vec2& outCenter, Math::Vec2& outSize) const;
+    void GetTunnelInsideDepartWalkFloor(Math::Vec2& outCenter, Math::Vec2& outSize) const;
+    float GetTunnelInsideDeckSurfaceY() const;
+    void SnapPlayerToSecondTrain3Return(Player& player, Math::Vec2 playerHitboxSize);
+    Math::Vec2 GetTunnelInsideInjectPropWorldCenter() const;
+    void DrawTunnelInsideTrainForeground(Shader& shader) const;
+    void DrawTunnelInsideComposite(Shader& shader) const;
     TrainHitbox         m_car3InsideFloorHb{};
     TrainHitbox         m_car3InsideFloor2Hb{};
     TrainHitbox         m_car3InsideFloor3Hb{};
@@ -407,6 +476,8 @@ private:
     static constexpr float kCar3InsideBoundRightPx = 2421.f;
 
     bool IsPlayerInSecondTrain3Car(Math::Vec2 worldHbCenter) const;
+    float GetRailWalkSurfaceWorldY() const;
+    void SnapPlayerToTunnelInsideRail(Player& player, Math::Vec2 playerHitboxSize);
     void ClimbCar3InsideLadder(Player& player, Math::Vec2 playerHitboxSize);
 
     void ResetCarTransportSlotsToInitialState();

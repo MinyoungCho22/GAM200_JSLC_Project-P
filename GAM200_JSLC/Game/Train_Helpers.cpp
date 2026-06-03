@@ -1,4 +1,4 @@
-﻿// Train_Helpers.cpp - Query helpers, robot AI, clamp utilities, motion helpers
+// Train_Helpers.cpp - Query helpers, robot AI, clamp utilities, motion helpers
 
 #include "Train_Internal.hpp"
 #include "DroneManager.hpp"
@@ -17,10 +17,53 @@
 // ThirdTrain~SecondTrain 터널 블렌드(0=석양, 1=터널). Update에서 서서히 보간함.
 float Train::GetEffectiveTunnelBlend(Math::Vec2 /*cameraPos*/) const
 {
+    if (m_car3TunnelInsideViewActive || m_car3TunnelInsideTransitionActive)
+        return 1.f;
     if (m_car3InsideViewActive || m_car3InsideTransitionActive)
         return 1.f;
 
     return std::clamp(m_car3TunnelBlend, 0.f, 1.f);
+}
+
+float Train::GetEffectiveRightBound() const
+{
+    if (m_car3TunnelInsideViewActive)
+        return m_tunnelInsideWorldLeft + m_tunnelInsideWorldWidth + 960.f;
+    return MIN_X + m_totalTrainWidth + m_trainOffset + 960.f;
+}
+
+float Train::GetRailWalkSurfaceWorldY() const
+{
+    if (!m_staticWorldHitboxes.empty())
+    {
+        const TrainHitbox& rail = m_staticWorldHitboxes[0];
+        return MIN_Y + rail.localCenter.y + rail.size.y * 0.5f;
+    }
+    const float tileH = std::max(m_railTileH, 1.0f);
+    const float walkY = tileH * kRailWalkSurfaceFractionOfTileH;
+    return MIN_Y + walkY;
+}
+
+void Train::SnapPlayerToTunnelInsideRail(Player& player, Math::Vec2 playerHitboxSize)
+{
+    m_car3InsideOnRoof = false;
+    const float      railTop = GetRailWalkSurfaceWorldY();
+    const float      halfH   = playerHitboxSize.y * 0.5f;
+    const float      entryX  = m_tunnelInsideWorldLeft + 320.f;
+    const Math::Vec2 oldHb   = player.GetHitboxCenter();
+    const Math::Vec2 newHb   = { entryX, railTop + halfH };
+    player.SetPosition(player.GetPosition() + (newHb - oldHb));
+    player.SetCurrentGroundLevel(railTop);
+    player.ResetVelocity();
+    player.SetOnGround(true);
+    m_tunnelInsideCameraSnapPending = true;
+}
+
+bool Train::ConsumeTunnelInsideCameraSnap()
+{
+    const bool pending = m_tunnelInsideCameraSnapPending;
+    m_tunnelInsideCameraSnapPending = false;
+    return pending;
 }
 
 // Q 펄스 범위 내 열차 로봇 모두에게 방향성 넉백과 고정 데미지를 적용함
@@ -81,8 +124,9 @@ bool Train::IsPlayerInSecondTrain3Car(Math::Vec2 worldHbCenter) const
     const float lx = worldHbCenter.x - MIN_X - m_trainOffset;
     const float car3Left = m_car1Width + m_car2Width + m_car3Width + m_car3ExtensionWidths[0]
                          + m_car3ExtensionWidths[1];
-    const float car3Right = car3Left + m_car3ExtensionWidths[2];
-    return lx >= car3Left && lx < car3Right;
+    const float car3W  = m_car3ExtensionWidths[2];
+    // 칸 입구(약 10%)부터 인식 — 경계 클램프 직전에도 정지 트리거되게.
+    return lx >= car3Left + car3W * 0.10f && lx < car3Left + car3W;
 }
 
 // 플레이어 히트박스 중심 X로 현재 탑승 칸 번호(1~5)를 반환함 (열차 밖이면 0)
@@ -155,14 +199,17 @@ bool Train::IsTrainCarCombatCleared(int car1To5) const
 // 미클리어 칸으로 인한 플레이어 진행 한계 X 좌표를 반환함 (치트 활성 시 열차 끝까지 반환함)
 float Train::GetTrainCombatAdvanceCapWorldX() const
 {
+    if (m_car3TunnelInsideViewActive)
+        return m_tunnelInsideWorldLeft + m_tunnelInsideWorldWidth - 85.f;
+
     if (m_trainCheatCarUnlock)
         return MIN_X + m_trainOffset + m_totalTrainWidth - 85.f;
 
     const float tailGuard = MIN_X + m_trainOffset + m_totalTrainWidth - 85.f;
 
     // Cars 1–3: single zone — move freely until all three are cleared, then cap at car 4.
-    const bool zone123Cleared =
-        IsTrainCarCombatCleared(1) && IsTrainCarCombatCleared(2) && IsTrainCarCombatCleared(3);
+    const bool zone123Cleared = m_tunnelInsideInjectComplete ||
+        (IsTrainCarCombatCleared(1) && IsTrainCarCombatCleared(2) && IsTrainCarCombatCleared(3));
     if (!zone123Cleared)
         return std::min(MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(4) - 38.f, tailGuard);
     if (!IsTrainCarCombatCleared(4))

@@ -118,6 +118,7 @@ void PulseDetonateSkill::Update(
     {
         trainMapForBranchArcs->AppendCarTransportPulseBranchArcs(allArcs, playerCenter, SKILL_RADIUS);
         trainMapForBranchArcs->ApplyPulseToTrainRobots(playerCenter, SKILL_RADIUS);
+        trainMapForBranchArcs->ApplyPulseToTunnelInsideProps(playerCenter, SKILL_RADIUS);
     }
 
     pulseManager.StartDetonationVFX(playerCenter, SKILL_RADIUS, allArcs);

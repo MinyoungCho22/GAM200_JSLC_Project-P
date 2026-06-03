@@ -23,6 +23,8 @@ constexpr float kCar3InsideFadeHalfSec = 0.22f;
 void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize,
                             Math::Vec2 mouseWorldPos, bool attackHeld, bool injectGodMode)
 {
+    if (ShouldHideTrainExteriorHazards())
+        return;
     if (!m_car3SirenHbValid || !m_sirenDroneManager)
         return;
 
@@ -86,7 +88,8 @@ void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter,
         }
     }
 
-    const bool suppressExteriorDrones = m_car3InsideViewActive || m_car3InsideTransitionActive;
+    const bool suppressExteriorDrones = ShouldHideTrainExteriorHazards()
+        || m_car3InsideTransitionActive || m_car3TunnelInsideTransitionActive;
     const bool hideForSiren =
         IsPlayerHiding(playerHbCenter, playerHitboxSize, player.IsCrouching())
         || IsPlayerInCar2PurplePulseBox(playerHbCenter, playerHitboxSize)
@@ -111,6 +114,20 @@ bool Train::IsCar3SirenMouseHoverForPulseInject(Math::Vec2 playerHbCenter, Math:
     if (!Collision::CheckAABB(playerHbCenter, playerHbSize, sirenW, { 380.f, 300.f }))
         return false;
     return Collision::CheckPointInAABB(mouseWorld, sirenW, m_car3SirenHb.size);
+}
+
+bool Train::IsCar3TunnelEnterHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const
+{
+    if (!m_car3TunnelEnterHbValid || !m_car3InsideViewActive || m_car3InsideTransitionActive
+        || m_car3TunnelInsideTransitionActive || m_trainState != TrainState::Stationary)
+        return false;
+    const float      tl  = MIN_X + m_trainOffset;
+    const Math::Vec2 box = { tl + m_car3TunnelEnterHb.localCenter.x, MIN_Y + m_car3TunnelEnterHb.localCenter.y };
+    if (!Collision::CheckAABB(playerHbCenter, playerHbSize, box, { 560.f, 380.f }))
+        return false;
+    const Math::Vec2 cursorHb = { 32.f, 32.f };
+    return Collision::CheckPointInAABB(mouseWorld, box, m_car3TunnelEnterHb.size)
+           || Collision::CheckAABB(mouseWorld, cursorHb, box, m_car3TunnelEnterHb.size);
 }
 
 bool Train::IsCar3ExtensionEnterHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const
@@ -189,9 +206,12 @@ void Train::ClimbCar3InsideLadder(Player& player, Math::Vec2 playerHitboxSize)
 
 void Train::DrawCar3InsideFadeOverlay(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
 {
-    if (!m_skyVAO || !m_car3InsideTransitionActive)
+    const bool fadingInside = m_car3InsideTransitionActive;
+    const bool fadingTunnel = m_car3TunnelInsideTransitionActive;
+    if (!m_skyVAO || (!fadingInside && !fadingTunnel))
         return;
-    const float t = std::clamp(m_car3InsideTransitionTimer / kCar3InsideFadeHalfSec, 0.f, 2.f);
+    const float timer = fadingTunnel ? m_car3TunnelInsideTransitionTimer : m_car3InsideTransitionTimer;
+    const float t = std::clamp(timer / kCar3InsideFadeHalfSec, 0.f, 2.f);
     const float alpha = (t <= 1.f) ? t : (2.f - t);
     if (alpha <= 0.001f)
         return;
@@ -204,6 +224,8 @@ void Train::DrawCar3InsideFadeOverlay(Shader& colorShader, Math::Vec2 cameraPos,
 // 활성 사이렌의 팽창 파동을 타원 링 여러 개로 그림 (주입 진행도에 따라 투명도 감소함)
 void Train::DrawCar3SirenWaves(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
 {
+    if (ShouldHideTrainExteriorHazards())
+        return;
     if (!m_car3SirenHbValid || !m_car3SirenActive || m_car3SirenInjectT >= 0.995f)
         return;
 
@@ -267,6 +289,8 @@ void Train::DrawCar3SirenWaves(Shader& colorShader, Math::Vec2 cameraPos, float 
 // 사이렌 펄스 차단 진행도를 사이렌 옆에 세로 게이지로 그림 (0→1 채움)
 void Train::DrawCar3SirenProgressGauge(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
 {
+    if (ShouldHideTrainExteriorHazards())
+        return;
     if (!m_car3SirenHbValid || !m_car3SirenActive || !m_skyVAO)
         return;
 

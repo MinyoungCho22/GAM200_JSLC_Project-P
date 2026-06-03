@@ -641,6 +641,32 @@ void GameplayState::Update(double dt)
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Train (Ctrl+5)");
     }
 
+    if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num9))
+    {
+        silenceStoryForMapCheat();
+        m_skipRooftopQHintByCheat = true;
+        m_tutorial->DisableAll();
+        m_camera.StopAnimation();
+        m_cameraZoom = 1.0f;
+        m_trainZoomTransition = false;
+        player.SetSizeScale(0.6f);
+        m_trainDeferEntryUntilIntroDone = false;
+        m_doorOpened = true;
+        m_rooftopAccessed = true;
+        m_undergroundAccessed = true;
+        m_trainAccessed = true;
+        m_currentCheckpoint = MapZone::Train;
+
+        m_train->CheatWarpToTunnelInside(player, player.GetHitboxSize());
+
+        m_camera.SetBounds(
+            { m_train->GetTunnelInsideWorldLeft(), Train::MIN_Y },
+            { m_train->GetTunnelInsideWorldLeft() + m_train->GetTunnelInsideWorldWidth(), Train::MIN_Y + Train::HEIGHT });
+        m_camera.Update(player.GetPosition(), 1.0f);
+
+        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Warp to TunnelInside (Ctrl+9)");
+    }
+
     if (m_trainAccessed && m_train
         && (input.IsGlfwKeyPressed(GLFW_KEY_LEFT_ALT) || input.IsGlfwKeyPressed(GLFW_KEY_RIGHT_ALT)))
     {
@@ -917,10 +943,13 @@ void GameplayState::Update(double dt)
                 if (m_undergroundAccessed)
                     checkDrones(m_underground->GetDrones());
 
-                if (m_trainAccessed)
+                const bool trainHideExterior = m_trainAccessed && m_train
+                    && m_train->ShouldHideTrainExteriorHazards();
+
+                if (m_trainAccessed && !trainHideExterior)
                     checkDrones(m_train->GetDrones());
 
-                if (m_trainAccessed &&
+                if (m_trainAccessed && !trainHideExterior &&
                     m_train &&
                     m_train->GetCarTransportDroneManager())
                 {
@@ -928,7 +957,7 @@ void GameplayState::Update(double dt)
                         m_train->GetCarTransportDroneManager()->GetDrones());
                 }
 
-                if (m_trainAccessed &&
+                if (m_trainAccessed && !trainHideExterior &&
                     m_train &&
                     m_train->GetSirenDroneManager())
                 {
@@ -985,7 +1014,7 @@ void GameplayState::Update(double dt)
                     }
                 }
 
-                if (m_trainAccessed)
+                if (m_trainAccessed && !trainHideExterior)
                 {
                     auto& robots = m_train->GetRobots();
 
@@ -1471,13 +1500,26 @@ void GameplayState::Update(double dt)
         if (shakePx > 0.f)
             m_camera.AddScreenShake(0.48f, shakePx);
 
+        if (m_train->ConsumeTunnelInsideCameraSnap())
+        {
+            constexpr float trainCamHalfH = GAME_HEIGHT * 0.5f;
+            const float     trainCameraBaseY = Train::MIN_Y + trainCamHalfH;
+            m_camera.SetPosition({ player.GetPosition().x, trainCameraBaseY });
+        }
+
         // Keep right bound expanding while player advances.
         // This prevents camera lock when the player leaves the train and keeps moving right.
         const float visibleW = GAME_WIDTH / m_cameraZoom;
         const float playerLeadMargin = visibleW * 0.75f;
-        const float trainDrivenRight = m_train->GetEffectiveRightBound();
-        const float playerDrivenRight = player.GetPosition().x + playerLeadMargin;
-        const float dynamicRight = (trainDrivenRight > playerDrivenRight) ? trainDrivenRight : playerDrivenRight;
+        float       dynamicRight = 0.f;
+        if (m_train->IsCar3TunnelInsideViewActive())
+            dynamicRight = Train::MIN_X + m_train->GetTunnelInsideWorldWidth() + 120.f;
+        else
+        {
+            const float trainDrivenRight  = m_train->GetEffectiveRightBound();
+            const float playerDrivenRight = player.GetPosition().x + playerLeadMargin;
+            dynamicRight = (trainDrivenRight > playerDrivenRight) ? trainDrivenRight : playerDrivenRight;
+        }
 
         // Keep Y fixed at the normal train view unless the player is about to leave the safe screen band.
         constexpr float trainCamHalfH = GAME_HEIGHT * 0.5f;
@@ -2381,7 +2423,9 @@ void GameplayState::DrawMainLayer()
         textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
         textureShader.setBool("flipX", false);
         // 레일은 Rail.png가 장면 최하단 레이어이므로 하늘 바로 다음·다른 맵·기차 본체보다 먼저 그린다.
-        m_train->DrawRailTrack(textureShader, m_camera.GetPosition(), viewHalfW);
+        // Turnel_Inside 전용 뷰에서는 레일 타일을 깔지 않음.
+        if (!m_train->IsCar3TunnelInsideViewActive())
+            m_train->DrawRailTrack(textureShader, m_camera.GetPosition(), viewHalfW);
     }
 
     // Underground 패럴랙스 하늘 (SubwayStation 스프라이트보다 뒤, Train 맵에서는 Train 배경만 사용)
@@ -2403,7 +2447,9 @@ void GameplayState::DrawMainLayer()
     m_rooftop->Draw(textureShader);
     m_underground->Draw(textureShader);
     m_train->Draw(textureShader, m_camera.GetPosition(), viewHalfW);
-    if (m_trainAccessed)
+    const bool trainTunnelInsideOnly =
+        m_trainAccessed && m_train->IsCar3TunnelInsideViewActive();
+    if (m_trainAccessed && !trainTunnelInsideOnly)
     {
         colorShader->use();
         colorShader->setMat4("projection", worldProjection);
@@ -2416,7 +2462,7 @@ void GameplayState::DrawMainLayer()
         m_train->DrawCar2EnterLeavePrompt(textureShader, m_camera.GetPosition(), viewHalfW);
     }
 
-    if (m_trainAccessed)
+    if (m_trainAccessed && !trainTunnelInsideOnly)
     {
         textureShader.use();
         textureShader.setMat4("projection", worldProjection);
@@ -2432,9 +2478,12 @@ void GameplayState::DrawMainLayer()
         colorShader->setMat4("projection", worldProjection);
         GL::Enable(GL_BLEND);
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        m_train->DrawCar3SirenWaves(*colorShader, m_camera.GetPosition(), viewHalfW);
-        m_train->DrawCarTransportVFX(*colorShader, m_camera.GetPosition(), viewHalfW);
-        m_train->DrawValveWaterVFX(*colorShader, worldProjection, m_camera.GetPosition(), viewHalfW);
+        if (!trainTunnelInsideOnly)
+        {
+            m_train->DrawCar3SirenWaves(*colorShader, m_camera.GetPosition(), viewHalfW);
+            m_train->DrawCarTransportVFX(*colorShader, m_camera.GetPosition(), viewHalfW);
+            m_train->DrawValveWaterVFX(*colorShader, worldProjection, m_camera.GetPosition(), viewHalfW);
+        }
         m_train->DrawCar3InsideFadeOverlay(*colorShader, m_camera.GetPosition(), viewHalfW);
         textureShader.use();
         textureShader.setMat4("projection", worldProjection);
@@ -2550,9 +2599,15 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         src.DrawRemainGauge(*colorShader);
     if (m_trainAccessed && m_train)
     {
-        m_train->DrawCar3SirenProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
-        m_train->DrawCarTransportInjectProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
-        m_train->DrawCar2InsideLockTimer(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
+        const bool tunnelInside = m_train->IsCar3TunnelInsideViewActive();
+        if (!tunnelInside)
+        {
+            m_train->DrawCar3SirenProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
+            m_train->DrawCarTransportInjectProgressGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
+            m_train->DrawCar2InsideLockTimer(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
+        }
+        else
+            m_train->DrawTunnelInsideInjectGauge(*colorShader, fgCamPos, fgEffectiveWidth * 0.5f);
     }
     colorShader->setFloat("uAlpha", 1.0f);
 
@@ -2560,6 +2615,14 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     textureShader.setMat4("projection", projection);
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
+    textureShader.setFloat("alpha", 1.0f);
+    textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+    textureShader.setFloat("tintStrength", 0.0f);
+    if (m_trainAccessed && m_train && m_train->IsCar3TunnelInsideViewActive())
+    {
+        m_train->DrawTunnelInsideBackground(textureShader);
+        m_train->DrawTunnelInsideProps(textureShader);
+    }
     player.Draw(textureShader);
 
     textureShader.use();
@@ -2610,14 +2673,19 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         }
     }
 
-    // 6) World-space overlays (radars / gauges)
+    // 6) World-space overlays (radars / gauges) — 터널 인사이드는 외부(드론 레이더) 영향 없음
     colorShader->use();
     colorShader->setMat4("projection", projection);
-    droneManager->DrawRadars(*colorShader, *m_debugRenderer);
-    m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
-    m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
-    m_underground->DrawRadars(*colorShader, *m_debugRenderer);
-    m_train->DrawRadars(*colorShader, *m_debugRenderer);
+    const bool suppressTrainExteriorHazards =
+        m_trainAccessed && m_train && m_train->ShouldHideTrainExteriorHazards();
+    if (!suppressTrainExteriorHazards)
+    {
+        droneManager->DrawRadars(*colorShader, *m_debugRenderer);
+        m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
+        m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
+        m_underground->DrawRadars(*colorShader, *m_debugRenderer);
+        m_train->DrawRadars(*colorShader, *m_debugRenderer);
+    }
 
     droneManager->DrawGauges(*colorShader, *m_debugRenderer);
     m_hallway->DrawGauges(*colorShader, *m_debugRenderer);
@@ -2625,7 +2693,8 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     m_underground->DrawGauges(*colorShader, *m_debugRenderer);
     m_train->DrawGauges(*colorShader, *m_debugRenderer);
 
-    pulseManager->DrawDetonationVFX(*colorShader, *m_debugRenderer);
+    if (!suppressTrainExteriorHazards)
+        pulseManager->DrawDetonationVFX(*colorShader, *m_debugRenderer);
 
     // 7) Fullscreen frame overlay (1920x1080), camera-locked in world space
     if (m_hudFrame && m_hudFrame->GetWidth() > 0)
@@ -2843,6 +2912,10 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             m_train->IsCar3SirenMouseHoverForPulseInject(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
             overLeftClickTarget = true;
 
+        if (!overLeftClickTarget && m_trainAccessed && m_train
+            && m_train->IsTunnelInsideInjectHovered(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
+            overLeftClickTarget = true;
+
         // Right-click targets (pulse chargers): player overlaps AND cursor is inside the source
         auto checkPulseSources = [&](const std::vector<PulseSource>& sources) {
             for (const auto& src : sources)
@@ -2986,6 +3059,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             overLeftClickTarget = true;
         if (!overLeftClickTarget && m_trainAccessed && m_train
             && m_train->IsCar3InsideLadderHovered(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
+            overLeftClickTarget = true;
+        if (!overLeftClickTarget && m_trainAccessed && m_train
+            && m_train->IsCar3TunnelEnterHovered(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
             overLeftClickTarget = true;
 
         showCombatIdleCursor =
