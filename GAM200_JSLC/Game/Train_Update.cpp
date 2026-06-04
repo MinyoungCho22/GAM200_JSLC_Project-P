@@ -318,9 +318,51 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         m_car3InsideTransitionTargetInside = !m_car3InsideViewActive;
     }
     if (attackTriggered && m_car3InsideViewActive && !m_car3InsideTransitionActive
+        && !m_car3LadderClimbActive
         && IsCar3InsideLadderHovered(player.GetHitboxCenter(), playerHitboxSize, mouseWorldPos))
     {
         ClimbCar3InsideLadder(player, playerHitboxSize);
+    }
+    // 사다리 부드러운 등반 애니메이션 업데이트
+    if (m_car3LadderClimbActive)
+    {
+        m_car3LadderClimbTimer += fdt;
+        const float raw = std::clamp(m_car3LadderClimbTimer / kCar3LadderClimbDuration, 0.f, 1.f);
+        // smoothstep ease-in-out: 시작/끝 부드럽게
+        const float t = raw * raw * (3.f - 2.f * raw);
+        // 매 프레임 목표 월드 X를 로컬 오프셋 + 현재 열차 위치로 재계산 (밀림 방지)
+        const float targetWorldX = MIN_X + m_trainOffset + m_car3LadderClimbTargetLocalX;
+        const float targetWorldY = m_car3LadderClimbTargetY;
+        const Math::Vec2 lerped = {
+            m_car3LadderClimbStartPos.x + (targetWorldX - m_car3LadderClimbStartPos.x) * t,
+            m_car3LadderClimbStartPos.y + (targetWorldY - m_car3LadderClimbStartPos.y) * t
+        };
+        player.SetPosition(lerped);
+        player.ResetVelocity();
+        player.SetOnGround(false);  // 등반 중 중력 차단
+
+        if (m_car3LadderClimbTimer >= kCar3LadderClimbDuration)
+        {
+            // 등반 완료 — 최종 위치로 확정
+            player.SetPosition({ targetWorldX, targetWorldY });
+            m_car3InsideOnRoof = m_car3LadderClimbToRoof;
+            if (m_car3LadderClimbToRoof)
+            {
+                const float roofTop = MIN_Y + m_car3InsideRoofHb.localCenter.y
+                                      + m_car3InsideRoofHb.size.y * 0.5f;
+                player.SetCurrentGroundLevel(roofTop);
+            }
+            else
+            {
+                const float floorTop = MIN_Y + m_car3InsideFloorHb.localCenter.y
+                                       + m_car3InsideFloorHb.size.y * 0.5f;
+                player.SetCurrentGroundLevel(floorTop);
+            }
+            player.ResetVelocity();
+            player.SetOnGround(true);
+            m_car3LadderClimbActive = false;
+            m_car3LadderClimbTimer  = 0.f;
+        }
     }
     if (m_car3InsideTransitionActive)
     {
@@ -330,14 +372,79 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         {
             m_car3InsideViewActive = m_car3InsideTransitionTargetInside;
             if (m_car3InsideViewActive && m_sirenDroneManager)
+            {
                 m_sirenDroneManager->ClearAllDrones();
+                m_car3InsideDronesSpawned        = false;
+                m_car3InsideDroneInside2Activated = false;
+            }
             if (!m_car3InsideViewActive)
-                m_car3InsideOnRoof = false;
+            {
+                m_car3InsideOnRoof               = false;
+                m_car3InsideDronesSpawned        = false;
+                m_car3InsideDroneInside2Activated = false;
+            }
         }
         if (m_car3InsideTransitionTimer >= kCar3InsideFadeHalfSec * 2.f)
         {
             m_car3InsideTransitionActive = false;
             m_car3InsideTransitionTimer = 0.f;
+
+            // SecondInside 진입 완료 직후: 드론 2+2 스폰
+            if (m_car3InsideViewActive && !m_car3InsideOnRoof
+                && m_sirenDroneManager && !m_car3InsideDronesSpawned)
+            {
+                m_car3InsideDronesSpawned = true;
+                const float tl = MIN_X + m_trainOffset;
+                const float ext1L = m_car1Width + m_car2Width + m_car3Width;
+                // Inside_1 드론 2개 (즉시 느린 추적)
+                const float in1MidX = tl + ext1L + m_car3ExtensionWidths[0] * 0.4f;
+                const float in1MidY = MIN_Y + 740.f - 120.f;
+                for (int k = 0; k < 2; ++k)
+                {
+                    const Math::Vec2 sp = { in1MidX + k * 250.f, in1MidY };
+                    Drone& d = m_sirenDroneManager->SpawnDrone(sp, kTrainDroneTexturePath, false);
+                    ScaleTrainCombatDrone(d);
+                    d.SetBaseSpeed(40.f);   // 아주 천천히
+                    d.SetSirenMapDrone(false);
+                    d.SetTrainCarSegment(3);
+                }
+                // Inside_2 드론 2개 (진입 전까지 대기)
+                const float in2MidX = tl + ext1L + m_car3ExtensionWidths[0] * 1.5f;
+                const float in2MidY = MIN_Y + 740.f - 120.f;
+                for (int k = 0; k < 2; ++k)
+                {
+                    const Math::Vec2 sp = { in2MidX + k * 250.f, in2MidY };
+                    Drone& d = m_sirenDroneManager->SpawnDrone(sp, kTrainDroneTexturePath, false);
+                    ScaleTrainCombatDrone(d);
+                    d.SetBaseSpeed(0.f);    // 플레이어가 Inside_2 진입 전까지 정지
+                    d.SetSirenMapDrone(false);
+                    d.SetTrainCarSegment(3);
+                    d.SetDebugMode(true);   // AI 비활성화로 정지 상태 유지
+                }
+            }
+        }
+    }
+
+    // Inside_2 진입 감지 → Inside_2 드론 추적 활성화
+    if (m_car3InsideViewActive && m_car3InsideDronesSpawned && !m_car3InsideDroneInside2Activated
+        && m_sirenDroneManager)
+    {
+        const float tl    = MIN_X + m_trainOffset;
+        const float ext1L = m_car1Width + m_car2Width + m_car3Width;
+        // Inside_2 X 범위: ext1L + car3ExtensionWidths[0] 이후
+        const float inside2Left = tl + ext1L + m_car3ExtensionWidths[0];
+        const float playerX     = player.GetHitboxCenter().x;
+        if (playerX >= inside2Left)
+        {
+            m_car3InsideDroneInside2Activated = true;
+            auto& drones = m_sirenDroneManager->GetDrones();
+            // 마지막 2개 드론 (Inside_2 드론)을 활성화
+            const int total = static_cast<int>(drones.size());
+            for (int k = total - 2; k < total && k >= 0; ++k)
+            {
+                drones[k].SetDebugMode(false);  // AI 재활성화
+                drones[k].SetBaseSpeed(35.f);   // 아주 천천히 추적
+            }
         }
     }
 
@@ -450,6 +557,17 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     player.SetHiding(isPlayerHiding);
     player.SetTrainEnemyUndetectable(trainEnemyUndetect);
 
+    // SecondInside 뷰: 외부 드론 대신 내부 드론(siren 매니저 재사용) 별도 업데이트
+    if (m_car3InsideViewActive && m_sirenDroneManager && m_car3InsideDronesSpawned)
+    {
+        for (auto& d : m_sirenDroneManager->GetDrones())
+        {
+            if (d.IsDead()) continue;
+            if (!d.IsDebugMode())  // AI 비활성화 드론은 업데이트 생략 (Inside_2 대기 중)
+                d.Update(static_cast<double>(fdt), player, playerHitboxSize, false);
+        }
+    }
+
     if (!suppressExteriorDrones)
         UpdateCarTransportDrones(fdt, player, playerHitboxSize, trainEnemyUndetect);
 
@@ -534,6 +652,23 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     {
         for (const auto& obs : m_obstacles)
             ResolveAABB(player, currentHbCenter, playerHalfSize, obs.pos, obs.size);
+    }
+
+    // SecondTrain_1 문 강제 경계: 문을 열기 전까지 오른쪽으로 진행 불가
+    // (m_car3InsideViewActive가 true가 되면 inside 경계로 전환되므로 이 조건 해제)
+    if (!m_car3InsideViewActive && !m_car3InsideTransitionActive
+        && m_car3ExtensionEnterHbValid && m_car3DoorBarrierLocalX > 0.f)
+    {
+        const float barrierWorldX  = MIN_X + m_trainOffset + m_car3DoorBarrierLocalX;
+        currentHbCenter = player.GetHitboxCenter();
+        const float playerRight    = currentHbCenter.x + playerHalfSize.x;
+        if (playerRight > barrierWorldX)
+        {
+            const float dx = barrierWorldX - playerRight;
+            player.SetPosition({ player.GetPosition().x + dx, player.GetPosition().y });
+            currentHbCenter = player.GetHitboxCenter();
+            // 속도는 건드리지 않음 → 중력이 정상 작동해 바로 낙하
+        }
     }
 
     // 내부칸(SecondInside): 문 진입 후에만 적용 — 좌우 경계 + (지붕 전) 천장 점프 차단.

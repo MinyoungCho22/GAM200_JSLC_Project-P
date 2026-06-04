@@ -418,10 +418,21 @@ private:
     bool                m_car3SirenPendingShutdown = false;
     TrainHitbox         m_car3ExtensionEnterHb{};
     bool                m_car3ExtensionEnterHbValid = false;
+    float               m_car3DoorBarrierLocalX = 0.f; ///< SecondTrain_1 문 오른쪽 보이지 않는 경계벽 로컬 X
     bool                m_car3InsideViewActive = false;
     bool                m_car3InsideTransitionActive = false;
     float               m_car3InsideTransitionTimer = 0.f;
     bool                m_car3InsideTransitionTargetInside = false;
+    bool                m_car3InsideDronesSpawned = false;        ///< SecondInside 진입 드론 스폰 완료 여부
+    bool                m_car3InsideDroneInside2Activated = false; ///< Inside_2 드론 추적 활성화 여부
+    // 사다리 부드러운 등반 애니메이션
+    bool                m_car3LadderClimbActive = false;
+    float               m_car3LadderClimbTimer  = 0.f;
+    static constexpr float kCar3LadderClimbDuration = 0.55f; ///< 등반 총 소요 시간 (초)
+    Math::Vec2          m_car3LadderClimbStartPos{};     ///< 등반 시작 월드 포지션
+    float               m_car3LadderClimbTargetLocalX = 0.f; ///< 도착 X (열차 로컬, 매 프레임 월드로 재계산)
+    float               m_car3LadderClimbTargetY      = 0.f; ///< 도착 Y (월드, 고정)
+    bool                m_car3LadderClimbToRoof = false; ///< true=올라가기, false=내려가기
     TrainHitbox         m_car3TunnelEnterHb{};
     bool                m_car3TunnelEnterHbValid = false;
     bool                m_car3TunnelInsideViewActive = false;

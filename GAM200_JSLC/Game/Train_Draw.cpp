@@ -436,15 +436,23 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
 // ---------------------------------------------------------------------------
 void Train::DrawDrones(Shader& shader) const
 {
-    if (m_car3InsideViewActive || m_car3InsideTransitionActive || m_car3TunnelInsideViewActive
-        || m_car3TunnelInsideTransitionActive)
-        return;
-    if (m_droneManager)
-        m_droneManager->Draw(shader);
-    if (m_carTransportDroneManager)
-        m_carTransportDroneManager->Draw(shader);
-    if (m_sirenDroneManager)
-        m_sirenDroneManager->Draw(shader);
+    const bool insideView = m_car3InsideViewActive || m_car3InsideTransitionActive
+        || m_car3TunnelInsideViewActive || m_car3TunnelInsideTransitionActive;
+    if (!insideView)
+    {
+        // 외부 뷰: 모든 드론 그리기
+        if (m_droneManager)
+            m_droneManager->Draw(shader);
+        if (m_carTransportDroneManager)
+            m_carTransportDroneManager->Draw(shader);
+    }
+    // 사이렌 드론: 외부 뷰에서는 사이렌 드론, 내부 뷰에서는 inside 드론으로 재사용
+    // → 항상 그리기 (터널 인사이드 제외)
+    if (!m_car3TunnelInsideViewActive && !m_car3TunnelInsideTransitionActive)
+    {
+        if (m_sirenDroneManager)
+            m_sirenDroneManager->Draw(shader);
+    }
 }
 
 // 전투·사이렌·자동차 운반 드론의 레이더 범위 원을 그림

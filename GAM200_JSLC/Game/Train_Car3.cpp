@@ -175,33 +175,43 @@ void Train::ClimbCar3InsideLadder(Player& player, Math::Vec2 playerHitboxSize)
 {
     if (!m_car3InsideLadderHbValid)
         return;
+    if (m_car3LadderClimbActive)
+        return;  // 이미 등반 중이면 무시
 
     const float trainWorldLeft = MIN_X + m_trainOffset;
     const float halfH          = playerHitboxSize.y * 0.5f;
-    const Math::Vec2 oldHb = player.GetHitboxCenter();
+    const Math::Vec2 startHb   = player.GetHitboxCenter();
+    const Math::Vec2 startPos  = player.GetPosition();
+    // 플레이어 위치와 히트박스 중심의 오프셋 (고정값)
+    const Math::Vec2 hbOffset  = startHb - startPos;
+
+    m_car3LadderClimbStartPos = startPos;
+    m_car3LadderClimbTimer    = 0.f;
 
     if (!m_car3InsideOnRoof)
     {
-        const float ladderCx = trainWorldLeft + m_car3InsideLadderHb.localCenter.x;
-        const float roofTop  = MIN_Y + m_car3InsideRoofHb.localCenter.y + m_car3InsideRoofHb.size.y * 0.5f;
-        const Math::Vec2 newHb = { ladderCx, roofTop + halfH };
-        m_car3InsideOnRoof = true;
-        player.SetCurrentGroundLevel(roofTop);
-        player.SetPosition(player.GetPosition() + (newHb - oldHb));
+        // 내부 → 지붕으로 올라가기
+        // 도착 히트박스 X: ladderHb.localCenter.x (열차 로컬 좌표계)
+        const float ladderLocalX = m_car3InsideLadderHb.localCenter.x;
+        const float roofTop      = MIN_Y + m_car3InsideRoofHb.localCenter.y + m_car3InsideRoofHb.size.y * 0.5f;
+        // 로컬 X 저장 (MIN_X 기준 → 열차 hibox local center)
+        m_car3LadderClimbTargetLocalX = ladderLocalX - hbOffset.x;
+        m_car3LadderClimbTargetY      = roofTop + halfH - hbOffset.y;
+        m_car3LadderClimbToRoof       = true;
     }
     else
     {
-        const float ladder2Cx = trainWorldLeft + m_car3InsideLadder2Hb.localCenter.x;
-        const float floorTop  = MIN_Y + m_car3InsideFloorHb.localCenter.y + m_car3InsideFloorHb.size.y * 0.5f;
-        // 지붕에서 내려올 때는 항상 SecondInside_2 사다리 앞(해당 X)으로 배치.
-        const Math::Vec2 newHb = { ladder2Cx, floorTop + halfH };
-        m_car3InsideOnRoof = false;
-        player.SetCurrentGroundLevel(floorTop);
-        player.SetPosition(player.GetPosition() + (newHb - oldHb));
+        // 지붕 → 내부로 내려가기 (항상 SecondInside_2 사다리 앞)
+        const float ladder2LocalX = m_car3InsideLadder2Hb.localCenter.x;
+        const float floorTop      = MIN_Y + m_car3InsideFloorHb.localCenter.y + m_car3InsideFloorHb.size.y * 0.5f;
+        m_car3LadderClimbTargetLocalX = ladder2LocalX - hbOffset.x;
+        m_car3LadderClimbTargetY      = floorTop + halfH - hbOffset.y;
+        m_car3LadderClimbToRoof       = false;
     }
 
+    m_car3LadderClimbActive = true;
     player.ResetVelocity();
-    player.SetOnGround(true);
+    player.SetOnGround(false);  // 등반 중에는 공중 상태
 }
 
 void Train::DrawCar3InsideFadeOverlay(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const

@@ -503,15 +503,19 @@ void Train::BuildTrainHitboxes()
         if (i == 0)
         {
             // SecondTrain_1 좌측 인터랙션 박스(디버그 표시 + 마우스 클릭 전환)
-            m_car3ExtensionEnterHb = MakeHitbox(cExt, 420.f, 280.f, 260.f, 460.f, false);
+            // 문 너비 260의 1/4 = 65px 오른쪽으로 이동 (420 → 485)
+            m_car3ExtensionEnterHb = MakeHitbox(cExt, 485.f, 280.f, 260.f, 460.f, false);
             m_car3ExtensionEnterHbValid = true;
+            // 문 오른쪽 경계: 문에서 한 발짝 오른쪽 (~900px)
+            // localCenter는 cExt 기준이므로 cExt 더해서 저장
+            m_car3DoorBarrierLocalX = cExt + 900.f;
 
             // SecondInside_1 — (372,351) 2049×399 내부, 좌우 경계 371 / 2421, 사다리 (1920,309) 150×444
             const float cIn = cExt;
-            m_car3InsideFloorHb   = MakeHitbox(cIn, 372.f, 705.f, 2049.f, 45.f);
-            m_car3InsideFloor2Hb  = MakeHitbox(cIn, m_car3ExtensionWidths[0] + 372.f, 705.f, 2049.f, 45.f);
+            m_car3InsideFloorHb   = MakeHitbox(cIn, 372.f, 740.f, 2049.f, 45.f);
+            m_car3InsideFloor2Hb  = MakeHitbox(cIn, m_car3ExtensionWidths[0] + 372.f, 740.f, 2049.f, 45.f);
             m_car3InsideFloor3Hb  = MakeHitbox(cIn,
-                m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1] + 372.f, 705.f, 2049.f, 45.f);
+                m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1] + 372.f, 740.f, 2049.f, 45.f);
             m_car3InsideCeilingHb = MakeHitbox(cIn, 372.f, 351.f, 2049.f, 32.f);
             // 지붕: Inside_1~Inside_2 연속 (371 ~ car0폭+2421)
             const float roofW = m_car3ExtensionWidths[0] + kCar3InsideBoundRightPx - kCar3InsideBoundLeftPx;

@@ -957,7 +957,9 @@ void GameplayState::Update(double dt)
                         m_train->GetCarTransportDroneManager()->GetDrones());
                 }
 
-                if (m_trainAccessed && !trainHideExterior &&
+                // 사이렌 드론은 SecondInside 내부 드론으로도 재사용되므로
+                // trainHideExterior와 무관하게 항상 피해 판정 처리
+                if (m_trainAccessed &&
                     m_train &&
                     m_train->GetSirenDroneManager())
                 {
@@ -2717,8 +2719,8 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     m_underground->DrawGauges(*colorShader, *m_debugRenderer);
     m_train->DrawGauges(*colorShader, *m_debugRenderer);
 
-    if (!suppressTrainExteriorHazards)
-        pulseManager->DrawDetonationVFX(*colorShader, *m_debugRenderer);
+    // Q스킬 이펙트는 SecondInside / TunnelInside에서도 항상 표시
+    pulseManager->DrawDetonationVFX(*colorShader, *m_debugRenderer);
 
     // 7) Fullscreen frame overlay (1920x1080), camera-locked in world space
     if (m_hudFrame && m_hudFrame->GetWidth() > 0)
