@@ -315,7 +315,7 @@ void Train::ApplyPulseToTunnelInsideProps(Math::Vec2 pulseWorldCenter, float rad
         return;
 
     const Math::Vec2 pulseHalf = { radius, radius };
-    constexpr float kKnockSpeedX = 1100.f;
+    constexpr float kKnockSpeedX = 1800.f;  // 더 멀리 밀림
 
     for (auto& prop : m_tunnelInsideProps)
     {
@@ -328,7 +328,8 @@ void Train::ApplyPulseToTunnelInsideProps(Math::Vec2 pulseWorldCenter, float rad
         if (!Collision::CheckAABB(pulseWorldCenter, pulseHalf, worldC, detect))
             continue;
 
-        prop.velocity.x = std::max(prop.velocity.x, kKnockSpeedX);
+        prop.velocity.x      = std::max(prop.velocity.x, kKnockSpeedX);
+        prop.pushFlashTimer  = 0.35f;  // 0.35초 밝은 flash 이펙트
         Logger::Instance().Log(Logger::Severity::Info, "Train: Q pulse knocked tunnel Object to the right.");
     }
 }
@@ -342,6 +343,10 @@ void Train::UpdateTunnelInsideProps(float dt, Player& /*player*/, Math::Vec2 /*p
 
     for (auto& prop : m_tunnelInsideProps)
     {
+        // 플래시 타이머 탄클
+        if (prop.pushFlashTimer > 0.f)
+            prop.pushFlashTimer -= dt;
+
         if (!prop.pushable || std::abs(prop.velocity.x) <= 1.f)
             continue;
 
@@ -422,10 +427,6 @@ void Train::DrawTunnelInsideProps(Shader& shader) const
     if (!m_car3TunnelInsideViewActive)
         return;
 
-    shader.setFloat("alpha", 1.0f);
-    shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
-    shader.setFloat("tintStrength", 0.0f);
-
     for (const auto& prop : m_tunnelInsideProps)
     {
         if (!prop.useObjectSprite || !m_tunnelObjectTex || m_tunnelObjectTex->GetWidth() <= 0)
@@ -435,7 +436,29 @@ void Train::DrawTunnelInsideProps(Shader& shader) const
                                     MIN_Y + prop.localCenter.y };
         Math::Matrix     model  = Math::Matrix::CreateTranslation(worldC)
                                * Math::Matrix::CreateScale(prop.size);
-        m_tunnelObjectTex->Draw(shader, model);
+
+        if (prop.pushFlashTimer > 0.f)
+        {
+            // 충격 후 0.35초동안 파란색 밝은 flash 효과
+            const float t = prop.pushFlashTimer / 0.35f;  // 1닥 밝게 시작 → 0으로
+            // 진동 offset: 충격 직후 왼쪽으로 툵힜다는 느낌
+            const float shakeX = std::sin(prop.pushFlashTimer * 60.f) * 4.f * t;
+            Math::Matrix shakeModel = Math::Matrix::CreateTranslation({ worldC.x + shakeX, worldC.y })
+                                    * Math::Matrix::CreateScale(prop.size);
+            shader.setFloat("alpha", 1.0f);
+            shader.setVec3("colorTint", 0.5f + 0.5f * t, 0.8f + 0.2f * t, 1.0f);
+            shader.setFloat("tintStrength", t * 0.7f);
+            m_tunnelObjectTex->Draw(shader, shakeModel);
+            shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+            shader.setFloat("tintStrength", 0.0f);
+        }
+        else
+        {
+            shader.setFloat("alpha", 1.0f);
+            shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+            shader.setFloat("tintStrength", 0.0f);
+            m_tunnelObjectTex->Draw(shader, model);
+        }
     }
 }
 
@@ -449,6 +472,8 @@ void Train::CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize)
     InitTunnelInsideProps();
     SnapPlayerToTunnelInsideRail(player, playerHitboxSize);
     m_trainCarGapFalling = false;
+    m_tunnelInsideHazardFalling = false;
+    m_tunnelInsideHazardTimer   = 0.f;
     player.GetPulseCore().getPulse().set(player.GetPulseCore().getPulse().Max());
     if (m_sirenDroneManager)
         m_sirenDroneManager->ClearAllDrones();

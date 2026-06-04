@@ -119,6 +119,7 @@ private:
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;
+    float m_gameOverDelay = -1.0f;   ///< -1 = idle; >= 0 = 사망 후 GameOver 지연 카운트다운
     MapZone m_currentCheckpoint = MapZone::Room;
     FadeState m_fadeState = FadeState::None;
     float m_fadeAlpha = 0.0f;

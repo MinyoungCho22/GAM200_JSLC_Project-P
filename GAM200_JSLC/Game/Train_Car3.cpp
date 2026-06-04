@@ -1,4 +1,4 @@
-﻿// Train_Car3.cpp - ThirdTrain (Car3): siren pulse source
+// Train_Car3.cpp - ThirdTrain (Car3): siren pulse source
 
 #include "Train_Internal.hpp"
 #include "DroneManager.hpp"
@@ -123,7 +123,7 @@ bool Train::IsCar3TunnelEnterHovered(Math::Vec2 playerHbCenter, Math::Vec2 playe
         return false;
     const float      tl  = MIN_X + m_trainOffset;
     const Math::Vec2 box = { tl + m_car3TunnelEnterHb.localCenter.x, MIN_Y + m_car3TunnelEnterHb.localCenter.y };
-    if (!Collision::CheckAABB(playerHbCenter, playerHbSize, box, { 560.f, 380.f }))
+    if (!Collision::CheckAABB(playerHbCenter, playerHbSize, box, { 750.f, 550.f }))
         return false;
     const Math::Vec2 cursorHb = { 32.f, 32.f };
     return Collision::CheckPointInAABB(mouseWorld, box, m_car3TunnelEnterHb.size)

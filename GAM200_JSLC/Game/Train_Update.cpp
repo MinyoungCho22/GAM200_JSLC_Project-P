@@ -608,7 +608,10 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     }
 
     if (player.IsGodMode() || player.IsDead())
+    {
         m_trainCarGapFalling = false;
+        m_tunnelInsideHazardFalling = false;
+    }
 
     bool skipTrainDeckPhysics = false;
 
@@ -790,18 +793,43 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             {
                 const float     railTop = GetRailWalkSurfaceWorldY();
                 constexpr float kSlabH  = 36.f;
-                const Math::Vec2 floorS = { m_tunnelInsideWorldWidth, kSlabH };
-                const Math::Vec2 floorC = { m_tunnelInsideWorldLeft + m_tunnelInsideWorldWidth * 0.5f,
-                                            railTop - kSlabH * 0.5f };
+                const float     floorY  = railTop - kSlabH * 0.5f;
 
-                if (SnapToTopSupport(player, currentHbCenter, playerHalfSize, floorC, floorS,
+                // Left rail: [0, 835] (50px wider to the right)
+                const Math::Vec2 leftS = { 835.f, kSlabH };
+                const Math::Vec2 leftC = { m_tunnelInsideWorldLeft + 835.f * 0.5f, floorY };
+
+                // Right rail: [2056, 2640] (50px wider to the left)
+                const Math::Vec2 rightS = { 584.f, kSlabH };
+                const Math::Vec2 rightC = { m_tunnelInsideWorldLeft + 2056.f + 584.f * 0.5f, floorY };
+
+                bool landedOnLeft = false;
+                bool landedOnRight = false;
+
+                // Collide with left rail
+                if (SnapToTopSupport(player, currentHbCenter, playerHalfSize, leftC, leftS,
                                      Train::TrainHitboxKind::Solid, crouchHeld))
                 {
-                    playerOnStaticRail = true;
-                    if (m_tunnelInsideDepartStarted)
-                        m_playerOnTunnelDepartWalkFloor = true;
+                    landedOnLeft = true;
                 }
-                else if (ResolveAABB(player, currentHbCenter, playerHalfSize, floorC, floorS))
+                else if (ResolveAABB(player, currentHbCenter, playerHalfSize, leftC, leftS))
+                {
+                    landedOnLeft = true;
+                }
+
+                // Collide with right rail
+                currentHbCenter = player.GetHitboxCenter();
+                if (SnapToTopSupport(player, currentHbCenter, playerHalfSize, rightC, rightS,
+                                     Train::TrainHitboxKind::Solid, crouchHeld))
+                {
+                    landedOnRight = true;
+                }
+                else if (ResolveAABB(player, currentHbCenter, playerHalfSize, rightC, rightS))
+                {
+                    landedOnRight = true;
+                }
+
+                if (landedOnLeft || landedOnRight)
                 {
                     playerOnStaticRail = true;
                     if (m_tunnelInsideDepartStarted)
@@ -893,7 +921,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     {
         player.SetOnGround(false);
         if (m_car3TunnelInsideViewActive)
-            player.SetCurrentGroundLevel(GetRailWalkSurfaceWorldY());
+            player.SetCurrentGroundLevel(MIN_Y);
     }
     else if (m_playerOnTunnelBoardingFloor)
     {
@@ -909,6 +937,74 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     {
         player.SetOnGround(true);
         player.SetCurrentGroundLevel(GetRailWalkSurfaceWorldY());
+    }
+
+    // --- TunnelInside hazard fall logic (낭떠러지 추락 즉사) ---
+    if (m_car3TunnelInsideViewActive && !player.IsGodMode() && !player.IsDead())
+    {
+        const float lx        = player.GetHitboxCenter().x - m_tunnelInsideWorldLeft;
+        const bool onLeftRail  = (lx >= 0.f   && lx <= 835.f);   // 좌측 레일 확장
+        const bool onRightRail = (lx >= 2056.f && lx <= 2640.f);  // 우측 레일 확장
+        const bool onSafe      = onLeftRail || onRightRail || m_playerOnTunnelBoardingFloor;
+
+        // 발이 레일 표면 이하인지 확인 (점프 중 공중에 있을 때는 죽지 않음)
+        const float railSurfaceY = GetRailWalkSurfaceWorldY();
+        const float playerFootY  = player.GetHitboxCenter().y - playerHalfSize.y;
+        const bool footAtRailLevel = (playerFootY <= railSurfaceY + 20.f);
+
+        if (!onSafe && footAtRailLevel)
+        {
+            // 지면에 서있었는지, 아래 방향으로 낙하 중인지 확인
+            const bool wasOnGround = player.IsOnGround();
+            const bool fallingDown = (player.GetVelocity().y <= 50.f);
+            const bool shouldTrigger = wasOnGround || fallingDown;
+
+            // 낭떠러지 구역: 화면 아래로 무한 추락 (Player.cpp의 MIN_Y snap을 우회)
+            if (player.IsOnGround())
+                player.SetOnGround(false);
+            player.SetCurrentGroundLevel(MIN_Y - 5000.f);
+
+            if (!m_tunnelInsideHazardFalling && shouldTrigger)
+            {
+                m_tunnelInsideHazardFalling = true;
+                m_tunnelInsideHazardTimer   = 0.f;
+                // 강한 아래 방향 초기 속도
+                player.SetVerticalVelocity(-800.f);
+                // 추락 시작 충격 쉐이크 (지면에서 밟았을 때만)
+                RequestTrainCameraShake(18.f);
+            }
+
+            if (m_tunnelInsideHazardFalling)
+            {
+                // 추락 중 지속 쉐이크 (점점 강해지는 느낌)
+                const float shakeT = std::min(m_tunnelInsideHazardTimer / 0.3f, 1.f);
+                RequestTrainCameraShake(8.f + shakeT * 10.f);
+
+                // 추락 중 펄스 빠르게 감소 (0.3초 안에 전부 소모)
+                player.GetPulseCore().getPulse().spend(400.f * fdt);
+
+                // 0.3초 후 잔여 펄스까지 전부 소모 → 즉사 확정
+                m_tunnelInsideHazardTimer += fdt;
+                if (m_tunnelInsideHazardTimer >= 0.3f)
+                {
+                    auto& pulse = player.GetPulseCore().getPulse();
+                    pulse.spend(pulse.Value() + 1.0f);
+                    m_tunnelInsideHazardFalling = false;
+                    m_tunnelInsideHazardTimer   = 0.f;
+                }
+            }
+        }
+        else
+        {
+            // 안전 구역이거나 위로 점프 중 — 플래그 해제
+            m_tunnelInsideHazardFalling = false;
+            m_tunnelInsideHazardTimer   = 0.f;
+        }
+    }
+    else
+    {
+        m_tunnelInsideHazardFalling = false;
+        m_tunnelInsideHazardTimer   = 0.f;
     }
 
     UpdateCarTransport(fdt, player, currentHbCenter, carTransportInjectHeld, ignoreCarInjectPulseCost,

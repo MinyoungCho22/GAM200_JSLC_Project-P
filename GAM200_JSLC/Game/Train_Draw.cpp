@@ -491,10 +491,29 @@ void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
         debugRenderer.DrawBox(colorShader, obs.pos, obs.size, { 1.0f, 0.0f });
 
     // 월드 고정 레일 발판 (orange)
-    for (const auto& hb : m_staticWorldHitboxes)
+    if (m_car3TunnelInsideViewActive)
     {
-        const Math::Vec2 worldPos = { MIN_X + hb.localCenter.x, MIN_Y + hb.localCenter.y };
-        debugRenderer.DrawBox(colorShader, worldPos, hb.size, 1.0f, 0.55f, 0.2f);
+        const float     railTop = GetRailWalkSurfaceWorldY();
+        constexpr float kSlabH  = 36.f;
+        const float     y       = railTop - kSlabH * 0.5f;
+
+        // Left rail: [0, 835]
+        const Math::Vec2 leftC = { m_tunnelInsideWorldLeft + 835.f * 0.5f, y };
+        const Math::Vec2 leftS = { 835.f, kSlabH };
+        debugRenderer.DrawBox(colorShader, leftC, leftS, 1.0f, 0.55f, 0.2f);
+
+        // Right rail: [2056, 2640]
+        const Math::Vec2 rightC = { m_tunnelInsideWorldLeft + 2056.f + 584.f * 0.5f, y };
+        const Math::Vec2 rightS = { 584.f, kSlabH };
+        debugRenderer.DrawBox(colorShader, rightC, rightS, 1.0f, 0.55f, 0.2f);
+    }
+    else
+    {
+        for (const auto& hb : m_staticWorldHitboxes)
+        {
+            const Math::Vec2 worldPos = { MIN_X + hb.localCenter.x, MIN_Y + hb.localCenter.y };
+            debugRenderer.DrawBox(colorShader, worldPos, hb.size, 1.0f, 0.55f, 0.2f);
+        }
     }
 
     // Hiding spots (green) — move with train, same as Hallway display convention

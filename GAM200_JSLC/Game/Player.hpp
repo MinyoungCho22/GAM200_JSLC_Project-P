@@ -110,6 +110,10 @@ public:
     bool IsCrouching() const { return is_crouching; }
     bool IsCrouchTriggered() const { return m_crouchTriggered; }  // S 한 번 눌린 프레임만 true
     bool IsDead() const;
+    bool IsInvincible() const { return m_isInvincible; }
+    void SetInvincible(bool val) { m_isInvincible = val; }
+    float GetInvincibilityTimer() const { return m_invincibilityTimer; }
+    void SetInvincibilityTimer(float val) { m_invincibilityTimer = val; }
 
 private:
     void GetCurrentDrawTransform(Math::Vec2& drawPosition, Math::Vec2& drawSize) const;

@@ -1768,22 +1768,46 @@ void GameplayState::Update(double dt)
 
     if (player.IsDead())
     {
-        // Sync checkpoint with the currently active map before opening GameOver.
-        if (m_trainAccessed)
-            m_currentCheckpoint = MapZone::Train;
-        else if (m_undergroundAccessed)
-            m_currentCheckpoint = MapZone::Underground;
-        else if (m_rooftopAccessed)
-            m_currentCheckpoint = MapZone::Rooftop;
-        else if (m_doorOpened)
-            m_currentCheckpoint = MapZone::Hallway;
-        else
-            m_currentCheckpoint = MapZone::Room;
+        // 터널 인사이드 추락 중이면 1.0초 딜레이 후 GameOver (낙하 모션 충분히 보이도록)
+        const float kDeathDelay = (m_trainAccessed && m_train && m_train->IsTunnelInsideHazardFalling())
+                                  ? 1.0f : 0.0f;
 
-        engine.GetPostProcess().Settings().exposure = 1.0f;
-        gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver,
-            [this]() { RespawnAtCheckpoint(); }));
-        return;
+        if (m_gameOverDelay < 0.f)
+        {
+            // 처음 사망 감지 — 딜레이 카운트다운 시작
+            m_gameOverDelay = kDeathDelay;
+        }
+
+        if (m_gameOverDelay <= 0.f)
+        {
+            // 딜레이 만료 또는 즉시 처리
+            // Sync checkpoint with the currently active map before opening GameOver.
+            if (m_trainAccessed)
+                m_currentCheckpoint = MapZone::Train;
+            else if (m_undergroundAccessed)
+                m_currentCheckpoint = MapZone::Underground;
+            else if (m_rooftopAccessed)
+                m_currentCheckpoint = MapZone::Rooftop;
+            else if (m_doorOpened)
+                m_currentCheckpoint = MapZone::Hallway;
+            else
+                m_currentCheckpoint = MapZone::Room;
+
+            m_gameOverDelay = -1.f;
+            engine.GetPostProcess().Settings().exposure = 1.0f;
+            gsm.PushState(std::make_unique<GameOver>(gsm, m_isGameOver,
+                [this]() { RespawnAtCheckpoint(); }));
+            return;
+        }
+        else
+        {
+            m_gameOverDelay -= static_cast<float>(dt);
+        }
+    }
+    else
+    {
+        // 살아있으면 타이머 리셋
+        m_gameOverDelay = -1.f;
     }
 
     SoundSystem::Instance().Update();

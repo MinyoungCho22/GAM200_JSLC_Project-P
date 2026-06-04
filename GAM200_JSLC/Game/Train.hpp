@@ -154,6 +154,7 @@ public:
     bool IsCar3InsideOnRoof() const { return m_car3InsideOnRoof; }
     bool IsCar3TunnelInsideViewActive() const { return m_car3TunnelInsideViewActive; }
     bool IsCar3TunnelInsideTransitionActive() const { return m_car3TunnelInsideTransitionActive; }
+    bool IsTunnelInsideHazardFalling() const { return m_tunnelInsideHazardFalling; }
     /// 터널 진입 페이드부터 인사이드 종료 전까지(사이렌 파동·레이더 등 외부 연출 차단)
     bool ShouldHideTrainExteriorHazards() const;
     float GetTunnelInsideWorldWidth() const { return m_tunnelInsideWorldWidth; }
@@ -325,6 +326,9 @@ private:
     float      m_pipeDropCooldown = 0.0f;    // 드롭 발동 직후 잠시 파이프 충돌·스냅을 무시
     /// 칸 사이 갭: 덱 스냅 스킵 후 중력 낙하 → 레일 착지 시 펄스 소모
     bool       m_trainCarGapFalling = false;
+    /// 터널 인사이드 낭떠러지 낙하: 레일 밖 구역 진입 → 추락 → MIN_Y 착지 시 즉사
+    bool       m_tunnelInsideHazardFalling = false;
+    float      m_tunnelInsideHazardTimer   = 0.f;
 
     // Entry countdown: -1 means not yet started; counts up to TRAIN_DEPART_DELAY
     float m_entryTimer        = -1.0f;
@@ -437,6 +441,7 @@ private:
         bool       useObjectSprite = false;
         bool       pushable        = false;
         bool       injectable      = false;
+        float      pushFlashTimer  = 0.f;  ///< Q스킬 충격 후 밝은 flash 지속 시간
     };
     std::vector<TunnelInsideProp> m_tunnelInsideProps;
     float               m_tunnelInsideInjectT          = 0.f;
