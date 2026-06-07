@@ -35,6 +35,9 @@ public:
     // Renders visual representations of hitboxes and interactive zones
     void DrawDebug(DebugRenderer& renderer, Shader& colorShader, const Math::Matrix& projection, const Player& player) const;
 
+    // 플레이어 근접 시 펄스 소스 스프라이트에 외곽선(아웃라인) 효과 렌더링
+    void DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist = 300.f) const;
+
     void SetRightBoundaryActive(bool active) { m_rightBoundaryActive = active; }
     Background* GetBackground() { return m_background.get(); }
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }

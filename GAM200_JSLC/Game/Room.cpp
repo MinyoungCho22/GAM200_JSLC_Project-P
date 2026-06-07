@@ -54,6 +54,8 @@ void Room::ApplyConfig(const RoomObjectConfig& cfg)
         Math::Vec2 center = { p.topLeft.x + p.size.x * 0.5f, p.topLeft.y - p.size.y * 0.5f };
         m_pulseSources.emplace_back();
         m_pulseSources.back().Initialize(center, p.size, 100.0f);
+        if (!p.spritePath.empty())
+            m_pulseSources.back().InitializeSprite(p.spritePath.c_str());
     }
 
     float blindBottomY = GAME_HEIGHT - cfg.blind.topLeft.y;
@@ -141,6 +143,29 @@ void Room::Draw(Shader& textureShader) const
     else
     {
         m_background->Draw(textureShader, bg_model);
+    }
+
+    // 펄스 소스 오버레이 스프라이트 (Room_A, Room_B)
+    // DrawSprite 전에 shader 상태를 명시적으로 설정해야 이전 draw pass의 값이 남지 않는다
+    textureShader.use();
+    textureShader.setFloat("alpha", 1.0f);
+    textureShader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+    textureShader.setBool("flipX", false);
+    for (const auto& source : m_pulseSources)
+    {
+        source.DrawSprite(textureShader);
+    }
+}
+
+void Room::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist) const
+{
+    const float proxDistSq = proximityDist * proximityDist;
+    for (const auto& source : m_pulseSources)
+    {
+        if (!source.HasSprite()) continue;
+        float distSq = (playerPos - source.GetPosition()).LengthSq();
+        if (distSq <= proxDistSq)
+            source.DrawOutline(outlineShader);
     }
 }
 

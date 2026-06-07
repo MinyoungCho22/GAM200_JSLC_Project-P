@@ -2570,6 +2570,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     m_outlineShader->setMat4("projection", projection);
     {
         Math::Vec2 playerPos = player.GetPosition();
+        m_room->DrawSpriteOutlines(*m_outlineShader, playerPos);
         m_hallway->DrawSpriteOutlines(*m_outlineShader, playerPos);
         m_rooftop->DrawSpriteOutlines(*m_outlineShader, playerPos);
     }
