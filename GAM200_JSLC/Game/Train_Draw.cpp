@@ -14,7 +14,16 @@
 #include <string>
 #include <vector>
 
-// 솔리드 컬러로 채운 사각형을 지정 위치·크기로 그림
+// ---------------------------------------------------------------------------
+// [DrawFilledQuad]
+// - 기능: 단색(Solid Color)으로 채워진 직사각형(Quad)을 지정된 위치와 크기로 렌더링합니다.
+// - 매개변수:
+//   - colorShader: 렌더링에 사용할 단색 셰이더 레퍼런스
+//   - center: 화면 월드 상의 직사각형 중심 위치
+//   - size: 직사각형의 가로/세로 크기
+//   - r, g, b, a: 색상 값 (RGB 및 알파값)
+// - 가이드라인: 하늘 그라데이션, 암막 오버레이 등 단순 기하도형 표현 시 사용하십시오.
+// ---------------------------------------------------------------------------
 void Train::DrawFilledQuad(Shader& colorShader,
                              Math::Vec2 center, Math::Vec2 size,
                              float r, float g, float b, float a) const
@@ -31,7 +40,15 @@ void Train::DrawFilledQuad(Shader& colorShader,
     GL::BindVertexArray(0);
 }
 // ---------------------------------------------------------------------------
-// 두께가 있는 타원 링을 위쪽 반원 형태로 그림 (사이렌 파동 이펙트에 사용함)
+// [DrawCircleLine]
+// - 기능: 사이렌 음파 이펙트 등 반원 형태의 두께를 가진 링 라인을 렌더링합니다.
+// - 매개변수:
+//   - colorShader: 렌더링에 사용할 단색 셰이더 레퍼런스
+//   - center: 반원의 중심 위치
+//   - size: 반원의 가로/세로 반지름 스케일
+//   - thickness: 라인의 선 두께
+//   - r, g, b, a: 색상 및 투명도
+// - 가이드라인: 삼각함수를 통해 정점을 동적으로 빌드하여 그립니다. 대량 호출 시 성능 저하 주의 필요.
 // ---------------------------------------------------------------------------
 void Train::DrawCircleLine(Shader& colorShader,
     Math::Vec2 center, Math::Vec2 size,
@@ -102,7 +119,13 @@ void Train::DrawCircleLine(Shader& colorShader,
 
 
 // ---------------------------------------------------------------------------
-// 석양 하늘 그라데이션과 레일 그림자를 카메라 시야 범위 내에서 그림 (텍스처 패스 이전에 호출함)
+// [DrawBackground]
+// - 기능: 석양 하늘 그라데이션, 태양광 및 패럴랙스 구름 실루엣을 시야 범위 내에 렌더링합니다.
+// - 매개변수:
+//   - colorShader: 단색 채우기 셰이더 레퍼런스
+//   - cameraPos: 현재 카메라의 월드 위치 (패럴랙스 보정용)
+//   - viewHalfW: 화면 가로 반폭 (가시 범위 검사용)
+// - 가이드라인: 터널 진입 시 `m_car3TunnelInsideViewActive` 분기를 거치며, 어두운 암전 백드롭으로 대체됩니다.
 // ---------------------------------------------------------------------------
 void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
 {
@@ -225,7 +248,13 @@ void Train::DrawBackground(Shader& colorShader, Math::Vec2 cameraPos, float view
 }
 
 // ---------------------------------------------------------------------------
-// 레일 타일을 수평으로 반복해 카메라 가시 범위만큼 그림
+// [DrawRailTrack]
+// - 기능: 기차가 달리는 하단 레일 타일을 수평으로 가시 범위만큼 반복 렌더링합니다.
+// - 매개변수:
+//   - shader: 텍스처 렌더링에 사용할 스프라이트 셰이더 레퍼런스
+//   - cameraPos: 현재 카메라 월드 좌표
+//   - viewHalfW: 화면 가로 반폭
+// - 가이드라인: 터널 내부 뷰(`m_car3TunnelInsideViewActive`)에서는 레일 타일을 그리지 않고 스킵합니다.
 // ---------------------------------------------------------------------------
 void Train::DrawRailTrack(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
 {
@@ -254,6 +283,18 @@ void Train::DrawRailTrack(Shader& shader, Math::Vec2 cameraPos, float viewHalfW)
 }
 
 // 열차 칸 스프라이트(Car1~5), 밸브, 로봇을 카메라 시야 내에서 그림
+// ---------------------------------------------------------------------------
+// [Draw]
+// - 기능: 열차 차량 스프라이트(1~5칸), 하이딩 스팟, 사이렌 장치, 파이프(WaterOpener) 및 밸브(Valve)를 렌더링합니다.
+// - 매개변수:
+//   - shader: 메인 텍스처를 렌더링할 셰이더 레퍼런스
+//   - cameraPos: 현재 카메라 위치
+//   - viewHalfW: 화면 가로 반폭
+//   - outlineShader: 글로우 아웃라인 렌더링용 셰이더 포인터 (인터리브드 그리기용)
+//   - playerPos: 플레이어 위치 (글로우 조건 판정용)
+//   - projection: 월드 좌표 투영 행렬 포인터 (인터리브드 그리기용)
+// - 가이드라인: 중첩 오브젝트(파이프, 밸브)는 깊이 문제 방지를 위해 순서대로 텍스처와 아웃라인을 교차 렌더링합니다.
+// ---------------------------------------------------------------------------
 void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW,
                  Shader* outlineShader, Math::Vec2 playerPos,
                  const Math::Matrix* projection) const
@@ -454,6 +495,22 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW,
         m_sirenSprite->Draw(shader, model);
     }
 
+    // -------------------------------------------------------------------------
+    // [개발 팀 안내 / 가이드라인] - 중첩 오브젝트의 글로우 아웃라인 렌더링 규칙
+    // -------------------------------------------------------------------------
+    // 물탱크 칸(Car 5)의 파이프(WaterOpener.png)와 밸브 휠(Valve.png)처럼
+    // 화면상에서 물리적으로 중합되거나 겹치는 상하 관계를 가진 오브젝트들의 글로우 아웃라인은
+    // 셰이더와 깊이 판정의 영향 없이 올바르게 정렬하기 위해 "인터리브드(Interleaved) 순서"로 그려야 합니다.
+    //
+    // 1. 하위 오브젝트(예: 파이프) 텍스처 그리기
+    // 2. 하위 오브젝트의 블루 글로우 아웃라인 그리기
+    // 3. 상위 오브젝트(예: 밸브 휠) 텍스처 그리기 -> 파이프의 블루 글로우 선을 깔끔하게 마스킹(덮음)
+    // 4. 상위 오브젝트의 레드 글로우 아웃라인 그리기 -> 최종적으로 밸브 위에 안착
+    //
+    // 향후 맵 오브젝트 중 서로 겹치면서 각자 독립된 색상의 아웃라인을 가져야 하는 스프라이트가 추가된다면,
+    // 전체 아웃라인 패스(DrawSpriteOutlines)에 일괄 배치하는 대신 아래처럼 Draw 함수 내부에
+    // 셰이더 스위칭(outlineShader -> textureShader) 코드를 삽입하여 드로우 순서를 제어해야 합니다.
+    // -------------------------------------------------------------------------
     if (m_waterOpenerSprite && m_waterOpenerSprite->GetWidth() > 0)
     {
         const Math::Vec2 openerWorld = { trainLeft + m_valveLocalCenter.x, MIN_Y + m_valveLocalCenter.y };
@@ -510,7 +567,11 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW,
 
 
 // ---------------------------------------------------------------------------
-// 전투·사이렌·자동차 운반 드론 스프라이트를 모두 그림
+// [DrawDrones]
+// - 기능: 외부 뷰 상태인 경우 모든 드론(전투, 사이렌, 자동차 운반 등)의 이미지를 그립니다.
+// - 매개변수:
+//   - shader: 스프라이트 렌더링에 사용할 셰이더 레퍼런스
+// - 가이드라인: 내부 뷰나 터널 내부인 경우 연출 스킵 및 드론 노출 상태 분기를 판정합니다.
 // ---------------------------------------------------------------------------
 void Train::DrawDrones(Shader& shader) const
 {
@@ -533,7 +594,14 @@ void Train::DrawDrones(Shader& shader) const
     }
 }
 
-// 전투·사이렌·자동차 운반 드론의 레이더 범위 원을 그림
+// ---------------------------------------------------------------------------
+// [DrawRadars]
+// - 기능: 드론들의 위험 구역 및 인식 거리(레이더 원)를 월드 상에 그립니다.
+// - 매개변수:
+//   - colorShader: 선 그리기에 사용할 단색 셰이더 레퍼런스
+//   - debugRenderer: 렌더링을 실제 수행할 디버그 드로어 객체
+// - 가이드라인: 외부 위협 연출 차단(`ShouldHideTrainExteriorHazards`) 상태 시 노출하지 않습니다.
+// ---------------------------------------------------------------------------
 void Train::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     if (m_car3InsideViewActive || m_car3InsideTransitionActive || ShouldHideTrainExteriorHazards())
@@ -546,7 +614,14 @@ void Train::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) 
         m_sirenDroneManager->DrawRadars(colorShader, debugRenderer);
 }
 
-// 드론 체력 게이지, 로봇 체력 게이지 등을 그림
+// ---------------------------------------------------------------------------
+// [DrawGauges]
+// - 기능: 드론들과 로봇들의 HP 바, 또는 경고 게이지를 각 캐릭터 상단에 렌더링합니다.
+// - 매개변수:
+//   - colorShader: 게이지 사각형을 그릴 셰이더 레퍼런스
+//   - debugRenderer: 렌더링을 위임할 디버그 드로어
+// - 가이드라인: 각 유닛의 활성화/사망 상태를 우선 판정하여 예외 처리를 수행하십시오.
+// ---------------------------------------------------------------------------
 void Train::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     if (m_droneManager)
@@ -564,7 +639,12 @@ void Train::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const
 
 
 // ---------------------------------------------------------------------------
-// 디버그 모드에서 히트박스·히딩 스팟·레일 발판을 색상 박스로 그림
+// [DrawDebug]
+// - 기능: 디버그 상태일 때 히트박스(물리적 충돌 영역), 히딩 스팟, 레일 발판 등을 유채색 박스로 시각화합니다.
+// - 매개변수:
+//   - colorShader: 박스 그리기에 사용할 셰이더 레퍼런스
+//   - debugRenderer: 사각형 렌더링용 디버그 렌더러 객체
+// - 가이드라인: 히트박스의 로컬 좌표계와 월드 좌표계 변환이 정확한지 검사하는 용도이므로, 크기 보정이 올바른지 확인해야 합니다.
 // ---------------------------------------------------------------------------
 void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 {

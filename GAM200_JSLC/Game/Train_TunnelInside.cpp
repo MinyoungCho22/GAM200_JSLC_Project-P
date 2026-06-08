@@ -26,6 +26,11 @@ float TunnelInsideCar3SliceLeft(const Train& train)
 
 }
 
+// ---------------------------------------------------------------------------
+// [ShouldHideTrainExteriorHazards]
+// - 기능: 터널 외부 추적 드론/사이렌 기동 등 열차 외부 위협 연출을 차단해야 하는 상태인지 여부를 판정합니다.
+// - 반환값: 외부 위협 차단 시 true, 노출 시 false
+// ---------------------------------------------------------------------------
 bool Train::ShouldHideTrainExteriorHazards() const
 {
     // SecondInside(SecondTrain_1 문) 진입·터널 전환·터널 인사이드 동안 외부(사이렌) 연출 차단
@@ -40,16 +45,29 @@ bool Train::ShouldHideTrainExteriorHazards() const
     return false;
 }
 
+// ---------------------------------------------------------------------------
+// [GetTunnelInsideDeckSurfaceY]
+// - 기능: 터널 내부 열차 덱(Deck) 상단의 물리적 월드 Y 높이를 계산하여 반환합니다.
+// ---------------------------------------------------------------------------
 float Train::GetTunnelInsideDeckSurfaceY() const
 {
     return MIN_Y + kTunnelInsideTrainDeckTopLocalY;
 }
 
+// ---------------------------------------------------------------------------
+// [GetTunnelInsideExteriorDeckSurfaceY]
+// - 기능: 복귀 시 탑승할 일반 열차 덱(Deck) 외부 상단의 물리적 월드 Y 높이를 반환합니다.
+// ---------------------------------------------------------------------------
 float Train::GetTunnelInsideExteriorDeckSurfaceY() const
 {
     return MIN_Y + kTrainFlatbedDeckTopLocalY;
 }
 
+// ---------------------------------------------------------------------------
+// [GetTunnelInsideBoardingFloor]
+// - 기능: 터널 안에서 대기 중인 기차를 다시 탈 수 있는 승강장(Boarding Floor)의 임시 중심 좌표와 크기를 계산합니다.
+// - 가이드라인: 복귀 시 기차 뒤편으로 떨어져 낙사하는 일이 없도록 좌측 영역을 800픽셀만큼 충분히 확장해 안전성을 제공합니다.
+// ---------------------------------------------------------------------------
 void Train::GetTunnelInsideBoardingFloor(Math::Vec2& outCenter, Math::Vec2& outSize) const
 {
     const float car3W  = TunnelInsideCar3Width(*this);
@@ -68,6 +86,10 @@ void Train::GetTunnelInsideBoardingFloor(Math::Vec2& outCenter, Math::Vec2& outS
 }
 
 // 출발 후: 터널 왼쪽 끝부터 이동 중인 열차 앞까지 이어지는 발판(걸어서 탑승 가능)
+// ---------------------------------------------------------------------------
+// [GetTunnelInsideDepartWalkFloor]
+// - 기능: 열차 출발 후, 터널 왼쪽 끝부터 오른쪽으로 멀어지는 열차 앞부분까지 이어지는 하단 레일 도보용 임시 발판 좌표를 계산합니다.
+// ---------------------------------------------------------------------------
 void Train::GetTunnelInsideDepartWalkFloor(Math::Vec2& outCenter, Math::Vec2& outSize) const
 {
     const float car3W  = TunnelInsideCar3Width(*this);
@@ -87,11 +109,19 @@ void Train::GetTunnelInsideDepartWalkFloor(Math::Vec2& outCenter, Math::Vec2& ou
     outCenter              = { leftEdge + width * 0.5f, railTop - kSlabH * 0.5f };
 }
 
+// ---------------------------------------------------------------------------
+// [GetTunnelInsideCar3WorldWidth]
+// - 기능: 터널 뷰에서 가시적으로 표시되는 3호차의 월드 픽셀 너비를 반환합니다.
+// ---------------------------------------------------------------------------
 float Train::GetTunnelInsideCar3WorldWidth() const
 {
     return m_car3ExtensionWidths[2];
 }
 
+// ---------------------------------------------------------------------------
+// [GetTunnelInsideInjectPropWorldCenter]
+// - 기능: 좌클릭 펄스 주입 대상인 펄스 주입기(Pulse_1) 장치의 월드 중심 좌표를 반환합니다.
+// ---------------------------------------------------------------------------
 Math::Vec2 Train::GetTunnelInsideInjectPropWorldCenter() const
 {
     if (m_tunnelInsideProps.size() < 2 || !m_tunnelInsideProps[1].injectable)
@@ -100,6 +130,10 @@ Math::Vec2 Train::GetTunnelInsideInjectPropWorldCenter() const
     return { m_tunnelInsideWorldLeft + prop.localCenter.x, MIN_Y + prop.localCenter.y };
 }
 
+// ---------------------------------------------------------------------------
+// [InitTunnelInsideProps]
+// - 기능: 터널 내부의 푸시(Push) 상자 오브젝트(Object.png)와 펄스 주입기(Pulse_1.png)의 로컬 배치 정보 및 물리 변수들을 초기화합니다.
+// ---------------------------------------------------------------------------
 void Train::InitTunnelInsideProps()
 {
     m_tunnelInsideProps.clear();
@@ -133,6 +167,11 @@ void Train::InitTunnelInsideProps()
     }
 }
 
+// ---------------------------------------------------------------------------
+// [UpdateTunnelInsideInject]
+// - 기능: 플레이어가 펄스 주입기에 접근해 마우스 좌클릭 시 펄스 소모 충전(1.5초간 총 5.0f 소모)을 매 프레임 업데이트합니다.
+// - 가이드라인: 충전 완료 시 기차 출발 신호 플래그(`m_tunnelInsideInjectComplete = true`)를 활성화합니다.
+// ---------------------------------------------------------------------------
 void Train::UpdateTunnelInsideInject(float dt, Player& player, Math::Vec2 playerHbCenter,
                                      Math::Vec2 playerHitboxSize, Math::Vec2 mouseWorldPos, bool attackHeld,
                                      bool injectGodMode)
@@ -195,6 +234,10 @@ void Train::UpdateTunnelInsideInject(float dt, Player& player, Math::Vec2 player
     }
 }
 
+// ---------------------------------------------------------------------------
+// [IsTunnelInsideInjectHovered]
+// - 기능: 플레이어가 주입기 범위 근처에 서 있고, 마우스 커서가 주입기 위에 올라와 있는지 검사합니다. (좌클릭 충전 커서 활성화용)
+// ---------------------------------------------------------------------------
 bool Train::IsTunnelInsideInjectHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize,
                                         Math::Vec2 mouseWorld) const
 {
@@ -212,6 +255,11 @@ bool Train::IsTunnelInsideInjectHovered(Math::Vec2 playerHbCenter, Math::Vec2 pl
            || Collision::CheckAABB(mouseWorld, { 24.f, 24.f }, worldC, prop.size);
 }
 
+// ---------------------------------------------------------------------------
+// [IsPlayerOnTunnelInsideBoardingSlice]
+// - 기능: 출발 연출 후 기차가 오른쪽으로 천천히 움직일 때, 플레이어가 기차의 탑승 데크 범위 안에 알맞게 발을 딛고 있는지 검사합니다.
+// - 가이드라인: 물리 프레임 틱 오차 보정을 위해 발끝 Y 좌표와 덱 높이 차이에 약 24픽셀 여유 마진을 둡니다.
+// ---------------------------------------------------------------------------
 bool Train::IsPlayerOnTunnelInsideBoardingSlice(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize,
                                                 bool /*onGround*/) const
 {
@@ -249,6 +297,10 @@ bool Train::IsPlayerOnTunnelInsideBoardingSlice(Math::Vec2 playerHbCenter, Math:
     return ok;
 }
 
+// ---------------------------------------------------------------------------
+// [SnapPlayerToSecondTrain3Return]
+// - 기능: 터널 내부 퍼즐 클리어 후 일반 3호차의 정해진 위치로 플레이어 물리 위치를 순간이동시키고 카메라 스냅을 요청합니다.
+// ---------------------------------------------------------------------------
 void Train::SnapPlayerToSecondTrain3Return(Player& player, Math::Vec2 playerHitboxSize)
 {
     m_car3InsideOnRoof = false;
@@ -267,6 +319,10 @@ void Train::SnapPlayerToSecondTrain3Return(Player& player, Math::Vec2 playerHitb
     m_tunnelInsideCameraSnapPending = true;
 }
 
+// ---------------------------------------------------------------------------
+// [DrawTunnelInsideInjectGauge]
+// - 기능: 펄스 주입기 우측 상단에 펄스 소모 충전 진행 상태를 나타내는 하늘색 게이지 바를 그립니다.
+// ---------------------------------------------------------------------------
 void Train::DrawTunnelInsideInjectGauge(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
 {
     if (!m_car3TunnelInsideViewActive || m_tunnelInsideInjectComplete || m_tunnelInsideProps.size() < 2
@@ -310,6 +366,10 @@ void Train::DrawTunnelInsideInjectGauge(Shader& colorShader, Math::Vec2 cameraPo
     }
 }
 
+// ---------------------------------------------------------------------------
+// [ApplyPulseToTunnelInsideProps]
+// - 기능: 플레이어가 Q 스킬 펄스를 시전했을 때 충격파 범위 내에 있는 노란색 물리 박스(Object.png)를 오른쪽으로 강하게 밀쳐냅니다.
+// ---------------------------------------------------------------------------
 void Train::ApplyPulseToTunnelInsideProps(Math::Vec2 pulseWorldCenter, float radius)
 {
     if (!m_car3TunnelInsideViewActive || m_tunnelInsideProps.empty())
@@ -335,6 +395,10 @@ void Train::ApplyPulseToTunnelInsideProps(Math::Vec2 pulseWorldCenter, float rad
     }
 }
 
+// ---------------------------------------------------------------------------
+// [UpdateTunnelInsideProps]
+// - 기능: 밀려난 물리 상자 오브젝트의 속도 감쇠(마찰력) 및 좌우 맵 최대 영역 제한 충돌 처리를 매 프레임 계산합니다.
+// ---------------------------------------------------------------------------
 void Train::UpdateTunnelInsideProps(float dt, Player& /*player*/, Math::Vec2 /*playerHitboxSize*/)
 {
     if (!m_car3TunnelInsideViewActive || m_tunnelInsideProps.empty())
@@ -361,6 +425,10 @@ void Train::UpdateTunnelInsideProps(float dt, Player& /*player*/, Math::Vec2 /*p
     }
 }
 
+// ---------------------------------------------------------------------------
+// [DrawTunnelInsideBackground]
+// - 기능: 어두운 터널 내부의 정적 실내 배경을 그립니다.
+// ---------------------------------------------------------------------------
 void Train::DrawTunnelInsideBackground(Shader& shader) const
 {
     if (!m_car3TunnelInsideViewActive)
@@ -382,6 +450,10 @@ void Train::DrawTunnelInsideBackground(Shader& shader) const
     }
 }
 
+// ---------------------------------------------------------------------------
+// [DrawTunnelInsideTrainForeground]
+// - 기능: 터널 내부 구역의 3호차 내부 단면과 기차 앞머리 전경 스프라이트를 렌더링합니다.
+// ---------------------------------------------------------------------------
 void Train::DrawTunnelInsideTrainForeground(Shader& shader) const
 {
     if (!m_car3TunnelInsideViewActive)
@@ -417,12 +489,20 @@ void Train::DrawTunnelInsideTrainForeground(Shader& shader) const
     }
 }
 
+// ---------------------------------------------------------------------------
+// [DrawTunnelInsideComposite]
+// - 기능: 터널 뷰의 배경과 전경 열차 스프라이트를 순서대로 일괄 호출하여 그립니다.
+// ---------------------------------------------------------------------------
 void Train::DrawTunnelInsideComposite(Shader& shader) const
 {
     DrawTunnelInsideBackground(shader);
     DrawTunnelInsideTrainForeground(shader);
 }
 
+// ---------------------------------------------------------------------------
+// [DrawTunnelInsideProps]
+// - 기능: 터널 내 배치된 물리 상자(밀침 반응 및 쉐이크 렌더링)와 펄스 주입기 본체를 그립니다.
+// ---------------------------------------------------------------------------
 void Train::DrawTunnelInsideProps(Shader& shader) const
 {
     if (!m_car3TunnelInsideViewActive)
@@ -479,6 +559,11 @@ void Train::DrawTunnelInsideProps(Shader& shader) const
     }
 }
 
+// ---------------------------------------------------------------------------
+// [CheatWarpToTunnelInside]
+// - 기능: [Ctrl + 9] 치트 키를 눌렀을 때 터널 내부 공간으로 모든 상태 변수를 세팅하여 강제 텔레포트시킵니다.
+// - 가이드라인: 치트로 이동하더라도 기차가 정상 출발 및 복귀되도록 열차 속도를 0으로 멈추고 변수를 완벽히 리셋합니다.
+// ---------------------------------------------------------------------------
 void Train::CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize)
 {
     m_car3InsideViewActive       = true;   // suppress exterior drones/robots
@@ -498,6 +583,10 @@ void Train::CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize)
         m_sirenDroneManager->ClearAllDrones();
 }
 
+// ---------------------------------------------------------------------------
+// [CheatWarpToCar5]
+// - 기능: [Ctrl + 7] 치트 키 입력 시 5호차 물탱크 수조 덱 한가운데로 위치를 이동시키고 맵 상태를 Moving으로 자동 기동시킵니다.
+// ---------------------------------------------------------------------------
 void Train::CheatWarpToCar5(Player& player, Math::Vec2 playerHitboxSize)
 {
     m_car3InsideViewActive       = false;

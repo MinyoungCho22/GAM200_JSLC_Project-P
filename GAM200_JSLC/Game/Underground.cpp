@@ -29,6 +29,10 @@ constexpr float kApproachTrainBrakeAccel = 82.0f;
 constexpr float kApproachTrainAssumedImageHeight = 1080.0f;
 }
 
+// ---------------------------------------------------------------------------
+// [ReapplyEntryTracerDroneAfterLiveState]
+// - 기능: 라이브 드론 상태 JSON 로드 등으로 인해 오버라이드된 경우, 언더그라운드 구역 입구의 추적 드론의 HP 최대치를 재할당합니다.
+// ---------------------------------------------------------------------------
 void Underground::ReapplyEntryTracerDroneAfterLiveState()
 {
     if (!m_droneManager)
@@ -42,6 +46,10 @@ void Underground::ReapplyEntryTracerDroneAfterLiveState()
     entryTracer.SetTracerHeatLevel(0);
 }
 
+// ---------------------------------------------------------------------------
+// [Initialize]
+// - 기능: 지하철 역사 배경 로드, 진입 연출용 기차 스프라이트 초기화, 드론 7마리 및 정적 물리 궤도 좌표를 할당합니다.
+// ---------------------------------------------------------------------------
 void Underground::Initialize()
 {
     // Initialize background parallax/static image
@@ -98,6 +106,10 @@ void Underground::Initialize()
     ApplyConfig(MapObjectConfig::Instance().GetData().underground);
 }
 
+// ---------------------------------------------------------------------------
+// [RecalculateApproachTrainAnchors]
+// - 기능: 진입 연출 열차(Subway Train)의 화면 밖 시작 숨김 X 좌표와 도킹 완료 시의 목표 X 좌표를 맵 가로폭 및 플랫폼 오프셋 기반으로 계산합니다.
+// ---------------------------------------------------------------------------
 void Underground::RecalculateApproachTrainAnchors()
 {
     const float mapRight = MIN_X + m_mapWidth;
@@ -107,6 +119,10 @@ void Underground::RecalculateApproachTrainAnchors()
     m_approachTrainTargetCenterX = trainTargetLeft + m_approachTrainWidth * 0.5f;
 }
 
+// ---------------------------------------------------------------------------
+// [ResetApproachTrainMotion]
+// - 기능: 진입 열차 상태를 리셋하여 다시 화면 밖에 대기 상태로 되돌립니다.
+// ---------------------------------------------------------------------------
 void Underground::ResetApproachTrainMotion()
 {
     RecalculateApproachTrainAnchors();
@@ -117,6 +133,12 @@ void Underground::ResetApproachTrainMotion()
     m_approachTrainBlend = 0.0f;
 }
 
+// ---------------------------------------------------------------------------
+// [ApplyConfig]
+// - 기능: JSON 파일의 구성 파라미터(스폰할 로봇 개수, 램프 경사면, 엄폐 상자, 펄스 소스 충전소 목록)를 지하철 역 맵에 로드합니다.
+// - 매개변수:
+//   - cfg: Underground 맵 오브젝트 설정 레퍼런스
+// ---------------------------------------------------------------------------
 void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
 {
     m_trainBoardingMinWorldX = MIN_X + cfg.trainBoardingLocalRightX;
@@ -294,6 +316,15 @@ void Underground::ApplyConfig(const UndergroundObjectConfig& cfg)
     }
 }
 
+// ---------------------------------------------------------------------------
+// [Update]
+// - 기능: 자판기 근처 접근 시 기차 진입 연출(감속 물리), 드론 및 로봇 순찰 AI 구동, 경사면(Ramp) 보정 및 정적 장애물 AABB 충돌 충돌 해결을 총괄합니다.
+// - 매개변수:
+//   - dt: 프레임 시간 델타
+//   - player: 플레이어 레퍼런스
+//   - playerHitboxSize: 플레이어 히트박스 크기
+// - 가이드라인: 경사면(Ramp)은 플레이어 발끝이 경사면 위에 안착하는 순간 Y 좌표 보정을 위해 선형 보간을 사용합니다.
+// ---------------------------------------------------------------------------
 void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
 {
     const float triggerStart = m_trainBoardingMinWorldX - kUndergroundTrainRevealRange;
@@ -520,6 +551,10 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     }
 }
 
+// ---------------------------------------------------------------------------
+// [InitParallaxSkyVAO]
+// - 기능: 석양 하늘 그라데이션 및 팩맨 하늘 그리기를 위한 VAO, VBO 정점 버퍼 데이터를 초기화합니다.
+// ---------------------------------------------------------------------------
 void Underground::InitParallaxSkyVAO()
 {
     float vertices[] = {
@@ -540,6 +575,10 @@ void Underground::InitParallaxSkyVAO()
     GL::BindVertexArray(0);
 }
 
+// ---------------------------------------------------------------------------
+// [DrawFilledQuad]
+// - 기능: 단색 셰이더를 사용하여 화면 임의 좌표에 지정한 크기와 색상으로 사각형을 렌더링합니다.
+// ---------------------------------------------------------------------------
 void Underground::DrawFilledQuad(Shader& colorShader, Math::Vec2 center, Math::Vec2 size, float r, float g,
                                  float b, float a) const
 {
@@ -556,6 +595,14 @@ void Underground::DrawFilledQuad(Shader& colorShader, Math::Vec2 center, Math::V
     GL::BindVertexArray(0);
 }
 
+// ---------------------------------------------------------------------------
+// [DrawParallaxBackground]
+// - 기능: 하늘 석양 그라데이션, 태양, 원경 구름, 빌딩 실루엣, 전신주 등을 패럴랙스 카메라 보정을 반영하여 다중 레이어로 그립니다.
+// - 매개변수:
+//   - colorShader: 단색 드로잉 셰이더
+//   - cameraPos: 현재 카메라 위치
+//   - viewHalfW: 화면 반폭 크기
+// ---------------------------------------------------------------------------
 void Underground::DrawParallaxBackground(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
 {
     if (!m_parallaxSkyVAO)
@@ -643,6 +690,10 @@ void Underground::DrawParallaxBackground(Shader& colorShader, Math::Vec2 cameraP
     }
 }
 
+// ---------------------------------------------------------------------------
+// [Draw]
+// - 기능: 진입 연출 중인 기차, 지하철역 벽면 배경, 라이트 텍스처, 장애물, 로봇 및 펄스 충전소 스프라이트를 렌더링합니다.
+// ---------------------------------------------------------------------------
 void Underground::Draw(Shader& shader) const
 {
     // 열차를 먼저 그리고, 그 위에 배경을 그려 자판기가 열차보다 위 레이어에 오도록 유지.
@@ -692,6 +743,10 @@ void Underground::Draw(Shader& shader) const
     }
 }
 
+// ---------------------------------------------------------------------------
+// [IsPlayerOnApproachTrain]
+// - 기능: 플레이어가 진입 후 정차 완료한 열차(Subway Train)의 발판 덱(Deck) 위에 완전히 올라타 서있는 상태인지 AABB 검사합니다.
+// ---------------------------------------------------------------------------
 bool Underground::IsPlayerOnApproachTrain(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize) const
 {
     if (!m_approachTrainDocked || m_approachTrainWidth <= 1.0f || m_approachTrainHeight <= 1.0f)
@@ -708,16 +763,28 @@ bool Underground::IsPlayerOnApproachTrain(Math::Vec2 playerHbCenter, Math::Vec2 
     return Collision::CheckAABB(playerHbCenter, playerHitboxSize, deckCenter, deckSize);
 }
 
+// ---------------------------------------------------------------------------
+// [DrawDrones]
+// - 기능: 공중 순찰 드론 스프라이트를 그립니다.
+// ---------------------------------------------------------------------------
 void Underground::DrawDrones(Shader& shader) const
 {
     m_droneManager->Draw(shader);
 }
 
+// ---------------------------------------------------------------------------
+// [DrawRadars]
+// - 기능: 순찰 드론들의 레이더 범위 선을 그립니다.
+// ---------------------------------------------------------------------------
 void Underground::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     m_droneManager->DrawRadars(colorShader, debugRenderer);
 }
 
+// ---------------------------------------------------------------------------
+// [DrawGauges]
+// - 기능: 드론 상단 경고 및 로봇 HP바, 충돌 예고선(Alert) 레이어를 렌더링합니다.
+// ---------------------------------------------------------------------------
 void Underground::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     m_droneManager->DrawGauges(colorShader, debugRenderer);
@@ -729,6 +796,10 @@ void Underground::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) 
     }
 }
 
+// ---------------------------------------------------------------------------
+// [DrawDebug]
+// - 기능: 디버그 모드가 켜진 경우, 장애물 히트박스(적색), 펄스 소스 충전소(주황), 램프 경사면(백색) 히트박스를 표시합니다.
+// ---------------------------------------------------------------------------
 void Underground::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     // Draw collision boxes for all environment objects
@@ -749,6 +820,13 @@ void Underground::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) c
 
 }
 
+// ---------------------------------------------------------------------------
+// [ApplyPulseToRobots]
+// - 기능: 플레이어가 Q 스킬 폭발 펄스를 시전했을 때 범위 내 지하철 로봇들에게 데미지를 입히고 넉백 효과를 줍니다.
+// - 매개변수:
+//   - pulseWorldCenter: 펄스 구체 중심 좌표
+//   - radius: 펄스 반경
+// ---------------------------------------------------------------------------
 void Underground::ApplyPulseToRobots(Math::Vec2 pulseWorldCenter, float radius)
 {
     constexpr float kDamage            = 14.f;
@@ -777,6 +855,10 @@ void Underground::ApplyPulseToRobots(Math::Vec2 pulseWorldCenter, float radius)
     }
 }
 
+// ---------------------------------------------------------------------------
+// [IsPlayerHiding]
+// - 기능: 플레이어가 지하철 맵 내의 숨기기 영역( crates 등) 내부에서 웅크리고 있는지 여부를 판정합니다.
+// ---------------------------------------------------------------------------
 bool Underground::IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHitboxSize,
                                  bool isPlayerCrouching) const
 {
@@ -790,6 +872,10 @@ bool Underground::IsPlayerHiding(Math::Vec2 playerHbCenter, Math::Vec2 playerHit
     return false;
 }
 
+// ---------------------------------------------------------------------------
+// [IsPointOverConfiguredGeometry]
+// - 기능: 주어진 마우스 좌표가 맵 내 충돌 장애물, 라이트, 경사면, 엄폐 구역 중 하나 이상과 겹치는지 검사합니다. (커서 프롬프트 판정용)
+// ---------------------------------------------------------------------------
 bool Underground::IsPointOverConfiguredGeometry(Math::Vec2 worldPos, Math::Vec2 cursorHitboxSize) const
 {
     auto test = [&](const Math::Vec2& c, const Math::Vec2& sz) {
@@ -819,12 +905,20 @@ bool Underground::IsPointOverConfiguredGeometry(Math::Vec2 worldPos, Math::Vec2 
     return false;
 }
 
+// ---------------------------------------------------------------------------
+// [RefillPulseSourcesAfterCheckpointRespawn]
+// - 기능: 체크포인트 부활 시 맵 내 펄스 충전소의 충전량을 최대로 복구합니다.
+// ---------------------------------------------------------------------------
 void Underground::RefillPulseSourcesAfterCheckpointRespawn()
 {
     for (auto& s : m_pulseSources)
         s.RefillStock();
 }
 
+// ---------------------------------------------------------------------------
+// [Shutdown]
+// - 기능: 옥상 배경 이미지 해제, 드론 및 로봇 객체의 셧다운 소멸을 수행합니다.
+// ---------------------------------------------------------------------------
 void Underground::Shutdown()
 {
     if (m_parallaxSkyVAO)

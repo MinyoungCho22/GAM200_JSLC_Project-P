@@ -13,6 +13,11 @@
 #include <algorithm>
 #include <cmath>
 
+// ---------------------------------------------------------------------------
+// [Initialize]
+// - 기능: Rooftop 맵의 배경 텍스처, 리프트 엘리베이터 모델 및 감지 드론 5마리를 기본 스폰하여 초기화합니다.
+// - 가이드라인: 리프트의 초기 위치 및 물리 좌표계 계산, 우측 목표 착지 좌표(`m_liftTargetX`)를 상수 기준으로 할당합니다.
+// ---------------------------------------------------------------------------
 void Rooftop::Initialize()
 {
     // Initialize background assets for different states
@@ -74,6 +79,12 @@ void Rooftop::Initialize()
     m_isPlayerClose = false;
 }
 
+// ---------------------------------------------------------------------------
+// [ApplyConfig]
+// - 기능: JSON 데이터 구조체로부터 리프트 버튼 위치, 낙하 구멍(Hole) 위치 및 충격 펄스 충전기들의 사양을 옥상 맵에 반영합니다.
+// - 매개변수:
+//   - cfg: Rooftop 맵 정보가 담긴 설정 레퍼런스
+// ---------------------------------------------------------------------------
 void Rooftop::ApplyConfig(const RooftopObjectConfig& cfg)
 {
     for (auto& source : m_pulseSources) source.Shutdown();
@@ -109,6 +120,14 @@ void Rooftop::ApplyConfig(const RooftopObjectConfig& cfg)
     m_liftButtonPos = { cfg.liftButton.topLeft.x + w * 0.5f, cfg.liftButton.topLeft.y - h * 0.5f };
 }
 
+// ---------------------------------------------------------------------------
+// [SyncGroundLevelForPlayer]
+// - 기능: 움직이는 리프트 발판 위나 맵 바닥면 위에 서있는 플레이어의 물리 착지 기준 높이(Ground Level)를 계산하여 강제 동기화합니다.
+// - 매개변수:
+//   - player: 플레이어 객체 레퍼런스
+//   - playerHitboxSize: 플레이어 히트박스 크기
+// - 가이드라인: 리프트가 있는 낭떠러지(Abyss) 구간에서는 리프트를 밟고 있거나 기동 대기 중인 상태에서만 발판 높이로 동기화하며, 공중 낙하 시에는 지옥 낙하 처리를 위해 바닥 제한을 해제(abyssGroundY)합니다.
+// ---------------------------------------------------------------------------
 void Rooftop::SyncGroundLevelForPlayer(Player& player, Math::Vec2 playerHitboxSize)
 {
     Math::Vec2 playerPos = player.GetPosition();
@@ -161,6 +180,20 @@ void Rooftop::SyncGroundLevelForPlayer(Player& player, Math::Vec2 playerHitboxSi
     }
 }
 
+// ---------------------------------------------------------------------------
+// [Update]
+// - 기능: 리프트 작동 카운트다운/이동 처리, 리프트 위 플레이어 관성 캐리, 낙하 구멍 메우기 퍼즐 상호작용 및 외벽 충돌을 업데이트합니다.
+// - 매개변수:
+//   - dt: 프레임 시간 델타
+//   - player: 플레이어 레퍼런스
+//   - playerHitboxSize: 플레이어 히트박스 크기
+//   - input: 입력 상태 관리 객체 레퍼런스
+//   - mouseWorldPos: 마우스의 월드 좌표
+//   - isLeftClickTriggered: 마우스 좌클릭 트리거 여부
+// - 가이드라인:
+//   - 낙하 구멍이 열려 있는 동안(`!m_isClose`) 플레이어가 구멍의 좌우 X 영역을 더블 점프 등으로 넘어가지 못하도록 수직 경계벽 충돌 처리를 엄격히 적용해야 합니다.
+//   - 리프트 버튼 작동 비용은 8.0f이며, 플레이어가 작동 버튼 근처에서 마우스를 클릭해야 합니다.
+// ---------------------------------------------------------------------------
 void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Input::Input& input,
                      Math::Vec2 mouseWorldPos, bool isLeftClickTriggered)
 {
@@ -610,6 +643,12 @@ void Rooftop::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Inp
     m_hasPrevPlayerX = true;
 }
 
+// ---------------------------------------------------------------------------
+// [Draw]
+// - 기능: 옥상 배경 이미지, 닫힌 구멍 패치, 엘리베이터 버튼, 펄스 소스 충전소 및 움직이는 리프트 본체를 렌더링합니다.
+// - 매개변수:
+//   - shader: 렌더링 스프라이트용 기본 텍스처 셰이더 레퍼런스
+// ---------------------------------------------------------------------------
 void Rooftop::Draw(Shader& shader) const
 {
     // Render current background (dark or closed-hole version)
@@ -654,23 +693,39 @@ void Rooftop::Draw(Shader& shader) const
     m_lift->Draw(shader, liftModel);
 }
 
+// ---------------------------------------------------------------------------
+// [DrawDrones]
+// - 기능: 옥상 순찰 드론들의 비행 모션을 렌더링합니다.
+// ---------------------------------------------------------------------------
 void Rooftop::DrawDrones(Shader& shader) const
 {
     m_droneManager->Draw(shader);
 }
 
+// ---------------------------------------------------------------------------
+// [DrawRadars]
+// - 기능: 드론 감지 레이더 원들을 렌더링합니다.
+// ---------------------------------------------------------------------------
 void Rooftop::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     // Render enemy detection radars
     m_droneManager->DrawRadars(colorShader, debugRenderer);
 }
 
+// ---------------------------------------------------------------------------
+// [DrawGauges]
+// - 기능: 드론 상단 경고 게이지 바를 그립니다.
+// ---------------------------------------------------------------------------
 void Rooftop::DrawGauges(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     // Render enemy health/status gauges
     m_droneManager->DrawGauges(colorShader, debugRenderer);
 }
 
+// ---------------------------------------------------------------------------
+// [Shutdown]
+// - 기능: Rooftop 맵의 할당된 텍스처 및 드론들을 해제하고 메모리에서 소멸시킵니다.
+// ---------------------------------------------------------------------------
 void Rooftop::Shutdown()
 {
     // Cleanup allocated resources
@@ -706,6 +761,10 @@ void Rooftop::Shutdown()
     }
 }
 
+// ---------------------------------------------------------------------------
+// [DrawDebug]
+// - 기능: 디버그 모드에서 낭떠러지 바운더리와 리프트 진입 장벽 라인을 색상 박스로 가시화합니다.
+// ---------------------------------------------------------------------------
 void Rooftop::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     // Visualize actual abyss/fall range regardless of unlock state.
@@ -733,6 +792,10 @@ void Rooftop::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
     debugRenderer.DrawBox(colorShader, { wallRightX, wallCenterY }, { wallWidth, wallHeight }, { 0.0f, 1.0f });
 }
 
+// ---------------------------------------------------------------------------
+// [DrawSpriteOutlines]
+// - 기능: 플레이어 접근 시 충전소, 엘리베이터 조작 버튼, 리프트 본체, 그리고 닫히지 않은 옥상 구멍 주위에 아웃라인 글로우를 렌더링합니다.
+// ---------------------------------------------------------------------------
 void Rooftop::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist) const
 {
     const float proxDistSq = proximityDist * proximityDist;
@@ -849,6 +912,10 @@ void Rooftop::ClearAllDrones()
     m_droneManager->ClearAllDrones();
 }
 
+// ---------------------------------------------------------------------------
+// [GetLiftCountdownText]
+// - 기능: 리프트 버튼 클릭 후 출발 직전까지 카운트다운 잔여 초 문구를 UI 표시용으로 포맷팅해 반환합니다.
+// ---------------------------------------------------------------------------
 std::string Rooftop::GetLiftCountdownText() const
 {
     // Provide countdown timer text for UI display
