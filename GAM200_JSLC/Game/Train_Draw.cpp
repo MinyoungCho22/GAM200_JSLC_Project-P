@@ -411,6 +411,19 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
         m_fourthTrain->Draw(shader, model);
     }
 
+    // Draw Hiding Spot Sprites
+    for (const auto& spot : m_hidingSpots)
+    {
+        if (spot.sprite)
+        {
+            shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+            shader.setBool("flipX", false);
+            Math::Vec2 worldPos = { trainLeft + spot.localCenter.x, MIN_Y + spot.localCenter.y };
+            Math::Matrix spotModel = Math::Matrix::CreateTranslation(worldPos) * Math::Matrix::CreateScale(spot.size);
+            spot.sprite->Draw(shader, spotModel);
+        }
+    }
+
     if (m_valveSprite && m_valveSprite->GetWidth() > 0)
     {
         const Math::Vec2 valveWorld = { trainLeft + m_valveLocalCenter.x, MIN_Y + m_valveLocalCenter.y };
@@ -618,4 +631,29 @@ void Train::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
         { MIN_X,         MIN_Y + bndH * 0.5f }, { 10.0f, bndH }, { 1.0f, 1.0f });
     debugRenderer.DrawBox(colorShader,
         { MIN_X + m_totalTrainWidth, MIN_Y + bndH * 0.5f }, { 10.0f, bndH }, { 1.0f, 1.0f });
+}
+
+void Train::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist) const
+{
+    const float proxDistSq = proximityDist * proximityDist;
+    const float trainLeft = MIN_X + m_trainOffset;
+
+    for (const auto& spot : m_hidingSpots)
+    {
+        if (!spot.sprite) continue;
+        Math::Vec2 worldPos = { trainLeft + spot.localCenter.x, MIN_Y + spot.localCenter.y };
+        float distSq = (playerPos - worldPos).LengthSq();
+        if (distSq <= proxDistSq)
+        {
+            int w = spot.sprite->GetWidth();
+            int h = spot.sprite->GetHeight();
+            if (w <= 0 || h <= 0) continue;
+
+            outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+            outlineShader.setVec4("outlineColor", 0.15f, 1.0f, 0.35f, 1.0f);
+
+            Math::Matrix model = Math::Matrix::CreateTranslation(worldPos) * Math::Matrix::CreateScale(spot.size);
+            spot.sprite->Draw(outlineShader, model);
+        }
+    }
 }

@@ -76,6 +76,7 @@ public:
     {
         Math::Vec2 localCenter;
         Math::Vec2 size;
+        std::unique_ptr<Background> sprite = nullptr;
     };
 
     /// Third_ThirdTrain 2×3 자동차 운반 구역 — 엔진 시동 / 펄스 주입 / 연쇄 반응
@@ -108,6 +109,9 @@ public:
     // textureShader: draws train car images + robots (레일 타일은 DrawRailTrack)
     // viewHalfW: half of currently visible world width (zoom-aware)
     void Draw(Shader& textureShader, Math::Vec2 cameraPos, float viewHalfW) const;
+
+    // Draw sprite outlines for hiding spots
+    void DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist = 300.f) const;
 
     /// rail.png 타일만 그림. 하늘(DrawBackground) 직후 호출해 다른 맵·차량보다 아래 레이어에 두는 용도.
     void DrawRailTrack(Shader& textureShader, Math::Vec2 cameraPos, float viewHalfW) const;

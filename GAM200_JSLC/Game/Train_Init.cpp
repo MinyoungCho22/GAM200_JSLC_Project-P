@@ -596,13 +596,17 @@ void Train::BuildTrainHitboxes()
     // [Car1] 컨테이너 D  ─  우측 은색 컨테이너  (2005, 573) 525×237
     {
         auto hs = MakeHitbox(c1, 2005, 573, 525, 237);
-        m_hidingSpots.push_back({ hs.localCenter, hs.size });
+        HidingSpot spot{ hs.localCenter, hs.size, nullptr };
+        spot.sprite = std::make_unique<Background>();
+        spot.sprite->Initialize("Asset/Train/HidingBox.png");
+        m_hidingSpots.push_back(std::move(spot));
     }
 
     // [Car3] 좌측 밝은 회색 박스 (177, 567) 324×237
     {
         auto hs = MakeHitbox(c3, 177, 567, 324, 237);
-        m_hidingSpots.push_back({ hs.localCenter, hs.size });
+        HidingSpot spot{ hs.localCenter, hs.size, nullptr };
+        m_hidingSpots.push_back(std::move(spot));
     }
 
     // rail.png — Draw와 동일한 타일 박스 안에서 실제 궤도 높이(kRailWalkSurfaceFractionOfTileH)에 발판 정렬.
@@ -707,6 +711,16 @@ void Train::Shutdown()
     if (m_skyVBO) { GL::DeleteBuffers(1, &m_skyVBO);      m_skyVBO = 0; }
 
     for (auto& source : m_pulseSources) source.Shutdown();
+
+    for (auto& spot : m_hidingSpots)
+    {
+        if (spot.sprite)
+        {
+            spot.sprite->Shutdown();
+            spot.sprite.reset();
+        }
+    }
+    m_hidingSpots.clear();
 
     for (auto& robot : m_robots)
         robot.Shutdown();
