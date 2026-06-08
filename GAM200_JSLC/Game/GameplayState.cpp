@@ -667,6 +667,28 @@ void GameplayState::Update(double dt)
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Warp to TunnelInside (Ctrl+9)");
     }
 
+    if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsGlfwKeyTriggered(GLFW_KEY_7))
+    {
+        silenceStoryForMapCheat();
+        m_skipRooftopQHintByCheat = true;
+        m_tutorial->DisableAll();
+        m_camera.StopAnimation();
+        m_cameraZoom = 1.0f;
+        m_trainZoomTransition = false;
+        player.SetSizeScale(0.6f);
+        m_trainDeferEntryUntilIntroDone = false;
+        m_doorOpened = true;
+        m_rooftopAccessed = true;
+        m_undergroundAccessed = true;
+        m_trainAccessed = true;
+        m_currentCheckpoint = MapZone::Train;
+
+        m_train->CheatWarpToCar5(player, player.GetHitboxSize());
+        m_camera.Update(player.GetPosition(), 1.0f);
+
+        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Warp to Car 5 Water Tank (Ctrl+7)");
+    }
+
     if (m_trainAccessed && m_train
         && (input.IsGlfwKeyPressed(GLFW_KEY_LEFT_ALT) || input.IsGlfwKeyPressed(GLFW_KEY_RIGHT_ALT)))
     {
@@ -2472,9 +2494,11 @@ void GameplayState::DrawMainLayer()
     m_hallway->Draw(textureShader);
     m_rooftop->Draw(textureShader);
     m_underground->Draw(textureShader);
-    m_train->Draw(textureShader, m_camera.GetPosition(), viewHalfW);
+
     const bool trainTunnelInsideOnly =
         m_trainAccessed && m_train->IsCar3TunnelInsideViewActive();
+
+    m_train->Draw(textureShader, m_camera.GetPosition(), viewHalfW, m_outlineShader.get(), playerPos, &worldProjection);
     if (m_trainAccessed && !trainTunnelInsideOnly)
     {
         colorShader->use();
@@ -2650,6 +2674,12 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     {
         m_train->DrawTunnelInsideBackground(textureShader);
         m_train->DrawTunnelInsideProps(textureShader);
+
+        m_outlineShader->use();
+        m_outlineShader->setMat4("projection", projection);
+        m_train->DrawSpriteOutlines(*m_outlineShader, player.GetPosition());
+        textureShader.use();
+        textureShader.setMat4("projection", projection);
     }
     player.Draw(textureShader);
 

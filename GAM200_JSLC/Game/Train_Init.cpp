@@ -35,6 +35,10 @@ void Train::Initialize()
 
     // --- Train car images ---
     m_firstTrain  = std::make_unique<Background>();
+    m_pulseBoxSprite = std::make_unique<Background>();
+    m_sirenSprite = std::make_unique<Background>();
+    m_waterOpenerSprite = std::make_unique<Background>();
+    m_tunnelPulseInjectorSprite = std::make_unique<Background>();
     m_secondTrain = std::make_unique<Background>();
     m_thirdTrain       = std::make_unique<Background>();
     m_car3InsideTrainA = std::make_unique<Background>();
@@ -50,6 +54,10 @@ void Train::Initialize()
     m_valveSprite      = std::make_unique<Background>();
 
     m_firstTrain ->Initialize("Asset/Train/FirstTrain.png");
+    m_pulseBoxSprite->Initialize("Asset/Train/PulseBox.png");
+    m_sirenSprite->Initialize("Asset/Train/LED.png");
+    m_waterOpenerSprite->Initialize("Asset/Train/WaterOpener.png");
+    m_tunnelPulseInjectorSprite->Initialize("Asset/Train/Pulse_1.png");
     m_secondTrain->Initialize("Asset/Train/SecondTrain.png");
     m_thirdTrain ->Initialize("Asset/Train/ThirdTrain.png");
     m_car3InsideTrainA->Initialize("Asset/Train/SecondInside_1.png");
@@ -606,6 +614,8 @@ void Train::BuildTrainHitboxes()
     {
         auto hs = MakeHitbox(c3, 177, 567, 324, 237);
         HidingSpot spot{ hs.localCenter, hs.size, nullptr };
+        spot.sprite = std::make_unique<Background>();
+        spot.sprite->Initialize("Asset/Train/Third_HidingBox.png");
         m_hidingSpots.push_back(std::move(spot));
     }
 
@@ -688,6 +698,10 @@ void Train::Shutdown()
     ShutdownValveWaterGpu();
 
     if (m_firstTrain)      m_firstTrain->Shutdown();
+    if (m_pulseBoxSprite)  { m_pulseBoxSprite->Shutdown(); m_pulseBoxSprite.reset(); }
+    if (m_sirenSprite)     { m_sirenSprite->Shutdown(); m_sirenSprite.reset(); }
+    if (m_waterOpenerSprite) { m_waterOpenerSprite->Shutdown(); m_waterOpenerSprite.reset(); }
+    if (m_tunnelPulseInjectorSprite) { m_tunnelPulseInjectorSprite->Shutdown(); m_tunnelPulseInjectorSprite.reset(); }
     if (m_secondTrain)     m_secondTrain->Shutdown();
     if (m_thirdTrain)      m_thirdTrain->Shutdown();
     if (m_car3InsideTrainA) m_car3InsideTrainA->Shutdown();

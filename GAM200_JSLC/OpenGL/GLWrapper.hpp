@@ -75,6 +75,7 @@ namespace GL
     static inline void GenerateMipmap(GLenum target) { glGenerateMipmap(target); }
     static inline void ActiveTexture(GLenum texture) { glActiveTexture(texture); }
     static inline void DeleteTextures(GLsizei n, const GLuint* textures) { glDeleteTextures(n, textures); }
+    static inline void PixelStorei(GLenum pname, GLint param) { glPixelStorei(pname, param); }
 
     // -------------------------------------------------------------------------
     // Framebuffers (FBO)

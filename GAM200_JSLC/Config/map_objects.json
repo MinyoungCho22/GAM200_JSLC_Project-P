@@ -2,7 +2,6 @@
   "room": {
     "pulse_sources": [
       { "top_left": [424.0, 360.0], "size": [51.0, 63.0], "sprite": "Asset/Room_A.png" },
-      { "top_left": [692.0, 550.0], "size": [215.0, 180.0] },
       { "top_left": [1414.0, 212.0], "size": [81.0, 39.0], "sprite": "Asset/Room_B.png" }
     ],
     "blind": { "top_left": [1105.0, 352.0], "size": [310.0, 300.0] }

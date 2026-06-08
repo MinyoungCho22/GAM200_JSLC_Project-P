@@ -471,6 +471,8 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             m_car3TunnelInsideViewActive = m_car3TunnelInsideTransitionTargetInside;
             if (m_car3TunnelInsideViewActive)
             {
+                m_trainState                 = TrainState::Stationary;
+                m_trainCurrentSpeed          = 0.f;
                 m_tunnelInsideWorldLeft = MIN_X;
                 if (m_tunnelInsideTrain && m_tunnelInsideTrain->GetWidth() > 0)
                     m_tunnelInsideWorldWidth =
@@ -656,7 +658,8 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
 
     // SecondTrain_1 문 강제 경계: 문을 열기 전까지 오른쪽으로 진행 불가
     // (m_car3InsideViewActive가 true가 되면 inside 경계로 전환되므로 이 조건 해제)
-    if (!m_car3InsideViewActive && !m_car3InsideTransitionActive
+    if (!m_tunnelInsideInjectComplete && !m_trainCheatCarUnlock
+        && !m_car3InsideViewActive && !m_car3InsideTransitionActive
         && m_car3ExtensionEnterHbValid && m_car3DoorBarrierLocalX > 0.f)
     {
         const float barrierWorldX  = MIN_X + m_trainOffset + m_car3DoorBarrierLocalX;

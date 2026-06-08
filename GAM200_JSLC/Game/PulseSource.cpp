@@ -152,7 +152,7 @@ void PulseSource::DrawOutline(Shader& outlineShader) const
     if (w <= 0 || h <= 0) return;
 
     outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
-    outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
+    outlineShader.setVec4("outlineColor", 0.8f, 0.2f, 1.0f, 1.0f);
     outlineShader.setFloat("outlineWidthTexels", 2.0f);
 
     Math::Vec2 renderPos = {

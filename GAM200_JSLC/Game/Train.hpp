@@ -108,7 +108,9 @@ public:
 
     // textureShader: draws train car images + robots (레일 타일은 DrawRailTrack)
     // viewHalfW: half of currently visible world width (zoom-aware)
-    void Draw(Shader& textureShader, Math::Vec2 cameraPos, float viewHalfW) const;
+    void Draw(Shader& textureShader, Math::Vec2 cameraPos, float viewHalfW,
+              Shader* outlineShader = nullptr, Math::Vec2 playerPos = {},
+              const Math::Matrix* projection = nullptr) const;
 
     // Draw sprite outlines for hiding spots
     void DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist = 300.f) const;
@@ -255,6 +257,7 @@ public:
 
     void SetTrainCarCheatUnlock(bool v) { m_trainCheatCarUnlock = v; }
     void CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize);
+    void CheatWarpToCar5(Player& player, Math::Vec2 playerHitboxSize);
 
     void RequestTrainCameraShake(float maxPixelOffset);
     float ConsumeTrainCameraShakeRequest();
@@ -277,6 +280,10 @@ public:
 private:
     // Train car textures
     std::unique_ptr<Background> m_firstTrain;
+    std::unique_ptr<Background> m_pulseBoxSprite;
+    std::unique_ptr<Background> m_sirenSprite;
+    std::unique_ptr<Background> m_waterOpenerSprite;
+    std::unique_ptr<Background> m_tunnelPulseInjectorSprite;
     std::unique_ptr<Background> m_secondTrain;
     std::unique_ptr<Background> m_thirdTrain;
     static constexpr int kCar3ExtensionCount = 3;

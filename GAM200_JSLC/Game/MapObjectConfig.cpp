@@ -216,7 +216,6 @@ MapObjectConfigData MapObjectConfig::DefaultData()
 
     data.room.pulseSources = {
         { {424.0f, 360.0f}, {51.0f, 63.0f}, "Asset/Room_A.png", {} },
-        { {692.0f, 550.0f}, {215.0f, 180.0f}, "", {} },
         { {1414.0f, 212.0f}, {81.0f, 39.0f}, "Asset/Room_B.png", {} }
     };
     data.room.blind = { {1105.0f, 352.0f}, {310.0f, 300.0f}, "", {} };

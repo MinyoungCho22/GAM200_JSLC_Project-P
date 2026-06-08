@@ -28,6 +28,7 @@ void Background::Initialize(const char* texturePath)
     GL::BindTexture(GL_TEXTURE_2D, m_textureID);
 
     GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
+    GL::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
     GL::TexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
     GL::GenerateMipmap(GL_TEXTURE_2D);
 
@@ -91,6 +92,7 @@ void Background::InitializeWithBlackKeyTransparency(const char* texturePath, uns
 
     GL::GenTextures(1, &m_textureID);
     GL::BindTexture(GL_TEXTURE_2D, m_textureID);
+    GL::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
     GL::TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     GL::GenerateMipmap(GL_TEXTURE_2D);
 

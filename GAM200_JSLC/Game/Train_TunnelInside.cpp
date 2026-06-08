@@ -264,6 +264,7 @@ void Train::SnapPlayerToSecondTrain3Return(Player& player, Math::Vec2 playerHitb
     player.SetCurrentGroundLevel(floorTop);
     player.ResetVelocity();
     player.SetOnGround(true);
+    m_tunnelInsideCameraSnapPending = true;
 }
 
 void Train::DrawTunnelInsideInjectGauge(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const
@@ -429,6 +430,22 @@ void Train::DrawTunnelInsideProps(Shader& shader) const
 
     for (const auto& prop : m_tunnelInsideProps)
     {
+        if (prop.injectable)
+        {
+            if (m_tunnelPulseInjectorSprite && m_tunnelPulseInjectorSprite->GetWidth() > 0)
+            {
+                const Math::Vec2 worldC = { m_tunnelInsideWorldLeft + prop.localCenter.x,
+                                            MIN_Y + prop.localCenter.y };
+                Math::Matrix     model  = Math::Matrix::CreateTranslation(worldC)
+                                       * Math::Matrix::CreateScale(prop.size);
+                shader.setFloat("alpha", 1.0f);
+                shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+                shader.setFloat("tintStrength", 0.0f);
+                m_tunnelPulseInjectorSprite->Draw(shader, model);
+            }
+            continue;
+        }
+
         if (!prop.useObjectSprite || !m_tunnelObjectTex || m_tunnelObjectTex->GetWidth() <= 0)
             continue;
 
@@ -466,6 +483,8 @@ void Train::CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize)
 {
     m_car3InsideViewActive       = true;   // suppress exterior drones/robots
     m_car3TunnelInsideViewActive = true;
+    m_trainState                 = TrainState::Stationary;
+    m_trainCurrentSpeed          = 0.f;
     m_tunnelInsideWorldLeft = MIN_X;
     if (m_tunnelInsideTrain && m_tunnelInsideTrain->GetWidth() > 0)
         m_tunnelInsideWorldWidth = static_cast<float>(m_tunnelInsideTrain->GetWidth());
@@ -475,6 +494,47 @@ void Train::CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize)
     m_tunnelInsideHazardFalling = false;
     m_tunnelInsideHazardTimer   = 0.f;
     player.GetPulseCore().getPulse().set(player.GetPulseCore().getPulse().Max());
+    if (m_sirenDroneManager)
+        m_sirenDroneManager->ClearAllDrones();
+}
+
+void Train::CheatWarpToCar5(Player& player, Math::Vec2 playerHitboxSize)
+{
+    m_car3InsideViewActive       = false;
+    m_car3TunnelInsideViewActive = false;
+    m_trainCheatCarUnlock        = true;
+
+    m_car3InsideTransitionActive = false;
+    m_car3TunnelInsideTransitionActive = false;
+
+    // Reset TunnelInside state variables
+    m_tunnelInsideInjectT              = 0.f;
+    m_tunnelInsideInjectComplete       = false;
+    m_tunnelInsideDepartStarted        = false;
+    m_tunnelInsideTrainVisualX         = 0.f;
+    m_tunnelInsideDepartTrainOffset0   = 0.f;
+    m_tunnelInsideBoardTimer           = -1.f;
+    m_playerOnTunnelBoardingFloor        = false;
+    m_playerOnTunnelDepartWalkFloor      = false;
+
+    // Snapping player to the center of Car 5 (water tank car)
+    const float cx = GetTrainCarCenterWorldX(5);
+    const float deckSurfaceY = MIN_Y + kTrainFlatbedDeckTopLocalY;
+    const float halfH = playerHitboxSize.y * 0.5f;
+
+    const Math::Vec2 oldHb = player.GetHitboxCenter();
+    const Math::Vec2 newHb = { cx, deckSurfaceY + halfH };
+
+    player.SetPosition(player.GetPosition() + (newHb - oldHb));
+    player.SetCurrentGroundLevel(deckSurfaceY);
+    player.ResetVelocity();
+    player.SetOnGround(true);
+
+    m_tunnelInsideCameraSnapPending = true;
+
+    // Guarantee train is moving at full speed
+    m_trainState = TrainState::Moving;
+    m_trainCurrentSpeed = TRAIN_SPEED;
     if (m_sirenDroneManager)
         m_sirenDroneManager->ClearAllDrones();
 }

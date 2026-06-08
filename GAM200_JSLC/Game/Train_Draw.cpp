@@ -254,7 +254,9 @@ void Train::DrawRailTrack(Shader& shader, Math::Vec2 cameraPos, float viewHalfW)
 }
 
 // 열차 칸 스프라이트(Car1~5), 밸브, 로봇을 카메라 시야 내에서 그림
-void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
+void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW,
+                 Shader* outlineShader, Math::Vec2 playerPos,
+                 const Math::Matrix* projection) const
 {
     // 열차만 MainLayer — Turnel_Inside·오브젝트·플레이어는 ForegroundLayer
     if (m_car3TunnelInsideViewActive)
@@ -262,6 +264,14 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
         DrawTunnelInsideTrainForeground(shader);
         return;
     }
+
+    auto getAABBProximitySq = [](Math::Vec2 pPos, Math::Vec2 boxPos, Math::Vec2 boxSize) {
+        float dx = std::max(0.0f, std::abs(pPos.x - boxPos.x) - boxSize.x * 0.5f);
+        float dy = std::max(0.0f, std::abs(pPos.y - boxPos.y) - boxSize.y * 0.5f);
+        return dx * dx + dy * dy;
+    };
+    const float proxDist = 300.f;
+    const float proxDistSq = proxDist * proxDist;
 
     // ── Train car images (move with trainOffset) ───────────────────────────
     const float trainLeft = MIN_X + m_trainOffset;
@@ -424,6 +434,47 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
         }
     }
 
+    // Draw PulseBox sprite
+    if (m_car2PurpleHbValid && m_pulseBoxSprite)
+    {
+        shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+        shader.setBool("flipX", false);
+        Math::Vec2 worldPos = { trainLeft + m_car2PurpleHb.localCenter.x, MIN_Y + m_car2PurpleHb.localCenter.y };
+        Math::Matrix model = Math::Matrix::CreateTranslation(worldPos) * Math::Matrix::CreateScale(m_car2PurpleHb.size);
+        m_pulseBoxSprite->Draw(shader, model);
+    }
+
+    // Draw Siren (LED) sprite
+    if (m_car3SirenHbValid && m_sirenSprite)
+    {
+        shader.setVec4("spriteRect", 0.f, 0.f, 1.f, 1.f);
+        shader.setBool("flipX", false);
+        Math::Vec2 worldPos = { trainLeft + m_car3SirenHb.localCenter.x, MIN_Y + m_car3SirenHb.localCenter.y };
+        Math::Matrix model = Math::Matrix::CreateTranslation(worldPos) * Math::Matrix::CreateScale(m_car3SirenHb.size);
+        m_sirenSprite->Draw(shader, model);
+    }
+
+    if (m_waterOpenerSprite && m_waterOpenerSprite->GetWidth() > 0)
+    {
+        const Math::Vec2 openerWorld = { trainLeft + m_valveLocalCenter.x, MIN_Y + m_valveLocalCenter.y };
+        Math::Matrix model = Math::Matrix::CreateTranslation(openerWorld) * Math::Matrix::CreateScale({ 330.f, 165.f });
+        m_waterOpenerSprite->Draw(shader, model);
+
+        if (outlineShader && projection)
+        {
+            float distSq = getAABBProximitySq(playerPos, openerWorld, { 330.f, 165.f });
+            if (distSq <= proxDistSq)
+            {
+                outlineShader->use();
+                outlineShader->setMat4("projection", *projection);
+                outlineShader->setVec2("texelSize", 1.0f / m_waterOpenerSprite->GetWidth(), 1.0f / m_waterOpenerSprite->GetHeight());
+                outlineShader->setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f); // Blue glow outline
+                m_waterOpenerSprite->Draw(*outlineShader, model);
+                shader.use();
+            }
+        }
+    }
+
     if (m_valveSprite && m_valveSprite->GetWidth() > 0)
     {
         const Math::Vec2 valveWorld = { trainLeft + m_valveLocalCenter.x, MIN_Y + m_valveLocalCenter.y };
@@ -433,6 +484,20 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW) const
             Math::Matrix::CreateRotation(cwDeg) *
             Math::Matrix::CreateScale(m_valveVisualSize);
         m_valveSprite->Draw(shader, model);
+
+        if (outlineShader && projection)
+        {
+            float distSq = getAABBProximitySq(playerPos, valveWorld, m_valveVisualSize);
+            if (distSq <= proxDistSq)
+            {
+                outlineShader->use();
+                outlineShader->setMat4("projection", *projection);
+                outlineShader->setVec2("texelSize", 1.0f / m_valveSprite->GetWidth(), 1.0f / m_valveSprite->GetHeight());
+                outlineShader->setVec4("outlineColor", 1.0f, 0.2f, 0.2f, 1.0f); // Red glow outline
+                m_valveSprite->Draw(*outlineShader, model);
+                shader.use();
+            }
+        }
     }
 
     // ── Robots (none currently, kept for future use) ─────────────────────
@@ -638,11 +703,46 @@ void Train::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, floa
     const float proxDistSq = proximityDist * proximityDist;
     const float trainLeft = MIN_X + m_trainOffset;
 
+    auto getAABBProximitySq = [](Math::Vec2 pPos, Math::Vec2 boxPos, Math::Vec2 boxSize) {
+        float dx = std::max(0.0f, std::abs(pPos.x - boxPos.x) - boxSize.x * 0.5f);
+        float dy = std::max(0.0f, std::abs(pPos.y - boxPos.y) - boxSize.y * 0.5f);
+        return dx * dx + dy * dy;
+    };
+
+    if (m_car3TunnelInsideViewActive)
+    {
+        // Draw ONLY Tunnel Pulse Injector outline when inside tunnel
+        if (m_tunnelPulseInjectorSprite)
+        {
+            for (const auto& prop : m_tunnelInsideProps)
+            {
+                if (!prop.injectable) continue;
+                Math::Vec2 worldPos = { m_tunnelInsideWorldLeft + prop.localCenter.x, MIN_Y + prop.localCenter.y };
+                float distSq = getAABBProximitySq(playerPos, worldPos, prop.size);
+                if (distSq <= proxDistSq)
+                {
+                    int w = m_tunnelPulseInjectorSprite->GetWidth();
+                    int h = m_tunnelPulseInjectorSprite->GetHeight();
+                    if (w > 0 && h > 0)
+                    {
+                        outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+                        outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f); // Blue glow outline
+
+                        Math::Matrix model = Math::Matrix::CreateTranslation(worldPos) * Math::Matrix::CreateScale(prop.size);
+                        m_tunnelPulseInjectorSprite->Draw(outlineShader, model);
+                    }
+                }
+            }
+        }
+        return; // Early return to prevent drawing main train outlines!
+    }
+
+    // Draw Hiding Spots outlines
     for (const auto& spot : m_hidingSpots)
     {
         if (!spot.sprite) continue;
         Math::Vec2 worldPos = { trainLeft + spot.localCenter.x, MIN_Y + spot.localCenter.y };
-        float distSq = (playerPos - worldPos).LengthSq();
+        float distSq = getAABBProximitySq(playerPos, worldPos, spot.size);
         if (distSq <= proxDistSq)
         {
             int w = spot.sprite->GetWidth();
@@ -650,10 +750,50 @@ void Train::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, floa
             if (w <= 0 || h <= 0) continue;
 
             outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
-            outlineShader.setVec4("outlineColor", 0.15f, 1.0f, 0.35f, 1.0f);
+            outlineShader.setVec4("outlineColor", 0.15f, 1.0f, 0.35f, 1.0f); // Green glow outline
 
             Math::Matrix model = Math::Matrix::CreateTranslation(worldPos) * Math::Matrix::CreateScale(spot.size);
             spot.sprite->Draw(outlineShader, model);
+        }
+    }
+
+    // Draw PulseBox outline
+    if (m_car2PurpleHbValid && m_pulseBoxSprite)
+    {
+        Math::Vec2 worldPos = { trainLeft + m_car2PurpleHb.localCenter.x, MIN_Y + m_car2PurpleHb.localCenter.y };
+        float distSq = getAABBProximitySq(playerPos, worldPos, m_car2PurpleHb.size);
+        if (distSq <= proxDistSq)
+        {
+            int w = m_pulseBoxSprite->GetWidth();
+            int h = m_pulseBoxSprite->GetHeight();
+            if (w > 0 && h > 0)
+            {
+                outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+                outlineShader.setVec4("outlineColor", 0.8f, 0.2f, 1.0f, 1.0f); // Purple glow outline
+
+                Math::Matrix model = Math::Matrix::CreateTranslation(worldPos) * Math::Matrix::CreateScale(m_car2PurpleHb.size);
+                m_pulseBoxSprite->Draw(outlineShader, model);
+            }
+        }
+    }
+
+    // Draw Siren LED outline
+    if (m_car3SirenHbValid && m_sirenSprite)
+    {
+        Math::Vec2 worldPos = { trainLeft + m_car3SirenHb.localCenter.x, MIN_Y + m_car3SirenHb.localCenter.y };
+        float distSq = getAABBProximitySq(playerPos, worldPos, m_car3SirenHb.size);
+        if (distSq <= proxDistSq)
+        {
+            int w = m_sirenSprite->GetWidth();
+            int h = m_sirenSprite->GetHeight();
+            if (w > 0 && h > 0)
+            {
+                outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+                outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f); // Blue glow outline
+
+                Math::Matrix model = Math::Matrix::CreateTranslation(worldPos) * Math::Matrix::CreateScale(m_car3SirenHb.size);
+                m_sirenSprite->Draw(outlineShader, model);
+            }
         }
     }
 }
