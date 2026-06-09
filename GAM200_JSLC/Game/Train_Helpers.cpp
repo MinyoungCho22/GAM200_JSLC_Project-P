@@ -104,16 +104,17 @@ float Train::GetCar4LocalLeft() const
     return x;
 }
 
-float Train::GetTrainCarLocalLeftEdge(int carIndex1To5) const
+float Train::GetTrainCarLocalLeftEdge(int carIndex1To6) const
 {
-    switch (carIndex1To5)
+    switch (carIndex1To6)
     {
     case 1: return 0.f;
     case 2: return m_car1Width;
     case 3: return m_car1Width + m_car2Width;
     case 4: return GetCar4LocalLeft();
     case 5: return GetCar4LocalLeft() + m_car4Width;
-    case 6: return m_totalTrainWidth;
+    case 6: return GetCar4LocalLeft() + m_car4Width + m_car5Width;
+    case 7: return m_totalTrainWidth;
     default: return m_totalTrainWidth;
     }
 }
@@ -129,7 +130,7 @@ bool Train::IsPlayerInSecondTrain3Car(Math::Vec2 worldHbCenter) const
     return lx >= car3Left + car3W * 0.10f && lx < car3Left + car3W;
 }
 
-// 플레이어 히트박스 중심 X로 현재 탑승 칸 번호(1~5)를 반환함 (열차 밖이면 0)
+// 플레이어 히트박스 중심 X로 현재 탑승 칸 번호(1~6)를 반환함 (열차 밖이면 0)
 int Train::GetPlayerTrainCarIndex(Math::Vec2 worldHbCenter) const
 {
     const float lx = worldHbCenter.x - MIN_X - m_trainOffset;
@@ -145,53 +146,57 @@ int Train::GetPlayerTrainCarIndex(Math::Vec2 worldHbCenter) const
         return 3;
     if (lx < GetCar4LocalLeft() + m_car4Width)
         return 4;
-    return 5;
+    if (lx < GetCar4LocalLeft() + m_car4Width + m_car5Width)
+        return 5;
+    return 6;
 }
 
-// 지정 칸(1~5)의 월드 X 중심 좌표를 반환함 (범위 밖이면 열차 전체 중앙을 반환함)
-float Train::GetTrainCarCenterWorldX(int carIndex1To5) const
+// 지정 칸(1~6)의 월드 X 중심 좌표를 반환함 (범위 밖이면 열차 전체 중앙을 반환함)
+float Train::GetTrainCarCenterWorldX(int carIndex1To6) const
 {
-    if (carIndex1To5 < 1 || carIndex1To5 > 5)
+    if (carIndex1To6 < 1 || carIndex1To6 > 6)
         return MIN_X + m_trainOffset + m_totalTrainWidth * 0.5f;
-    const float l = GetTrainCarLocalLeftEdge(carIndex1To5);
+    const float l = GetTrainCarLocalLeftEdge(carIndex1To6);
     float       w = m_car1Width;
-    if (carIndex1To5 == 2)
+    if (carIndex1To6 == 2)
         w = m_car2Width;
-    else if (carIndex1To5 == 3)
+    else if (carIndex1To6 == 3)
         w = m_car3Width;
-    else if (carIndex1To5 == 4)
+    else if (carIndex1To6 == 4)
         w = m_car4Width;
-    else if (carIndex1To5 == 5)
+    else if (carIndex1To6 == 5)
         w = m_car5Width;
+    else if (carIndex1To6 == 6)
+        w = m_car6Width;
     return MIN_X + m_trainOffset + l + w * 0.5f;
 }
 
 // 해당 칸의 드론과 로봇이 모두 처치됐으면 true를 반환함
-bool Train::IsTrainCarCombatCleared(int car1To5) const
+bool Train::IsTrainCarCombatCleared(int car1To6) const
 {
-    if (car1To5 < 1 || car1To5 > 5)
+    if (car1To6 < 1 || car1To6 > 6)
         return true;
 
     if (m_droneManager)
     {
         for (const auto& d : m_droneManager->GetDrones())
-            if (!d.IsDead() && d.GetTrainCarSegment() == car1To5)
+            if (!d.IsDead() && d.GetTrainCarSegment() == car1To6)
                 return false;
     }
-    if (car1To5 == 3 && m_sirenDroneManager)
+    if (car1To6 == 3 && m_sirenDroneManager)
     {
         for (const auto& d : m_sirenDroneManager->GetDrones())
             if (!d.IsDead())
                 return false;
     }
-    if (car1To5 == 4 && m_carTransportDroneManager)
+    if (car1To6 == 4 && m_carTransportDroneManager)
     {
         for (const auto& d : m_carTransportDroneManager->GetDrones())
             if (!d.IsDead())
                 return false;
     }
     for (const auto& r : m_robots)
-        if (!r.IsDead() && r.GetTrainCarSegment() == car1To5)
+        if (!r.IsDead() && r.GetTrainCarSegment() == car1To6)
             return false;
     return true;
 }

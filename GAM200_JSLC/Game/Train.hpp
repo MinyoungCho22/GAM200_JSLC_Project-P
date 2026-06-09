@@ -298,6 +298,7 @@ private:
     std::unique_ptr<Background> m_tunnelObjectTex;
     std::unique_ptr<Background> m_thirdThirdTrain;
     std::unique_ptr<Background> m_fourthTrain;
+    std::unique_ptr<Background> m_fifthTrain;
     std::unique_ptr<Background> m_valveSprite;
 
     // Rail tile texture (tiled horizontally along train-map floor)
@@ -312,6 +313,7 @@ private:
     float m_car3Width = 2640.0f;
     float m_car4Width = 2640.0f;
     float m_car5Width = 2640.0f;
+    float m_car6Width = 2640.0f;
     float m_totalTrainWidth = 7920.0f;
 
     // Rail tile info (computed after loading rail image)

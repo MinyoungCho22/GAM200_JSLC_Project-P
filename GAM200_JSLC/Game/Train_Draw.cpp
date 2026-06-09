@@ -462,6 +462,16 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW,
         m_fourthTrain->Draw(shader, model);
     }
 
+    if (m_fifthTrain)
+    {
+        float cx = trainLeft + GetCar4LocalLeft() + m_car4Width + m_car5Width + m_car6Width * 0.5f;
+        float cy = MIN_Y + HEIGHT * 0.5f;
+        Math::Matrix model =
+            Math::Matrix::CreateTranslation({ cx, cy }) *
+            Math::Matrix::CreateScale({ m_car6Width, HEIGHT });
+        m_fifthTrain->Draw(shader, model);
+    }
+
     // Draw Hiding Spot Sprites
     for (const auto& spot : m_hidingSpots)
     {

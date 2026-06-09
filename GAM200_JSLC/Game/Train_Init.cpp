@@ -51,6 +51,7 @@ void Train::Initialize()
     m_secondTrainFrontTex = std::make_unique<Background>();
     m_thirdThirdTrain  = std::make_unique<Background>();
     m_fourthTrain      = std::make_unique<Background>();
+    m_fifthTrain       = std::make_unique<Background>();
     m_valveSprite      = std::make_unique<Background>();
 
     m_firstTrain ->Initialize("Asset/Train/FirstTrain.png");
@@ -90,6 +91,7 @@ void Train::Initialize()
     }
     m_thirdThirdTrain->Initialize("Asset/Train/Third_ThirdTrain.png");
     m_fourthTrain    ->Initialize("Asset/Train/FourthTrain.png");
+    m_fifthTrain     ->Initialize("Asset/Train/SecondTrain_1.png");
     // File name in request had spacing typo ("Valve. png"), so try common variants.
     m_valveSprite->Initialize("Asset/Train/Valve.png");
     if (m_valveSprite->GetWidth() <= 0)
@@ -101,7 +103,8 @@ void Train::Initialize()
     if (m_thirdTrain->GetWidth()  > 0) m_car3Width = static_cast<float>(m_thirdTrain->GetWidth());
     if (m_thirdThirdTrain->GetWidth() > 0) m_car4Width = static_cast<float>(m_thirdThirdTrain->GetWidth());
     if (m_fourthTrain->GetWidth()     > 0) m_car5Width = static_cast<float>(m_fourthTrain->GetWidth());
-    m_totalTrainWidth = GetCar4LocalLeft() + m_car4Width + m_car5Width;
+    if (m_fifthTrain->GetWidth()      > 0) m_car6Width = static_cast<float>(m_fifthTrain->GetWidth());
+    m_totalTrainWidth = GetCar4LocalLeft() + m_car4Width + m_car5Width + m_car6Width;
 
     // Car5 valve anchor: centered on existing valve/pipe hitbox (c5, 894,351,317,162).
     // Keep local-space so it follows train offset automatically.
@@ -596,6 +599,16 @@ void Train::BuildTrainHitboxes()
 
 
     // ════════════════════════════════════════════════════════════════════════
+    // ▣  Car 6  –  SecondTrain_1.png (물탱크 칸 오른쪽 추가 칸)
+    // ════════════════════════════════════════════════════════════════════════
+    const float c6 = c5 + m_car5Width;
+    {
+        const float deckW = std::max(m_car6Width - 168.0f, 400.0f);
+        m_trainHitboxes.push_back(MakeHitbox(c6, 84, 804, deckW, 45));
+    }
+
+
+    // ════════════════════════════════════════════════════════════════════════
     // ▣  Hiding Spots  (기차와 함께 이동, 드론 탐지 차단)
     //    Car1 D / Car3 I  (Car4 자동차 윤곽은 비충돌 표시만)
     // ════════════════════════════════════════════════════════════════════════
@@ -718,6 +731,7 @@ void Train::Shutdown()
     }
     if (m_thirdThirdTrain) m_thirdThirdTrain->Shutdown();
     if (m_fourthTrain)     m_fourthTrain->Shutdown();
+    if (m_fifthTrain)      m_fifthTrain->Shutdown();
     if (m_valveSprite)     m_valveSprite->Shutdown();
     if (m_railTile)        m_railTile->Shutdown();
 
