@@ -91,7 +91,7 @@ void Train::Initialize()
     }
     m_thirdThirdTrain->Initialize("Asset/Train/Third_ThirdTrain.png");
     m_fourthTrain    ->Initialize("Asset/Train/FourthTrain.png");
-    m_fifthTrain     ->Initialize("Asset/Train/SecondTrain_1.png");
+    m_fifthTrain     ->Initialize("Asset/Train/Train_Head.png");
     // File name in request had spacing typo ("Valve. png"), so try common variants.
     m_valveSprite->Initialize("Asset/Train/Valve.png");
     if (m_valveSprite->GetWidth() <= 0)
@@ -599,7 +599,7 @@ void Train::BuildTrainHitboxes()
 
 
     // ════════════════════════════════════════════════════════════════════════
-    // ▣  Car 6  –  SecondTrain_1.png (물탱크 칸 오른쪽 추가 칸)
+    // ▣  Car 6  –  Train_Head.png (물탱크 칸 오른쪽 추가 칸)
     // ════════════════════════════════════════════════════════════════════════
     const float c6 = c5 + m_car5Width;
     {

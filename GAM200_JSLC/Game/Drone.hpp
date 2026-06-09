@@ -211,7 +211,8 @@ private:
     float m_baseY = 0.0f;
     float m_bobTimer = 0.0f;
     float m_groundLevel = 180.0f;
-    unsigned int VAO = 0, VBO = 0, textureID = 0;
+    unsigned int VAO = 0, VBO = 0, textureID = 0, m_radarTextureID = 0;
+    int m_radarWidth = 0, m_radarHeight = 0;
 
     bool m_debugMode = false; // When true, AI is disabled for manual positioning
     float m_debugExitTimer = 0.0f; // Timer to delay AI restart after exiting debug mode

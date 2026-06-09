@@ -2732,22 +2732,24 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     }
 
     // 6) World-space overlays (radars / gauges) — 터널 인사이드는 외부(드론 레이더) 영향 없음
-    colorShader->use();
-    colorShader->setMat4("projection", projection);
+    m_outlineShader->use();
+    m_outlineShader->setMat4("projection", projection);
     const bool suppressTrainExteriorHazards =
         m_trainAccessed && m_train && m_train->ShouldHideTrainExteriorHazards();
     if (!suppressTrainExteriorHazards)
     {
-        droneManager->DrawRadars(*colorShader, *m_debugRenderer);
-        m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
-        m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
-        m_underground->DrawRadars(*colorShader, *m_debugRenderer);
+        droneManager->DrawRadars(*m_outlineShader, *m_debugRenderer);
+        m_hallway->DrawRadars(*m_outlineShader, *m_debugRenderer);
+        m_rooftop->DrawRadars(*m_outlineShader, *m_debugRenderer);
+        m_underground->DrawRadars(*m_outlineShader, *m_debugRenderer);
     }
     if (m_trainAccessed && m_train)
     {
-        m_train->DrawRadars(*colorShader, *m_debugRenderer);
+        m_train->DrawRadars(*m_outlineShader, *m_debugRenderer);
     }
 
+    colorShader->use();
+    colorShader->setMat4("projection", projection);
     droneManager->DrawGauges(*colorShader, *m_debugRenderer);
     m_hallway->DrawGauges(*colorShader, *m_debugRenderer);
     m_rooftop->DrawGauges(*colorShader, *m_debugRenderer);

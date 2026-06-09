@@ -5,6 +5,7 @@ in vec2 TexCoord;
 uniform sampler2D ourTexture;
 uniform vec2 texelSize;
 uniform vec4 outlineColor;   
+uniform bool radialScanline;
 
 float alphaAt(vec2 uv)
 {
@@ -76,8 +77,20 @@ void main()
 
     vec3 baseColor = outlineColor.rgb;
 
-    float scan = sin(TexCoord.y * scanlineDensity) * 0.5 + 0.5;
-    float scanMask = mix(1.0 - scanlineStrength, 1.0, scan);
+    float scan = 1.0;
+    float currentStrength = scanlineStrength;
+    if (radialScanline)
+    {
+        vec2 toTip = TexCoord - vec2(0.5, 0.0);
+        float angle = atan(toTip.y, toTip.x);
+        scan = sin(angle * 80.0) * 0.5 + 0.5;
+        currentStrength = 0.75;
+    }
+    else
+    {
+        scan = sin(TexCoord.y * scanlineDensity) * 0.5 + 0.5;
+    }
+    float scanMask = mix(1.0 - currentStrength, 1.0, scan);
 
     vec3 color = baseColor;
     float alpha = 0.0;

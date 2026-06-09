@@ -38,7 +38,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, DroneType type)
     m_baseY = startPos.y;
     m_velocity = { 0.0f, 0.0f };
     m_direction = { 1.0f, 0.0f };
-    if (m_type == DroneType::Tracer)
+    if (m_type == DroneType::Tracer || m_type == DroneType::Detection)
     {
         m_texturePath = "Asset/RedDrone.png";
     }
@@ -127,6 +127,87 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, DroneType type)
     {
         Logger::Instance().Log(Logger::Severity::Error, "Failed to load drone texture: %s", texturePath);
     }
+
+    // Load Drone_Rader.png texture for the radar sweep outline
+    GL::GenTextures(1, &m_radarTextureID);
+    GL::BindTexture(GL_TEXTURE_2D, m_radarTextureID);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    GL::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    int rChannels = 0;
+    unsigned char* rData = stbi_load("Asset/Drone_Rader.png", &m_radarWidth, &m_radarHeight, &rChannels, 0);
+    if (rData)
+    {
+        if (rChannels == 4)
+        {
+            // Step 1: Scanline fill the inside of the cone in memory
+            for (int y = 0; y < m_radarHeight; ++y)
+            {
+                int first_x = -1;
+                int last_x = -1;
+                for (int x = 0; x < m_radarWidth; ++x)
+                {
+                    unsigned char alpha = rData[(y * m_radarWidth + x) * 4 + 3];
+                    if (alpha > 0)
+                    {
+                        if (first_x == -1)
+                        {
+                            first_x = x;
+                        }
+                        last_x = x;
+                    }
+                }
+
+                if (first_x != -1 && last_x != -1)
+                {
+                    for (int x = first_x; x <= last_x; ++x)
+                    {
+                        // Fill inside pixels with baseline alpha (e.g. 15)
+                        if (rData[(y * m_radarWidth + x) * 4 + 3] == 0)
+                        {
+                            rData[(y * m_radarWidth + x) * 4 + 3] = 15;
+                        }
+                    }
+                }
+            }
+
+            // Step 2: Find maximum alpha
+            unsigned char maxAlpha = 0;
+            int pixelCount = m_radarWidth * m_radarHeight;
+            for (int i = 0; i < pixelCount; ++i)
+            {
+                unsigned char alpha = rData[i * 4 + 3];
+                if (alpha > maxAlpha)
+                {
+                    maxAlpha = alpha;
+                }
+            }
+
+            // Step 3: Scale alpha to 0-255 range if maxAlpha is low
+            if (maxAlpha > 0 && maxAlpha < 255)
+            {
+                float scale = 255.0f / maxAlpha;
+                for (int i = 0; i < pixelCount; ++i)
+                {
+                    float scaledAlpha = rData[i * 4 + 3] * scale;
+                    rData[i * 4 + 3] = static_cast<unsigned char>(std::clamp(scaledAlpha, 0.0f, 255.0f));
+                }
+                Logger::Instance().Log(Logger::Severity::Info, "Scaled drone radar texture alpha (maxAlpha was %d).", maxAlpha);
+            }
+        }
+
+        GLenum format = (rChannels == 4) ? GL_RGBA : GL_RGB;
+        GL::TexImage2D(GL_TEXTURE_2D, 0, format, m_radarWidth, m_radarHeight, 0, format, GL_UNSIGNED_BYTE, rData);
+        GL::GenerateMipmap(GL_TEXTURE_2D);
+        Logger::Instance().Log(Logger::Severity::Info, "Drone radar texture loaded successfully (Asset/Drone_Rader.png).");
+    }
+    else
+    {
+        Logger::Instance().Log(Logger::Severity::Error, "Failed to load drone radar texture (Asset/Drone_Rader.png).");
+    }
+    stbi_image_free(rData);
 
     stbi_image_free(data);
 }
@@ -852,9 +933,8 @@ void Drone::Draw(const Shader& shader) const
     if (!m_isHit && !m_isDead && m_dmgWobbleTimer > 0.f)
     {
         float progress = m_dmgWobbleTimer / 0.5f;
-        float wobbleAngle = std::sin(m_wobbleAnimTime * 20.0f) * 25.0f * progress;
+        float wobbleAngle = std::sin(m_wobbleAnimTime * 12.0f) * 45.0f * progress;
         rotationMatrix = rotationMatrix * Math::Matrix::CreateRotation(wobbleAngle);
-        drawPos.x += std::sin(m_wobbleAnimTime * 24.0f) * 15.0f * progress;
     }
 
     if (!m_isHit && m_stunTimer > 0.f)
@@ -892,26 +972,50 @@ void Drone::Draw(const Shader& shader) const
     GL::BindVertexArray(0);
 }
 
-void Drone::DrawRadar(const Shader& colorShader, DebugRenderer& debugRenderer) const
+void Drone::DrawRadar(const Shader& shader, DebugRenderer& debugRenderer) const
 {
-    if (m_isDead && m_corpseFadeAlpha <= 0.f) return;
+    if (m_isDead) return;
+    if (m_radarTextureID == 0) return;
 
-    const int numLines = 14;
-    const float sweepAngle = 45.0f;
-    float halfSweep = sweepAngle / 2.0f;
+    // Use the outline shader (passed as shader)
+    shader.use();
+    shader.setVec2("texelSize", 1.0f / m_radarWidth, 1.0f / m_radarHeight);
+    shader.setVec4("outlineColor", 1.0f, 0.0f, 0.0f, 1.0f); // Red glow outline
+    shader.setBool("radialScanline", true);
 
-    for (int i = 0; i <= numLines; ++i)
-    {
-        float angle = (m_radarAngle - halfSweep + (sweepAngle * i / numLines)) * (PI / 180.0f);
+    // Width and height of the radar quad in world units.
+    // The height matches the radar range (m_radarLength = 150.0f).
+    // The width preserves the original texture aspect ratio (64 / 86).
+    const float yScale = m_radarLength;
+    const float xScale = m_radarLength * (64.0f / 86.0f);
 
-        Math::Vec2 lineEnd = m_position;
-        lineEnd.x += std::cos(angle) * m_radarLength;
-        lineEnd.y += std::sin(angle) * m_radarLength;
+    Math::Matrix scaleMatrix = Math::Matrix::CreateScale(Math::Vec2(xScale, yScale));
+    
+    // Tip of the cone in Drone_Rader.png is located at bottom center.
+    // In model space, bottom center of standard quad (centered at 0,0) is at (0.0f, -0.5f).
+    // So we translate the quad by +0.5 * yScale in scaled space to align the tip with local origin (0,0).
+    Math::Matrix pivotTranslation = Math::Matrix::CreateTranslation(Math::Vec2(0.0f, yScale * 0.5f));
+    
+    // Rotate the cone to point in the direction of m_radarAngle.
+    // Since our raw texture points straight up (+Y), we subtract 90 degrees to align it pointing to the right (+X).
+    const float rotationAngle = m_radarAngle - 90.0f;
+    Math::Matrix rotationMatrix = Math::Matrix::CreateRotation(rotationAngle);
+    
+    Math::Matrix transMatrix = Math::Matrix::CreateTranslation(m_position);
+    
+    Math::Matrix model = transMatrix * rotationMatrix * pivotTranslation * scaleMatrix;
+    
+    shader.setMat4("model", model);
+    shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    shader.setBool("flipX", false);
 
-        float brightness = 1.0f - (std::abs(i - numLines / 2.0f) / (numLines / 2.0f)) * 0.7f;
-        debugRenderer.DrawLine(colorShader, m_position, lineEnd, brightness, 0.0f, 0.0f);
+    GL::ActiveTexture(GL_TEXTURE0);
+    GL::BindTexture(GL_TEXTURE_2D, m_radarTextureID);
+    GL::BindVertexArray(VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+    GL::BindVertexArray(0);
 
-    }
+    shader.setBool("radialScanline", false);
 }
 
 void Drone::Reset()
@@ -974,6 +1078,10 @@ void Drone::Shutdown()
     GL::DeleteVertexArrays(1, &VAO);
     GL::DeleteBuffers(1, &VBO);
     GL::DeleteTextures(1, &textureID);
+    if (m_radarTextureID != 0)
+    {
+        GL::DeleteTextures(1, &m_radarTextureID);
+    }
     m_moveSound.Stop();
 }
 
