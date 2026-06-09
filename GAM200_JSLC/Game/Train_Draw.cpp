@@ -614,12 +614,17 @@ void Train::DrawDrones(Shader& shader) const
 // ---------------------------------------------------------------------------
 void Train::DrawRadars(const Shader& colorShader, DebugRenderer& debugRenderer) const
 {
-    if (m_car3InsideViewActive || m_car3InsideTransitionActive || ShouldHideTrainExteriorHazards())
+    if (m_car3TunnelInsideViewActive || m_car3TunnelInsideTransitionActive)
         return;
-    if (m_droneManager)
-        m_droneManager->DrawRadars(colorShader, debugRenderer);
-    if (m_carTransportDroneManager)
-        m_carTransportDroneManager->DrawRadars(colorShader, debugRenderer);
+
+    if (!m_car3InsideViewActive && !m_car3InsideTransitionActive && !ShouldHideTrainExteriorHazards())
+    {
+        if (m_droneManager)
+            m_droneManager->DrawRadars(colorShader, debugRenderer);
+        if (m_carTransportDroneManager)
+            m_carTransportDroneManager->DrawRadars(colorShader, debugRenderer);
+    }
+
     if (m_sirenDroneManager)
         m_sirenDroneManager->DrawRadars(colorShader, debugRenderer);
 }

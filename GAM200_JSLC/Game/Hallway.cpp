@@ -30,8 +30,8 @@ void Hallway::Initialize()
     m_position = { ROOM_WIDTH + WIDTH / 2.0f, HEIGHT / 2.0f };
 
     m_droneManager = std::make_unique<DroneManager>();
-    m_droneManager->SpawnDrone({ 2600.0f, 400.0f }, "Asset/Drone.png");
-    m_droneManager->SpawnDrone({ 5500.0f, 400.0f }, "Asset/Drone.png");
+    m_droneManager->SpawnDrone({ 2600.0f, 400.0f }, "Asset/Drone.png", DroneType::General);
+    m_droneManager->SpawnDrone({ 5500.0f, 400.0f }, "Asset/Drone.png", DroneType::Detection);
 }
 
 // ---------------------------------------------------------------------------

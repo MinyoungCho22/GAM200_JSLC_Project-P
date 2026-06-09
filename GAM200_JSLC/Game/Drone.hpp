@@ -9,10 +9,17 @@ class Shader;
 class Player;
 class DebugRenderer;
 
+enum class DroneType
+{
+    General,   // 일반드론
+    Detection, // 감지드론
+    Tracer     // 추적드론
+};
+
 class Drone
 {
 public:
-    void Init(Math::Vec2 startPos, const char* texturePath, bool isTracer = false);
+    void Init(Math::Vec2 startPos, const char* texturePath, DroneType type = DroneType::General);
     void Reset();
     void SetSirenMapDrone(bool v) { m_sirenMapDrone = v; }
     /// isPlayerUndetectable: 히딩/펄스박스 등으로 레이더 추적 불가
@@ -35,7 +42,9 @@ public:
     bool IsAttacking() const { return m_isAttacking; }
     bool IsDead() const { return m_isDead; }
     bool IsTracer() const { return m_isTracer; }
-    bool IsTraceReinforcement() const { return m_isTracer && m_texturePath.find("RedDrone.png") != std::string::npos; }
+    bool IsTraceReinforcement() const { return m_type == DroneType::Tracer; }
+    DroneType GetType() const { return m_type; }
+    void SetType(DroneType type) { m_type = type; }
     bool ShouldDealDamage() const { return m_shouldDealDamage; }
     void ResetDamageFlag() { m_shouldDealDamage = false; }
     bool IsHit() const { return m_isHit; }
@@ -236,4 +245,5 @@ private:
     float      m_dmgWobbleTimer = 0.f;
     float      m_wobbleAnimTime = 0.f;
     Math::Vec2 m_attackTargetPos{};
+    DroneType  m_type = DroneType::General;
 };

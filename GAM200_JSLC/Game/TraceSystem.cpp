@@ -46,24 +46,16 @@ void TraceSystem::SpawnTracerWave(DroneManager& droneManager, TraceStage stage, 
         const float a  = ang + angJitter;
         const float rx = std::cos(a) * radius;
         const float ry = std::sin(a) * radius * 0.62f;
-        Drone&      d  = droneManager.SpawnDrone({ origin.x + rx, origin.y + ry }, "Asset/RedDrone.png", true);
+        Drone&      d  = droneManager.SpawnDrone({ origin.x + rx, origin.y + ry }, "Asset/RedDrone.png", DroneType::Tracer);
         d.SetBaseSpeed(speed);
         d.SetTracerHeatLevel(heatLevel);
         if (IsTracerSpawnOnTrainWorld({ origin.x + rx, origin.y + ry }))
             Train::ApplyCombatDroneVisualScale(d);
     };
 
-    if (stage == TraceStage::Stage1)
-    {
-        const float r0 = 560.f;
-        spawnOne(-0.15f * PI, r0 + 40.f, 58.f, 0.04f);
-        spawnOne(0.10f * PI, r0 + 10.f, 98.f, -0.05f);
-    }
-    else
-    {
-        const float r0 = 520.f;
-        spawnOne(-0.22f * PI, r0 + 90.f, 52.f, 0.02f);
-        spawnOne(-0.02f * PI, r0 + 20.f, 78.f, -0.04f);
-        spawnOne(0.18f * PI, r0 + 55.f, 108.f, 0.05f);
-    }
+    // Always spawn 3 tracer drones when triggered
+    const float r0 = 520.f;
+    spawnOne(-0.22f * PI, r0 + 90.f, 52.f, 0.02f);
+    spawnOne(-0.02f * PI, r0 + 20.f, 78.f, -0.04f);
+    spawnOne(0.18f * PI, r0 + 55.f, 108.f, 0.05f);
 }

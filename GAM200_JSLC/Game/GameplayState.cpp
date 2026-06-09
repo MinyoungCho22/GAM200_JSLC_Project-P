@@ -1162,7 +1162,7 @@ void GameplayState::Update(double dt)
             bool didDroneDie = targetDrone->ApplyDamage(static_cast<float>(dt));
             if (didDroneDie)
             {
-                if (!targetDrone->IsTraceReinforcement())
+                if (targetDrone->GetType() == DroneType::Detection)
                     m_traceSystem->OnDroneKilled(*droneManager, player.GetPosition(), GetCurrentTraceStage());
                 player.GetPulseCore().getPulse().add(KILL_PULSE_REWARD);
             }
@@ -1261,7 +1261,7 @@ void GameplayState::Update(double dt)
         if (trainDocked && playerOnBoardingHitbox)
         {
             if (m_undergroundTrainBoardingDelay < 0.0f)
-                m_undergroundTrainBoardingDelay = 0.1f;
+                m_undergroundTrainBoardingDelay = 0.7f;
             else
             {
                 m_undergroundTrainBoardingDelay -= static_cast<float>(dt);
@@ -2742,6 +2742,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_hallway->DrawRadars(*colorShader, *m_debugRenderer);
         m_rooftop->DrawRadars(*colorShader, *m_debugRenderer);
         m_underground->DrawRadars(*colorShader, *m_debugRenderer);
+    }
+    if (m_trainAccessed && m_train)
+    {
         m_train->DrawRadars(*colorShader, *m_debugRenderer);
     }
 

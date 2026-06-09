@@ -84,23 +84,23 @@ void Underground::Initialize()
     // Spawn aerial drones with varying speeds (higher patrol band)
     float droneY = MIN_Y + 550.0f;
     {
-        Drone& entryTracer = m_droneManager->SpawnDrone({ MIN_X + 1350.0f, droneY }, "Asset/Drone.png", true);
+        Drone& entryTracer = m_droneManager->SpawnDrone({ MIN_X + 1350.0f, droneY }, "Asset/Drone.png", DroneType::General);
         entryTracer.SetBaseSpeed(55.0f);
         entryTracer.SetMaxHP(kUndergroundEntryTracerMaxHp);
         entryTracer.SetHP(kUndergroundEntryTracerMaxHp);
         entryTracer.SetTracerHeatLevel(0);
     }
     // First patrol drone: shifted left toward robot patrol (~18.2k)
-    m_droneManager->SpawnDrone({ 18470.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(180.0f);
-    m_droneManager->SpawnDrone({ 22203.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(250.0f);
-    m_droneManager->SpawnDrone({ 22787.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(400.0f);
-    m_droneManager->SpawnDrone({ 23920.0f, droneY }, "Asset/Drone.png", false).SetBaseSpeed(290.0f);
+    m_droneManager->SpawnDrone({ 18470.0f, droneY }, "Asset/Drone.png", DroneType::General).SetBaseSpeed(180.0f);
+    m_droneManager->SpawnDrone({ 22203.0f, droneY }, "Asset/Drone.png", DroneType::General).SetBaseSpeed(250.0f);
+    m_droneManager->SpawnDrone({ 22787.0f, droneY }, "Asset/Drone.png", DroneType::General).SetBaseSpeed(400.0f);
+    m_droneManager->SpawnDrone({ 23920.0f, droneY }, "Asset/Drone.png", DroneType::General).SetBaseSpeed(290.0f);
 
     // Two extra drones skimming much lower (near floor / robot height band)
     const float lowDroneY = MIN_Y + 300.0f;
     // One low drone further ahead (right) than the first high drone
-    m_droneManager->SpawnDrone({ 22150.0f, lowDroneY }, "Asset/Drone.png", false).SetBaseSpeed(175.0f);
-    m_droneManager->SpawnDrone({ 23580.0f, lowDroneY }, "Asset/Drone.png", false).SetBaseSpeed(210.0f);
+    m_droneManager->SpawnDrone({ 22150.0f, lowDroneY }, "Asset/Drone.png", DroneType::General).SetBaseSpeed(175.0f);
+    m_droneManager->SpawnDrone({ 23580.0f, lowDroneY }, "Asset/Drone.png", DroneType::General).SetBaseSpeed(210.0f);
 
     InitParallaxSkyVAO();
     ApplyConfig(MapObjectConfig::Instance().GetData().underground);
@@ -384,6 +384,24 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     Math::Vec2 currentHitboxCenter = player.GetHitboxCenter();
     Math::Vec2 playerHalfSize = playerHitboxSize / 2.0f;
 
+    struct CollisionTarget { Math::Vec2 pos; Math::Vec2 size; };
+    std::vector<CollisionTarget> collisionTargets;
+    for (const auto& obs : m_obstacles)
+    {
+        collisionTargets.push_back({ obs.pos, obs.size });
+    }
+
+    if (m_approachTrainDocked && m_approachTrainWidth > 1.0f && m_approachTrainHeight > 1.0f)
+    {
+        const float left = m_approachTrainCenterX - m_approachTrainWidth * 0.5f;
+        const float xScale = m_approachTrainWidth / 2640.0f;
+        const float yScale = m_approachTrainHeight / kApproachTrainAssumedImageHeight;
+        const float deckX = left + (84.0f + 2472.0f * 0.5f) * xScale;
+        const float deckY =
+            m_approachTrainCenterY + (kApproachTrainAssumedImageHeight * 0.5f - (804.0f + 45.0f * 0.5f)) * yScale - 20.0f;
+        collisionTargets.push_back({ { deckX, deckY }, { 2472.0f * xScale, 85.0f * yScale } });
+    }
+
     auto resolveObsHorizontal = [&](const Math::Vec2& obsCenter, const Math::Vec2& obsMin,
                                     const Math::Vec2& obsMax) {
         Math::Vec2 n = currentHitboxCenter;
@@ -394,7 +412,7 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
         return n;
     };
 
-    for (const auto& obs : m_obstacles)
+    for (const auto& obs : collisionTargets)
     {
         if (Collision::CheckAABB(currentHitboxCenter, playerHitboxSize, obs.pos, obs.size))
         {
@@ -513,7 +531,7 @@ void Underground::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
         if (footY >= gl - 28.f && footY <= gl + 32.f)
             supported = true;
 
-        for (const auto& obs : m_obstacles)
+        for (const auto& obs : collisionTargets)
         {
             const float halfW = obs.size.x * 0.5f;
             const float halfH = obs.size.y * 0.5f;
@@ -756,11 +774,27 @@ bool Underground::IsPlayerOnApproachTrain(Math::Vec2 playerHbCenter, Math::Vec2 
     const float xScale = m_approachTrainWidth / 2640.0f;
     const float yScale = m_approachTrainHeight / kApproachTrainAssumedImageHeight;
     const float deckX = left + (84.0f + 2472.0f * 0.5f) * xScale;
+    const float deckWidth = 2472.0f * xScale;
+
+    // Horizontal check: player must be within the train deck's left/right boundaries.
+    const float playerLeft = playerHbCenter.x - playerHitboxSize.x * 0.5f;
+    const float playerRight = playerHbCenter.x + playerHitboxSize.x * 0.5f;
+    const float trainLeft = deckX - deckWidth * 0.5f;
+    const float trainRight = deckX + deckWidth * 0.5f;
+
+    const bool xOverlap = (playerLeft >= m_trainBoardingMinWorldX) && (playerLeft < trainRight);
+
+    // Vertical check: player's feet must be on or above the deck top,
+    // but below a high threshold where they might be jumping or standing on containers.
     const float deckY =
-        m_approachTrainCenterY + (kApproachTrainAssumedImageHeight * 0.5f - (804.0f + 45.0f * 0.5f)) * yScale + 8.0f;
-    const Math::Vec2 deckCenter = { deckX, deckY };
-    const Math::Vec2 deckSize = { 2472.0f * xScale, 85.0f * yScale };
-    return Collision::CheckAABB(playerHbCenter, playerHitboxSize, deckCenter, deckSize);
+        m_approachTrainCenterY + (kApproachTrainAssumedImageHeight * 0.5f - (804.0f + 45.0f * 0.5f)) * yScale - 20.0f;
+    const float deckTopY = deckY + 85.0f * yScale * 0.5f;
+    const float playerFeetY = playerHbCenter.y - playerHitboxSize.y * 0.5f;
+
+    // We allow a small tolerance below the deck (e.g. -15.f) and a large height above the deck (e.g. +450.f)
+    const bool yOverlap = (playerFeetY >= deckTopY - 15.0f) && (playerFeetY <= deckTopY + 450.0f * yScale);
+
+    return xOverlap && yOverlap;
 }
 
 // ---------------------------------------------------------------------------
@@ -818,6 +852,31 @@ void Underground::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) c
         debugRenderer.DrawBox(colorShader, ramp.pos, ramp.size, { 1.0f, 1.0f });
     }
 
+    if (m_approachTrainDocked && m_approachTrainWidth > 1.0f && m_approachTrainHeight > 1.0f)
+    {
+        const float left = m_approachTrainCenterX - m_approachTrainWidth * 0.5f;
+        const float xScale = m_approachTrainWidth / 2640.0f;
+        const float yScale = m_approachTrainHeight / kApproachTrainAssumedImageHeight;
+        const float deckX = left + (84.0f + 2472.0f * 0.5f) * xScale;
+        const float deckY =
+            m_approachTrainCenterY + (kApproachTrainAssumedImageHeight * 0.5f - (804.0f + 45.0f * 0.5f)) * yScale - 20.0f;
+        const Math::Vec2 deckSize = { 2472.0f * xScale, 85.0f * yScale };
+
+        // 1) Draw solid collision box in Cyan (0.0f, 0.8f, 1.0f)
+        debugRenderer.DrawBox(colorShader, { deckX, deckY }, deckSize, 0.0f, 0.8f, 1.0f);
+
+        // 2) Draw boarding transition trigger box in Yellow (1.0f, 0.9f, 0.0f)
+        const float deckWidth = 2472.0f * xScale;
+        const float trainRight = deckX + deckWidth * 0.5f;
+        const float triggerWidth = trainRight - m_trainBoardingMinWorldX;
+        const float triggerCenterX = (m_trainBoardingMinWorldX + trainRight) * 0.5f;
+
+        const float deckTopY = deckY + 85.0f * yScale * 0.5f;
+        const float triggerHeight = 450.0f * yScale + 15.0f;
+        const float triggerCenterY = deckTopY + (450.0f * yScale - 15.0f) * 0.5f;
+
+        debugRenderer.DrawBox(colorShader, { triggerCenterX, triggerCenterY }, { triggerWidth, triggerHeight }, 1.0f, 0.9f, 0.0f);
+    }
 }
 
 // ---------------------------------------------------------------------------

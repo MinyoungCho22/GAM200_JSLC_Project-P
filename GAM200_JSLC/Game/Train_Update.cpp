@@ -402,7 +402,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                 for (int k = 0; k < 2; ++k)
                 {
                     const Math::Vec2 sp = { in1MidX + k * 250.f, in1MidY };
-                    Drone& d = m_sirenDroneManager->SpawnDrone(sp, kTrainDroneTexturePath, false);
+                    Drone& d = m_sirenDroneManager->SpawnDrone(sp, kTrainDroneTexturePath, DroneType::General);
                     ScaleTrainCombatDrone(d);
                     d.SetBaseSpeed(40.f);   // 아주 천천히
                     d.SetSirenMapDrone(false);
@@ -414,7 +414,7 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
                 for (int k = 0; k < 2; ++k)
                 {
                     const Math::Vec2 sp = { in2MidX + k * 250.f, in2MidY };
-                    Drone& d = m_sirenDroneManager->SpawnDrone(sp, kTrainDroneTexturePath, false);
+                    Drone& d = m_sirenDroneManager->SpawnDrone(sp, kTrainDroneTexturePath, DroneType::General);
                     ScaleTrainCombatDrone(d);
                     d.SetBaseSpeed(0.f);    // 플레이어가 Inside_2 진입 전까지 정지
                     d.SetSirenMapDrone(false);
@@ -425,25 +425,40 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         }
     }
 
-    // Inside_2 진입 감지 → Inside_2 드론 추적 활성화
+    // Inside_2 진입 감지 또는 화면 시야 내 진입 감지 → Inside_2 드론 추적 활성화
     if (m_car3InsideViewActive && m_car3InsideDronesSpawned && !m_car3InsideDroneInside2Activated
         && m_sirenDroneManager)
     {
         const float tl    = MIN_X + m_trainOffset;
         const float ext1L = m_car1Width + m_car2Width + m_car3Width;
-        // Inside_2 X 범위: ext1L + car3ExtensionWidths[0] 이후
         const float inside2Left = tl + ext1L + m_car3ExtensionWidths[0];
         const float playerX     = player.GetHitboxCenter().x;
-        if (playerX >= inside2Left)
+
+        bool shouldActivate = (playerX >= inside2Left);
+        if (!shouldActivate)
+        {
+            auto& drones = m_sirenDroneManager->GetDrones();
+            const int total = static_cast<int>(drones.size());
+            if (total >= 2)
+            {
+                // 플레이어와 첫 번째 Inside_2 드론의 거리가 1050 픽셀 미만일 때 즉시 활성화
+                float distToDrone = std::abs(drones[total - 2].GetPosition().x - playerX);
+                if (distToDrone < 1050.f)
+                {
+                    shouldActivate = true;
+                }
+            }
+        }
+
+        if (shouldActivate)
         {
             m_car3InsideDroneInside2Activated = true;
             auto& drones = m_sirenDroneManager->GetDrones();
-            // 마지막 2개 드론 (Inside_2 드론)을 활성화
             const int total = static_cast<int>(drones.size());
             for (int k = total - 2; k < total && k >= 0; ++k)
             {
                 drones[k].SetDebugMode(false);  // AI 재활성화
-                drones[k].SetBaseSpeed(35.f);   // 아주 천천히 추적
+                drones[k].SetBaseSpeed(95.f);   // 추적하는 움직임이 잘 보이도록 95.f 속도로 상향
             }
         }
     }

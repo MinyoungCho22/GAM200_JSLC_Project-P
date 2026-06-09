@@ -12,7 +12,7 @@ class DebugRenderer;
 class DroneManager
 {
 public:
-    Drone& SpawnDrone(Math::Vec2 position, const char* texturePath, bool isTracer = false);
+    Drone& SpawnDrone(Math::Vec2 position, const char* texturePath, DroneType type = DroneType::General);
     void Update(double dt, const Player& player, Math::Vec2 playerHitboxSize, bool isPlayerUndetectable,
                  bool sirenTracerJamEvade = false, float sirenTracerSpeedMul = 1.f,
                  float sirenTracerTrainAssistMul = 1.f);

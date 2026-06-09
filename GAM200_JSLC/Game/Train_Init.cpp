@@ -242,7 +242,7 @@ void Train::Initialize()
                         MIN_X + l + w * t + static_cast<float>((j * 23 + 5) % 13 - 6) * 11.f;
                     const float yExtra = behindTank ? (-18.f - static_cast<float>(sub) * 14.f)
                                                     : (12.f + static_cast<float>(sub) * 16.f);
-                    Drone& dj = m_droneManager->SpawnDrone({ xj, ySiren + yExtra }, kTrainDroneTexturePath, false);
+                    Drone& dj = m_droneManager->SpawnDrone({ xj, ySiren + yExtra }, kTrainDroneTexturePath, DroneType::General);
                     ScaleTrainCombatDrone(dj);
                     const float spd = behindTank ? (62.f + static_cast<float>(sub) * 19.f)
                                                  : (74.f + static_cast<float>(sub) * 21.f);
@@ -267,9 +267,9 @@ void Train::Initialize()
                 yA                 = yAtSiren + 8.f;
                 yB                 = yAtSiren + 28.f;
             }
-            Drone& da = m_droneManager->SpawnDrone({ xA, yA }, kTrainDroneTexturePath, false);
+            Drone& da = m_droneManager->SpawnDrone({ xA, yA }, kTrainDroneTexturePath, DroneType::General);
             ScaleTrainCombatDrone(da);
-            Drone& db = m_droneManager->SpawnDrone({ xB, yB }, kTrainDroneTexturePath, false);
+            Drone& db = m_droneManager->SpawnDrone({ xB, yB }, kTrainDroneTexturePath, DroneType::General);
             ScaleTrainCombatDrone(db);
             if (carIdx == 1)
             {
@@ -368,7 +368,7 @@ void Train::Initialize()
                 const float ly = ASSUMED_IMG_HEIGHT - kCarTransportDronePixels[i].yTop;
                 const float wx = MIN_X + lx;
                 const float wy = MIN_Y + ly;
-                Drone&      dd = m_carTransportDroneManager->SpawnDrone({ wx, wy }, kTrainDroneTexturePath, false);
+                Drone&      dd = m_carTransportDroneManager->SpawnDrone({ wx, wy }, kTrainDroneTexturePath, DroneType::General);
                 ScaleTrainCombatDrone(dd);
                 dd.SetBaseSpeed(0.f);
                 dd.SetCarTransportPersistHover(true);

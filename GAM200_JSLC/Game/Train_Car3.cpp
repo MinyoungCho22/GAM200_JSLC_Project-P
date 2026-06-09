@@ -56,7 +56,7 @@ void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter,
         {
             m_car3SirenSpawnTimer = 0.f;
             const Math::Vec2 spawnPos = { sirenW.x + 25.f, sirenW.y + 55.f };
-            Drone& d = m_sirenDroneManager->SpawnDrone(spawnPos, kTrainDroneTexturePath, true);
+            Drone& d = m_sirenDroneManager->SpawnDrone(spawnPos, "Asset/RedDrone.png", DroneType::Tracer);
             ScaleTrainCombatDrone(d);
             d.SetBaseSpeed(185.f);
             d.SetSirenMapDrone(true);

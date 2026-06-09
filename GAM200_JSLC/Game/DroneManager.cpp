@@ -7,10 +7,10 @@
 #include <algorithm>
 #include <deque>
 
-Drone& DroneManager::SpawnDrone(Math::Vec2 position, const char* texturePath, bool isTracer)
+Drone& DroneManager::SpawnDrone(Math::Vec2 position, const char* texturePath, DroneType type)
 {
     drones.emplace_back();
-    drones.back().Init(position, texturePath, isTracer);
+    drones.back().Init(position, texturePath, type);
     return drones.back();
 }
 

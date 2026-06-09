@@ -29,15 +29,23 @@ std::default_random_engine drone_generator;
 std::uniform_real_distribution<float> drone_distribution(-1.0f, 1.0f);
 std::uniform_real_distribution<float> drone_angle_distribution(25.0f, 45.0f);
 
-void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
+void Drone::Init(Math::Vec2 startPos, const char* texturePath, DroneType type)
 {
+    m_type = type;
+    m_isTracer = (type == DroneType::Tracer);
     m_spawnPos = startPos;
     m_position = startPos;
     m_baseY = startPos.y;
     m_velocity = { 0.0f, 0.0f };
     m_direction = { 1.0f, 0.0f };
-    m_isTracer = isTracer;
-    m_texturePath = texturePath ? texturePath : "";
+    if (m_type == DroneType::Tracer)
+    {
+        m_texturePath = "Asset/RedDrone.png";
+    }
+    else
+    {
+        m_texturePath = texturePath ? texturePath : "";
+    }
     m_isChasing = false;
     m_lostTimer = 0.0f;
     m_currentSpeed = m_baseSpeed;
@@ -101,7 +109,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, bool isTracer)
 
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load(texturePath, &width, &height, &nrChannels, 0);
+    unsigned char* data = stbi_load(m_texturePath.c_str(), &width, &height, &nrChannels, 0);
 
     if (data)
     {
