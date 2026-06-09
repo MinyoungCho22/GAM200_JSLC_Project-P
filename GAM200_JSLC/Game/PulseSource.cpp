@@ -61,6 +61,12 @@ void PulseSource::RefillStock()
         *m_sharedGaugeUnlocked = false;
 }
 
+void PulseSource::SetPulseAmount(float amount)
+{
+    if (!m_sharedCurrent) return;
+    *m_sharedCurrent = amount;
+}
+
 void PulseSource::Draw(Shader& shader) const
 {
     Math::Matrix scale = Math::Matrix::CreateScale(m_size);

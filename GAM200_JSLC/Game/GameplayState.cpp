@@ -904,9 +904,12 @@ void GameplayState::Update(double dt)
         m_logTimer -= 0.5;
     }
 
+    std::vector<PulseSource> emptySources;
+    std::vector<PulseSource>& finalSources = (m_finalAccessed && m_final) ? m_final->GetPulseSources() : emptySources;
+
     pulseManager->Update(playerCenter, playerHitboxSize, player, m_room->GetPulseSources(),
         m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(),
-        m_train->GetPulseSources(), isPressingInteract, dt, mouseWorldPos);
+        m_train->GetPulseSources(), finalSources, isPressingInteract, dt, mouseWorldPos);
 
     Drone* targetDrone = nullptr;
     Robot* targetRobot = nullptr;
@@ -1870,8 +1873,9 @@ void GameplayState::Update(double dt)
         if (m_gameOverDelay <= 0.f)
         {
             // 딜레이 만료 또는 즉시 처리
-            // Sync checkpoint with the currently active map before opening GameOver.
-            if (m_trainAccessed)
+            if (m_finalAccessed)
+                m_currentCheckpoint = MapZone::Final;
+            else if (m_trainAccessed)
                 m_currentCheckpoint = MapZone::Train;
             else if (m_undergroundAccessed)
                 m_currentCheckpoint = MapZone::Underground;
@@ -2077,9 +2081,9 @@ void GameplayState::HandleTrainToFinalTransition()
     }
 
     player.SetSizeScale(0.6f);
-    // Green square door is at X = Final::MIN_X + 293.5f, Y = Final::MIN_Y + 276.0f (deck top)
+    // Green square door is at X = Final::MIN_X + 293.5f, Y = Final::MIN_Y + 258.0f (deck top)
     float playerStartX = Final::MIN_X + 293.5f;
-    float newGroundLevel = Final::MIN_Y + 276.0f;
+    float newGroundLevel = Final::MIN_Y + 258.0f;
     float playerStartY = newGroundLevel + player.GetHitboxSize().y * 0.5f;
 
     player.SetCurrentGroundLevel(newGroundLevel);
@@ -2297,7 +2301,7 @@ void GameplayState::RespawnAtCheckpoint()
 
         player.SetSizeScale(0.6f);
         float playerStartX = Final::MIN_X + 293.5f;
-        float newGroundLevel = Final::MIN_Y + 276.0f;
+        float newGroundLevel = Final::MIN_Y + 258.0f;
         float playerStartY = newGroundLevel + player.GetHitboxSize().y * 0.5f;
 
         player.SetCurrentGroundLevel(newGroundLevel);
@@ -2700,7 +2704,7 @@ void GameplayState::DrawMainLayer()
 
     if (m_finalAccessed)
     {
-        m_final->Draw(textureShader, *colorShader, m_camera.GetPosition(), viewHalfW);
+        m_final->Draw(textureShader, *colorShader, m_camera.GetPosition(), viewHalfW, worldProjection);
         textureShader.use();
         textureShader.setMat4("projection", worldProjection);
         textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
@@ -2815,6 +2819,11 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         src.DrawRemainGauge(*colorShader);
     for (const auto& src : m_train->GetPulseSources())
         src.DrawRemainGauge(*colorShader);
+    if (m_finalAccessed && m_final && m_final->GetActiveVentIndex() != -1)
+    {
+        int activeIdx = m_final->GetActiveVentIndex();
+        m_final->GetPulseSources()[activeIdx].DrawRemainGauge(*colorShader);
+    }
     if (m_trainAccessed && m_train)
     {
         const bool tunnelInside = m_train->IsCar3TunnelInsideViewActive();
@@ -2836,6 +2845,14 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     textureShader.setFloat("alpha", 1.0f);
     textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
     textureShader.setFloat("tintStrength", 0.0f);
+
+    if (m_finalAccessed && m_final)
+    {
+        m_final->DrawPulseVents(textureShader, *m_outlineShader, fgCamPos, fgEffectiveWidth * 0.5f);
+        textureShader.use();
+        textureShader.setMat4("projection", projection);
+    }
+
     if (m_trainAccessed && m_train && m_train->IsCar3TunnelInsideViewActive())
     {
         m_train->DrawTunnelInsideBackground(textureShader);
@@ -3166,7 +3183,8 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             checkPulseSources(m_hallway->GetPulseSources()) ||
             checkPulseSources(m_rooftop->GetPulseSources()) ||
             checkPulseSources(m_underground->GetPulseSources()) ||
-            checkPulseSources(m_train->GetPulseSources()))
+            checkPulseSources(m_train->GetPulseSources()) ||
+            (m_finalAccessed && m_final && checkPulseSources(m_final->GetPulseSources())))
         {
             overRightClickTarget = true;
         }
@@ -3655,6 +3673,8 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_rooftop->DrawDebug(*colorShader, *m_debugRenderer);
         m_underground->DrawDebug(*colorShader, *m_debugRenderer);
         m_train->DrawDebug(*colorShader, *m_debugRenderer);
+        if (m_finalAccessed && m_final)
+            m_final->DrawDebug(*colorShader, *m_debugRenderer);
         m_door->DrawDebug(*colorShader);
         m_rooftopDoor->DrawDebug(*colorShader);
     }

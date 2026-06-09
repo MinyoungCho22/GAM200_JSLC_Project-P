@@ -48,6 +48,7 @@ class Player
 public:
     void Init(Math::Vec2 startPos);
     void Update(double dt, Input::Input& input, const ControlBindings& controls);
+    void UpdateNPC(float dt, AnimationState state);
     void Draw(const Shader& shader) const;
     void DrawOutline(const Shader& outlineShader) const;
     void Shutdown();

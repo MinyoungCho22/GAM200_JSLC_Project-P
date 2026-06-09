@@ -23,6 +23,7 @@ public:
         std::vector<PulseSource>& rooftopSources,
         std::vector<PulseSource>& undergroundSources,
         std::vector<PulseSource>& trainSources,
+        std::vector<PulseSource>& finalSources,
         bool is_interact_key_pressed, double dt, Math::Vec2 mouseWorldPos);
 
     void UpdateAttackVFX(

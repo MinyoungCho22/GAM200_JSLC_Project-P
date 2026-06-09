@@ -24,6 +24,7 @@ public:
 
     /// 잔량을 최대치로 되돌림. 공유 저장소(Underground 그룹 충전소 등)는 한 번만 채워지면 됨.
     void RefillStock();
+    void SetPulseAmount(float amount);
 
     void Draw(Shader& shader) const;
     void DrawSprite(Shader& textureShader) const;

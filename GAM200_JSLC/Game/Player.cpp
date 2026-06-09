@@ -344,6 +344,12 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
 
 }
 
+void Player::UpdateNPC(float dt, AnimationState state)
+{
+    m_currentAnimState = state;
+    m_animations[static_cast<int>(state)].Update(dt);
+}
+
 void Player::Draw(const Shader& shader) const
 {
     if (m_isInvincible && !IsDead())
