@@ -109,6 +109,9 @@ public:
     // HP system
     float GetHP() const { return m_hp; }
     void SetHP(float hp) { 
+        if (hp < m_hp && hp > 0.0f) {
+            m_dmgWobbleTimer = 0.5f;
+        }
         m_hp = hp; 
         if (m_hp <= 0.0f) { 
             m_hp = 0.0f; 
@@ -229,4 +232,8 @@ private:
     int m_trainCarSegment = 0;
     /// 0 = 일반/입장 트레이서, 1~2 = Trace stage
     int m_tracerHeatLevel = 0;
+
+    float      m_dmgWobbleTimer = 0.f;
+    float      m_wobbleAnimTime = 0.f;
+    Math::Vec2 m_attackTargetPos{};
 };

@@ -154,6 +154,18 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
 {
     const float fdt = static_cast<float>(dt);
 
+    if (m_dmgWobbleTimer > 0.f)
+    {
+        m_dmgWobbleTimer -= fdt;
+        if (m_dmgWobbleTimer < 0.f)
+            m_dmgWobbleTimer = 0.f;
+        m_wobbleAnimTime += fdt;
+    }
+    else
+    {
+        m_wobbleAnimTime = 0.f;
+    }
+
     if (m_isDead)
     {
         m_moveSound.Stop();
@@ -318,14 +330,40 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
                 m_isAttacking = false;
                 m_position    = m_attackStartPos;
                 m_attackTimer = 0.0f;
+                m_shouldDealDamage = false;
             }
             else
             {
-                m_attackAngle +=
-                    (360.0f / m_attackDuration) * fdt * static_cast<float>(m_attackDirection);
-                const float      rad = m_attackAngle * (PI / 180.0f);
-                m_position.x = m_attackCenter.x + std::cos(rad) * m_attackRadius;
-                m_position.y = m_attackCenter.y + std::sin(rad) * m_attackRadius;
+                Math::Vec2 toTarget = m_attackTargetPos - m_attackStartPos;
+                float dist = toTarget.Length();
+                Math::Vec2 dir = (dist > 0.01f) ? (toTarget / dist) : Math::Vec2{1.f, 0.f};
+
+                if (m_attackTimer < 0.2f)
+                {
+                    float t = m_attackTimer / 0.2f;
+                    m_position = m_attackStartPos - dir * (40.0f * t);
+                }
+                else if (m_attackTimer < 0.4f)
+                {
+                    float t = (m_attackTimer - 0.2f) / 0.2f;
+                    Math::Vec2 start = m_attackStartPos - dir * 40.0f;
+                    m_position = start + (m_attackTargetPos - start) * t;
+                    
+                    if (m_attackTimer >= 0.38f && m_attackTimer <= 0.42f)
+                    {
+                        m_shouldDealDamage = true;
+                    }
+                }
+                else if (m_attackTimer < 0.55f)
+                {
+                    m_position = m_attackTargetPos;
+                }
+                else
+                {
+                    float t = (m_attackTimer - 0.55f) / 0.45f;
+                    float ease = 1.0f - std::pow(1.0f - t, 2.0f);
+                    m_position = m_attackTargetPos + (m_attackStartPos - m_attackTargetPos) * ease;
+                }
             }
             if (!canDetectPlayer)
             {
@@ -338,9 +376,10 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         else if (canDetectPlayer && distSq < effectiveRangeSq && m_attackCooldown <= 0.0f)
         {
             m_isAttacking      = true;
-            m_shouldDealDamage = true;
+            m_shouldDealDamage = false;
             m_attackTimer      = 0.0f;
             m_attackStartPos   = m_position;
+            m_attackTargetPos  = player.GetHitboxCenter();
             m_attackCooldown   = m_attackCooldownDuration;
             m_attackCenter     = (m_position + player.GetPosition()) * 0.5f;
             Math::Vec2 toC = m_attackCenter - m_position;
@@ -522,14 +561,40 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
             m_isAttacking = false;
             m_position = m_attackStartPos;
             m_attackTimer = 0.0f;
+            m_shouldDealDamage = false;
         }
         else
         {
-            m_attackAngle += (360.0f / m_attackDuration) * static_cast<float>(dt) * m_attackDirection;
+            Math::Vec2 toTarget = m_attackTargetPos - m_attackStartPos;
+            float dist = toTarget.Length();
+            Math::Vec2 dir = (dist > 0.01f) ? (toTarget / dist) : Math::Vec2{1.f, 0.f};
 
-            float radians = m_attackAngle * (PI / 180.0f);
-            m_position.x = m_attackCenter.x + std::cos(radians) * m_attackRadius;
-            m_position.y = m_attackCenter.y + std::sin(radians) * m_attackRadius;
+            if (m_attackTimer < 0.2f)
+            {
+                float t = m_attackTimer / 0.2f;
+                m_position = m_attackStartPos - dir * (40.0f * t);
+            }
+            else if (m_attackTimer < 0.4f)
+            {
+                float t = (m_attackTimer - 0.2f) / 0.2f;
+                Math::Vec2 start = m_attackStartPos - dir * 40.0f;
+                m_position = start + (m_attackTargetPos - start) * t;
+                
+                if (m_attackTimer >= 0.38f && m_attackTimer <= 0.42f)
+                {
+                    m_shouldDealDamage = true;
+                }
+            }
+            else if (m_attackTimer < 0.55f)
+            {
+                m_position = m_attackTargetPos;
+            }
+            else
+            {
+                float t = (m_attackTimer - 0.55f) / 0.45f;
+                float ease = 1.0f - std::pow(1.0f - t, 2.0f);
+                m_position = m_attackTargetPos + (m_attackStartPos - m_attackTargetPos) * ease;
+            }
         }
 
         if (!canDetectPlayer)
@@ -543,9 +608,10 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
     else if (canDetectPlayer && distSq < effectiveDetectionRangeSq && m_attackCooldown <= 0.0f)
     {
         m_isAttacking = true;
-        m_shouldDealDamage = true;
+        m_shouldDealDamage = false;
         m_attackTimer = 0.0f;
         m_attackStartPos = m_position;
+        m_attackTargetPos = player.GetHitboxCenter();
         m_attackCooldown = m_attackCooldownDuration;
 
         m_attackCenter = (m_position + player.GetPosition()) * 0.5f;
@@ -718,8 +784,10 @@ void Drone::Draw(const Shader& shader) const
     }
     else if (m_isAttacking)
     {
-        float tiltAngle = m_attackAngle + 90.0f * m_attackDirection;
-        rotationMatrix = Math::Matrix::CreateRotation(tiltAngle);
+        flipX = (m_attackTargetPos.x < m_attackStartPos.x);
+        Math::Vec2 toT = m_attackTargetPos - m_attackStartPos;
+        float baseAngle = std::atan2(toT.y, flipX ? -toT.x : toT.x) * (180.0f / PI);
+        rotationMatrix = Math::Matrix::CreateRotation(baseAngle);
     }
     else if (m_isTracer)
     {
@@ -772,6 +840,15 @@ void Drone::Draw(const Shader& shader) const
 
     Math::Matrix scaleMatrix = Math::Matrix::CreateScale(m_size);
     Math::Vec2 drawPos       = m_position;
+
+    if (!m_isHit && !m_isDead && m_dmgWobbleTimer > 0.f)
+    {
+        float progress = m_dmgWobbleTimer / 0.5f;
+        float wobbleAngle = std::sin(m_wobbleAnimTime * 20.0f) * 25.0f * progress;
+        rotationMatrix = rotationMatrix * Math::Matrix::CreateRotation(wobbleAngle);
+        drawPos.x += std::sin(m_wobbleAnimTime * 24.0f) * 15.0f * progress;
+    }
+
     if (!m_isHit && m_stunTimer > 0.f)
     {
         // 감전: 고주파 sine 제거 — 저주파 + 약한 배음 + 스턴 남은 시간에 따른 감쇠
@@ -880,6 +957,8 @@ void Drone::Reset()
     m_carTransportHover           = m_carTransportPersistHover;
     m_trainCarSegment             = 0;
     m_tracerHeatLevel             = 0;
+    m_dmgWobbleTimer              = 0.f;
+    m_wobbleAnimTime              = 0.f;
 }
 
 void Drone::Shutdown()
@@ -915,12 +994,10 @@ bool Drone::ApplyDamage(float dt)
     float damagePerSecond = m_maxHP / TIME_TO_DESTROY;
     float damage = damagePerSecond * dt;
     
-    m_hp -= damage;
+    TakeDamage(damage);
     
     if (m_hp <= 0.0f)
     {
-        m_hp = 0.0f;
-        StartDeathSequence();
         return true;
     }
     return false;
