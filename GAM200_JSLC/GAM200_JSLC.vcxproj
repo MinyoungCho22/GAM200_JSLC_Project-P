@@ -262,6 +262,16 @@ if exist "$(OutDir)GAM200JSLC.exe" del /q "$(OutDir)GAM200JSLC.exe"</Command>
     <ClCompile Include="Game\SplashState.cpp" />
     <ClCompile Include="Game\StoryDialogue.cpp" />
     <ClCompile Include="Game\Train.cpp" />
+    <ClCompile Include="Game\Train_Car2.cpp" />
+    <ClCompile Include="Game\Train_Car3.cpp" />
+    <ClCompile Include="Game\Train_Car4.cpp" />
+    <ClCompile Include="Game\Train_Car5.cpp" />
+    <ClCompile Include="Game\Train_Draw.cpp" />
+    <ClCompile Include="Game\Train_Helpers.cpp" />
+    <ClCompile Include="Game\Train_Init.cpp" />
+    <ClCompile Include="Game\Train_TunnelInside.cpp" />
+    <ClCompile Include="Game\Train_Update.cpp" />
+    <ClCompile Include="Game\Final.cpp" />
     <ClCompile Include="Game\TraceSystem.cpp" />
     <ClCompile Include="Game\Tutorial.cpp" />
     <ClCompile Include="Game\Underground.cpp" />
@@ -280,6 +290,7 @@ if exist "$(OutDir)GAM200JSLC.exe" del /q "$(OutDir)GAM200JSLC.exe"</Command>
     <ClInclude Include="Engine\GameState.hpp" />
     <ClInclude Include="Engine\GameStateManager.hpp" />
     <ClInclude Include="Engine\ImguiManager.hpp" />
+    <ClInclude Include="Engine\ControlBindings.hpp" />
     <ClInclude Include="Engine\Input.hpp" />
     <ClInclude Include="Engine\Logger.hpp" />
     <ClInclude Include="Engine\Matrix.hpp" />
@@ -320,6 +331,11 @@ if exist "$(OutDir)GAM200JSLC.exe" del /q "$(OutDir)GAM200JSLC.exe"</Command>
     <ClInclude Include="Game\TraceSystem.hpp" />
     <ClInclude Include="Game\Tutorial.hpp" />
     <ClInclude Include="Game\Underground.hpp" />
+    <ClInclude Include="Game\Final.hpp" />
+    <ClInclude Include="Game\MapObjectTypes.hpp" />
+    <ClInclude Include="Game\Skill.hpp" />
+    <ClInclude Include="Game\Train.hpp" />
+    <ClInclude Include="Game\Train_Internal.hpp" />
     <ClInclude Include="OpenGL\GLWrapper.hpp" />
     <ClInclude Include="OpenGL\PostProcessManager.h" />
     <ClInclude Include="OpenGL\Shader.hpp" />

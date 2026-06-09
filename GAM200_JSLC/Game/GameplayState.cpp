@@ -151,6 +151,11 @@ void GameplayState::Initialize()
     m_train->Initialize();
     m_trainAccessed = false;
     m_trainDeferEntryUntilIntroDone = false;
+
+    m_final = std::make_unique<Final>();
+    m_final->Initialize();
+    m_finalAccessed = false;
+
     m_rooftopAccessed = false;
     m_pulseDetonateSkill.Initialize();
 
@@ -343,10 +348,17 @@ void GameplayState::Initialize()
             }
         }
     }
+    Logger::Instance().Log(Logger::Severity::Info, "GameplayState Initialize complete.");
 }
 
 void GameplayState::Update(double dt)
 {
+    static bool firstUpdate = true;
+    if (firstUpdate)
+    {
+        Logger::Instance().Log(Logger::Severity::Info, "GameplayState First Update start.");
+        firstUpdate = false;
+    }
     Engine& engine = gsm.GetEngine();
     auto& input = engine.GetInput();
     auto& ctl = engine.GetControlBindings();
@@ -474,6 +486,7 @@ void GameplayState::Update(double dt)
         m_rooftopAccessed = false;
         m_undergroundAccessed = false;
         m_trainAccessed = false;
+        m_finalAccessed = false;
         m_trainDeferEntryUntilIntroDone = false;
         m_room->SetRightBoundaryActive(true);
         m_door->ResetMapTransition();
@@ -513,10 +526,10 @@ void GameplayState::Update(double dt)
     {
         silenceStoryForMapCheat();
         m_hallwayEntryStoryPending = false;
-        m_hallwayEntryStoryDelayRemaining = 0.0f;
         m_cameraZoom = 1.0f;
         m_trainZoomTransition = false;
         player.SetSizeScale(1.0f);
+        m_finalAccessed = false;
         m_currentCheckpoint = MapZone::Hallway;
 
         const float hallwaySpawnX = GAME_WIDTH + player.GetHitboxSize().x * 0.5f + HALLWAY_ENTRY_MARGIN_X;
@@ -567,9 +580,9 @@ void GameplayState::Update(double dt)
     {
         silenceStoryForMapCheat();
         m_tutorial->DisableAll();
-        m_camera.StopAnimation();
         m_undergroundAccessed = false;
         m_trainAccessed = false;
+        m_finalAccessed = false;
         m_trainDeferEntryUntilIntroDone = false;
         m_cameraZoom = 1.0f;
         m_trainZoomTransition = false;
@@ -597,6 +610,7 @@ void GameplayState::Update(double dt)
             m_trainDeferEntryUntilIntroDone = false;
             m_rooftopAccessed = true;
             m_undergroundAccessed = true;
+            m_finalAccessed = false;
             m_currentCheckpoint = MapZone::Underground;
 
             float playerStartX = Underground::MIN_X + 100.0f;
@@ -639,6 +653,20 @@ void GameplayState::Update(double dt)
         m_trainDeferEntryUntilIntroDone = false;
         StartTransition(PendingTransition::UndergroundToTrain);
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Train (Ctrl+5)");
+    }
+
+    if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsGlfwKeyTriggered(GLFW_KEY_6))
+    {
+        silenceStoryForMapCheat();
+        m_skipRooftopQHintByCheat = true;
+        m_tutorial->DisableAll();
+        m_camera.StopAnimation();
+        m_cameraZoom = 1.0f;
+        m_trainZoomTransition = false;
+        player.SetSizeScale(0.6f);
+        m_trainDeferEntryUntilIntroDone = false;
+        StartTransition(PendingTransition::TrainToFinal);
+        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Final Map (Ctrl+6)");
     }
 
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num9))
@@ -1300,6 +1328,11 @@ void GameplayState::Update(double dt)
     else
         m_undergroundTrainBoardingDelay = -1.0f;
 
+    if (m_trainAccessed && m_train && m_train->IsFinalTransitionReady() && m_pendingTransition == PendingTransition::None)
+    {
+        StartTransition(PendingTransition::TrainToFinal);
+    }
+
     bool isPlayerHidingInRoom = m_room->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     bool isPlayerHidingInHallway = m_hallway->IsPlayerHiding(playerCenter, playerHitboxSize, player.IsCrouching());
     bool isPlayerHiding = isPlayerHidingInRoom || isPlayerHidingInHallway;
@@ -1582,6 +1615,12 @@ void GameplayState::Update(double dt)
         m_camera.SetBounds({ Train::MIN_X, boundMinY }, { dynamicRight, boundMaxY });
     }
 
+    if (m_finalAccessed)
+    {
+        m_final->Update(dt, player, playerHitboxSize);
+        m_camera.SetBounds({ Final::MIN_X, Final::MIN_Y }, { Final::MIN_X + m_final->GetMapWidth(), Final::MIN_Y + Final::HEIGHT });
+    }
+
     auto& hallwayDrones = m_hallway->GetDrones();
     for (auto& drone : hallwayDrones)
     {
@@ -1738,6 +1777,10 @@ void GameplayState::Update(double dt)
             else if (playerY < trainCameraBaseY - TRAIN_CAMERA_DEADZONE_DOWN)
                 cameraTarget.y = playerY + TRAIN_CAMERA_DEADZONE_DOWN;
         }
+        else if (m_finalAccessed)
+        {
+            cameraTarget.y = Final::MIN_Y + GAME_HEIGHT * 0.5f;
+        }
         m_camera.Update(cameraTarget, m_cameraSmoothSpeed);
     }
     m_camera.UpdateScreenShake(static_cast<float>(dt));
@@ -1885,6 +1928,10 @@ void GameplayState::HandleRoomToHallwayTransition()
     OpenHallwayDoorLayoutOnly();
     m_hallwayEntryStoryPending = true;
     m_hallwayEntryStoryDelayRemaining = HALLWAY_ENTRY_STORY_DELAY_SEC;
+    m_rooftopAccessed = false;
+    m_undergroundAccessed = false;
+    m_trainAccessed = false;
+    m_finalAccessed = false;
     m_currentCheckpoint = MapZone::Hallway;
 }
 
@@ -1892,6 +1939,9 @@ void GameplayState::HandleHallwayToRooftopTransition()
 {
     m_rooftopDoor->ResetMapTransition();
     m_rooftopAccessed = true;
+    m_undergroundAccessed = false;
+    m_trainAccessed = false;
+    m_finalAccessed = false;
     m_currentCheckpoint = MapZone::Rooftop;
     if (!m_rooftopQStoryDone)
     {
@@ -1927,6 +1977,8 @@ void GameplayState::HandleRooftopToUndergroundTransition()
 {
     m_rooftopAccessed = true;
     m_undergroundAccessed = true;
+    m_trainAccessed = false;
+    m_finalAccessed = false;
     m_currentCheckpoint = MapZone::Underground;
 
     m_rooftop->ClearAllDrones();
@@ -1962,6 +2014,7 @@ void GameplayState::HandleUndergroundToTrainTransition()
     m_rooftopAccessed = true;
     m_undergroundAccessed = true;
     m_trainAccessed = true;
+    m_finalAccessed = false;
     m_currentCheckpoint = MapZone::Train;
 
     m_underground->ClearAllDrones();
@@ -2002,6 +2055,55 @@ void GameplayState::HandleUndergroundToTrainTransition()
         cameraTargetPos.x, cameraTargetPos.y, playerStartX, playerStartY);
 }
 
+void GameplayState::HandleTrainToFinalTransition()
+{
+    Logger::Instance().Log(Logger::Severity::Event,
+        "Transition to Final Map! Starting final layout...");
+
+    m_rooftopAccessed = true;
+    m_undergroundAccessed = true;
+    m_trainAccessed = false;
+    m_finalAccessed = true;
+    m_currentCheckpoint = MapZone::Final;
+
+    if (m_train)
+    {
+        m_train->GetDroneManager()->ClearAllDrones();
+        if (m_train->GetCarTransportDroneManager())
+            m_train->GetCarTransportDroneManager()->ClearAllDrones();
+        if (m_train->GetSirenDroneManager())
+            m_train->GetSirenDroneManager()->ClearAllDrones();
+        m_train->GetRobots().clear();
+    }
+
+    player.SetSizeScale(0.6f);
+    // Green square door is at X = Final::MIN_X + 293.5f, Y = Final::MIN_Y + 276.0f (deck top)
+    float playerStartX = Final::MIN_X + 293.5f;
+    float newGroundLevel = Final::MIN_Y + 276.0f;
+    float playerStartY = newGroundLevel + player.GetHitboxSize().y * 0.5f;
+
+    player.SetCurrentGroundLevel(newGroundLevel);
+    player.SetPosition({ playerStartX, playerStartY });
+    player.ResetVelocity();
+    player.SetOnGround(true);
+
+    float worldMinX = Final::MIN_X;
+    float worldMaxX = Final::MIN_X + m_final->GetMapWidth();
+    float worldMinY = Final::MIN_Y;
+    float worldMaxY = Final::MIN_Y + Final::HEIGHT;
+
+    m_camera.SetBounds({ worldMinX, worldMinY }, { worldMaxX, worldMaxY });
+
+    Math::Vec2 cameraTargetPos = { playerStartX, Final::MIN_Y + GAME_HEIGHT / 2.0f };
+    m_camera.SetPosition(cameraTargetPos);
+
+    m_cameraSmoothSpeed = 0.05f;
+
+    Logger::Instance().Log(Logger::Severity::Event,
+        "Final Transition Complete! Player: (%.1f, %.1f)",
+        playerStartX, playerStartY);
+}
+
 void GameplayState::StartTransition(PendingTransition t)
 {
     if (m_fadeState != FadeState::None) return;
@@ -2031,6 +2133,9 @@ void GameplayState::ExecutePendingTransition()
         break;
     case PendingTransition::UndergroundToTrain:
         HandleUndergroundToTrainTransition();
+        break;
+    case PendingTransition::TrainToFinal:
+        HandleTrainToFinalTransition();
         break;
     default:
         break;
@@ -2088,6 +2193,7 @@ void GameplayState::RespawnAtCheckpoint()
     m_cameraZoom = 1.0f;
     m_trainZoomTransition = false;
     m_camera.StopAnimation();
+    m_finalAccessed = false;
 
     switch (m_currentCheckpoint)
     {
@@ -2180,6 +2286,29 @@ void GameplayState::RespawnAtCheckpoint()
         if (m_train)
             m_train->RestartEntryTimer(); // reset offset/speed/countdown/sounds to first-entry state
         Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Train");
+        break;
+    }
+    case MapZone::Final:
+    {
+        m_rooftopAccessed = true;
+        m_undergroundAccessed = true;
+        m_trainAccessed = false;
+        m_finalAccessed = true;
+
+        player.SetSizeScale(0.6f);
+        float playerStartX = Final::MIN_X + 293.5f;
+        float newGroundLevel = Final::MIN_Y + 276.0f;
+        float playerStartY = newGroundLevel + player.GetHitboxSize().y * 0.5f;
+
+        player.SetCurrentGroundLevel(newGroundLevel);
+        player.SetPosition({ playerStartX, playerStartY });
+        player.SetOnGround(true);
+
+        m_camera.SetBounds({ Final::MIN_X, Final::MIN_Y },
+                           { Final::MIN_X + m_final->GetMapWidth(), Final::MIN_Y + Final::HEIGHT });
+        m_camera.Update(player.GetPosition(), 1.0f);
+
+        Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Final");
         break;
     }
     }
@@ -2405,6 +2534,12 @@ void GameplayState::Draw()
 
 void GameplayState::DrawMainLayer()
 {
+    static bool firstDraw = true;
+    if (firstDraw)
+    {
+        Logger::Instance().Log(Logger::Severity::Info, "GameplayState First DrawMainLayer start.");
+        firstDraw = false;
+    }
     // If GameOver has just popped, do not render the previous gameplay frame.
     if (m_isGameOver)
     {
@@ -2557,6 +2692,15 @@ void GameplayState::DrawMainLayer()
             m_train->DrawValveWaterVFX(*colorShader, worldProjection, m_camera.GetPosition(), viewHalfW);
         }
         m_train->DrawCar3InsideFadeOverlay(*colorShader, m_camera.GetPosition(), viewHalfW);
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+    }
+
+    if (m_finalAccessed)
+    {
+        m_final->Draw(textureShader, *colorShader, m_camera.GetPosition(), viewHalfW);
         textureShader.use();
         textureShader.setMat4("projection", worldProjection);
         textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
@@ -3560,6 +3704,7 @@ void GameplayState::Shutdown()
     m_rooftop->Shutdown();
     m_underground->Shutdown();
     m_train->Shutdown();
+    m_final->Shutdown();
     player.Shutdown();
     droneManager->Shutdown();
     m_pulseGauge.Shutdown();

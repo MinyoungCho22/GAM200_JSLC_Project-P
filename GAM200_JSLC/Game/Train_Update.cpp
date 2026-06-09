@@ -1242,6 +1242,20 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
         }
     }
 
+    // Train_Head (Car 6) 도달 시 서서히 정지
+    if (m_trainState == TrainState::Moving && !m_finalStopTriggered)
+    {
+        const Math::Vec2 hc = player.GetHitboxCenter();
+        int playerCarIndex = GetPlayerTrainCarIndex(hc);
+        if (playerCarIndex == 6)
+        {
+            m_finalStopTriggered = true;
+            m_trainState         = TrainState::Stopping;
+            Logger::Instance().Log(Logger::Severity::Info,
+                "Train: player reached Train_Head (Car 6) — final stop engaged.");
+        }
+    }
+
     // --- Train movement ---
     auto applyTrainCarryToPlayer = [&](float move)
     {
@@ -1292,6 +1306,23 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             m_trainRunLoopSound.Stop();
             RequestTrainCameraShake(8.f);
             Logger::Instance().Log(Logger::Severity::Info, "Train: inertial stop complete.");
+        }
+    }
+
+    if (m_finalStopTriggered && m_trainState == TrainState::Stationary)
+    {
+        if (m_finalTransitionTimer < 0.0f)
+        {
+            m_finalTransitionTimer = 0.7f;
+            Logger::Instance().Log(Logger::Severity::Info, "Train: stationary reached, final transition timer (0.7s) started.");
+        }
+        else if (m_finalTransitionTimer > 0.0f)
+        {
+            m_finalTransitionTimer = std::max(0.0f, m_finalTransitionTimer - fdt);
+            if (m_finalTransitionTimer == 0.0f)
+            {
+                Logger::Instance().Log(Logger::Severity::Info, "Train: final transition timer complete.");
+            }
         }
     }
 

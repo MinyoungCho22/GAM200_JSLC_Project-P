@@ -169,6 +169,8 @@ void Train::Initialize()
     m_car3InsideTransitionTargetInside = false;
     m_car3InsideOnRoof                 = false;
     m_car3ExtensionStopTriggered       = false;
+    m_finalStopTriggered               = false;
+    m_finalTransitionTimer             = -1.0f;
     m_trainDepartedOnce                = false;
     m_car3TunnelInsideViewActive       = false;
     m_car3TunnelInsideTransitionActive = false;

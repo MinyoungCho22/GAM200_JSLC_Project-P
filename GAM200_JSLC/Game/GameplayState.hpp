@@ -22,6 +22,7 @@
 #include "StoryDialogue.hpp"
 #include "Underground.hpp"
 #include "Train.hpp"
+#include "Final.hpp"
 #include "Skill.hpp"
 #include <memory>
 #include <vector>
@@ -32,10 +33,10 @@ class Background;
 class Shader;
 class GameStateManager;
 
-enum class MapZone { Room, Hallway, Rooftop, Underground, Train };
+enum class MapZone { Room, Hallway, Rooftop, Underground, Train, Final };
 
 enum class FadeState { None, FadingOut, FadingIn };
-enum class PendingTransition { None, RoomToHallway, HallwayToRooftop, RooftopToUnderground, UndergroundToTrain };
+enum class PendingTransition { None, RoomToHallway, HallwayToRooftop, RooftopToUnderground, UndergroundToTrain, TrainToFinal };
 
 class GameplayState : public GameState
 {
@@ -60,6 +61,7 @@ private:
     void HandleHallwayToRooftopTransition();
     void HandleRooftopToUndergroundTransition();
     void HandleUndergroundToTrainTransition();
+    void HandleTrainToFinalTransition();
     Math::Vec2 ScreenToWorldCoordinates(double screenX, double screenY) const;
     void WorldToFramebuffer(Math::Vec2 world, double& outFbX, double& outFbY) const;
     void ApplyGamepadDroneTargetingAssist(double dt, Input::Input& input, Math::Vec2& inOutMouseWorldPos);
@@ -106,6 +108,7 @@ private:
     bool m_hallwayFaradayBoxStoryDone = false;
     std::unique_ptr<Underground> m_underground;
     std::unique_ptr<Train> m_train;
+    std::unique_ptr<Final> m_final;
     std::unique_ptr<Background> m_mouseIdleCursor;
     std::unique_ptr<Background> m_mousePointerCursor;
     std::unique_ptr<Background> m_mouseLeftCursor;
@@ -116,6 +119,7 @@ private:
     Math::Vec2 m_lastMouseWorldPos{};
     bool m_undergroundAccessed = false;
     bool m_trainAccessed = false;
+    bool m_finalAccessed = false;
     bool m_doorOpened = false;
     bool m_rooftopAccessed = false;
     bool m_isGameOver = false;

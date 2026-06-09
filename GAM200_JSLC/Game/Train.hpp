@@ -271,6 +271,7 @@ public:
     /// 현재 열차 이동 속도(월드 유닛/초) — 추적 드론 보조 등에 사용
     float      GetTrainCurrentSpeed() const { return m_trainCurrentSpeed; }
     TrainState GetTrainState()  const { return m_trainState; }
+    bool       IsFinalTransitionReady() const { return m_finalStopTriggered && m_finalTransitionTimer == 0.0f; }
 
     // Total world width of all train car images (1 px = 1 world unit)
     float GetMapWidth() const { return m_totalTrainWidth; }
@@ -332,6 +333,8 @@ private:
     bool       m_playerOnTrain = false;
     Sound      m_trainStartSound;
     Sound      m_trainRunLoopSound;
+    bool       m_finalStopTriggered = false;
+    float      m_finalTransitionTimer = -1.0f;
 
     // Riding momentum: carry player X with moving train while grounded, jumping above cars, or crouching on deck
     bool       m_prevPlayerOnTrain = false;

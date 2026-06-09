@@ -130,6 +130,39 @@
     <ClCompile Include="Game\Robot.cpp">
       <Filter>Game</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Train.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Train_Car2.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Train_Car3.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Train_Car4.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Train_Car5.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Train_Draw.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Train_Helpers.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Train_Init.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Train_TunnelInside.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Train_Update.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Final.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\Sound.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -247,6 +280,21 @@
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\Robot.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Final.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\MapObjectTypes.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Skill.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Train.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Train_Internal.hpp">
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Sound.hpp">
