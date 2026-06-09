@@ -70,6 +70,19 @@ constexpr float HIDING_S_PROMPT_DISTANCE_SQ = HIDING_S_PROMPT_DISTANCE * HIDING_
 constexpr float HIDING_S_ICON_WORLD_SIZE = 80.0f;
 constexpr float HIDING_S_ICON_OFFSET_Y = 55.0f;
 
+constexpr size_t ROOM_TV_PULSE_SOURCE_INDEX = 1;
+constexpr float TV_POWER_ON_COST = 20.0f;
+constexpr float TV_OFF_LINE_INTERVAL = 0.8f;
+constexpr float TV_ON_LINE_INTERVAL = 2.5f;
+constexpr float TV_FLICKER_INTERVAL = 0.4f;
+constexpr float TV_ON_FONT_HEIGHT = 24.0f;
+constexpr float TV_TEXT_FONT_HEIGHT = TV_ON_FONT_HEIGHT + 4.0f;
+constexpr float TV_TEXT_POS_X = 480.0f;
+constexpr float TV_TEXT_POS_Y = 575.0f;
+// Trimmed Room_news_dialog.png top-left (world coords, same space as TV_TEXT_POS_*).
+constexpr float TV_NEWS_DIALOG_PNG_POS_X = TV_TEXT_POS_X - 5.0f;
+constexpr float TV_NEWS_DIALOG_PNG_POS_Y = TV_TEXT_POS_Y - 10.0f;
+
 // Hallway entry spawn: slightly right/down from the previous defaults (door + Ctrl+2).
 constexpr float HALLWAY_ENTRY_MARGIN_X = 235.0f + 65.0f;
 constexpr float HALLWAY_FLOOR_VERTICAL_ADJUST = -20.0f;
@@ -78,8 +91,55 @@ constexpr float HALLWAY_ENTRY_POS_Y = GROUND_LEVEL + 60.0f + 50.0f + HALLWAY_FLO
 
 constexpr float OPENING_STORY_DELAY_SEC = 1.5f;
 constexpr float HALLWAY_ENTRY_STORY_DELAY_SEC = 1.0f;
+constexpr float UI_EXPLANATION_TRIGGER_X = 998.6f;
+constexpr float UI_EXPLANATION_TRIGGER_Y = 349.4f;
+constexpr float UI_EXPLANATION_TRIGGER_RADIUS = 80.0f;
 /// Caps dt so a single huge tick (first frame, focus loss) does not skip story delays.
 constexpr float STORY_DELAY_DT_CAP = 0.1f;
+
+namespace RoomTvPng {
+
+std::unique_ptr<Background> g_news;
+std::unique_ptr<Background> g_dialog;
+
+void EnsureDialog()
+{
+    if (!g_dialog)
+    {
+        g_dialog = std::make_unique<Background>();
+        g_dialog->Initialize("Asset/Room_news_dialog.png");
+    }
+}
+
+void EnsureNews()
+{
+    if (!g_news)
+    {
+        g_news = std::make_unique<Background>();
+        g_news->Initialize("Asset/Room_news.png");
+    }
+}
+
+void ReleaseNews()
+{
+    if (g_news)
+    {
+        g_news->Shutdown();
+        g_news.reset();
+    }
+}
+
+void ReleaseAll()
+{
+    ReleaseNews();
+    if (g_dialog)
+    {
+        g_dialog->Shutdown();
+        g_dialog.reset();
+    }
+}
+
+} // namespace RoomTvPng
 
 GameplayState::GameplayState(GameStateManager& gsm_ref) : gsm(gsm_ref) {}
 
@@ -130,6 +190,7 @@ void GameplayState::Initialize()
 
     m_room = std::make_unique<Room>();
     m_room->Initialize(engine, "Asset/Room.png");
+    ConfigureRoomTvPulseSource();
 
     m_door = std::make_unique<Door>();
     m_door->Initialize({ 1710.0f, 440.0f }, { 50.0f, 300.0f }, 20.0f, DoorType::RoomToHallway);
@@ -158,6 +219,7 @@ void GameplayState::Initialize()
     {
         const auto& cfg = MapObjectConfig::Instance().GetData();
         m_room->ApplyConfig(cfg.room);
+        ConfigureRoomTvPulseSource();
         m_hallway->ApplyConfig(cfg.hallway);
         m_rooftop->ApplyConfig(cfg.rooftop);
         m_underground->ApplyConfig(cfg.underground);
@@ -191,6 +253,13 @@ void GameplayState::Initialize()
 
     m_hallwayHidingPromptS = std::make_unique<Background>();
     m_hallwayHidingPromptS->Initialize("Asset/S.png");
+
+    m_uiExplanation = std::make_unique<Background>();
+    m_uiExplanation->Initialize("Asset/ui_explanation.png");
+    m_showUiExplanation = false;
+    m_uiExplanationSeen = false;
+
+    ResetTvNewsState();
 
     m_tutorial = std::make_unique<Tutorial>();
 
@@ -469,6 +538,7 @@ void GameplayState::Update(double dt)
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsKeyTriggered(Input::Key::Num1))
     {
         silenceStoryForMapCheat();
+        ResetTvNewsState();
         m_tutorial->DisableAll();
         m_doorOpened = false;
         m_rooftopAccessed = false;
@@ -736,6 +806,27 @@ void GameplayState::Update(double dt)
     Math::Vec2 playerHitboxSize = player.GetHitboxSize();
     Math::Vec2 playerHbCenter = player.GetHitboxCenter();
 
+    if (!m_uiExplanationSeen && !m_showUiExplanation && m_currentCheckpoint == MapZone::Room)
+    {
+        const float dx = playerCenter.x - UI_EXPLANATION_TRIGGER_X;
+        const float dy = playerCenter.y - UI_EXPLANATION_TRIGGER_Y;
+        if (dx * dx + dy * dy <= UI_EXPLANATION_TRIGGER_RADIUS * UI_EXPLANATION_TRIGGER_RADIUS)
+            m_showUiExplanation = true;
+    }
+
+    if (m_showUiExplanation)
+    {
+        if (ctl.IsActionTriggered(ControlAction::Attack, input))
+        {
+            m_showUiExplanation = false;
+            m_uiExplanationSeen = true;
+        }
+        if (!m_camera.IsAnimating())
+            m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
+        SoundSystem::Instance().Update();
+        return;
+    }
+
     if (!m_rooftopAccessed)
         m_prevRooftopForQHint = false;
 
@@ -759,10 +850,7 @@ void GameplayState::Update(double dt)
     const bool car2PulseBoxBlocksAttack =
         m_trainAccessed && m_train
         && m_train->IsPlayerInCar2PurplePulseBox(playerHbCenter, playerHitboxSize);
-    bool isPressingAttack = ctl.IsActionPressed(ControlAction::Attack, input) && !crouchHidingBlocksAttack
-        && !car2PulseBoxBlocksAttack;
 
-    // Get mouse world position
     double mouseScreenX, mouseScreenY;
     input.GetMousePosition(mouseScreenX, mouseScreenY);
     Math::Vec2 mouseWorldPos = ScreenToWorldCoordinates(mouseScreenX, mouseScreenY);
@@ -770,11 +858,31 @@ void GameplayState::Update(double dt)
         ApplyGamepadDroneTargetingAssist(dt, input, mouseWorldPos);
     m_lastMouseWorldPos = mouseWorldPos;
 
+    bool tvBlocksAttackWhenOff = false;
+    if (!m_doorOpened && !m_rooftopAccessed && m_room && m_room->IsBlindOpen()
+        && m_tvPhase == TvPhase::OffGlitch)
+    {
+        const auto& roomSources = m_room->GetPulseSources();
+        if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
+        {
+            const auto& tv = roomSources[ROOM_TV_PULSE_SOURCE_INDEX];
+            const bool playerOnTv = Collision::CheckAABB(
+                playerHbCenter, playerHitboxSize, tv.GetPosition(), tv.GetHitboxSize());
+            const bool cursorOnTv = Collision::CheckPointInAABB(
+                mouseWorldPos, tv.GetPosition(), tv.GetHitboxSize());
+            tvBlocksAttackWhenOff = playerOnTv && cursorOnTv;
+        }
+    }
+
+    bool isPressingAttack = ctl.IsActionPressed(ControlAction::Attack, input) && !crouchHidingBlocksAttack
+        && !car2PulseBoxBlocksAttack && !tvBlocksAttackWhenOff;
+
     // Auto hot-reload on file save for map object coordinates/sizes/sprites.
     if (MapObjectConfig::Instance().ReloadIfChanged())
     {
         const auto& cfg = MapObjectConfig::Instance().GetData();
         m_room->ApplyConfig(cfg.room);
+        ConfigureRoomTvPulseSource();
         m_hallway->ApplyConfig(cfg.hallway);
         m_rooftop->ApplyConfig(cfg.rooftop);
         m_underground->ApplyConfig(cfg.underground);
@@ -832,9 +940,77 @@ void GameplayState::Update(double dt)
         m_logTimer -= 0.5;
     }
 
+    if (!m_doorOpened && !m_rooftopAccessed && m_room)
+    {
+        auto& roomSources = m_room->GetPulseSources();
+        if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
+            roomSources[ROOM_TV_PULSE_SOURCE_INDEX].Drain(100000.0f);
+    }
+
     pulseManager->Update(playerCenter, playerHitboxSize, player, m_room->GetPulseSources(),
         m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(),
         m_train->GetPulseSources(), isPressingInteract, dt, mouseWorldPos);
+
+    if (!m_doorOpened && !m_rooftopAccessed && m_room && m_font && m_fontShader && m_room->IsBlindOpen())
+    {
+        const float fdt = static_cast<float>(dt);
+        auto& roomSources = m_room->GetPulseSources();
+
+        bool tvPowerOnTriggered = false;
+        if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
+        {
+            const auto& tv = roomSources[ROOM_TV_PULSE_SOURCE_INDEX];
+            const bool playerOnTv = Collision::CheckAABB(
+                playerHbCenter, playerHitboxSize, tv.GetPosition(), tv.GetHitboxSize());
+            const bool cursorOnTv = Collision::CheckPointInAABB(
+                mouseWorldPos, tv.GetPosition(), tv.GetHitboxSize());
+            tvPowerOnTriggered = playerOnTv && cursorOnTv
+                && ctl.IsActionTriggered(ControlAction::Attack, input);
+        }
+
+        if (m_tvPhase == TvPhase::OffGlitch && tvPowerOnTriggered)
+        {
+            Pulse& pulse = player.GetPulseCore().getPulse();
+            if (pulse.Value() >= TV_POWER_ON_COST)
+            {
+                pulse.spend(TV_POWER_ON_COST);
+                RoomTvPng::EnsureNews();
+                m_tvPhase = TvPhase::OnNews;
+                m_tvNewsActive = true;
+                m_tvLineIndex = 0;
+                m_tvLineTimer = 0.0f;
+                m_tvTextVisible = true;
+                RebuildTvLineTexture();
+            }
+        }
+
+        const float lineInterval = (m_tvPhase == TvPhase::OffGlitch) ? TV_OFF_LINE_INTERVAL : TV_ON_LINE_INTERVAL;
+        m_tvLineTimer += fdt;
+        if (m_tvLineTimer >= lineInterval)
+        {
+            m_tvLineTimer = 0.0f;
+            const auto& pool = (m_tvPhase == TvPhase::OffGlitch) ? m_tvLeakLines : m_tvNewsLines;
+            if (!pool.empty())
+            {
+                m_tvLineIndex = (m_tvLineIndex + 1) % pool.size();
+                RebuildTvLineTexture();
+            }
+        }
+
+        if (m_tvPhase == TvPhase::OffGlitch)
+        {
+            m_tvFlickerTimer += fdt;
+            if (m_tvFlickerTimer >= TV_FLICKER_INTERVAL)
+            {
+                m_tvFlickerTimer = 0.0f;
+                m_tvTextVisible = !m_tvTextVisible;
+            }
+        }
+        else
+        {
+            m_tvTextVisible = true;
+        }
+    }
 
     Drone* targetDrone = nullptr;
     Robot* targetRobot = nullptr;
@@ -1999,6 +2175,7 @@ void GameplayState::RespawnAtCheckpoint()
 {
     player.Revive(50.0f);
     m_storyDialogue->ResetForNewRun();
+    ResetTvNewsState();
 
     // Reset all enemies
     droneManager->ResetAllDrones();
@@ -2613,8 +2790,12 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     colorShader->use();
     colorShader->setMat4("projection", projection);
     colorShader->setFloat("uAlpha", 0.72f);
-    for (const auto& src : m_room->GetPulseSources())
-        src.DrawRemainGauge(*colorShader);
+    for (size_t i = 0; i < m_room->GetPulseSources().size(); ++i)
+    {
+        if (i == ROOM_TV_PULSE_SOURCE_INDEX)
+            continue;
+        m_room->GetPulseSources()[i].DrawRemainGauge(*colorShader);
+    }
     for (const auto& src : m_hallway->GetPulseSources())
         src.DrawRemainGauge(*colorShader);
     for (const auto& src : m_rooftop->GetPulseSources())
@@ -2649,6 +2830,63 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_train->DrawTunnelInsideBackground(textureShader);
         m_train->DrawTunnelInsideProps(textureShader);
     }
+
+    // Room TV PNGs — native texture size (after blind open; news when TV is on).
+    if (!m_doorOpened && !m_rooftopAccessed && m_room && m_room->IsBlindOpen())
+    {
+        auto drawNativeSpriteAtCenter = [&](const std::unique_ptr<Background>& bg, Math::Vec2 center)
+        {
+            if (!bg || bg->GetTextureID() == 0)
+                return;
+            const float w = static_cast<float>(bg->GetWidth());
+            const float h = static_cast<float>(bg->GetHeight());
+            if (w <= 0.0f || h <= 0.0f)
+                return;
+            Math::Matrix model =
+                Math::Matrix::CreateTranslation(center) * Math::Matrix::CreateScale({ w, h });
+            bg->Draw(textureShader, model);
+        };
+
+        auto drawNativeSpriteAtTopLeft = [&](const std::unique_ptr<Background>& bg, Math::Vec2 topLeft)
+        {
+            if (!bg || bg->GetTextureID() == 0)
+                return;
+            const float w = static_cast<float>(bg->GetWidth());
+            const float h = static_cast<float>(bg->GetHeight());
+            if (w <= 0.0f || h <= 0.0f)
+                return;
+            const Math::Vec2 center = { topLeft.x + w * 0.5f, topLeft.y + h * 0.5f };
+            drawNativeSpriteAtCenter(bg, center);
+        };
+
+        textureShader.use();
+        textureShader.setMat4("projection", projection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        textureShader.setFloat("tintStrength", 0.0f);
+
+        const bool showDialogPng =
+            m_tvPhase != TvPhase::OffGlitch || m_tvTextVisible;
+        if (showDialogPng)
+        {
+            RoomTvPng::EnsureDialog();
+            drawNativeSpriteAtTopLeft(
+                RoomTvPng::g_dialog, { TV_NEWS_DIALOG_PNG_POS_X, TV_NEWS_DIALOG_PNG_POS_Y });
+        }
+
+        if (m_tvPhase == TvPhase::OnNews && m_tvNewsActive)
+        {
+            auto& roomSources = m_room->GetPulseSources();
+            if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
+            {
+                const Math::Vec2 tvCenter = roomSources[ROOM_TV_PULSE_SOURCE_INDEX].GetPosition();
+                drawNativeSpriteAtCenter(RoomTvPng::g_news, tvCenter);
+            }
+        }
+    }
+
     player.Draw(textureShader);
 
     textureShader.use();
@@ -2696,6 +2934,22 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             Math::Matrix sModel = Math::Matrix::CreateTranslation(topCenter)
                 * Math::Matrix::CreateScale({ HIDING_S_ICON_WORLD_SIZE, HIDING_S_ICON_WORLD_SIZE });
             m_hallwayHidingPromptS->Draw(textureShader, sModel);
+        }
+    }
+
+    if (!m_doorOpened && !m_rooftopAccessed && m_room && m_font && m_fontShader
+        && (m_room->IsBlindOpen() || m_tvPhase == TvPhase::OnNews))
+    {
+        if (m_tvLineTex.textureID != 0 && m_tvTextVisible)
+        {
+            m_fontShader->use();
+            m_fontShader->setMat4("projection", projection);
+            m_fontShader->setVec3("colorTint", 0.0f, 0.0f, 0.0f);
+            m_fontShader->setFloat("tintStrength", 1.0f);
+            m_font->DrawBakedText(
+                *m_fontShader, m_tvLineTex, { TV_TEXT_POS_X, TV_TEXT_POS_Y }, TV_TEXT_FONT_HEIGHT);
+            m_fontShader->setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+            m_fontShader->setFloat("tintStrength", 0.0f);
         }
     }
 
@@ -2824,6 +3078,23 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
     m_tutorial->Draw(*m_font, *m_fontShader);
 
+    if (m_showUiExplanation && m_uiExplanation && m_uiExplanation->GetWidth() > 0)
+    {
+        textureShader.use();
+        textureShader.setMat4("projection", baseProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        textureShader.setFloat("tintStrength", 0.0f);
+
+        const float texW = static_cast<float>(m_uiExplanation->GetWidth());
+        const float texH = static_cast<float>(m_uiExplanation->GetHeight());
+        Math::Matrix uiModel = Math::Matrix::CreateTranslation({ GAME_WIDTH * 0.5f, GAME_HEIGHT * 0.5f })
+            * Math::Matrix::CreateScale({ texW, texH });
+        m_uiExplanation->Draw(textureShader, uiModel);
+    }
+
     if (m_storyDialogue && m_storyDialogue->IsBlocking())
     {
         Shader& texForStory = engine.GetTextureShader();
@@ -2905,8 +3176,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     bool showIdleOverWorldObject = false;
 
     const bool storyDialogueBlocking = m_storyDialogue && m_storyDialogue->IsBlocking();
+    const bool uiExplanationBlocking = m_showUiExplanation;
 
-    if (!m_isDebugDraw && !storyDialogueBlocking)
+    if (!m_isDebugDraw && !storyDialogueBlocking && !uiExplanationBlocking)
     {
         const Math::Vec2 mouseWorldPosForHover = m_lastMouseWorldPos;
         const Math::Vec2 playerHitboxCenter    = player.GetHitboxCenter();
@@ -2926,6 +3198,19 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             Collision::CheckPointInAABB(mouseWorldPosForHover, m_room->GetBlindPos(), m_room->GetBlindSize()))
             overLeftClickTarget = true;
 
+        if (!overLeftClickTarget && !m_doorOpened && !m_rooftopAccessed && m_room
+            && m_room->IsBlindOpen() && m_tvPhase == TvPhase::OffGlitch)
+        {
+            const auto& roomSources = m_room->GetPulseSources();
+            if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
+            {
+                const auto& tv = roomSources[ROOM_TV_PULSE_SOURCE_INDEX];
+                if (Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, tv.GetPosition(), tv.GetHitboxSize())
+                    && Collision::CheckPointInAABB(mouseWorldPosForHover, tv.GetPosition(), tv.GetHitboxSize()))
+                    overLeftClickTarget = true;
+            }
+        }
+
         if (!overLeftClickTarget && m_rooftop && m_rooftop->IsPlayerCloseToHole() && !m_rooftop->IsHoleClosed() &&
             Collision::CheckPointInAABB(mouseWorldPosForHover, m_rooftop->GetHolePos(), m_rooftop->GetHoleSize()))
             overLeftClickTarget = true;
@@ -2943,9 +3228,12 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             overLeftClickTarget = true;
 
         // Right-click targets (pulse chargers): player overlaps AND cursor is inside the source
-        auto checkPulseSources = [&](const std::vector<PulseSource>& sources) {
-            for (const auto& src : sources)
+        auto checkPulseSources = [&](const std::vector<PulseSource>& sources, size_t skipIndex = SIZE_MAX) {
+            for (size_t i = 0; i < sources.size(); ++i)
             {
+                if (i == skipIndex)
+                    continue;
+                const auto& src = sources[i];
                 if (!Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, src.GetPosition(), src.GetHitboxSize()))
                     continue;
                 if (Collision::CheckPointInAABB(mouseWorldPosForHover, src.GetPosition(), src.GetHitboxSize()))
@@ -2954,7 +3242,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             return false;
         };
 
-        if (checkPulseSources(m_room->GetPulseSources()) ||
+        if (checkPulseSources(m_room->GetPulseSources(), ROOM_TV_PULSE_SOURCE_INDEX) ||
             checkPulseSources(m_hallway->GetPulseSources()) ||
             checkPulseSources(m_rooftop->GetPulseSources()) ||
             checkPulseSources(m_underground->GetPulseSources()) ||
@@ -3268,7 +3556,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     const bool showLeftCursor = overLeftClickTarget && !overRightClickTarget;
     const bool showRightCursor = overRightClickTarget && !overLeftClickTarget;
     const bool showMouseIdleCursor =
-        storyDialogueBlocking
+        storyDialogueBlocking || uiExplanationBlocking
         || (!m_isDebugDraw && (showCombatIdleCursor || showIdleOverWorldObject));
 
     if (showLeftCursor || showRightCursor)
@@ -3316,7 +3604,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             Math::Matrix::CreateScale({ iconSize, iconSize });
         m_mouseIdleCursor->Draw(textureShader, iconModel);
     }
-    else if (!storyDialogueBlocking && m_mousePointerCursor && m_mousePointerCursor->GetWidth() > 0)
+    else if (!storyDialogueBlocking && !uiExplanationBlocking && m_mousePointerCursor && m_mousePointerCursor->GetWidth() > 0)
     {
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -3480,6 +3768,50 @@ TraceStage GameplayState::GetCurrentTraceStage() const
     return TraceStage::Stage1;
 }
 
+void GameplayState::RebuildTvLineTexture()
+{
+    if (!m_font || !m_fontShader)
+        return;
+
+    const auto& pool = (m_tvPhase == TvPhase::OffGlitch)
+        ? m_tvLeakLines
+        : m_tvNewsLines;
+
+    if (pool.empty())
+        return;
+
+    if (m_tvLineIndex >= pool.size())
+        m_tvLineIndex = 0;
+
+    m_tvLineTex = m_font->PrintToTexture(*m_fontShader, pool[m_tvLineIndex]);
+}
+
+void GameplayState::ConfigureRoomTvPulseSource()
+{
+    if (!m_room)
+        return;
+
+    auto& roomSources = m_room->GetPulseSources();
+    if (roomSources.size() <= ROOM_TV_PULSE_SOURCE_INDEX)
+        return;
+
+    PulseSource& tvSource = roomSources[ROOM_TV_PULSE_SOURCE_INDEX];
+    tvSource.SetDrawRemainGauge(false);
+    tvSource.Drain(100000.0f);
+}
+
+void GameplayState::ResetTvNewsState()
+{
+    RoomTvPng::ReleaseNews();
+    m_tvPhase = TvPhase::OffGlitch;
+    m_tvNewsActive = false;
+    m_tvLineIndex = 0;
+    m_tvLineTimer = 0.0f;
+    m_tvFlickerTimer = 0.0f;
+    m_tvTextVisible = true;
+    RebuildTvLineTexture();
+}
+
 void GameplayState::Shutdown()
 {
     auto& pp = gsm.GetEngine().GetPostProcess();
@@ -3510,6 +3842,8 @@ void GameplayState::Shutdown()
     if (m_mouseRightCursor) m_mouseRightCursor->Shutdown();
     if (m_hudFrame) m_hudFrame->Shutdown();
     if (m_hallwayHidingPromptS) m_hallwayHidingPromptS->Shutdown();
+    if (m_uiExplanation) m_uiExplanation->Shutdown();
+    RoomTvPng::ReleaseAll();
 
     if (m_storyDialogue) m_storyDialogue->Shutdown();
 
