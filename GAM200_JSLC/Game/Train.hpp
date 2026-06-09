@@ -140,6 +140,7 @@ public:
     void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
     /// SecondTrain 보라 컨테이너 Enter / Leave 프롬프트 (월드 스페이스)
     void DrawCar2EnterLeavePrompt(Shader& textureShader, Math::Vec2 cameraPos, float viewHalfW) const;
+    void DrawSecondTrain3Foreground(Shader& textureShader, Math::Vec2 playerPos) const;
     /// ThirdTrain 사이렌 파동 (solid_color)
     void DrawCar3SirenWaves(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
     /// ThirdTrain 사이렌 펄스 차단 진행 — Room 충전소 남은 양 바와 같은 스타일, 사이렌 옆 월드 좌표 (solid_color)
@@ -158,6 +159,7 @@ public:
     /// SecondInside 사다리: 내부에서 지붕으로, 지붕에서 내부로 이동할 때 커서 판정
     bool IsCar3InsideLadderHovered(Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
     bool IsCar3InsideOnRoof() const { return m_car3InsideOnRoof; }
+    bool IsCar3InsideViewActive() const { return m_car3InsideViewActive; }
     bool IsCar3TunnelInsideViewActive() const { return m_car3TunnelInsideViewActive; }
     bool IsCar3TunnelInsideTransitionActive() const { return m_car3TunnelInsideTransitionActive; }
     bool IsTunnelInsideHazardFalling() const { return m_tunnelInsideHazardFalling; }
@@ -258,6 +260,7 @@ public:
     void SetTrainCarCheatUnlock(bool v) { m_trainCheatCarUnlock = v; }
     void CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize);
     void CheatWarpToCar5(Player& player, Math::Vec2 playerHitboxSize);
+    void CheatWarpToSecondInside1(Player& player, Math::Vec2 playerHitboxSize);
 
     void RequestTrainCameraShake(float maxPixelOffset);
     float ConsumeTrainCameraShakeRequest();

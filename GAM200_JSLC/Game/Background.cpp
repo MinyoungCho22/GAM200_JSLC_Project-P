@@ -152,3 +152,21 @@ void Background::Draw(Shader& shader, const Math::Matrix& model)
 
     GL::BindVertexArray(0);
 }
+
+void Background::Draw(Shader& shader, const Math::Matrix& model, float rectX, float rectY, float rectW, float rectH)
+{
+    if (!VAO || !m_textureID) return;
+
+    shader.setMat4("model", model);
+
+    shader.setVec4("spriteRect", rectX, rectY, rectW, rectH);
+    shader.setBool("flipX", false);
+
+    GL::ActiveTexture(GL_TEXTURE0);
+    GL::BindTexture(GL_TEXTURE_2D, m_textureID);
+
+    GL::BindVertexArray(VAO);
+    GL::DrawArrays(GL_TRIANGLES, 0, 6);
+
+    GL::BindVertexArray(0);
+}

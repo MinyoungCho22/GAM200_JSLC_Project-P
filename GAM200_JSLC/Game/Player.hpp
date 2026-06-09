@@ -96,6 +96,7 @@ public:
         else if (m > 1.f) m_spriteAlphaMul = 1.f;
         else m_spriteAlphaMul = m;
     }
+    float GetSpriteAlphaMul() const { return m_spriteAlphaMul; }
     void SetSizeScale(float scale) { m_sizeScale = scale; }
     float GetSizeScale() const { return m_sizeScale; }
 

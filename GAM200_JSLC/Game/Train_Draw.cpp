@@ -892,3 +892,62 @@ void Train::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, floa
         }
     }
 }
+
+void Train::DrawSecondTrain3Foreground(Shader& shader, Math::Vec2 playerPos) const
+{
+    if (!m_car3InsideViewActive || m_car3InsideTransitionActive || m_car3InsideOnRoof)
+        return;
+
+    if (m_car3TunnelInsideTransitionActive)
+        return;
+
+    const float trainLeft = MIN_X + m_trainOffset;
+    const float lx = playerPos.x - trainLeft;
+    
+    // Green boundary: 12261.f (inside2Right boundary = ext1Local + extension[0] + kCar3InsideBoundRightPx)
+    const float greenBoundary = m_car1Width + m_car2Width + m_car3Width 
+                              + m_car3ExtensionWidths[0] + kCar3InsideBoundRightPx;
+    
+    if (lx >= greenBoundary)
+    {
+        // 1) Draw the rightmost portion of SecondInside_2 (index 1) which player walks behind
+        Background* texInside2 = m_car3InsideTrainB ? m_car3InsideTrainB.get() : m_car3ExtensionTrains[1].get();
+        if (texInside2 && texInside2->GetWidth() > 0)
+        {
+            const float extLeftInside2 = trainLeft + m_car1Width + m_car2Width + m_car3Width 
+                                       + m_car3ExtensionWidths[0];
+            const float wInside2 = m_car3ExtensionWidths[1];
+            const float sliceStart = kCar3InsideBoundRightPx;
+            const float sliceW = wInside2 - sliceStart;
+            
+            const float cx = extLeftInside2 + sliceStart + sliceW * 0.5f;
+            const float cy = MIN_Y + HEIGHT * 0.5f;
+            Math::Matrix model =
+                Math::Matrix::CreateTranslation({ cx, cy }) * Math::Matrix::CreateScale({ sliceW, HEIGHT });
+            
+            shader.setBool("flipX", false);
+            shader.setFloat("alpha", 1.0f);
+            
+            texInside2->Draw(shader, model, sliceStart / wInside2, 0.0f, sliceW / wInside2, 1.0f);
+        }
+
+        // 2) Draw the entire SecondTrain_3 (index 2) as overlay
+        Background* tex3 = m_car3ExtensionTrains[2].get();
+        if (tex3 && tex3->GetWidth() > 0)
+        {
+            const float extLeft3 = trainLeft + m_car1Width + m_car2Width + m_car3Width 
+                                 + m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1];
+            const float w3 = m_car3ExtensionWidths[2];
+            const float cx = extLeft3 + w3 * 0.5f;
+            const float cy = MIN_Y + HEIGHT * 0.5f;
+            Math::Matrix model =
+                Math::Matrix::CreateTranslation({ cx, cy }) * Math::Matrix::CreateScale({ w3, HEIGHT });
+            
+            shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+            shader.setBool("flipX", false);
+            shader.setFloat("alpha", 1.0f);
+            
+            tex3->Draw(shader, model);
+        }
+    }
+}

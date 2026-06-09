@@ -15,6 +15,7 @@ public:
     void InitializeWithBlackKeyTransparency(const char* texturePath, unsigned char rgbMaxTransparent = 40);
     void Shutdown();
     void Draw(Shader& shader, const Math::Matrix& model);
+    void Draw(Shader& shader, const Math::Matrix& model, float rectX, float rectY, float rectW, float rectH);
 
     int GetWidth()  const { return m_width; }
     int GetHeight() const { return m_height; }

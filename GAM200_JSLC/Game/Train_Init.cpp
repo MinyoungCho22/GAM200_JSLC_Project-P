@@ -543,7 +543,7 @@ void Train::BuildTrainHitboxes()
             // SecondTrain_3 우측 터널 문(정지 후 좌클릭 → Turnel_Inside 전환)
             // 문 너비 260의 3/4 = 195px 오른쪽으로 이동 (w-950 → w-755)
             const float doorX = std::max(84.f, w - 755.f);
-            m_car3TunnelEnterHb      = MakeHitbox(cExt, doorX, 120.f, 260.f, 680.f, false);
+            m_car3TunnelEnterHb      = MakeHitbox(cExt, doorX, 120.f, 420.f, 760.f, false);
             m_car3TunnelEnterHbValid = true;
         }
         cExt += w;

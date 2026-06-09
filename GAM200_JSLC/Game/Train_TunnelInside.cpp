@@ -627,3 +627,38 @@ void Train::CheatWarpToCar5(Player& player, Math::Vec2 playerHitboxSize)
     if (m_sirenDroneManager)
         m_sirenDroneManager->ClearAllDrones();
 }
+
+void Train::CheatWarpToSecondInside1(Player& player, Math::Vec2 playerHitboxSize)
+{
+    m_car3InsideViewActive       = true;   // suppress exterior drones/robots
+    m_car3TunnelInsideViewActive = false;  // not in tunnel inside
+    m_car3InsideOnRoof           = false;  // inside cabin
+    
+    // Start of SecondInside_1 (cabin 1)
+    const float tl = MIN_X + m_trainOffset;
+    const float car3Left = tl + m_car1Width + m_car2Width + m_car3Width;
+    
+    // Spawn player inside the cabin, slightly to the right of the left wall
+    const float targetX = car3Left + kCar3InsideBoundLeftPx + 100.f;
+    const float floorTop = MIN_Y + m_car3InsideFloorHb.localCenter.y + m_car3InsideFloorHb.size.y * 0.5f;
+    const float halfH = playerHitboxSize.y * 0.5f;
+    
+    const Math::Vec2 oldHb = player.GetHitboxCenter();
+    const Math::Vec2 newHb = { targetX, floorTop + halfH };
+    
+    player.SetPosition(player.GetPosition() + (newHb - oldHb));
+    player.SetCurrentGroundLevel(floorTop);
+    player.ResetVelocity();
+    player.SetOnGround(true);
+    
+    m_tunnelInsideCameraSnapPending = true;
+    
+    if (m_sirenDroneManager)
+        m_sirenDroneManager->ClearAllDrones();
+        
+    // Reset flags related to transitions
+    m_car3InsideTransitionActive = false;
+    m_car3TunnelInsideTransitionActive = false;
+    m_car3InsideDronesSpawned = false;
+    m_car3InsideDroneInside2Activated = false;
+}

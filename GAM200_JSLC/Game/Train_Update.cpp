@@ -716,6 +716,22 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             player.SetPosition({ player.GetPosition().x + dx, player.GetPosition().y });
             currentHbCenter = player.GetHitboxCenter();
         }
+
+        // Reset player alpha to 1.f (fade-in/fade-out removed)
+        if (m_car2HidePhase == Car2HidePhase::None)
+        {
+            player.SetSpriteAlphaMul(1.f);
+        }
+    }
+    else
+    {
+        // Reset alpha when outside Car 3 interior physics context
+        // to prevent opacity sticking on screen transitions or checkpoint respawns.
+        // But only if we are not actively in the Car 2 container hide phase (which handles its own alpha).
+        if (m_car2HidePhase == Car2HidePhase::None)
+        {
+            player.SetSpriteAlphaMul(1.f);
+        }
     }
 
     // --- Train hitbox collision ---
