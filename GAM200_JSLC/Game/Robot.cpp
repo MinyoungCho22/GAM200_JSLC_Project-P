@@ -150,9 +150,10 @@ void Robot::Init(Math::Vec2 startPos)
     m_directionX = 1.0f;
 
     // Load necessary assets
-    m_textureID = LoadTexture("Asset/Robot.png");
+    m_textureID     = LoadTexture("Asset/Robot.png");
     m_textureHighID = LoadTexture("Asset/Robot_High.png");
-    m_textureLowID = LoadTexture("Asset/Robot_Low.png");
+    m_textureLowID  = LoadTexture("Asset/Robot_Low.png");
+    m_textureDeadID = LoadTexture("Asset/Robot_Dead.png");
 
     m_soundHigh.Load("Asset/Robot_High.mp3", false);
     m_soundLow.Load("Asset/Robot_Low.mp3", false);
@@ -219,7 +220,37 @@ void Robot::ApplyTrainBerserkerProfile()
 
 void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& obstacles, float mapMinX, float mapMaxX)
 {
-    if (m_state == RobotState::Dead) return;
+    if (m_state == RobotState::Dead)
+    {
+        // Dead body physics: gravity + bounce until settled on the ground
+        if (!m_deadBodyOnGround)
+        {
+            const float fDt = static_cast<float>(dt);
+            m_deadBodyVel.y -= DEAD_BODY_GRAVITY * fDt;
+            m_deadBodyPos   += m_deadBodyVel * fDt;
+
+            // Ground collision: dead body is flat, use half the normal height as body radius
+            const float bodyHalfH = m_size.y * 0.25f;
+            const float groundY   = m_groundLimitY + bodyHalfH;
+
+            if (m_deadBodyPos.y <= groundY)
+            {
+                m_deadBodyPos.y = groundY;
+                if (m_deadBounceCount < MAX_DEAD_BOUNCES && std::abs(m_deadBodyVel.y) > 60.0f)
+                {
+                    m_deadBodyVel.y  = -m_deadBodyVel.y * DEAD_BOUNCE_RESTITUTION;
+                    m_deadBodyVel.x *=  0.6f;
+                    ++m_deadBounceCount;
+                }
+                else
+                {
+                    m_deadBodyVel   = { 0.0f, 0.0f };
+                    m_deadBodyOnGround = true;
+                }
+            }
+        }
+        return;
+    }
 
     float fDt = static_cast<float>(dt);
     m_stateTimer -= fDt;
@@ -721,7 +752,28 @@ void Robot::DecideAttackPattern()
 
 void Robot::Draw(const Shader& shader) const
 {
-    if (m_state == RobotState::Dead) return;
+    if (m_state == RobotState::Dead)
+    {
+        if (m_textureDeadID == 0) return;
+
+        const Math::Vec2 deadSize = { m_size.x, m_size.y * 0.5f };
+        Math::Matrix model = Math::Matrix::CreateTranslation(m_deadBodyPos)
+                           * Math::Matrix::CreateScale(deadSize);
+        shader.use();
+        shader.setMat4("model", model);
+        shader.setBool("flipX", m_directionX > 0.0f);
+        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setFloat("alpha", 1.0f);
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("tintStrength", 0.0f);
+
+        GL::ActiveTexture(GL_TEXTURE0);
+        GL::BindTexture(GL_TEXTURE_2D, m_textureDeadID);
+        GL::BindVertexArray(m_VAO);
+        GL::DrawArrays(GL_TRIANGLES, 0, 6);
+        GL::BindVertexArray(0);
+        return;
+    }
 
     shader.use();
 
@@ -909,6 +961,11 @@ void Robot::TakeDamage(float amount, bool applyStagger)
     {
         m_hp = 0.0f;
         m_state = RobotState::Dead;
+        // Initialize dead body physics
+        m_deadBodyPos      = m_position;
+        m_deadBodyVel      = { m_velocity.x * 0.4f, 80.0f };  // small upward pop
+        m_deadBodyOnGround = false;
+        m_deadBounceCount  = 0;
         Logger::Instance().Log(Logger::Severity::Verbose, "Sweep Stalker Destroyed!");
     }
 }
@@ -923,9 +980,14 @@ void Robot::ApplyPulseImpact(Math::Vec2 impulse, float damage)
     m_hp -= damage;
     if (m_hp <= 0.0f)
     {
-        m_hp                = 0.0f;
-        m_state             = RobotState::Dead;
+        m_hp                       = 0.0f;
+        m_state                    = RobotState::Dead;
         m_horzExternalImpulseTimer = 0.f;
+        // Initialize dead body physics (pulse knockback gives horizontal momentum)
+        m_deadBodyPos      = m_position;
+        m_deadBodyVel      = { impulse.x * 0.3f, 120.0f };
+        m_deadBodyOnGround = false;
+        m_deadBounceCount  = 0;
         Logger::Instance().Log(Logger::Severity::Verbose, "Sweep Stalker Destroyed!");
         return;
     }

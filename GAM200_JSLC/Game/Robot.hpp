@@ -120,9 +120,19 @@ private:
 
     unsigned int m_textureHighID = 0;
     unsigned int m_textureLowID = 0;
+    unsigned int m_textureDeadID = 0;
 
     unsigned int m_VAO = 0;
     unsigned int m_VBO = 0;
+
+    // Dead body physics (gravity + bounce)
+    Math::Vec2 m_deadBodyPos{};
+    Math::Vec2 m_deadBodyVel{};
+    bool       m_deadBodyOnGround  = false;
+    int        m_deadBounceCount   = 0;
+    static constexpr int   MAX_DEAD_BOUNCES        = 3;
+    static constexpr float DEAD_BODY_GRAVITY       = 1200.0f;
+    static constexpr float DEAD_BOUNCE_RESTITUTION = 0.40f;
 
     Math::Vec2 m_position;
     Math::Vec2 m_size;

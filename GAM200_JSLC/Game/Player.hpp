@@ -4,6 +4,7 @@
 #include "../Engine/Vec2.hpp"
 #include "../Game/PulseCore.hpp"
 #include "../Engine/Input.hpp"
+#include "../Engine/Sound.hpp"
 
 class ControlBindings;
 
@@ -166,6 +167,8 @@ private:
     bool  m_trainForcedCar2Crouch = false;
     bool  m_trainJumpBlocked = false;
     float m_spriteAlphaMul = 1.0f;
+
+    Sound m_walkSound;
 
     // Sandevistan afterimage effect
     std::vector<AfterimageGhost> m_afterimageGhosts;

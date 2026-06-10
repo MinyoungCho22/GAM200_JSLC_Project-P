@@ -108,6 +108,12 @@ void Player::Init(Math::Vec2 startPos)
     LoadAnimation(AnimationState::Walking, "Asset/Player_Walking.png", 7, 0.1f);
     LoadAnimation(AnimationState::Crouching, "Asset/Player_Crouch.png", 2, 0.1f);
 
+    if (m_walkSound.Load("Asset/Player_Walking.mp3", true))
+    {
+        m_walkSound.SetVolume(0.0f);
+        m_walkSound.Play();
+    }
+
     AnimationData& walkAnim = m_animations[static_cast<int>(AnimationState::Walking)];
     float desiredWidth = 240.0f;
     float frameAspectRatio = static_cast<float>(walkAnim.texHeight) / static_cast<float>(walkAnim.frameWidth);
@@ -322,6 +328,26 @@ void Player::Update(double dt, Input::Input& input, const ControlBindings& contr
         // Speed up walking animation 3x during dash
         const float animDt = fdt * (is_dashing ? 3.0f : 1.0f);
         m_animations[static_cast<int>(m_currentAnimState)].Update(animDt);
+    }
+
+    // Walking sound: loop faster via pitch so footsteps match walk cadence
+    {
+        const bool isWalking = is_on_ground
+                            && !is_crouching
+                            && !IsDead()
+                            && std::abs(m_currentHorizontalSpeed) > 20.0f;
+        if (isWalking)
+        {
+            if (!m_walkSound.IsPlaying())
+                m_walkSound.Play();
+            m_walkSound.SetPitch(2.2f);
+            m_walkSound.SetVolume(0.5f);
+        }
+        else
+        {
+            m_walkSound.SetPitch(1.0f);
+            m_walkSound.SetVolume(0.0f);
+        }
     }
 
     // Spawn Sandevistan afterimage ghosts at fixed intervals.

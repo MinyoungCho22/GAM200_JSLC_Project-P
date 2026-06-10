@@ -34,33 +34,32 @@ void Final::Initialize()
 
     m_hitboxes.clear();
 
-    // Yellow / Tall blocks (Yellow: 348x662)
-    // Coords from image: (537, 686), (2325, 686), (3507, 825)
-    auto makeYellowHitbox = [&](float px, float py) {
+    // Yellow / Tall blocks (348x662)
+    // Layout label: px = left edge, py = bottom edge (image Y-down). Convert to world center.
+    auto makeYellowHitbox = [&](float px, float pyBottom) {
         float pw = 348.0f;
         float ph = 662.0f;
         float cx = MIN_X + w1 + px + pw * 0.5f;
-        float cy = MIN_Y + (1080.0f - py - ph * 0.5f);
+        float cy = MIN_Y + (HEIGHT - pyBottom + ph * 0.5f);
         return Hitbox{ {cx, cy}, {pw, ph}, true };
     };
 
-    m_hitboxes.push_back(makeYellowHitbox(537.0f, 24.0f));
-    m_hitboxes.push_back(makeYellowHitbox(2325.0f, 24.0f));
-    m_hitboxes.push_back(makeYellowHitbox(3507.0f, 163.0f));
+    m_hitboxes.push_back(makeYellowHitbox(537.0f, 686.0f));
+    m_hitboxes.push_back(makeYellowHitbox(2325.0f, 686.0f));
+    m_hitboxes.push_back(makeYellowHitbox(3507.0f, 825.0f));
 
-    // Orange / Low slabs (Orange: 252x203)
-    // Coords from image: (453, 944), (1436, 944), (2421, 944)
-    auto makeOrangeHitbox = [&](float px, float py) {
+    // Orange / Low slabs (252x203) — same layout convention as yellow blocks
+    auto makeOrangeHitbox = [&](float px, float pyBottom) {
         float pw = 252.0f;
         float ph = 203.0f;
         float cx = MIN_X + w1 + px + pw * 0.5f;
-        float cy = MIN_Y + (1080.0f - py - ph * 0.5f);
+        float cy = MIN_Y + (HEIGHT - pyBottom + ph * 0.5f);
         return Hitbox{ {cx, cy}, {pw, ph}, false };
     };
 
-    m_hitboxes.push_back(makeOrangeHitbox(453.0f, 741.0f));
-    m_hitboxes.push_back(makeOrangeHitbox(1436.0f, 741.0f));
-    m_hitboxes.push_back(makeOrangeHitbox(2421.0f, 741.0f));
+    m_hitboxes.push_back(makeOrangeHitbox(453.0f, 944.0f));
+    m_hitboxes.push_back(makeOrangeHitbox(1436.0f, 944.0f));
+    m_hitboxes.push_back(makeOrangeHitbox(2421.0f, 944.0f));
 
     m_pulseLine = std::make_unique<Background>();
     m_pulseLine->Initialize("Asset/pulse/pulse_line_h.png");
@@ -87,23 +86,30 @@ void Final::Initialize()
     m_pulseSources[m_activeVentIndex].RefillStock();
     m_ventTimer = 0.0f;
 
-    // Initialize Boss (identical to player assets)
+    // Initialize Boss (identical to player assets, same scale so Y aligns with player)
     m_boss.Init({ Final::MIN_X + 3960.0f + 1436.0f, 0.0f });
-    m_boss.SetSizeScale(0.6f);
+    m_boss.SetSizeScale(1.0f);
     float bossY = (Final::MIN_Y + 258.0f) + m_boss.GetHitboxSize().y * 0.5f;
     m_boss.SetPosition({ Final::MIN_X + 3960.0f + 1436.0f, bossY });
     m_boss.SetCurrentGroundLevel(Final::MIN_Y + 258.0f);
 
-    // Setup Overload Devices
-    m_overloadDevices[0].pos = m_hitboxes[0].pos;
-    m_overloadDevices[0].size = m_hitboxes[0].size;
-    m_overloadDevices[0].charge = 0.0f;
-    m_overloadDevices[0].isOverloaded = false;
+    // Setup Overload Devices — interaction hitbox on visible purple panel inside pillar
+    auto setupOverloadDevice = [&](int deviceIdx, int pillarIdx) {
+        const auto& pillar = m_hitboxes[pillarIdx];
+        constexpr float kDeviceW = 280.0f;
+        constexpr float kDeviceH = 380.0f;
+        const float pillarBottom = pillar.pos.y - pillar.size.y * 0.5f;
 
-    m_overloadDevices[1].pos = m_hitboxes[1].pos;
-    m_overloadDevices[1].size = m_hitboxes[1].size;
-    m_overloadDevices[1].charge = 0.0f;
-    m_overloadDevices[1].isOverloaded = false;
+        m_overloadDevices[deviceIdx].size = { kDeviceW, kDeviceH };
+        m_overloadDevices[deviceIdx].pos  = {
+            pillar.pos.x,
+            pillarBottom + kDeviceH * 0.5f + 24.0f
+        };
+        m_overloadDevices[deviceIdx].charge = 0.0f;
+        m_overloadDevices[deviceIdx].isOverloaded = false;
+    };
+    setupOverloadDevice(0, 0);
+    setupOverloadDevice(1, 1);
 
     // Reset Boss AI variables
     m_bossState = BossState::Normal;
@@ -175,7 +181,7 @@ void Final::Reset()
 
     // Reset Boss NPC properties
     m_boss.Init({ Final::MIN_X + 3960.0f + 1436.0f, 0.0f });
-    m_boss.SetSizeScale(0.6f);
+    m_boss.SetSizeScale(1.0f);
     float bossY = (Final::MIN_Y + 258.0f) + m_boss.GetHitboxSize().y * 0.5f;
     m_boss.SetPosition({ Final::MIN_X + 3960.0f + 1436.0f, bossY });
     m_boss.SetCurrentGroundLevel(Final::MIN_Y + 258.0f);
@@ -189,7 +195,7 @@ void Final::Reset()
         float pw = 348.0f;
         float ph = 662.0f;
         float cx = MIN_X + w1 + 3507.0f + pw * 0.5f;
-        float cy = MIN_Y + (1080.0f - 163.0f - ph * 0.5f);
+        float cy = MIN_Y + (HEIGHT - 825.0f + ph * 0.5f);
         m_hitboxes[2].size = { pw, ph };
         m_hitboxes[2].pos = { cx, cy };
     }
@@ -1112,6 +1118,7 @@ void Final::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
             debugRenderer.DrawBox(colorShader, obs.pos, obs.size, 1.0f, 0.5f, 0.0f);
         }
     }
+
 }
 
 void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cameraPos, float viewHalfW)
@@ -1212,6 +1219,28 @@ void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cam
 
         // Reset isFireGlow uniform
         outlineShader.setBool("isFireGlow", false);
+    }
+
+    // 3. Draw interior purple line fill (additive blend over sprite body)
+    {
+        float pulse = (std::sin(static_cast<float>(glfwGetTime()) * 4.0f) * 0.5f + 0.5f); // 0~1 pulsing
+        float purpleAlpha = 0.35f + pulse * 0.25f;
+
+        GL::Enable(GL_BLEND);
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE); // additive for glow effect
+        shader.use();
+        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setBool("flipX", false);
+        shader.setFloat("alpha", purpleAlpha);
+        shader.setVec3("colorTint", 0.55f, 0.0f, 1.0f); // purple
+        shader.setFloat("tintStrength", 0.9f);
+        m_pulseVentSprite->Draw(shader, model);
+
+        // restore standard blend & tint
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        shader.setFloat("alpha", 1.0f);
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("tintStrength", 0.0f);
     }
 }
 
