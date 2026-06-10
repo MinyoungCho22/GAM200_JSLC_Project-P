@@ -94,6 +94,9 @@ constexpr float HALLWAY_ENTRY_STORY_DELAY_SEC = 1.0f;
 constexpr float UI_EXPLANATION_TRIGGER_X = 998.6f;
 constexpr float UI_EXPLANATION_TRIGGER_Y = 349.4f;
 constexpr float UI_EXPLANATION_TRIGGER_RADIUS = 80.0f;
+constexpr float SCANLINE_DRONE_EXPLANATION_TRIGGER_X = 2333.6f;
+constexpr float SCANLINE_DRONE_EXPLANATION_TRIGGER_Y = 329.4f;
+constexpr float SCANLINE_DRONE_EXPLANATION_TRIGGER_RADIUS = 80.0f;
 /// Caps dt so a single huge tick (first frame, focus loss) does not skip story delays.
 constexpr float STORY_DELAY_DT_CAP = 0.1f;
 
@@ -258,6 +261,11 @@ void GameplayState::Initialize()
     m_uiExplanation->Initialize("Asset/ui_explanation.png");
     m_showUiExplanation = false;
     m_uiExplanationSeen = false;
+
+    m_scanlineDroneExplanation = std::make_unique<Background>();
+    m_scanlineDroneExplanation->Initialize("Asset/scanline-drone_explanation.png");
+    m_showScanlineDroneExplanation = false;
+    m_scanlineDroneExplanationSeen = false;
 
     ResetTvNewsState();
 
@@ -820,6 +828,28 @@ void GameplayState::Update(double dt)
         {
             m_showUiExplanation = false;
             m_uiExplanationSeen = true;
+        }
+        if (!m_camera.IsAnimating())
+            m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
+        SoundSystem::Instance().Update();
+        return;
+    }
+
+    if (!m_scanlineDroneExplanationSeen && !m_showScanlineDroneExplanation
+        && m_doorOpened && !m_rooftopAccessed && m_currentCheckpoint == MapZone::Hallway)
+    {
+        const float dx = playerCenter.x - SCANLINE_DRONE_EXPLANATION_TRIGGER_X;
+        const float dy = playerCenter.y - SCANLINE_DRONE_EXPLANATION_TRIGGER_Y;
+        if (dx * dx + dy * dy <= SCANLINE_DRONE_EXPLANATION_TRIGGER_RADIUS * SCANLINE_DRONE_EXPLANATION_TRIGGER_RADIUS)
+            m_showScanlineDroneExplanation = true;
+    }
+
+    if (m_showScanlineDroneExplanation)
+    {
+        if (ctl.IsActionTriggered(ControlAction::Attack, input))
+        {
+            m_showScanlineDroneExplanation = false;
+            m_scanlineDroneExplanationSeen = true;
         }
         if (!m_camera.IsAnimating())
             m_camera.Update(player.GetPosition(), m_cameraSmoothSpeed);
@@ -3095,6 +3125,23 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_uiExplanation->Draw(textureShader, uiModel);
     }
 
+    if (m_showScanlineDroneExplanation && m_scanlineDroneExplanation && m_scanlineDroneExplanation->GetWidth() > 0)
+    {
+        textureShader.use();
+        textureShader.setMat4("projection", baseProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        textureShader.setFloat("tintStrength", 0.0f);
+
+        const float texW = static_cast<float>(m_scanlineDroneExplanation->GetWidth());
+        const float texH = static_cast<float>(m_scanlineDroneExplanation->GetHeight());
+        Math::Matrix uiModel = Math::Matrix::CreateTranslation({ GAME_WIDTH * 0.5f, GAME_HEIGHT * 0.5f })
+            * Math::Matrix::CreateScale({ texW, texH });
+        m_scanlineDroneExplanation->Draw(textureShader, uiModel);
+    }
+
     if (m_storyDialogue && m_storyDialogue->IsBlocking())
     {
         Shader& texForStory = engine.GetTextureShader();
@@ -3176,7 +3223,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     bool showIdleOverWorldObject = false;
 
     const bool storyDialogueBlocking = m_storyDialogue && m_storyDialogue->IsBlocking();
-    const bool uiExplanationBlocking = m_showUiExplanation;
+    const bool uiExplanationBlocking = m_showUiExplanation || m_showScanlineDroneExplanation;
 
     if (!m_isDebugDraw && !storyDialogueBlocking && !uiExplanationBlocking)
     {
@@ -3843,6 +3890,7 @@ void GameplayState::Shutdown()
     if (m_hudFrame) m_hudFrame->Shutdown();
     if (m_hallwayHidingPromptS) m_hallwayHidingPromptS->Shutdown();
     if (m_uiExplanation) m_uiExplanation->Shutdown();
+    if (m_scanlineDroneExplanation) m_scanlineDroneExplanation->Shutdown();
     RoomTvPng::ReleaseAll();
 
     if (m_storyDialogue) m_storyDialogue->Shutdown();

@@ -117,6 +117,9 @@ private:
     std::unique_ptr<Background> m_uiExplanation;
     bool m_showUiExplanation = false;
     bool m_uiExplanationSeen = false;
+    std::unique_ptr<Background> m_scanlineDroneExplanation;
+    bool m_showScanlineDroneExplanation = false;
+    bool m_scanlineDroneExplanationSeen = false;
     Math::Vec2 m_lastMouseWorldPos{};
     bool m_undergroundAccessed = false;
     bool m_trainAccessed = false;
