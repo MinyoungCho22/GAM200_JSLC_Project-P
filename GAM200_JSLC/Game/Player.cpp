@@ -496,10 +496,8 @@ void Player::Draw(const Shader& shader) const
     shader.setFloat("tintStrength", 0.0f);
 }
 
-void Player::DrawOutline(const Shader& outlineShader) const
+void Player::DrawOutline(const Shader& outlineShader, float r, float g, float b, float a) const
 {
-    if (IsDead()) return;
-
     const AnimationData& currentAnim = m_animations[static_cast<int>(m_currentAnimState)];
     if (currentAnim.textureID == 0 || currentAnim.texWidth <= 0 || currentAnim.texHeight <= 0)
     {
@@ -525,7 +523,7 @@ void Player::DrawOutline(const Shader& outlineShader) const
     outlineShader.setMat4("model", model);
     outlineShader.setBool("flipX", m_is_flipped);
     outlineShader.setFloat("alpha", (m_isHiding ? 0.5f : 1.0f) * m_spriteAlphaMul);
-    outlineShader.setVec4("outlineColor", 0.2f, 0.6f, 1.0f, 1.0f);
+    outlineShader.setVec4("outlineColor", r, g, b, a);
     outlineShader.setFloat("outlineWidthTexels", 2.0f);
     outlineShader.setVec2("texelSize", 1.0f / static_cast<float>(currentAnim.frameWidth),
                           1.0f / static_cast<float>(currentAnim.texHeight));

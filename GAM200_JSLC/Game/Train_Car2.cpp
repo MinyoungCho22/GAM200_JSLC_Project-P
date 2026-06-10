@@ -76,9 +76,11 @@ void Train::UpdateCar2PurpleContainer(float dt, Player& player, Math::Vec2 /*mou
     const Math::Vec2 promptSize   = { 150.f, 78.f };
     const bool        enterPromptOverlapped = Collision::CheckAABB(pHb, pHalf * 2.f, promptCenter, promptSize);
 
-    // 진입 트리거는 Enter.png와 플레이어 히트박스가 겹칠 때만 허용한다.
-    // 위/아래/오른쪽 경계에서는 진입하지 못하고, 왼쪽 경계만 풀린다.
-    const bool nearEntry = enterPromptOverlapped;
+    // 진입 트리거: 플레이어 오른쪽 면이 박스 왼쪽 경계에 실제로 닿아야 진입 시작
+    // 단순히 근처에 있는 것만으로는 진입되지 않는다
+    const float kEntryTouchThreshold = 8.f; // 박스 왼쪽 경계 ±8px 이내에 있어야 함
+    const bool touchingBoxEntry = (pR >= boxL - kEntryTouchThreshold) && enterPromptOverlapped;
+    const bool nearEntry = touchingBoxEntry;
 
     // 왼쪽으로 완전히 나갔는지 (Inside 상태 퇴장 조건)
     const bool exitedLeft = (pR <= boxL + 4.f);

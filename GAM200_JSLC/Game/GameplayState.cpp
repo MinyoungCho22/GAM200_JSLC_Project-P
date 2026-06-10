@@ -2903,6 +2903,12 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     if (m_finalAccessed && m_final)
     {
         m_final->DrawPulseVents(textureShader, *m_outlineShader, fgCamPos, fgEffectiveWidth * 0.5f);
+
+        // Draw purple pulsating glow on the boss after it is defeated
+        m_outlineShader->use();
+        m_outlineShader->setMat4("projection", projection);
+        m_final->DrawBossDefeatedEffect(*m_outlineShader);
+
         textureShader.use();
         textureShader.setMat4("projection", projection);
     }

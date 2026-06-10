@@ -51,7 +51,7 @@ public:
     void Update(double dt, Input::Input& input, const ControlBindings& controls);
     void UpdateNPC(float dt, AnimationState state);
     void Draw(const Shader& shader) const;
-    void DrawOutline(const Shader& outlineShader) const;
+    void DrawOutline(const Shader& outlineShader, float r = 0.2f, float g = 0.6f, float b = 1.0f, float a = 1.0f) const;
     void Shutdown();
     void MoveLeft();
     void MoveRight();

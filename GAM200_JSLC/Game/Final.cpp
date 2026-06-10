@@ -1109,6 +1109,8 @@ void Final::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 {
     for (const auto& obs : m_hitboxes)
     {
+        if (obs.size.x <= 0.0f || obs.size.y <= 0.0f) continue;
+
         if (obs.isYellow)
         {
             debugRenderer.DrawBox(colorShader, obs.pos, obs.size, 1.0f, 1.0f, 0.0f);
@@ -1118,7 +1120,6 @@ void Final::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
             debugRenderer.DrawBox(colorShader, obs.pos, obs.size, 1.0f, 0.5f, 0.0f);
         }
     }
-
 }
 
 void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cameraPos, float viewHalfW)
@@ -1242,6 +1243,28 @@ void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cam
         shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
         shader.setFloat("tintStrength", 0.0f);
     }
+}
+
+void Final::DrawBossDefeatedEffect(Shader& outlineShader)
+{
+    if (m_bossState != BossState::Defeated) return;
+
+    float t = static_cast<float>(glfwGetTime());
+
+    // Pulsating purple: alpha oscillates between 0.6 and 1.0
+    float pulseFactor  = std::sin(t * 5.0f) * 0.5f + 0.5f;
+    float outlineAlpha = 0.6f + pulseFactor * 0.4f;
+
+    outlineShader.use();
+    outlineShader.setFloat("uTime", t);
+    outlineShader.setBool("isFireGlow", false);
+    outlineShader.setBool("radialScanline", false);
+
+    // DrawOutline now accepts a color; pass purple with pulsing alpha
+    m_boss.DrawOutline(outlineShader, 0.55f, 0.0f, 1.0f, outlineAlpha);
+
+    // Reset uniform
+    outlineShader.setVec4("outlineColor", 1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 void Final::Shutdown()

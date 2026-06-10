@@ -74,6 +74,7 @@ public:
     void Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW, const Math::Matrix& projection);
     void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cameraPos, float viewHalfW);
+    void DrawBossDefeatedEffect(Shader& outlineShader);
     void Shutdown();
 
     float GetMapWidth() const { return m_mapWidth; }

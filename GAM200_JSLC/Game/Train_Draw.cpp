@@ -872,8 +872,8 @@ void Train::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, floa
         }
     }
 
-    // Draw Siren LED outline
-    if (m_car3SirenHbValid && m_sirenSprite)
+    // Draw Siren LED outline — only when siren is active
+    if (m_car3SirenActive && m_car3SirenHbValid && m_sirenSprite)
     {
         Math::Vec2 worldPos = { trainLeft + m_car3SirenHb.localCenter.x, MIN_Y + m_car3SirenHb.localCenter.y };
         float distSq = getAABBProximitySq(playerPos, worldPos, m_car3SirenHb.size);
