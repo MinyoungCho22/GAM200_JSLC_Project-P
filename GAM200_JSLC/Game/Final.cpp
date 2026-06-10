@@ -2,6 +2,7 @@
 
 #include "Final.hpp"
 #include "Player.hpp"
+#include "DroneManager.hpp"
 #include "../OpenGL/Shader.hpp"
 #include "../Engine/Matrix.hpp"
 #include "../OpenGL/GLWrapper.hpp"
@@ -92,6 +93,120 @@ void Final::Initialize()
     float bossY = (Final::MIN_Y + 258.0f) + m_boss.GetHitboxSize().y * 0.5f;
     m_boss.SetPosition({ Final::MIN_X + 3960.0f + 1436.0f, bossY });
     m_boss.SetCurrentGroundLevel(Final::MIN_Y + 258.0f);
+
+    // Setup Overload Devices
+    m_overloadDevices[0].pos = m_hitboxes[0].pos;
+    m_overloadDevices[0].size = m_hitboxes[0].size;
+    m_overloadDevices[0].charge = 0.0f;
+    m_overloadDevices[0].isOverloaded = false;
+
+    m_overloadDevices[1].pos = m_hitboxes[1].pos;
+    m_overloadDevices[1].size = m_hitboxes[1].size;
+    m_overloadDevices[1].charge = 0.0f;
+    m_overloadDevices[1].isOverloaded = false;
+
+    // Reset Boss AI variables
+    m_bossState = BossState::Normal;
+    m_bossHealth = 100.0f;
+    m_bossMaxHealth = 100.0f;
+    m_bossAttackTimer = 0.0f;
+    m_bossDroneSummonTimer = 0.0f;
+    m_bossSweepTimer = 0.0f;
+    m_slamGestureTimer = 0.0f;
+    m_bossFlipped = false;
+    m_bossProjectiles.clear();
+
+    m_pulseLock.active = false;
+    m_pulseLockCooldownTimer = 0.0f;
+    m_weakenedTimer = 0.0f;
+
+    // Load Sprites
+    m_overloadDeviceSprite = std::make_unique<Background>();
+    m_overloadDeviceSprite->Initialize("Asset/Train/PulseBox.png");
+
+    m_pulseMarkSprite = std::make_unique<Background>();
+    m_pulseMarkSprite->Initialize("Asset/Train/PulseMark.png");
+
+    m_bossDroneProjectileSprite = std::make_unique<Background>();
+    m_bossDroneProjectileSprite->Initialize("Asset/RedDrone.png");
+
+    m_pulseLineH = std::make_unique<Background>();
+    m_pulseLineH->Initialize("Asset/pulse/pulse_line_h.png");
+    m_pulseLineV = std::make_unique<Background>();
+    m_pulseLineV->Initialize("Asset/pulse/pulse_line_v.png");
+    m_pulseCornerNE = std::make_unique<Background>();
+    m_pulseCornerNE->Initialize("Asset/pulse/pulse_corner_ne.png");
+    m_pulseCornerNW = std::make_unique<Background>();
+    m_pulseCornerNW->Initialize("Asset/pulse/pulse_corner_nw.png");
+    m_pulseCornerSE = std::make_unique<Background>();
+    m_pulseCornerSE->Initialize("Asset/pulse/pulse_corner_se.png");
+    m_pulseCornerSW = std::make_unique<Background>();
+    m_pulseCornerSW->Initialize("Asset/pulse/pulse_corner_sw.png");
+
+    m_cameraShakeRequest = 0.0f;
+    m_nextVentIndex = -1;
+}
+
+void Final::Reset()
+{
+    // Reset Overload Devices
+    m_overloadDevices[0].charge = 0.0f;
+    m_overloadDevices[0].isOverloaded = false;
+    m_overloadDevices[0].pulseAttackActive = false;
+    m_overloadDevices[0].pulseAttackTimer = 0.0f;
+
+    m_overloadDevices[1].charge = 0.0f;
+    m_overloadDevices[1].isOverloaded = false;
+    m_overloadDevices[1].pulseAttackActive = false;
+    m_overloadDevices[1].pulseAttackTimer = 0.0f;
+
+    m_cameraShakeRequest = 0.0f;
+
+    // Reset Boss AI variables
+    m_bossState = BossState::Normal;
+    m_bossHealth = m_bossMaxHealth;
+    m_bossAttackTimer = 0.0f;
+    m_bossDroneSummonTimer = 0.0f;
+    m_bossSweepTimer = 0.0f;
+    m_slamGestureTimer = 0.0f;
+    m_bossFlipped = false;
+    m_bossProjectiles.clear();
+    m_sweeps.clear();
+
+    // Reset Boss NPC properties
+    m_boss.Init({ Final::MIN_X + 3960.0f + 1436.0f, 0.0f });
+    m_boss.SetSizeScale(0.6f);
+    float bossY = (Final::MIN_Y + 258.0f) + m_boss.GetHitboxSize().y * 0.5f;
+    m_boss.SetPosition({ Final::MIN_X + 3960.0f + 1436.0f, bossY });
+    m_boss.SetCurrentGroundLevel(Final::MIN_Y + 258.0f);
+    m_boss.ResetVelocity();
+    m_boss.SetOnGround(true);
+
+    // Restore hitboxes (re-enable exit gate hitbox at index 2 if it was cleared)
+    if (m_hitboxes.size() > 2)
+    {
+        float w1 = m_final1->GetWidth() > 0 ? static_cast<float>(m_final1->GetWidth()) : 3960.0f;
+        float pw = 348.0f;
+        float ph = 662.0f;
+        float cx = MIN_X + w1 + 3507.0f + pw * 0.5f;
+        float cy = MIN_Y + (1080.0f - 163.0f - ph * 0.5f);
+        m_hitboxes[2].size = { pw, ph };
+        m_hitboxes[2].pos = { cx, cy };
+    }
+
+    // Reset vent variables
+    m_activeVentIndex = rand() % 3;
+    for (auto& src : m_pulseSources)
+    {
+        src.SetPulseAmount(0.0f);
+    }
+    m_pulseSources[m_activeVentIndex].RefillStock();
+    m_nextVentIndex = -1;
+    m_ventTimer = 0.0f;
+
+    m_pulseLock.active = false;
+    m_pulseLockCooldownTimer = 0.0f;
+    m_weakenedTimer = 0.0f;
 }
 
 void Final::InitSkyVAO()
@@ -196,8 +311,9 @@ void Final::DrawParallaxLayer(Shader& shader, Background& bg, Math::Vec2 cameraP
     }
 }
 
-void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
+void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, DroneManager& droneManager)
 {
+    float fdt = static_cast<float>(dt);
     Math::Vec2 pos = player.GetPosition();
     Math::Vec2 halfSize = playerHitboxSize * 0.5f;
     float minX = MIN_X + halfSize.x;
@@ -214,7 +330,7 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     }
 
     // Floor Pulse Sweep update
-    m_sweepSpawnTimer += static_cast<float>(dt);
+    m_sweepSpawnTimer += fdt;
     if (m_sweepSpawnTimer >= 3.5f)
     {
         FloorSweep sweep;
@@ -242,7 +358,7 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
 
     for (auto it = m_sweeps.begin(); it != m_sweeps.end(); )
     {
-        it->x += it->speed * static_cast<float>(dt);
+        it->x += it->speed * fdt;
 
         // Check collision with the player on the ground
         if (player.IsOnGround() && !it->damagedPlayer && !player.IsGodMode())
@@ -274,14 +390,19 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
     }
 
     // Vent state cycling update
-    m_ventTimer += static_cast<float>(dt);
+    m_ventTimer += fdt;
     if (m_ventTimer >= VENT_CYCLE_DURATION)
     {
         m_ventTimer = 0.0f;
-        if (m_activeVentIndex != -1 && m_activeVentIndex < 3)
-            m_pulseSources[m_activeVentIndex].SetPulseAmount(0.0f);
-
-        m_activeVentIndex = rand() % 3;
+        if (m_nextVentIndex != -1)
+        {
+            m_activeVentIndex = m_nextVentIndex;
+            m_nextVentIndex = -1;
+        }
+        else
+        {
+            m_activeVentIndex = rand() % 3;
+        }
         m_pulseSources[m_activeVentIndex].RefillStock();
     }
     else if (m_ventTimer >= VENT_ACTIVE_DURATION)
@@ -289,10 +410,371 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize)
         if (m_activeVentIndex != -1 && m_activeVentIndex < 3)
             m_pulseSources[m_activeVentIndex].SetPulseAmount(0.0f);
         m_activeVentIndex = -1;
+
+        if (m_nextVentIndex == -1)
+        {
+            m_nextVentIndex = rand() % 3;
+        }
     }
 
-    // Update Boss Animation
-    m_boss.UpdateNPC(static_cast<float>(dt), AnimationState::Idle);
+    // ----------------------------------------------------
+    // Boss Physics & AI Logic
+    // ----------------------------------------------------
+    Math::Vec2 bossPos = m_boss.GetPosition();
+    Math::Vec2 bossVel = m_boss.GetVelocity();
+    bool bossOnGround = m_boss.IsOnGround();
+
+    // Gravity
+    if (!bossOnGround)
+    {
+        bossVel.y += -1500.0f * fdt;
+    }
+    else
+    {
+        bossVel.y = 0.0f;
+    }
+
+    // Boss State Machine
+    if (m_bossState == BossState::Weakened)
+    {
+        bossVel.x = 0.0f;
+        m_boss.UpdateNPC(fdt, AnimationState::Crouching);
+
+        m_weakenedTimer += fdt;
+        if (m_weakenedTimer >= WEAKENED_DURATION)
+        {
+            m_weakenedTimer = 0.0f;
+            m_bossState = BossState::Normal;
+            m_overloadDevices[0].charge = 0.0f;
+            m_overloadDevices[0].isOverloaded = false;
+            m_overloadDevices[1].charge = 0.0f;
+            m_overloadDevices[1].isOverloaded = false;
+        }
+
+        if (m_bossHealth <= 0.0f)
+        {
+            m_bossHealth = 0.0f;
+            m_bossState = BossState::Defeated;
+            // Clear exit gate hitbox (index 2)
+            if (m_hitboxes.size() > 2)
+            {
+                m_hitboxes[2].size = { 0.0f, 0.0f };
+            }
+        }
+    }
+    else if (m_bossState == BossState::Defeated)
+    {
+        bossVel = { 0.0f, 0.0f };
+        bossPos.y -= 300.0f * fdt; // fall off screen
+        m_boss.UpdateNPC(fdt, AnimationState::Idle);
+    }
+    else // Normal state AI
+    {
+        // 1. Gesture action
+        if (m_slamGestureTimer > 0.0f)
+        {
+            m_slamGestureTimer -= fdt;
+            bossVel.x = 0.0f;
+            m_boss.UpdateNPC(fdt, AnimationState::Crouching);
+            if (m_slamGestureTimer <= 0.0f)
+            {
+                // Slam shockwave sweep towards player
+                FloorSweep sweep;
+                sweep.width = 240.0f;
+                sweep.damagedPlayer = false;
+                sweep.x = bossPos.x;
+                sweep.speed = (player.GetPosition().x > bossPos.x ? 450.0f : -450.0f);
+                m_sweeps.push_back(sweep);
+            }
+        }
+        else
+        {
+            // 2. Target decision: compete for active pulse vent or track player
+            float targetX = player.GetPosition().x;
+            if (m_activeVentIndex != -1)
+            {
+                targetX = m_hitboxes[3 + m_activeVentIndex].pos.x;
+
+                // If boss reaches the vent, drain its stock
+                if (std::abs(bossPos.x - targetX) < 100.0f && bossOnGround)
+                {
+                    m_pulseSources[m_activeVentIndex].Drain(25.0f * fdt); // Drains 25 units per second and automatically unlocks the remaining gauge representation
+
+                    // If depleted, close the vent
+                    if (m_pulseSources[m_activeVentIndex].GetPulseAmount() <= 0.0f)
+                    {
+                        m_activeVentIndex = -1;
+                    }
+                }
+            }
+
+            // 3. Horizontal movement direction
+            float currentMoveSpeed = 220.0f;
+            // Catch up speed (dashing) if player is far away
+            float distToPlayer = std::abs(player.GetPosition().x - bossPos.x);
+            if (distToPlayer > 600.0f)
+            {
+                currentMoveSpeed = 550.0f;
+            }
+
+            if (bossPos.x < targetX - 70.0f)
+            {
+                bossVel.x = currentMoveSpeed;
+                m_bossFlipped = false;
+                m_boss.UpdateNPC(fdt, AnimationState::Walking);
+            }
+            else if (bossPos.x > targetX + 70.0f)
+            {
+                bossVel.x = -currentMoveSpeed;
+                m_bossFlipped = true;
+                m_boss.UpdateNPC(fdt, AnimationState::Walking);
+            }
+            else
+            {
+                bossVel.x = 0.0f;
+                m_boss.UpdateNPC(fdt, AnimationState::Idle);
+            }
+
+            m_boss.SetFlipped(m_bossFlipped);
+
+            // 4. Dodge floor sweeps
+            if (bossOnGround)
+            {
+                for (const auto& sweep : m_sweeps)
+                {
+                    float distToSweep = std::abs(sweep.x - bossPos.x);
+                    // If sweep is close and moving towards boss
+                    bool sweepApproaching = (sweep.speed > 0.0f && sweep.x < bossPos.x) || (sweep.speed < 0.0f && sweep.x > bossPos.x);
+                    if (distToSweep < 280.0f && sweepApproaching)
+                    {
+                        // Jump over sweep
+                        bossVel.y = 850.0f;
+                        bossOnGround = false;
+                        m_boss.SetOnGround(false);
+                        break;
+                    }
+                }
+            }
+
+            // 5. Jump to follow player on higher platforms
+            if (bossOnGround && player.GetPosition().y > bossPos.y + 150.0f && distToPlayer < 250.0f)
+            {
+                bossVel.y = 850.0f;
+                bossOnGround = false;
+                m_boss.SetOnGround(false);
+            }
+
+            // 6. Attacks
+            // Ground Slam trigger
+            m_bossSweepTimer += fdt;
+            if (m_bossSweepTimer >= 6.5f)
+            {
+                m_slamGestureTimer = 0.5f;
+                m_bossSweepTimer = 0.0f;
+            }
+
+            // Projectile Shoot trigger
+            m_bossAttackTimer += fdt;
+            if (m_bossAttackTimer >= 2.2f)
+            {
+                m_bossAttackTimer = 0.0f;
+                Math::Vec2 targetCenter = player.GetHitboxCenter();
+                Math::Vec2 dir = (targetCenter - bossPos).GetNormalized();
+                BossProjectile proj;
+                proj.pos = bossPos;
+                proj.vel = dir * 650.0f;
+                proj.active = true;
+                m_bossProjectiles.push_back(proj);
+            }
+
+            // Drone Summon trigger (aggressive summoning)
+            m_bossDroneSummonTimer += fdt;
+            if (m_bossDroneSummonTimer >= 6.0f)
+            {
+                int activeDrones = 0;
+                for (const auto& d : droneManager.GetDrones())
+                {
+                    if (!d.IsDead())
+                    {
+                        activeDrones++;
+                    }
+                }
+                if (activeDrones < 3)
+                {
+                    m_bossDroneSummonTimer = 0.0f;
+                    float summonX = player.GetPosition().x;
+                    float summonY = (Final::MIN_Y + 258.0f) + 150.0f; // Lower flight height (150px above deck)
+
+                    int choice = rand() % 4;
+                    if (choice == 0) // Guard Device 0
+                    {
+                        summonX = m_overloadDevices[0].pos.x + (rand() % 200 - 100);
+                        droneManager.SpawnDrone({ summonX, summonY }, "Asset/Drone.png", DroneType::General);
+                    }
+                    else if (choice == 1) // Guard Device 1
+                    {
+                        summonX = m_overloadDevices[1].pos.x + (rand() % 200 - 100);
+                        droneManager.SpawnDrone({ summonX, summonY }, "Asset/Drone.png", DroneType::General);
+                    }
+                    else if (choice == 2 && m_activeVentIndex != -1) // Guard Active Vent
+                    {
+                        summonX = m_hitboxes[3 + m_activeVentIndex].pos.x + (rand() % 100 - 50);
+                        droneManager.SpawnDrone({ summonX, summonY }, "Asset/Drone.png", DroneType::General);
+                    }
+                    else // Chase player directly (Tracer)
+                    {
+                        summonX = player.GetPosition().x + (rand() % 300 - 150);
+                        droneManager.SpawnDrone({ summonX, summonY }, "Asset/RedDrone.png", DroneType::Tracer);
+                    }
+                }
+            }
+
+            // Pulse Lock trigger (every 5.0 seconds)
+            m_pulseLockCooldownTimer -= fdt;
+            if (m_pulseLockCooldownTimer <= 0.0f && !m_pulseLock.active)
+            {
+                m_pulseLock.targetPos = player.GetPosition();
+                m_pulseLock.active = true;
+                m_pulseLock.warningTimer = 0.0f;
+                m_pulseLock.triggeredExplosion = false;
+                m_pulseLock.explosionVisualTimer = 0.0f;
+                m_pulseLockCooldownTimer = 5.0f;
+            }
+        }
+    }
+
+    // Update positions and velocities
+    bossPos += bossVel * fdt;
+
+    // Arena horizontal boundaries
+    float minBossX = MIN_X + 50.0f;
+    float maxBossX = MIN_X + m_mapWidth - 100.0f;
+    if (bossPos.x < minBossX) { bossPos.x = minBossX; bossVel.x = 0.0f; }
+    if (bossPos.x > maxBossX) { bossPos.x = maxBossX; bossVel.x = 0.0f; }
+
+    // Platform ground collision
+    float bossGroundLevel = Final::MIN_Y + 258.0f;
+    float bossHalfH = m_boss.GetHitboxSize().y * 0.5f;
+    if (bossPos.y - bossHalfH <= bossGroundLevel)
+    {
+        bossPos.y = bossGroundLevel + bossHalfH;
+        if (bossVel.y < 0.0f)
+        {
+            bossVel.y = 0.0f;
+        }
+        bossOnGround = true;
+        m_boss.SetOnGround(true);
+    }
+    else
+    {
+        bossOnGround = false;
+        m_boss.SetOnGround(false);
+    }
+
+    m_boss.SetPosition(bossPos);
+    m_boss.SetVelocity(bossVel);
+
+    // ----------------------------------------------------
+    // Update Boss Projectiles
+    // ----------------------------------------------------
+    for (auto& proj : m_bossProjectiles)
+    {
+        if (!proj.active) continue;
+
+        proj.pos += proj.vel * fdt;
+
+        // Out of bounds check
+        if (proj.pos.x < MIN_X || proj.pos.x > MIN_X + m_mapWidth ||
+            proj.pos.y < MIN_Y || proj.pos.y > MIN_Y + HEIGHT)
+        {
+            proj.active = false;
+            continue;
+        }
+
+        // Collision with player
+        bool hit = Collision::CheckPointInAABB(proj.pos, player.GetHitboxCenter(), player.GetHitboxSize());
+        if (hit)
+        {
+            proj.active = false;
+            if (!player.IsDead() && !player.IsGodMode())
+            {
+                player.TakeDamage(10.0f);
+            }
+        }
+    }
+
+    // Clean up inactive projectiles
+    m_bossProjectiles.erase(
+        std::remove_if(m_bossProjectiles.begin(), m_bossProjectiles.end(),
+            [](const BossProjectile& p) { return !p.active; }),
+        m_bossProjectiles.end());
+
+    // ----------------------------------------------------
+    // Update Pulse Lock Attack
+    // ----------------------------------------------------
+    if (m_pulseLock.active)
+    {
+        if (m_pulseLock.warningTimer < m_pulseLock.maxWarningTime)
+        {
+            m_pulseLock.warningTimer += fdt;
+        }
+        else if (!m_pulseLock.triggeredExplosion)
+        {
+            // Explosion triggers!
+            m_pulseLock.triggeredExplosion = true;
+            m_pulseLock.explosionVisualTimer = 0.4f;
+            m_cameraShakeRequest = 18.0f; // Request screen shake with peak 18 pixels
+
+            // Damage player if inside radius
+            float dist = (player.GetHitboxCenter() - m_pulseLock.targetPos).Length();
+            if (dist <= m_pulseLock.explosionRadius)
+            {
+                if (!player.IsDead() && !player.IsGodMode())
+                {
+                    player.TakeDamage(15.0f);
+                }
+            }
+        }
+        else
+        {
+            m_pulseLock.explosionVisualTimer -= fdt;
+            if (m_pulseLock.explosionVisualTimer <= 0.0f)
+            {
+                m_pulseLock.active = false;
+            }
+        }
+    }
+
+    // ----------------------------------------------------
+    // Update Overload Device Pulse Attacks
+    // ----------------------------------------------------
+    for (int i = 0; i < 2; ++i)
+    {
+        auto& dev = m_overloadDevices[i];
+        if (dev.pulseAttackActive)
+        {
+            dev.pulseAttackTimer -= fdt;
+            if (dev.pulseAttackTimer <= 0.0f)
+            {
+                dev.pulseAttackActive = false;
+                dev.pulseAttackTimer = 0.0f;
+            }
+            else
+            {
+                // Deal damage if player is too close to the active pulse attack surrounding the device
+                // The perimeter size is dev.size + Vec2(120.0f, 120.0f)
+                Math::Vec2 range = dev.size + Math::Vec2(120.0f, 120.0f);
+                if (Collision::CheckAABB(player.GetHitboxCenter(), playerHitboxSize, dev.pos, range))
+                {
+                    if (!player.IsDead() && !player.IsGodMode())
+                    {
+                        // Continuous damage: 12.0f units per second
+                        player.TakeDamage(12.0f * fdt);
+                    }
+                }
+            }
+        }
+    }
 }
 
 void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW, const Math::Matrix& projection)
@@ -333,6 +815,240 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
 
     // Draw Boss
     m_boss.Draw(shader);
+
+    // 1. Draw Overload Devices
+    for (int i = 0; i < 2; ++i)
+    {
+        const auto& dev = m_overloadDevices[i];
+
+        // 2. Draw vertical charge gauge next to the device if charging
+        if (dev.charge > 0.0f && !dev.isOverloaded)
+        {
+            colorShader.use();
+            colorShader.setMat4("projection", projection);
+
+            float barW = 14.0f;
+            float barH = 200.0f;
+            float barX = dev.pos.x + dev.size.x * 0.5f + 30.0f;
+            float barY = dev.pos.y;
+
+            // Background
+            DrawFilledQuad(colorShader, { barX, barY }, { barW + 6.0f, barH + 6.0f }, 0.2f, 0.2f, 0.2f, 1.0f);
+            DrawFilledQuad(colorShader, { barX, barY }, { barW, barH }, 0.1f, 0.1f, 0.12f, 1.0f);
+
+            // Fill (bright orange/red)
+            float fillH = barH * dev.charge;
+            if (fillH > 0.0f)
+            {
+                float fillY = (barY - barH * 0.5f) + fillH * 0.5f;
+                DrawFilledQuad(colorShader, { barX, fillY }, { barW, fillH }, 1.0f, 0.4f, 0.1f, 1.0f);
+            }
+            
+            shader.use();
+            shader.setMat4("projection", projection);
+        }
+
+        // Draw device pulse attack perimeter if active
+        if (dev.pulseAttackActive)
+        {
+            shader.use();
+            shader.setMat4("projection", projection);
+            shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+            shader.setBool("flipX", false);
+
+            float time = static_cast<float>(glfwGetTime());
+            // Pulsating intensity to look dynamic
+            float pulseAlpha = 0.6f + 0.4f * std::sin(time * 15.0f);
+            shader.setFloat("alpha", pulseAlpha);
+            shader.setVec3("colorTint", 1.0f, 0.2f, 0.2f); // Hot neon red glow
+            shader.setFloat("tintStrength", 1.0f);
+
+            float borderW = dev.size.x + 120.0f;
+            float borderH = dev.size.y + 120.0f;
+            float tileS = 32.0f;
+
+            Math::Vec2 halfB = { borderW * 0.5f, borderH * 0.5f };
+
+            // 1. Draw Corners
+            if (m_pulseCornerNW)
+                m_pulseCornerNW->Draw(shader, Math::Matrix::CreateTranslation(dev.pos + Math::Vec2(-halfB.x, halfB.y)) * Math::Matrix::CreateScale({ tileS, tileS }));
+            if (m_pulseCornerNE)
+                m_pulseCornerNE->Draw(shader, Math::Matrix::CreateTranslation(dev.pos + Math::Vec2(halfB.x, halfB.y)) * Math::Matrix::CreateScale({ tileS, tileS }));
+            if (m_pulseCornerSW)
+                m_pulseCornerSW->Draw(shader, Math::Matrix::CreateTranslation(dev.pos + Math::Vec2(-halfB.x, -halfB.y)) * Math::Matrix::CreateScale({ tileS, tileS }));
+            if (m_pulseCornerSE)
+                m_pulseCornerSE->Draw(shader, Math::Matrix::CreateTranslation(dev.pos + Math::Vec2(halfB.x, -halfB.y)) * Math::Matrix::CreateScale({ tileS, tileS }));
+
+            // 2. Draw Horizontal Lines (top and bottom)
+            if (m_pulseLineH)
+            {
+                float startX = dev.pos.x - halfB.x + tileS;
+                float endX = dev.pos.x + halfB.x - tileS;
+                for (float tx = startX; tx <= endX; tx += tileS)
+                {
+                    m_pulseLineH->Draw(shader, Math::Matrix::CreateTranslation({ tx, dev.pos.y + halfB.y }) * Math::Matrix::CreateScale({ tileS, tileS }));
+                    m_pulseLineH->Draw(shader, Math::Matrix::CreateTranslation({ tx, dev.pos.y - halfB.y }) * Math::Matrix::CreateScale({ tileS, tileS }));
+                }
+            }
+
+            // 3. Draw Vertical Lines (left and right)
+            if (m_pulseLineV)
+            {
+                float startY = dev.pos.y - halfB.y + tileS;
+                float endY = dev.pos.y + halfB.y - tileS;
+                for (float ty = startY; ty <= endY; ty += tileS)
+                {
+                    m_pulseLineV->Draw(shader, Math::Matrix::CreateTranslation({ dev.pos.x - halfB.x, ty }) * Math::Matrix::CreateScale({ tileS, tileS }));
+                    m_pulseLineV->Draw(shader, Math::Matrix::CreateTranslation({ dev.pos.x + halfB.x, ty }) * Math::Matrix::CreateScale({ tileS, tileS }));
+                }
+            }
+
+            // Reset tint state
+            shader.setFloat("tintStrength", 0.0f);
+            shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+            shader.setFloat("alpha", 1.0f);
+        }
+    }
+
+    // 3. Draw Boss Projectiles (Flying Red Drones)
+    if (!m_bossProjectiles.empty() && m_bossDroneProjectileSprite && m_bossDroneProjectileSprite->GetWidth() > 0)
+    {
+        shader.use();
+        shader.setMat4("projection", projection);
+        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setFloat("alpha", 1.0f);
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("tintStrength", 0.0f);
+
+        for (const auto& proj : m_bossProjectiles)
+        {
+            if (!proj.active) continue;
+
+            // Flip the drone horizontally depending on its flight direction (facing the player)
+            bool flipX = (proj.vel.x < 0.0f);
+            shader.setBool("flipX", flipX);
+
+            // Subtle rotation / tilt based on time to look like hovering/flying
+            float tilt = std::sin(static_cast<float>(glfwGetTime()) * 15.0f) * 0.08f;
+            
+            float droneSize = 48.0f; // slightly larger than plain hitbox for visual appeal
+            Math::Matrix model = Math::Matrix::CreateScale({ droneSize, droneSize })
+                               * Math::Matrix::CreateRotation(tilt * (180.0f / 3.14159265f))
+                               * Math::Matrix::CreateTranslation(proj.pos);
+
+            m_bossDroneProjectileSprite->Draw(shader, model);
+        }
+
+        shader.setBool("flipX", false);
+    }
+
+    // 4. Draw Target Pulse Mark in Weakened state
+    if (m_bossState == BossState::Weakened && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
+    {
+        shader.use();
+        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setBool("flipX", false);
+        shader.setFloat("alpha", 1.0f);
+        shader.setVec3("colorTint", 1.0f, 0.1f, 0.1f);
+        shader.setFloat("tintStrength", 1.0f);
+
+        Math::Vec2 targetMarkPos = m_boss.GetPosition() + Math::Vec2(0.0f, m_boss.GetHitboxSize().y * 0.5f + 40.0f);
+        float angleDegrees = static_cast<float>(glfwGetTime()) * 3.5f * (180.0f / 3.14159265f);
+        Math::Matrix model = Math::Matrix::CreateScale({ 75.0f, 75.0f })
+                           * Math::Matrix::CreateRotation(angleDegrees)
+                           * Math::Matrix::CreateTranslation(targetMarkPos);
+        m_pulseMarkSprite->Draw(shader, model);
+    }
+
+    // 4.5. Draw Pulse Lock Warning or Explosion
+    if (m_pulseLock.active)
+    {
+        if (!m_pulseLock.triggeredExplosion && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
+        {
+            shader.use();
+            shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+            shader.setBool("flipX", false);
+
+            float time = static_cast<float>(glfwGetTime());
+            float progress = m_pulseLock.warningTimer / m_pulseLock.maxWarningTime;
+
+            // 1. Outer Danger boundary (Blinking red, pulsating size slightly)
+            float alphaOuter = 0.3f + 0.3f * std::sin(time * 12.0f);
+            float pulseScale = 1.0f + 0.08f * std::sin(time * 12.0f);
+            shader.setFloat("alpha", alphaOuter);
+            shader.setVec3("colorTint", 1.0f, 0.1f, 0.1f);
+            shader.setFloat("tintStrength", 0.9f);
+
+            float angleDegreesOuter = time * 2.0f * (180.0f / 3.14159265f);
+            Math::Vec2 szOuter = { m_pulseLock.explosionRadius * 2.0f * pulseScale, m_pulseLock.explosionRadius * 2.0f * pulseScale };
+            Math::Matrix modelOuter = Math::Matrix::CreateScale(szOuter)
+                                    * Math::Matrix::CreateRotation(angleDegreesOuter)
+                                    * Math::Matrix::CreateTranslation(m_pulseLock.targetPos);
+            m_pulseMarkSprite->Draw(shader, modelOuter);
+
+            // 2. Inner Lock-on Reticle (Shrinks from 2.5x to 1.0x, fades color from hot orange to neon-yellow)
+            float shrinkFactor = 2.5f - 1.5f * progress;
+            float alphaInner = 0.5f + 0.5f * progress;
+            shader.setFloat("alpha", alphaInner);
+            shader.setVec3("colorTint", 1.0f, 0.5f + 0.5f * progress, 0.0f);
+            shader.setFloat("tintStrength", 1.0f);
+
+            float angleDegreesInner = -time * 5.0f * (180.0f / 3.14159265f);
+            Math::Vec2 szInner = { m_pulseLock.explosionRadius * 2.0f * shrinkFactor, m_pulseLock.explosionRadius * 2.0f * shrinkFactor };
+            Math::Matrix modelInner = Math::Matrix::CreateScale(szInner)
+                                    * Math::Matrix::CreateRotation(angleDegreesInner)
+                                    * Math::Matrix::CreateTranslation(m_pulseLock.targetPos);
+            m_pulseMarkSprite->Draw(shader, modelInner);
+
+            // Reset shader properties
+            shader.setFloat("alpha", 1.0f);
+            shader.setFloat("tintStrength", 0.0f);
+            shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        }
+        else if (m_pulseLock.triggeredExplosion && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
+        {
+            shader.use();
+            shader.setMat4("projection", projection);
+            shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+            shader.setBool("flipX", false);
+
+            float visualRatio = m_pulseLock.explosionVisualTimer / 0.4f; // fades from 1.0 to 0.0
+            if (visualRatio > 0.0f)
+            {
+                // Expands from 0.8x to 1.8x size as it fades
+                float scaleFactor = 0.8f + 1.0f * (1.0f - visualRatio);
+                float size = m_pulseLock.explosionRadius * 2.0f * scaleFactor;
+                float alpha = visualRatio * 0.9f;
+
+                // Outer spin layer (clockwise, bright orange)
+                float angleDegrees1 = static_cast<float>(glfwGetTime()) * 8.0f * (180.0f / 3.14159265f);
+                shader.setFloat("alpha", alpha);
+                shader.setVec3("colorTint", 1.0f, 0.45f, 0.0f);
+                shader.setFloat("tintStrength", 1.0f);
+                
+                Math::Matrix model1 = Math::Matrix::CreateScale({ size, size })
+                                    * Math::Matrix::CreateRotation(angleDegrees1)
+                                    * Math::Matrix::CreateTranslation(m_pulseLock.targetPos);
+                m_pulseMarkSprite->Draw(shader, model1);
+
+                // Inner spin layer (counter-clockwise, slightly smaller, bright neon yellow)
+                float angleDegrees2 = -static_cast<float>(glfwGetTime()) * 12.0f * (180.0f / 3.14159265f);
+                shader.setFloat("alpha", alpha * 0.8f);
+                shader.setVec3("colorTint", 1.0f, 0.85f, 0.1f);
+                shader.setFloat("tintStrength", 1.0f);
+
+                Math::Matrix model2 = Math::Matrix::CreateScale({ size * 0.75f, size * 0.75f })
+                                    * Math::Matrix::CreateRotation(angleDegrees2)
+                                    * Math::Matrix::CreateTranslation(m_pulseLock.targetPos);
+                m_pulseMarkSprite->Draw(shader, model2);
+            }
+
+            // Reset shader properties
+            shader.setFloat("alpha", 1.0f);
+            shader.setFloat("tintStrength", 0.0f);
+            shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        }
+    }
 
     // 4. Floor Pulse Sweep line drawing
     if (m_pulseLine)
@@ -400,6 +1116,42 @@ void Final::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 
 void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cameraPos, float viewHalfW)
 {
+    // 1. Draw pre-vent warning pulse mark if in warning/inactive phase
+    if (m_nextVentIndex != -1 && m_ventTimer >= VENT_ACTIVE_DURATION && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
+    {
+        const auto& hb = m_hitboxes[3 + m_nextVentIndex];
+
+        float time = static_cast<float>(glfwGetTime());
+        // Pulsate scale and blink alpha
+        float pulseScale = 1.0f + 0.15f * std::sin(time * 8.0f);
+        float warningAlpha = 0.5f + 0.5f * std::sin(time * 8.0f);
+
+        shader.use();
+        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setBool("flipX", false);
+        shader.setFloat("alpha", warningAlpha);
+        shader.setVec3("colorTint", 1.0f, 0.3f, 0.3f); // reddish warning tint
+        shader.setFloat("tintStrength", 0.5f);
+
+        Math::Vec2 markSize = { 48.0f * pulseScale, 48.0f * pulseScale };
+        float yPos = hb.pos.y - 90.0f + 24.0f; // sit near ground level
+
+        // Draw left of the platform
+        Math::Vec2 leftPos = { hb.pos.x - 120.0f, yPos };
+        Math::Matrix modelLeft = Math::Matrix::CreateTranslation(leftPos) * Math::Matrix::CreateScale(markSize);
+        m_pulseMarkSprite->Draw(shader, modelLeft);
+
+        // Draw right of the platform
+        Math::Vec2 rightPos = { hb.pos.x + 120.0f, yPos };
+        Math::Matrix modelRight = Math::Matrix::CreateTranslation(rightPos) * Math::Matrix::CreateScale(markSize);
+        m_pulseMarkSprite->Draw(shader, modelRight);
+
+        // Reset tint for subsequent drawings
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("tintStrength", 0.0f);
+        shader.setFloat("alpha", 1.0f);
+    }
+
     if (m_activeVentIndex == -1 || !m_pulseVentSprite) return;
 
     // Fast 0.25 second rising / falling animation
@@ -486,6 +1238,138 @@ void Final::Shutdown()
         m_pulseVentSprite->Shutdown();
         m_pulseVentSprite.reset();
     }
+    if (m_overloadDeviceSprite)
+    {
+        m_overloadDeviceSprite->Shutdown();
+        m_overloadDeviceSprite.reset();
+    }
+    if (m_pulseMarkSprite)
+    {
+        m_pulseMarkSprite->Shutdown();
+        m_pulseMarkSprite.reset();
+    }
+    if (m_bossDroneProjectileSprite)
+    {
+        m_bossDroneProjectileSprite->Shutdown();
+        m_bossDroneProjectileSprite.reset();
+    }
+    if (m_pulseLineH) { m_pulseLineH->Shutdown(); m_pulseLineH.reset(); }
+    if (m_pulseLineV) { m_pulseLineV->Shutdown(); m_pulseLineV.reset(); }
+    if (m_pulseCornerNE) { m_pulseCornerNE->Shutdown(); m_pulseCornerNE.reset(); }
+    if (m_pulseCornerNW) { m_pulseCornerNW->Shutdown(); m_pulseCornerNW.reset(); }
+    if (m_pulseCornerSE) { m_pulseCornerSE->Shutdown(); m_pulseCornerSE.reset(); }
+    if (m_pulseCornerSW) { m_pulseCornerSW->Shutdown(); m_pulseCornerSW.reset(); }
     for (auto& src : m_pulseSources) src.Shutdown();
     m_boss.Shutdown();
 }
+
+void Final::DamageBoss(float amount)
+{
+    if (m_bossState == BossState::Weakened)
+    {
+        m_bossHealth -= amount;
+        if (m_bossHealth <= 0.0f)
+        {
+            m_bossHealth = 0.0f;
+            m_bossState = BossState::Defeated;
+            // Clear exit gate hitbox (index 2)
+            if (m_hitboxes.size() > 2)
+            {
+                m_hitboxes[2].size = { 0.0f, 0.0f };
+            }
+        }
+    }
+}
+
+bool Final::IsDeviceHovered(int idx, Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const
+{
+    if (idx < 0 || idx >= 2 || m_overloadDevices[idx].isOverloaded)
+        return false;
+
+    const auto& dev = m_overloadDevices[idx];
+    const Math::Vec2 range = { dev.size.x + 250.0f, dev.size.y + 200.0f };
+    if (!Collision::CheckAABB(playerHbCenter, playerHbSize, dev.pos, range))
+        return false;
+
+    const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
+    return Collision::CheckPointInAABB(mouseWorld, dev.pos, dev.size) ||
+           Collision::CheckAABB(mouseWorld, cursorHitbox, dev.pos, dev.size);
+}
+
+void Final::UpdateDeviceInject(int idx, float dt, Player& player, bool godMode)
+{
+    if (idx < 0 || idx >= 2 || m_overloadDevices[idx].isOverloaded)
+        return;
+
+    float pulsePerSec = 25.0f; // drains 25 units per second (takes 4 seconds of continuous hold)
+    float pulseThisFrame = pulsePerSec * dt;
+
+    if (!godMode)
+    {
+        pulseThisFrame = std::min(pulseThisFrame, player.GetPulseCore().getPulse().Value());
+        if (pulseThisFrame > 0.0f)
+        {
+            player.GetPulseCore().getPulse().spend(pulseThisFrame);
+        }
+    }
+
+    if (pulseThisFrame > 0.0f || godMode)
+    {
+        // Activate device pulse attack surrounding the device!
+        m_overloadDevices[idx].pulseAttackActive = true;
+        m_overloadDevices[idx].pulseAttackTimer = 2.0f; // refreshes as long as player continues injecting
+
+        // Device Interference: if player is injecting, target them with a pulse lock attack on the player's position!
+        if (!m_pulseLock.active && m_pulseLockCooldownTimer <= 0.0f)
+        {
+            m_pulseLock.targetPos = player.GetPosition(); // Target the player's position directly
+            m_pulseLock.active = true;
+            m_pulseLock.warningTimer = 0.0f;
+            m_pulseLock.triggeredExplosion = false;
+            m_pulseLock.explosionVisualTimer = 0.0f;
+            m_pulseLockCooldownTimer = 2.5f; // shorter cooldown during interference to force movement
+        }
+
+        float deltaCharge = godMode ? (dt / 3.0f) : (pulseThisFrame / 100.0f); // 100 units to fully charge
+        m_overloadDevices[idx].charge += deltaCharge;
+
+        if (m_overloadDevices[idx].charge >= 1.0f)
+        {
+            m_overloadDevices[idx].charge = 1.0f;
+            m_overloadDevices[idx].isOverloaded = true;
+            m_overloadDevices[idx].pulseAttackActive = false;
+            m_overloadDevices[idx].pulseAttackTimer = 0.0f;
+        }
+    }
+
+    // Check if both devices are overloaded
+    if (m_overloadDevices[0].isOverloaded && m_overloadDevices[1].isOverloaded)
+    {
+        if (m_bossState == BossState::Normal)
+        {
+            m_bossState = BossState::Weakened;
+            m_bossHealth = 100.0f; // Set Weakened health
+        }
+    }
+}
+
+bool Final::IsBossHovered(Math::Vec2 mouseWorld) const
+{
+    if (m_bossState != BossState::Weakened)
+        return false;
+
+    const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
+    Math::Vec2 bossPos = m_boss.GetPosition();
+    Math::Vec2 bossSize = m_boss.GetHitboxSize();
+
+    return Collision::CheckPointInAABB(mouseWorld, bossPos, bossSize) ||
+           Collision::CheckAABB(mouseWorld, cursorHitbox, bossPos, bossSize);
+}
+
+float Final::ConsumeCameraShakeRequest()
+{
+    float shake = m_cameraShakeRequest;
+    m_cameraShakeRequest = 0.0f;
+    return shake;
+}
+

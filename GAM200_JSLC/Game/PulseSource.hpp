@@ -42,6 +42,7 @@ public:
     }
 
     bool HasPulse() const { return *m_sharedCurrent > 0.0f; }
+    float GetPulseAmount() const { return m_sharedCurrent ? *m_sharedCurrent : 0.0f; }
     bool HasSprite() const { return m_sprite != nullptr; }
 
 private:

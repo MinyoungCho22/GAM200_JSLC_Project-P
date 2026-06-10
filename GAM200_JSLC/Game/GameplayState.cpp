@@ -913,6 +913,7 @@ void GameplayState::Update(double dt)
 
     Drone* targetDrone = nullptr;
     Robot* targetRobot = nullptr;
+    Player* targetBoss = nullptr;
     float side = 1.0f;
 
     auto GetHorizontalRelationByAABB = [](Math::Vec2 playerCenter, Math::Vec2 playerSize,
@@ -932,7 +933,23 @@ void GameplayState::Update(double dt)
 
     if (isPressingAttack)
     {
-        if (m_lockedAttackDrone && !m_lockedAttackDrone->IsDead() && !m_lockedAttackDrone->IsHit())
+        if (m_finalAccessed && m_final && m_final->GetBossState() == BossState::Weakened && m_final->IsBossHovered(mouseWorldPos))
+        {
+            float distSq = (playerCenter - m_final->GetBossPosition()).LengthSq();
+            float rad = (m_final->GetBossSize().x + m_final->GetBossSize().y) * 0.25f;
+            float limitSq = (ATTACK_RANGE + rad) * (ATTACK_RANGE + rad);
+            if (distSq < limitSq)
+            {
+                targetBoss = &m_final->GetBoss();
+                side = (playerCenter.x < targetBoss->GetPosition().x) ? 1.0f : -1.0f;
+            }
+        }
+
+        if (targetBoss)
+        {
+            // Target acquired: Boss
+        }
+        else if (m_lockedAttackDrone && !m_lockedAttackDrone->IsDead() && !m_lockedAttackDrone->IsHit())
         {
             targetDrone = m_lockedAttackDrone;
             targetRobot = nullptr;
@@ -1173,7 +1190,21 @@ void GameplayState::Update(double dt)
         }
     }
 
-    if (isPressingAttack && (targetDrone != nullptr || targetRobot != nullptr))
+    if (isPressingAttack && m_finalAccessed && m_final)
+    {
+        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+        bool isGodMode = imguiManager && imguiManager->IsPlayerGodMode();
+        if (m_final->IsDeviceHovered(0, playerCenter, playerHitboxSize, mouseWorldPos))
+        {
+            m_final->UpdateDeviceInject(0, static_cast<float>(dt), player, isGodMode);
+        }
+        else if (m_final->IsDeviceHovered(1, playerCenter, playerHitboxSize, mouseWorldPos))
+        {
+            m_final->UpdateDeviceInject(1, static_cast<float>(dt), player, isGodMode);
+        }
+    }
+
+    if (isPressingAttack && (targetDrone != nullptr || targetRobot != nullptr || targetBoss != nullptr))
     {
         auto* imguiManager = gsm.GetEngine().GetImguiManager();
         bool isGodMode = imguiManager && imguiManager->IsPlayerGodMode();
@@ -1195,7 +1226,14 @@ void GameplayState::Update(double dt)
 
         constexpr float KILL_PULSE_REWARD = 10.0f;
 
-        if (targetDrone != nullptr)
+        if (targetBoss != nullptr)
+        {
+            m_final->DamageBoss(35.0f * static_cast<float>(dt));
+            targetSize = m_final->GetBossSize();
+            targetCenter = m_final->GetBossPosition();
+            targetPos = targetCenter;
+        }
+        else if (targetDrone != nullptr)
         {
             // Cache position before potential reinforcement spawn.
             // OnDroneKilled may spawn drones and reallocate vectors, invalidating targetDrone pointer.
@@ -1620,8 +1658,14 @@ void GameplayState::Update(double dt)
 
     if (m_finalAccessed)
     {
-        m_final->Update(dt, player, playerHitboxSize);
+        m_final->Update(dt, player, playerHitboxSize, *droneManager);
         m_camera.SetBounds({ Final::MIN_X, Final::MIN_Y }, { Final::MIN_X + m_final->GetMapWidth(), Final::MIN_Y + Final::HEIGHT });
+
+        const float shakePx = m_final->ConsumeCameraShakeRequest();
+        if (shakePx > 0.0f)
+        {
+            m_camera.AddScreenShake(0.48f, shakePx);
+        }
     }
 
     auto& hallwayDrones = m_hallway->GetDrones();
@@ -2070,6 +2114,11 @@ void GameplayState::HandleTrainToFinalTransition()
     m_finalAccessed = true;
     m_currentCheckpoint = MapZone::Final;
 
+    if (m_final)
+    {
+        m_final->Reset();
+    }
+
     if (m_train)
     {
         m_train->GetDroneManager()->ClearAllDrones();
@@ -2298,6 +2347,11 @@ void GameplayState::RespawnAtCheckpoint()
         m_undergroundAccessed = true;
         m_trainAccessed = false;
         m_finalAccessed = true;
+
+        if (m_final)
+        {
+            m_final->Reset();
+        }
 
         player.SetSizeScale(0.6f);
         float playerStartX = Final::MIN_X + 293.5f;
@@ -2984,6 +3038,64 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
     m_pulseGauge.Draw(textureShader);
 
+    // Boss HP bar in Final map
+    if (m_finalAccessed && m_final && m_final->GetBossState() != BossState::Defeated)
+    {
+        GL::Enable(GL_BLEND);
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // 1. Draw Boss HP Bar
+        colorShader->use();
+        colorShader->setMat4("projection", baseProjection);
+
+        float hpRatio = m_final->GetBossHealth() / 100.0f;
+        hpRatio = std::clamp(hpRatio, 0.0f, 1.0f);
+
+        Math::Vec2 barCenter = { GAME_WIDTH * 0.5f, GAME_HEIGHT - 65.0f };
+        Math::Vec2 barSize = { 600.0f, 20.0f };
+
+        // Background / Border
+        auto drawFilledHUD = [&](Math::Vec2 center, Math::Vec2 sz, float r, float g, float b, float alpha) {
+            Math::Matrix model = Math::Matrix::CreateTranslation(center) * Math::Matrix::CreateScale(sz);
+            colorShader->setMat4("model", model);
+            colorShader->setVec3("objectColor", r, g, b);
+            colorShader->setFloat("uAlpha", alpha);
+            GL::BindVertexArray(m_fadeVAO);
+            GL::DrawArrays(GL_TRIANGLES, 0, 6);
+            GL::BindVertexArray(0);
+        };
+
+        drawFilledHUD(barCenter, { barSize.x + 8.0f, barSize.y + 8.0f }, 0.15f, 0.15f, 0.18f, 1.0f);
+        drawFilledHUD(barCenter, barSize, 0.08f, 0.08f, 0.1f, 1.0f);
+
+        // Fill HP
+        if (m_final->GetBossState() == BossState::Weakened)
+        {
+            float fillW = barSize.x * hpRatio;
+            if (fillW > 0.0f)
+            {
+                float fillX = (barCenter.x - barSize.x * 0.5f) + fillW * 0.5f;
+                float pulse = 0.8f + 0.2f * std::sin(static_cast<float>(glfwGetTime()) * 10.0f);
+                drawFilledHUD({ fillX, barCenter.y }, { fillW, barSize.y }, 1.0f, 0.1f, 0.15f, pulse);
+            }
+        }
+        else // Normal state (protected)
+        {
+            drawFilledHUD(barCenter, barSize, 0.25f, 0.45f, 0.75f, 1.0f);
+        }
+
+        // 2. Draw Boss Name Text
+        m_fontShader->use();
+        m_fontShader->setMat4("projection", baseProjection);
+
+        std::string bossLabel = (m_final->GetBossState() == BossState::Weakened) ? "BOSS - VULNERABLE" : "BOSS - OVERLOAD DEVICE L & R TO BREAK SHIELD";
+        CachedTextureInfo bossLabelTex = m_font->PrintToTexture(*m_fontShader, bossLabel);
+        constexpr float labelH = 26.0f;
+        const float labelW = static_cast<float>(bossLabelTex.width) * (labelH / static_cast<float>(m_font->m_fontHeight));
+        m_font->DrawBakedText(*m_fontShader, bossLabelTex,
+            { GAME_WIDTH * 0.5f - labelW * 0.5f, GAME_HEIGHT - 35.0f }, labelH);
+    }
+
     // 9) Fonts / minimap / tutorial
     m_fontShader->use();
     m_fontShader->setMat4("projection", baseProjection);
@@ -3166,6 +3278,25 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         if (!overLeftClickTarget && m_trainAccessed && m_train
             && m_train->IsTunnelInsideInjectHovered(playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
             overLeftClickTarget = true;
+
+        if (!overLeftClickTarget && m_finalAccessed && m_final)
+        {
+            if (m_final->IsDeviceHovered(0, playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover) ||
+                m_final->IsDeviceHovered(1, playerHitboxCenter, playerHitboxSize, mouseWorldPosForHover))
+            {
+                overLeftClickTarget = true;
+            }
+            else if (m_final->GetBossState() == BossState::Weakened && m_final->IsBossHovered(mouseWorldPosForHover))
+            {
+                float distSq = (playerHitboxCenter - m_final->GetBossPosition()).LengthSq();
+                float rad = (m_final->GetBossSize().x + m_final->GetBossSize().y) * 0.25f;
+                float limitSq = (ATTACK_RANGE + rad) * (ATTACK_RANGE + rad);
+                if (distSq < limitSq)
+                {
+                    overLeftClickTarget = true;
+                }
+            }
+        }
 
         // Right-click targets (pulse chargers): player overlaps AND cursor is inside the source
         auto checkPulseSources = [&](const std::vector<PulseSource>& sources) {

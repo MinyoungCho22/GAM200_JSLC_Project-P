@@ -59,6 +59,11 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, DroneType type)
     {
         m_groundLevel = HALLWAY_GROUND_LEVEL;
     }
+    // Final 구역
+    else if (startPos.x >= 50000.0f)
+    {
+        m_groundLevel = -2000.0f + 258.0f;
+    }
     // Train 구역: 넓은 X 범위 + 세로 맵 밴드 (넓게 잡아 확장 월드폭에도 대응)
     else if (startPos.x >= Train::MIN_X && startPos.x < Train::MIN_X + 52000.f && startPos.y >= Train::MIN_Y - 120.f
              && startPos.y <= Train::MIN_Y + Train::HEIGHT + 120.f)
@@ -571,8 +576,12 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         m_position.y -= m_fallSpeed * static_cast<float>(dt);
 
         float floorY = m_groundLevel + m_size.y / 2.0f;
+        if (m_position.x >= 50000.0f)
+        {
+            floorY = -2000.0f + 258.0f + m_size.y / 2.0f;
+        }
         // 기차 맵에서 스폰 지 m_groundLevel이 방/복도 값이면 즉시 엉뚱한 높이로 스냅됨 — 덱 높이로 착지.
-        if (m_position.x >= Train::MIN_X - 300.f && m_position.x < Train::MIN_X + 52000.f
+        else if (m_position.x >= Train::MIN_X - 300.f && m_position.x < Train::MIN_X + 52000.f
             && m_position.y >= Train::MIN_Y - 400.f && m_position.y <= Train::MIN_Y + Train::HEIGHT + 500.f)
         {
             floorY = Train::MIN_Y + 95.f + m_size.y / 2.0f;
@@ -819,10 +828,27 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         else
         {
             m_moveTimer += static_cast<float>(dt);
-            if (m_moveTimer > 5.0f)
+            
+            // In Final boss arena, keep patrol range tight around m_spawnPos to guard devices/vents
+            float patrolLimit = (m_spawnPos.x >= 50000.0f) ? 180.0f : 5.0f * m_currentSpeed;
+            if (m_spawnPos.x >= 50000.0f)
             {
-                m_moveTimer = 0.0f;
-                m_direction.x = -m_direction.x;
+                if (m_position.x > m_spawnPos.x + patrolLimit && m_direction.x > 0.0f)
+                {
+                    m_direction.x = -1.0f;
+                }
+                else if (m_position.x < m_spawnPos.x - patrolLimit && m_direction.x < 0.0f)
+                {
+                    m_direction.x = 1.0f;
+                }
+            }
+            else
+            {
+                if (m_moveTimer > 5.0f)
+                {
+                    m_moveTimer = 0.0f;
+                    m_direction.x = -m_direction.x;
+                }
             }
 
             m_bobTimer += static_cast<float>(dt);

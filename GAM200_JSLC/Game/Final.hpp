@@ -8,6 +8,43 @@
 
 class Shader;
 class DebugRenderer;
+class DroneManager;
+
+enum class BossState
+{
+    Normal,
+    Weakened,
+    Defeated
+};
+
+struct OverloadDevice
+{
+    Math::Vec2 pos;
+    Math::Vec2 size;
+    float charge = 0.0f;
+    bool isOverloaded = false;
+    float pulseAttackTimer = 0.0f;
+    bool pulseAttackActive = false;
+};
+
+struct BossProjectile
+{
+    Math::Vec2 pos;
+    Math::Vec2 vel;
+    bool active = false;
+    float radius = 16.0f;
+};
+
+struct PulseLockAttack
+{
+    Math::Vec2 targetPos;
+    float warningTimer = 0.0f;
+    float maxWarningTime = 1.2f;
+    bool active = false;
+    float explosionRadius = 120.0f;
+    bool triggeredExplosion = false;
+    float explosionVisualTimer = 0.0f;
+};
 
 class Final
 {
@@ -32,7 +69,8 @@ public:
     };
 
     void Initialize();
-    void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
+    void Reset();
+    void Update(double dt, Player& player, Math::Vec2 playerHitboxSize, DroneManager& droneManager);
     void Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW, const Math::Matrix& projection);
     void DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const;
     void DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cameraPos, float viewHalfW);
@@ -45,6 +83,19 @@ public:
     std::vector<PulseSource>& GetPulseSources() { return m_pulseSources; }
     const std::vector<PulseSource>& GetPulseSources() const { return m_pulseSources; }
     int GetActiveVentIndex() const { return m_activeVentIndex; }
+
+    BossState GetBossState() const { return m_bossState; }
+    void DamageBoss(float amount);
+    float GetBossHealth() const { return m_bossHealth; }
+    Math::Vec2 GetBossPosition() const { return m_boss.GetPosition(); }
+    Math::Vec2 GetBossSize() const { return m_boss.GetHitboxSize(); }
+    Player& GetBoss() { return m_boss; }
+    const Player& GetBoss() const { return m_boss; }
+    OverloadDevice* GetOverloadDevices() { return m_overloadDevices; }
+    bool IsDeviceHovered(int idx, Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
+    void UpdateDeviceInject(int idx, float dt, Player& player, bool godMode);
+    bool IsBossHovered(Math::Vec2 mouseWorld) const;
+    float ConsumeCameraShakeRequest();
 
 private:
     void InitSkyVAO();
@@ -73,9 +124,37 @@ private:
     std::unique_ptr<Background> m_pulseVentSprite;
 
     int m_activeVentIndex = -1;
+    int m_nextVentIndex = -1;
     float m_ventTimer = 0.0f;
     static constexpr float VENT_ACTIVE_DURATION = 5.0f;
     static constexpr float VENT_CYCLE_DURATION = 8.0f;
 
     Player m_boss;
+    BossState m_bossState = BossState::Normal;
+    float m_bossHealth = 100.0f;
+    float m_bossMaxHealth = 100.0f;
+    OverloadDevice m_overloadDevices[2];
+    std::vector<BossProjectile> m_bossProjectiles;
+    float m_bossAttackTimer = 0.0f;
+    float m_bossDroneSummonTimer = 0.0f;
+    float m_bossSweepTimer = 0.0f;
+    float m_slamGestureTimer = 0.0f;
+    bool m_bossFlipped = false;
+
+    std::unique_ptr<Background> m_overloadDeviceSprite;
+    std::unique_ptr<Background> m_pulseMarkSprite;
+    std::unique_ptr<Background> m_bossDroneProjectileSprite;
+
+    std::unique_ptr<Background> m_pulseLineH;
+    std::unique_ptr<Background> m_pulseLineV;
+    std::unique_ptr<Background> m_pulseCornerNE;
+    std::unique_ptr<Background> m_pulseCornerNW;
+    std::unique_ptr<Background> m_pulseCornerSE;
+    std::unique_ptr<Background> m_pulseCornerSW;
+
+    PulseLockAttack m_pulseLock;
+    float m_pulseLockCooldownTimer = 0.0f;
+    float m_weakenedTimer = 0.0f;
+    static constexpr float WEAKENED_DURATION = 8.0f;
+    float m_cameraShakeRequest = 0.0f;
 };
