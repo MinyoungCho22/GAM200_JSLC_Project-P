@@ -132,11 +132,14 @@ void PulseGauge::Draw(Shader& shader)
         Math::Matrix::CreateRotation(needleAngle) *
         Math::Matrix::CreateScale(m_dialSize);
 
+    shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+    shader.setFloat("tintStrength", 0.0f);
+
     m_dialNeedle->Draw(shader, needleModel);
 
     // 4. centerCap (tint X)
-    shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
-    shader.setFloat("tintStrength", 0.0f);
+    shader.setVec3("colorTint", r, g, b);
+    shader.setFloat("tintStrength", tintStrength);
 
     Math::Matrix centerCapModel =
         Math::Matrix::CreateTranslation(m_dialPosition) *

@@ -24,11 +24,9 @@
 #include "Train.hpp"
 #include "Final.hpp"
 #include "Skill.hpp"
+#include "Background.hpp"
 #include <memory>
 #include <vector>
-
-class Background;
-
 
 class Shader;
 class GameStateManager;
@@ -66,6 +64,9 @@ private:
     void WorldToFramebuffer(Math::Vec2 world, double& outFbX, double& outFbY) const;
     void ApplyGamepadDroneTargetingAssist(double dt, Input::Input& input, Math::Vec2& inOutMouseWorldPos);
     TraceStage GetCurrentTraceStage() const;
+    void RebuildTvLineTexture();
+    void ResetTvNewsState();
+    void ConfigureRoomTvPulseSource();
 
     GameStateManager& gsm;
     Player player;
@@ -116,6 +117,12 @@ private:
     std::unique_ptr<Background> m_hudFrame;
     std::unique_ptr<Background> m_conversionBackdrop;
     std::unique_ptr<Background> m_hallwayHidingPromptS;
+    std::unique_ptr<Background> m_uiExplanation;
+    bool m_showUiExplanation = false;
+    bool m_uiExplanationSeen = false;
+    std::unique_ptr<Background> m_scanlineDroneExplanation;
+    bool m_showScanlineDroneExplanation = false;
+    bool m_scanlineDroneExplanationSeen = false;
     Math::Vec2 m_lastMouseWorldPos{};
     bool m_undergroundAccessed = false;
     bool m_trainAccessed = false;
@@ -164,4 +171,30 @@ private:
     Robot* m_lockedAttackRobot = nullptr;
     float m_lockedAttackSide = 1.0f;
     float side = 1.0f;
+
+    //story
+    bool m_tvNewsActive = false;
+
+    enum class TvPhase { OffGlitch, OnNews };
+    TvPhase m_tvPhase = TvPhase::OffGlitch;
+
+    std::vector<std::string> m_tvLeakLines = {
+        "Bzzzt… kzzzt…",
+        "...government...",
+        "...searching for...",
+        "...unidentified subject...",
+    };
+     
+    std::vector<std::string> m_tvNewsLines = {
+        "BREAKING: Authorities issue public warning.",
+        "Government officials are searching",
+        "for an unidentified individual.",
+        "The subject is considered highly dangerous.",
+        "If seen, do not approach. Report immediately.",
+    };
+    size_t m_tvLineIndex = 0;
+    float  m_tvLineTimer = 0.0f;      
+    float  m_tvFlickerTimer = 0.0f;   
+    bool   m_tvTextVisible = true;   
+    CachedTextureInfo m_tvLineTex{};
 };
