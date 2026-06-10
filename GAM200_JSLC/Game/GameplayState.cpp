@@ -82,6 +82,13 @@ constexpr float TV_TEXT_POS_Y = 575.0f;
 // Trimmed Room_news_dialog.png top-left (world coords, same space as TV_TEXT_POS_*).
 constexpr float TV_NEWS_DIALOG_PNG_POS_X = TV_TEXT_POS_X - 5.0f;
 constexpr float TV_NEWS_DIALOG_PNG_POS_Y = TV_TEXT_POS_Y - 10.0f;
+// Room TV 모니터 화면 중심(월드 좌표). Room_news.png(165x114)가 이 화면(164x113)에 딱 맞게 들어감.
+constexpr float TV_MONITOR_SCREEN_CENTER_X = 799.0f;
+constexpr float TV_MONITOR_SCREEN_CENTER_Y = 459.5f;
+constexpr float TV_MONITOR_SCREEN_W = 165.0f;
+constexpr float TV_MONITOR_SCREEN_H = 114.0f;
+// TV는 벽 위쪽에 있어 플레이어와 세로로 겹치지 않으므로 가로 근접으로 판정
+constexpr float TV_INTERACT_PLAYER_RANGE_X = 240.0f;
 
 // Hallway entry spawn: slightly right/down from the previous defaults (door + Ctrl+2).
 constexpr float HALLWAY_ENTRY_MARGIN_X = 235.0f + 65.0f;
@@ -964,16 +971,8 @@ void GameplayState::Update(double dt)
     if (!m_doorOpened && !m_rooftopAccessed && m_room && m_room->IsBlindOpen()
         && m_tvPhase == TvPhase::OffGlitch)
     {
-        const auto& roomSources = m_room->GetPulseSources();
-        if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
-        {
-            const auto& tv = roomSources[ROOM_TV_PULSE_SOURCE_INDEX];
-            const bool playerOnTv = Collision::CheckAABB(
-                playerHbCenter, playerHitboxSize, tv.GetPosition(), tv.GetHitboxSize());
-            const bool cursorOnTv = Collision::CheckPointInAABB(
-                mouseWorldPos, tv.GetPosition(), tv.GetHitboxSize());
-            tvBlocksAttackWhenOff = playerOnTv && cursorOnTv;
-        }
+        // TV 모니터를 좌클릭해 켤 때는 공격으로 처리하지 않음
+        tvBlocksAttackWhenOff = IsTvPowerHovered(playerHbCenter, mouseWorldPos);
     }
 
     bool isPressingAttack = ctl.IsActionPressed(ControlAction::Attack, input) && !crouchHidingBlocksAttack
@@ -1045,13 +1044,6 @@ void GameplayState::Update(double dt)
     std::vector<PulseSource> emptySources;
     std::vector<PulseSource>& finalSources = (m_finalAccessed && m_final) ? m_final->GetPulseSources() : emptySources;
 
-    if (!m_doorOpened && !m_rooftopAccessed && m_room)
-    {
-        auto& roomSources = m_room->GetPulseSources();
-        if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
-            roomSources[ROOM_TV_PULSE_SOURCE_INDEX].Drain(100000.0f);
-    }
-
     pulseManager->Update(playerCenter, playerHitboxSize, player, m_room->GetPulseSources(),
         m_hallway->GetPulseSources(), m_rooftop->GetPulseSources(), m_underground->GetPulseSources(),
         m_train->GetPulseSources(), finalSources, isPressingInteract, dt, mouseWorldPos);
@@ -1059,19 +1051,10 @@ void GameplayState::Update(double dt)
     if (!m_doorOpened && !m_rooftopAccessed && m_room && m_font && m_fontShader && m_room->IsBlindOpen())
     {
         const float fdt = static_cast<float>(dt);
-        auto& roomSources = m_room->GetPulseSources();
 
-        bool tvPowerOnTriggered = false;
-        if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
-        {
-            const auto& tv = roomSources[ROOM_TV_PULSE_SOURCE_INDEX];
-            const bool playerOnTv = Collision::CheckAABB(
-                playerHbCenter, playerHitboxSize, tv.GetPosition(), tv.GetHitboxSize());
-            const bool cursorOnTv = Collision::CheckPointInAABB(
-                mouseWorldPos, tv.GetPosition(), tv.GetHitboxSize());
-            tvPowerOnTriggered = playerOnTv && cursorOnTv
-                && ctl.IsActionTriggered(ControlAction::Attack, input);
-        }
+        // TV는 모니터를 좌클릭해서 켬 (콘센트가 아님)
+        const bool tvPowerOnTriggered = IsTvPowerHovered(playerHbCenter, mouseWorldPos)
+            && ctl.IsActionTriggered(ControlAction::Attack, input);
 
         if (m_tvPhase == TvPhase::OffGlitch && tvPowerOnTriggered)
         {
@@ -3196,12 +3179,8 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
     colorShader->use();
     colorShader->setMat4("projection", projection);
     colorShader->setFloat("uAlpha", 0.72f);
-    for (size_t i = 0; i < m_room->GetPulseSources().size(); ++i)
-    {
-        if (i == ROOM_TV_PULSE_SOURCE_INDEX)
-            continue;
-        m_room->GetPulseSources()[i].DrawRemainGauge(*colorShader);
-    }
+    for (const auto& src : m_room->GetPulseSources())
+        src.DrawRemainGauge(*colorShader);
     for (const auto& src : m_hallway->GetPulseSources())
         src.DrawRemainGauge(*colorShader);
     for (const auto& src : m_rooftop->GetPulseSources())
@@ -3309,12 +3288,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
         if (m_tvPhase == TvPhase::OnNews && m_tvNewsActive)
         {
-            auto& roomSources = m_room->GetPulseSources();
-            if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
-            {
-                const Math::Vec2 tvCenter = roomSources[ROOM_TV_PULSE_SOURCE_INDEX].GetPosition();
-                drawNativeSpriteAtCenter(RoomTvPng::g_news, tvCenter);
-            }
+            // 뉴스 이미지는 펄스 소스(콘센트)가 아니라 실제 TV 모니터 화면 위치에 그림
+            drawNativeSpriteAtCenter(
+                RoomTvPng::g_news, { TV_MONITOR_SCREEN_CENTER_X, TV_MONITOR_SCREEN_CENTER_Y });
         }
     }
 
@@ -3717,14 +3693,9 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         if (!overLeftClickTarget && !m_doorOpened && !m_rooftopAccessed && m_room
             && m_room->IsBlindOpen() && m_tvPhase == TvPhase::OffGlitch)
         {
-            const auto& roomSources = m_room->GetPulseSources();
-            if (roomSources.size() > ROOM_TV_PULSE_SOURCE_INDEX)
-            {
-                const auto& tv = roomSources[ROOM_TV_PULSE_SOURCE_INDEX];
-                if (Collision::CheckAABB(playerHitboxCenter, playerHitboxSize, tv.GetPosition(), tv.GetHitboxSize())
-                    && Collision::CheckPointInAABB(mouseWorldPosForHover, tv.GetPosition(), tv.GetHitboxSize()))
-                    overLeftClickTarget = true;
-            }
+            // TV 모니터 좌클릭 켜기 대상
+            if (IsTvPowerHovered(playerHitboxCenter, mouseWorldPosForHover))
+                overLeftClickTarget = true;
         }
 
         if (!overLeftClickTarget && m_rooftop && m_rooftop->IsPlayerCloseToHole() && !m_rooftop->IsHoleClosed() &&
@@ -3777,7 +3748,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             return false;
         };
 
-        if (checkPulseSources(m_room->GetPulseSources(), ROOM_TV_PULSE_SOURCE_INDEX) ||
+        if (checkPulseSources(m_room->GetPulseSources()) ||
             checkPulseSources(m_hallway->GetPulseSources()) ||
             checkPulseSources(m_rooftop->GetPulseSources()) ||
             checkPulseSources(m_underground->GetPulseSources()) ||
@@ -4326,16 +4297,18 @@ void GameplayState::RebuildTvLineTexture()
 
 void GameplayState::ConfigureRoomTvPulseSource()
 {
-    if (!m_room)
-        return;
+    // 콘센트(인덱스 1)는 일반 펄스 충전소로 동작하므로 더 이상 비활성화하지 않음.
+    // (TV 켜기는 모니터 좌클릭으로 분리됨)
+}
 
-    auto& roomSources = m_room->GetPulseSources();
-    if (roomSources.size() <= ROOM_TV_PULSE_SOURCE_INDEX)
-        return;
-
-    PulseSource& tvSource = roomSources[ROOM_TV_PULSE_SOURCE_INDEX];
-    tvSource.SetDrawRemainGauge(false);
-    tvSource.Drain(100000.0f);
+bool GameplayState::IsTvPowerHovered(Math::Vec2 playerHbCenter, Math::Vec2 mouseWorld) const
+{
+    const Math::Vec2 tvCenter = { TV_MONITOR_SCREEN_CENTER_X, TV_MONITOR_SCREEN_CENTER_Y };
+    const Math::Vec2 tvSize   = { TV_MONITOR_SCREEN_W, TV_MONITOR_SCREEN_H };
+    const bool cursorOnTv = Collision::CheckPointInAABB(mouseWorld, tvCenter, tvSize);
+    const bool playerNearTv =
+        std::abs(playerHbCenter.x - tvCenter.x) <= TV_INTERACT_PLAYER_RANGE_X;
+    return cursorOnTv && playerNearTv;
 }
 
 void GameplayState::ResetTvNewsState()

@@ -67,6 +67,8 @@ private:
     void RebuildTvLineTexture();
     void ResetTvNewsState();
     void ConfigureRoomTvPulseSource();
+    // 커서가 TV 모니터 화면 위에 있고 플레이어가 TV 근처(가로)인지 — TV 좌클릭 켜기 판정용
+    bool IsTvPowerHovered(Math::Vec2 playerHbCenter, Math::Vec2 mouseWorld) const;
 
     GameStateManager& gsm;
     Player player;
