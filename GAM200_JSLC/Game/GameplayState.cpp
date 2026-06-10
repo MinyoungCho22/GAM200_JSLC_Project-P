@@ -1844,6 +1844,25 @@ void GameplayState::Update(double dt)
             m_wasCar5Encounter = car5;
         }
 
+        // SecondTrain(사이렌) 칸 직전 2호차 첫 진입 시 카메라 시네마틱 1회 시작
+        if (m_secondTrainCine == SecondTrainCine::None && m_train
+            && m_train->IsCar3SirenValid() && m_train->GetCar3SirenActive()
+            && m_train->GetPlayerTrainCarIndex(player.GetHitboxCenter()) == 2)
+        {
+            m_secondTrainCine         = SecondTrainCine::Pan;
+            m_secondTrainCineTimer    = 0.0f;
+            m_secondTrainCinePanSpeed = 0.0f;
+        }
+
+        // 시네마틱(Pan/Hold/Return) 동안 플레이어 무적 — 이후 데미지 판정 전에 매 프레임 갱신
+        if (m_secondTrainCine == SecondTrainCine::Pan
+            || m_secondTrainCine == SecondTrainCine::Hold
+            || m_secondTrainCine == SecondTrainCine::Return)
+        {
+            player.SetInvincible(true);
+            player.SetInvincibilityTimer(0.5f);
+        }
+
         runPulseResonanceBurst();
 
         const float shakePx = m_train->ConsumeTrainCameraShakeRequest();
@@ -1869,6 +1888,15 @@ void GameplayState::Update(double dt)
             const float trainDrivenRight  = m_train->GetEffectiveRightBound();
             const float playerDrivenRight = player.GetPosition().x + playerLeadMargin;
             dynamicRight = (trainDrivenRight > playerDrivenRight) ? trainDrivenRight : playerDrivenRight;
+
+            // SecondTrain 시네마틱 중에는 사이렌까지 카메라가 갈 수 있도록 우측 바운드 확장
+            if (m_secondTrainCine != SecondTrainCine::None
+                && m_secondTrainCine != SecondTrainCine::Done
+                && m_train->IsCar3SirenValid())
+            {
+                const float sirenRight = m_train->GetCar3SirenWorldCenter().x + visibleW * 0.5f + 80.f;
+                dynamicRight = std::max(dynamicRight, sirenRight);
+            }
         }
 
         // Keep Y fixed at the normal train view unless the player is about to leave the safe screen band.
@@ -2043,6 +2071,7 @@ void GameplayState::Update(double dt)
     else
     {
         Math::Vec2 cameraTarget = player.GetPosition();
+        float      camSmooth    = m_cameraSmoothSpeed;
         if (m_trainAccessed)
         {
             constexpr float trainCamHalfH = GAME_HEIGHT * 0.5f;
@@ -2053,12 +2082,67 @@ void GameplayState::Update(double dt)
                 cameraTarget.y = playerY - TRAIN_CAMERA_DEADZONE_UP;
             else if (playerY < trainCameraBaseY - TRAIN_CAMERA_DEADZONE_DOWN)
                 cameraTarget.y = playerY + TRAIN_CAMERA_DEADZONE_DOWN;
+
+            // SecondTrain 카메라 시네마틱 처리
+            if (m_train
+                && m_secondTrainCine != SecondTrainCine::None
+                && m_secondTrainCine != SecondTrainCine::Done)
+            {
+                const Math::Vec2 sirenC = m_train->GetCar3SirenWorldCenter();
+                const float      camX   = m_camera.GetPosition().x;
+                const float      fdt    = static_cast<float>(dt);
+
+                switch (m_secondTrainCine)
+                {
+                case SecondTrainCine::Pan:
+                    // 오른쪽으로 가속하며 사이렌으로 이동 (2배 천천히)
+                    m_secondTrainCineTimer += fdt;
+                    m_secondTrainCinePanSpeed = std::min(0.07f, m_secondTrainCinePanSpeed + fdt * 0.08f);
+                    cameraTarget = { sirenC.x, trainCameraBaseY };
+                    camSmooth    = m_secondTrainCinePanSpeed;
+                    if (std::abs(camX - sirenC.x) < 70.0f || m_secondTrainCineTimer > 5.2f)
+                    {
+                        m_secondTrainCine      = SecondTrainCine::Hold;
+                        m_secondTrainCineTimer = 0.0f;
+                    }
+                    break;
+
+                case SecondTrainCine::Hold:
+                    // 사이렌에서 드론 나오는 모습 3초 노출
+                    m_secondTrainCineTimer += fdt;
+                    cameraTarget = { sirenC.x, trainCameraBaseY };
+                    camSmooth    = 0.045f;
+                    if (m_secondTrainCineTimer >= SECOND_TRAIN_CINE_HOLD_SEC)
+                    {
+                        m_secondTrainCine      = SecondTrainCine::Return;
+                        m_secondTrainCineTimer = 0.0f;
+                    }
+                    break;
+
+                case SecondTrainCine::Return:
+                    // 부드럽게 플레이어 쪽으로 복귀 (2배 천천히)
+                    m_secondTrainCineTimer += fdt;
+                    cameraTarget = { player.GetPosition().x, trainCameraBaseY };
+                    camSmooth    = 0.0275f;
+                    if (std::abs(camX - player.GetPosition().x) < 55.0f || m_secondTrainCineTimer > 6.0f)
+                    {
+                        m_secondTrainCine = SecondTrainCine::Done;
+                        // 복귀 후 2초간 깜빡이며 무적
+                        player.SetInvincible(true);
+                        player.SetInvincibilityTimer(2.0f);
+                    }
+                    break;
+
+                default:
+                    break;
+                }
+            }
         }
         else if (m_finalAccessed)
         {
             cameraTarget.y = Final::MIN_Y + GAME_HEIGHT * 0.5f;
         }
-        m_camera.Update(cameraTarget, m_cameraSmoothSpeed);
+        m_camera.Update(cameraTarget, camSmooth);
     }
     m_camera.UpdateScreenShake(static_cast<float>(dt));
 

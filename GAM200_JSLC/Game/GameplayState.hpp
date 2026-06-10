@@ -149,6 +149,13 @@ private:
     float m_cameraSmoothSpeed = 0.1f;
     Sound m_bgm;
 
+    // SecondTrain(사이렌 칸) 진입 시 카메라 시네마틱: 오른쪽 가속 → 사이렌 드론 3초 노출 → 부드럽게 플레이어 복귀
+    enum class SecondTrainCine { None, Pan, Hold, Return, Done };
+    SecondTrainCine m_secondTrainCine        = SecondTrainCine::None;
+    float           m_secondTrainCineTimer   = 0.0f;
+    float           m_secondTrainCinePanSpeed = 0.0f;
+    static constexpr float SECOND_TRAIN_CINE_HOLD_SEC = 3.0f;
+
     // Q-skill hint on first Rooftop visit — delayed StoryDialogue over Conversion.png
     PulseDetonateSkill m_pulseDetonateSkill;
     bool               m_prevRooftopForQHint  = false;

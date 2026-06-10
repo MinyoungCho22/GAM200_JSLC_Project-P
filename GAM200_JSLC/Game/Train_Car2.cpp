@@ -226,7 +226,7 @@ void Train::DrawCar2EnterLeavePrompt(Shader& textureShader, Math::Vec2 cameraPos
     const float      tl    = MIN_X + m_trainOffset;
     const Math::Vec2 contC = { tl + m_car2PurpleHb.localCenter.x, MIN_Y + m_car2PurpleHb.localCenter.y };
 
-    const Math::Vec2 promptCenter = { contC.x - m_car2PurpleHb.size.x * 0.5f - 115.f, contC.y + 10.f };
+    const Math::Vec2 promptCenter = { contC.x - m_car2PurpleHb.size.x * 0.5f - 55.f, contC.y + 10.f };
 
     const float visLeft  = cameraPos.x - viewHalfW - 400.f;
     const float visRight = cameraPos.x + viewHalfW + 400.f;

@@ -193,6 +193,10 @@ public:
     DroneManager* GetCarTransportDroneManager() { return m_carTransportDroneManager.get(); }
     float GetCar3SirenInjectT() const { return m_car3SirenInjectT; }
     bool  GetCar3SirenActive() const { return m_car3SirenActive; }
+    bool  IsCar3SirenValid() const { return m_car3SirenHbValid; }
+    Math::Vec2 GetCar3SirenWorldCenter() const {
+        return { MIN_X + m_trainOffset + m_car3SirenHb.localCenter.x, MIN_Y + m_car3SirenHb.localCenter.y };
+    }
     float GetCar2ContainerChargePct() const { return m_car2InsideCharge; }
     /// 펄스 박스 안에서 남은 퇴장 잠금 시간 (0이면 퇴장 가능)
     float GetCar2InsideLockRemaining() const

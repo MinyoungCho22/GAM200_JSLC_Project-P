@@ -49,7 +49,9 @@ void Train::UpdateCar3Siren(float dt, Player& player, Math::Vec2 playerHbCenter,
 
     if (m_car3SirenActive)
     {
-        const bool playerOnCar3 = (GetPlayerTrainCarIndex(playerHbCenter) == 3);
+        // 2호차(사이렌 칸 직전)부터 사이렌이 드론을 스폰 — 카메라 연출에서 드론이 보이도록
+        const int  playerCarIdx = GetPlayerTrainCarIndex(playerHbCenter);
+        const bool playerOnCar3 = (playerCarIdx == 2 || playerCarIdx == 3);
         if (playerOnCar3)
             m_car3SirenSpawnTimer += static_cast<float>(dt);
         if (playerOnCar3 && m_car3SirenSpawnTimer >= 2.4f && m_sirenDroneManager->GetDrones().size() < 14)

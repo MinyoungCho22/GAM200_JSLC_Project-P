@@ -137,8 +137,8 @@ void Train::Initialize()
 
     m_car2EnterPromptTex = std::make_unique<Background>();
     m_car2LeavePromptTex = std::make_unique<Background>();
-    m_car2EnterPromptTex->Initialize("Asset/Train/Enter.png");
-    m_car2LeavePromptTex->Initialize("Asset/Train/Leave.png");
+    m_car2EnterPromptTex->Initialize("Asset/Train/D.png");
+    m_car2LeavePromptTex->Initialize("Asset/Train/A.png");
 
     m_carTransportPulseLeftTex  = std::make_unique<Background>();
     m_carTransportPulseRightTex = std::make_unique<Background>();
