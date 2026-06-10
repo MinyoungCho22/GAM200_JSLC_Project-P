@@ -625,9 +625,10 @@ void Train::UpdateTrainEncounterScript(float dt, Player& player)
                                + std::sin(m_encounterScriptTime * 3.05f) * (c5R - c5L) * 0.30f
                        : std::clamp(ppos.x, c5L + 260.f, c5R - 260.f);
         const float formationSpacingBase = 228.f;
+        // 드론을 밸브 높이까지 내려서 배치
         const float car5HoverY =
-            m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f)
-                               : (Train::MIN_Y + kTrainFlatbedDeckTopLocalY + 380.f);
+            (m_valveLocalCenter.y > 0.f) ? (MIN_Y + m_valveLocalCenter.y)
+                                         : (Train::MIN_Y + kTrainFlatbedDeckTopLocalY);
         int car5LiveIdx = 0;
         for (size_t i = 0; i < drones.size(); ++i)
         {

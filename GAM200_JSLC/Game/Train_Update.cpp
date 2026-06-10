@@ -600,8 +600,9 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
             }
             if (seg == 5)
             {
+                // Car5 드론은 밸브 높이까지 내려서 호버링
                 const float ySiren =
-                    m_car3SirenHbValid ? (MIN_Y + m_car3SirenHb.localCenter.y + 55.f) : car12DroneHoverBase;
+                    (m_valveLocalCenter.y > 0.f) ? (MIN_Y + m_valveLocalCenter.y) : car12DroneHoverBase;
                 const float hoverY =
                     ySiren + std::sin(m_encounterScriptTime * 2.2f + static_cast<float>(i) * 0.61f) * 5.f;
                 Math::Vec2 p = d.GetPosition();
