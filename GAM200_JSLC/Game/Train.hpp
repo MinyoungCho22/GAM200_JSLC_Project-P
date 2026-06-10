@@ -163,6 +163,7 @@ public:
     bool IsCar3TunnelInsideViewActive() const { return m_car3TunnelInsideViewActive; }
     bool IsCar3TunnelInsideTransitionActive() const { return m_car3TunnelInsideTransitionActive; }
     bool IsTunnelInsideHazardFalling() const { return m_tunnelInsideHazardFalling; }
+    bool IsCar5EncounterActive() const { return m_car5EncounterActive; }
     /// 터널 진입 페이드부터 인사이드 종료 전까지(사이렌 파동·레이더 등 외부 연출 차단)
     bool ShouldHideTrainExteriorHazards() const;
     float GetTunnelInsideWorldWidth() const { return m_tunnelInsideWorldWidth; }

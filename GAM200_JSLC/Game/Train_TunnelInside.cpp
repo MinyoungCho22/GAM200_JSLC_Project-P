@@ -606,8 +606,9 @@ void Train::CheatWarpToCar5(Player& player, Math::Vec2 playerHitboxSize)
     m_playerOnTunnelBoardingFloor        = false;
     m_playerOnTunnelDepartWalkFloor      = false;
 
-    // Snapping player to the center of Car 5 (water tank car)
-    const float cx = GetTrainCarCenterWorldX(5);
+    // Snapping player to the leftmost edge of Car 5 (water tank car)
+    const float car5Left = MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(5);
+    const float cx = car5Left + playerHitboxSize.x * 0.5f + 40.f;
     const float deckSurfaceY = MIN_Y + kTrainFlatbedDeckTopLocalY;
     const float halfH = playerHitboxSize.y * 0.5f;
 

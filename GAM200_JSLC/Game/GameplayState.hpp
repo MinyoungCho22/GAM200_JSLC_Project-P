@@ -125,6 +125,11 @@ private:
     bool m_isGameOver = false;
     float m_gameOverDelay = -1.0f;   ///< -1 = idle; >= 0 = 사망 후 GameOver 지연 카운트다운
     MapZone m_currentCheckpoint = MapZone::Room;
+    bool m_checkpointTunnelInside = false;   ///< Train 체크포인트가 터널 인사이드인지 여부
+    bool m_tunnelInsideEntryStoryDone = false; ///< 터널 인사이드 진입 컨텍스트 1회 표시 여부
+    bool m_wasInTunnelInsideView = false;      ///< 직전 프레임 터널 인사이드 뷰 상태
+    bool m_car5ReachedStoryDone = false;       ///< 물탱크 칸 도달 대사 1회 표시 여부
+    bool m_wasCar5Encounter = false;           ///< 직전 프레임 Car5 조우 상태
     FadeState m_fadeState = FadeState::None;
     float m_fadeAlpha = 0.0f;
     PendingTransition m_pendingTransition = PendingTransition::None;

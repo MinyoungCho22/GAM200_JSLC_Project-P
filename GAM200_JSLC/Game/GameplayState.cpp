@@ -1614,6 +1614,30 @@ void GameplayState::Update(double dt)
         m_train->Update(dt, player, playerHitboxSize, isPressingInteract, carTransportInjectHeld, trainCarInjectGodMode,
                         attackHeld, attackTriggered, mouseWorldPos, injectViaStartIcon ? carInjectForced : -1);
 
+        // 터널 인사이드 진입 / 물탱크 칸 도달 컨텍스트 대사 (치트 워프 후에도 표시되도록 ambient 차단 게이트를 적용하지 않음)
+        if (m_storyDialogue && m_font && m_fontShader && m_train)
+        {
+            const bool inTunnel = m_train->IsCar3TunnelInsideViewActive();
+            if (inTunnel && !m_wasInTunnelInsideView && !m_tunnelInsideEntryStoryDone)
+            {
+                m_storyDialogue->EnqueueLines(
+                    { "I can sense something beyond the broken rail..." },
+                    *m_font, *m_fontShader);
+                m_tunnelInsideEntryStoryDone = true;
+            }
+            m_wasInTunnelInsideView = inTunnel;
+
+            const bool car5 = m_train->IsCar5EncounterActive();
+            if (car5 && !m_wasCar5Encounter && !m_car5ReachedStoryDone)
+            {
+                m_storyDialogue->EnqueueLines(
+                    { "LAST CAR REACHED" },
+                    *m_font, *m_fontShader);
+                m_car5ReachedStoryDone = true;
+            }
+            m_wasCar5Encounter = car5;
+        }
+
         runPulseResonanceBurst();
 
         const float shakePx = m_train->ConsumeTrainCameraShakeRequest();
@@ -1920,7 +1944,11 @@ void GameplayState::Update(double dt)
             if (m_finalAccessed)
                 m_currentCheckpoint = MapZone::Final;
             else if (m_trainAccessed)
+            {
                 m_currentCheckpoint = MapZone::Train;
+                // 터널 인사이드에서 사망하면 거기서 다시 시작하도록 기록
+                m_checkpointTunnelInside = (m_train && m_train->IsCar3TunnelInsideViewActive());
+            }
             else if (m_undergroundAccessed)
                 m_currentCheckpoint = MapZone::Underground;
             else if (m_rooftopAccessed)
@@ -2327,6 +2355,20 @@ void GameplayState::RespawnAtCheckpoint()
         m_trainAccessed = true;
 
         player.SetSizeScale(0.6f);
+
+        if (m_checkpointTunnelInside && m_train)
+        {
+            // 터널 인사이드에서 사망한 경우 — 터널 인사이드에서 다시 시작
+            m_train->CheatWarpToTunnelInside(player, player.GetHitboxSize());
+            m_camera.SetBounds(
+                { m_train->GetTunnelInsideWorldLeft(), Train::MIN_Y },
+                { m_train->GetTunnelInsideWorldLeft() + m_train->GetTunnelInsideWorldWidth(),
+                  Train::MIN_Y + Train::HEIGHT });
+            m_camera.Update(player.GetPosition(), 1.0f);
+            Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Train (TunnelInside)");
+            break;
+        }
+
         float playerStartX = Train::MIN_X + 300.0f;
         float playerStartY = Train::MIN_Y + 540.0f;
         player.SetCurrentGroundLevel(Train::MIN_Y + 90.0f);
