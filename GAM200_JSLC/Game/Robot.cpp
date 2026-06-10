@@ -222,10 +222,11 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
 {
     if (m_state == RobotState::Dead)
     {
+        const float fDt = static_cast<float>(dt);
+
         // Dead body physics: gravity + bounce until settled on the ground
         if (!m_deadBodyOnGround)
         {
-            const float fDt = static_cast<float>(dt);
             m_deadBodyVel.y -= DEAD_BODY_GRAVITY * fDt;
             m_deadBodyPos   += m_deadBodyVel * fDt;
 
@@ -248,6 +249,19 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
                     m_deadBodyOnGround = true;
                 }
             }
+
+            // 공중에서 좌우로 흔들림 — 낙하·바운스 동안 흔들리는 모션
+            m_deadBodyRockTimer += fDt;
+            m_deadBodyAngle = std::sin(m_deadBodyRockTimer * DEAD_ROCK_FREQ) * DEAD_ROCK_AMPLITUDE;
+        }
+        else if (std::abs(m_deadBodyAngle) > 0.05f)
+        {
+            // 착지 후 흔들림 감쇠 — 통 튀고 멈출 때 점점 안정화
+            m_deadBodyAngle *= std::exp(-fDt * 7.0f);
+        }
+        else
+        {
+            m_deadBodyAngle = 0.0f;
         }
         return;
     }
@@ -648,9 +662,6 @@ void Robot::Update(double dt, Player& player, const std::vector<ObstacleInfo>& o
 bool Robot::ShouldJumpAttack(const Math::Vec2& playerPos, const Math::Vec2& playerHbSize,
                              const std::vector<ObstacleInfo>& obstacles) const
 {
-    if (m_trainDeckPatrol || m_trainCarSegment > 0)
-        return false;
-
     if (!IsPlayerElevatedForJump(playerPos, m_position))
         return false;
 
@@ -758,6 +769,7 @@ void Robot::Draw(const Shader& shader) const
 
         const Math::Vec2 deadSize = { m_size.x, m_size.y * 0.5f };
         Math::Matrix model = Math::Matrix::CreateTranslation(m_deadBodyPos)
+                           * Math::Matrix::CreateRotation(m_deadBodyAngle)
                            * Math::Matrix::CreateScale(deadSize);
         shader.use();
         shader.setMat4("model", model);

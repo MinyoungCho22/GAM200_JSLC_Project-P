@@ -125,14 +125,18 @@ private:
     unsigned int m_VAO = 0;
     unsigned int m_VBO = 0;
 
-    // Dead body physics (gravity + bounce)
+    // Dead body physics (gravity + bounce + left-right rocking)
     Math::Vec2 m_deadBodyPos{};
     Math::Vec2 m_deadBodyVel{};
     bool       m_deadBodyOnGround  = false;
     int        m_deadBounceCount   = 0;
+    float      m_deadBodyAngle     = 0.0f;   ///< 현재 흔들림 각도(도)
+    float      m_deadBodyRockTimer = 0.0f;   ///< 흔들림 위상 누적 타이머
     static constexpr int   MAX_DEAD_BOUNCES        = 3;
     static constexpr float DEAD_BODY_GRAVITY       = 1200.0f;
     static constexpr float DEAD_BOUNCE_RESTITUTION = 0.40f;
+    static constexpr float DEAD_ROCK_FREQ          = 9.0f;   ///< 흔들림 주파수(rad/s)
+    static constexpr float DEAD_ROCK_AMPLITUDE     = 14.0f;  ///< 공중 흔들림 최대 각(도)
 
     Math::Vec2 m_position;
     Math::Vec2 m_size;
