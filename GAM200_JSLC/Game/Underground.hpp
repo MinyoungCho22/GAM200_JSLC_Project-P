@@ -58,6 +58,7 @@ public:
     void ApplyConfig(const UndergroundObjectConfig& cfg);
     void Update(double dt, Player& player, Math::Vec2 playerHitboxSize);
     void Draw(Shader& shader) const;
+    void DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist = 300.0f) const;
     /// Train 맵과 동일한 석양·구름 패럴랙스 하늘 (맵 스프라이트보다 먼저 그림)
     void DrawParallaxBackground(Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW) const;
     void DrawDrones(Shader& shader) const;

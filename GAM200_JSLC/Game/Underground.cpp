@@ -761,6 +761,19 @@ void Underground::Draw(Shader& shader) const
     }
 }
 
+void Underground::DrawSpriteOutlines(Shader& outlineShader, Math::Vec2 playerPos, float proximityDist) const
+{
+    const float proxDistSq = proximityDist * proximityDist;
+    for (const auto& source : m_pulseSources)
+    {
+        if (!source.HasSprite())
+            continue;
+        float distSq = (playerPos - source.GetPosition()).LengthSq();
+        if (distSq <= proxDistSq)
+            source.DrawOutline(outlineShader);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // [IsPlayerOnApproachTrain]
 // - 기능: 플레이어가 진입 후 정차 완료한 열차(Subway Train)의 발판 덱(Deck) 위에 완전히 올라타 서있는 상태인지 AABB 검사합니다.

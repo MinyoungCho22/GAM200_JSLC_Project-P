@@ -96,7 +96,7 @@ void main()
             float stepX = max(texelSize.x, 0.002);
             for (float x = distortedUV.x - stepX; x >= 0.0; x -= stepX)
             {
-                if (x < 0.13) break;
+                if (x < 0.11) break;
                 if (alphaAt(vec2(x, distortedUV.y)) > 0.2)
                 {
                     hitLeft = true;
@@ -108,7 +108,7 @@ void main()
                 bool hitRight = false;
                 for (float x = distortedUV.x + stepX; x <= 1.0; x += stepX)
                 {
-                    if (x > 0.86) break;
+                    if (x > 0.87) break;
                     if (alphaAt(vec2(x, distortedUV.y)) > 0.2)
                     {
                         hitRight = true;

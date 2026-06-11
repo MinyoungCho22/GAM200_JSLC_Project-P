@@ -3207,6 +3207,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_room->DrawSpriteOutlines(*m_outlineShader, playerPos);
         m_hallway->DrawSpriteOutlines(*m_outlineShader, playerPos);
         m_rooftop->DrawSpriteOutlines(*m_outlineShader, playerPos);
+        m_underground->DrawSpriteOutlines(*m_outlineShader, playerPos);
         m_train->DrawSpriteOutlines(*m_outlineShader, playerPos);
     }
     if (m_isDebugDraw)
