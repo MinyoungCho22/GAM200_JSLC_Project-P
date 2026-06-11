@@ -507,6 +507,10 @@ void GameplayState::Update(double dt)
                     { "",                                0.0f },
                     { "Special Thanks",                  45.0f },
                     { "DigiPen Institute of Technology", 36.0f },
+                    { "Rudy Castan",                     36.0f },
+                    { "Jonathan Holmes",                 36.0f },
+                    { "Bryce Dixon",                     36.0f },
+                    { "The 52 testers who helped us improve our game", 34.0f },
                     { "",                                0.0f },
                     { "",                                0.0f },
                     { "Thank you for playing our game!", 48.0f }
@@ -973,10 +977,10 @@ void GameplayState::Update(double dt)
         m_trainAccessed = true;
         m_currentCheckpoint = MapZone::Train;
 
-        m_train->CheatWarpToCar5(player, player.GetHitboxSize());
+        m_train->CheatWarpToSecondInside1(player, player.GetHitboxSize());
         m_camera.Update(player.GetPosition(), 1.0f);
 
-        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Warp to Car 5 Water Tank (Ctrl+7)");
+        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Warp to SecondInside_1 (Ctrl+7)");
     }
 
     if (input.IsKeyPressed(Input::Key::LeftControl) && input.IsGlfwKeyTriggered(GLFW_KEY_8))
@@ -995,10 +999,10 @@ void GameplayState::Update(double dt)
         m_trainAccessed = true;
         m_currentCheckpoint = MapZone::Train;
 
-        m_train->CheatWarpToSecondInside1(player, player.GetHitboxSize());
+        m_train->CheatWarpToCar5(player, player.GetHitboxSize());
         m_camera.Update(player.GetPosition(), 1.0f);
 
-        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Warp to SecondInside_1 (Ctrl+8)");
+        Logger::Instance().Log(Logger::Severity::Event, "Cheat: Warp to Car 5 Water Tank (Ctrl+8)");
     }
 
     if (m_trainAccessed && m_train
@@ -2423,6 +2427,8 @@ void GameplayState::Update(double dt)
                 m_currentCheckpoint = MapZone::Train;
                 // 터널 인사이드에서 사망하면 거기서 다시 시작하도록 기록
                 m_checkpointTunnelInside = (m_train && m_train->IsCar3TunnelInsideViewActive());
+                // SecondInside에서 사망하면 거기서 다시 시작하도록 기록
+                m_checkpointSecondInside = (m_train && m_train->IsCar3InsideViewActive());
             }
             else if (m_undergroundAccessed)
                 m_currentCheckpoint = MapZone::Underground;
@@ -2885,6 +2891,15 @@ void GameplayState::RespawnAtCheckpoint()
                   Train::MIN_Y + Train::HEIGHT });
             m_camera.Update(player.GetPosition(), 1.0f);
             Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Train (TunnelInside)");
+            break;
+        }
+
+        if (m_checkpointSecondInside && m_train)
+        {
+            // SecondInside에서 사망한 경우 — SecondInside_1 시작 부분에서 다시 시작
+            m_train->CheatWarpToSecondInside1(player, player.GetHitboxSize());
+            m_camera.Update(player.GetPosition(), 1.0f);
+            Logger::Instance().Log(Logger::Severity::Event, "Checkpoint respawn: Train (SecondInside)");
             break;
         }
 

@@ -164,13 +164,14 @@ bool Train::IsCar3InsideLadderHovered(Math::Vec2 playerHbCenter, Math::Vec2 play
 
     if (m_car3InsideOnRoof)
     {
-        // 지붕에서 내려갈 때는 SecondInside_2 사다리만 클릭 허용.
-        return hoveredLadder(m_car3InsideLadder2Hb, { 360.f, 900.f });
+        // 지붕에서 내려갈 때는 두 사다리 모두 사용 가능
+        return hoveredLadder(m_car3InsideLadderHb, { 360.f, 900.f })
+            || hoveredLadder(m_car3InsideLadder2Hb, { 360.f, 900.f });
     }
 
-    if (!hoveredLadder(m_car3InsideLadderHb, { 220.f, 320.f }))
-        return false;
-    return true;
+    // 내부에서 올라갈 때도 두 사다리 모두 사용 가능
+    return hoveredLadder(m_car3InsideLadderHb, { 220.f, 320.f })
+        || hoveredLadder(m_car3InsideLadder2Hb, { 220.f, 320.f });
 }
 
 void Train::ClimbCar3InsideLadder(Player& player, Math::Vec2 playerHitboxSize)
@@ -190,23 +191,29 @@ void Train::ClimbCar3InsideLadder(Player& player, Math::Vec2 playerHitboxSize)
     m_car3LadderClimbStartPos = startPos;
     m_car3LadderClimbTimer    = 0.f;
 
+    // 플레이어와 더 가까운 사다리를 선택하여 이동 타겟으로 설정
+    const float ladder1WorldX = trainWorldLeft + m_car3InsideLadderHb.localCenter.x;
+    const float ladder2WorldX = trainWorldLeft + m_car3InsideLadder2Hb.localCenter.x;
+    const float dist1 = std::abs(startPos.x - ladder1WorldX);
+    const float dist2 = std::abs(startPos.x - ladder2WorldX);
+
+    const float chosenLadderLocalX = (dist1 < dist2)
+                                     ? m_car3InsideLadderHb.localCenter.x
+                                     : m_car3InsideLadder2Hb.localCenter.x;
+
     if (!m_car3InsideOnRoof)
     {
         // 내부 → 지붕으로 올라가기
-        // 도착 히트박스 X: ladderHb.localCenter.x (열차 로컬 좌표계)
-        const float ladderLocalX = m_car3InsideLadderHb.localCenter.x;
         const float roofTop      = MIN_Y + m_car3InsideRoofHb.localCenter.y + m_car3InsideRoofHb.size.y * 0.5f;
-        // 로컬 X 저장 (MIN_X 기준 → 열차 hibox local center)
-        m_car3LadderClimbTargetLocalX = ladderLocalX - hbOffset.x;
+        m_car3LadderClimbTargetLocalX = chosenLadderLocalX - hbOffset.x;
         m_car3LadderClimbTargetY      = roofTop + halfH - hbOffset.y;
         m_car3LadderClimbToRoof       = true;
     }
     else
     {
-        // 지붕 → 내부로 내려가기 (항상 SecondInside_2 사다리 앞)
-        const float ladder2LocalX = m_car3InsideLadder2Hb.localCenter.x;
+        // 지붕 → 내부로 내려가기
         const float floorTop      = MIN_Y + m_car3InsideFloorHb.localCenter.y + m_car3InsideFloorHb.size.y * 0.5f;
-        m_car3LadderClimbTargetLocalX = ladder2LocalX - hbOffset.x;
+        m_car3LadderClimbTargetLocalX = chosenLadderLocalX - hbOffset.x;
         m_car3LadderClimbTargetY      = floorTop + halfH - hbOffset.y;
         m_car3LadderClimbToRoof       = false;
     }
