@@ -70,6 +70,11 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, DroneType type)
     {
         m_groundLevel = Train::MIN_Y + 95.f;
     }
+    // Underground 구역
+    else if (startPos.y < 0.0f && startPos.x < Train::MIN_X)
+    {
+        m_groundLevel = -2000.0f + 75.0f; // -1925.0f (floorY)
+    }
     else
     {
         m_groundLevel = GROUND_LEVEL;

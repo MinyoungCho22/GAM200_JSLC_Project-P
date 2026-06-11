@@ -66,7 +66,11 @@ public:
     void TakeDamage(float amount, bool applyStagger = true);
     
     // Debug setters for ImGui
-    void SetPosition(const Math::Vec2& pos) { m_position = pos; }
+    void SetPosition(const Math::Vec2& pos) {
+        Math::Vec2 diff = pos - m_position;
+        m_position = pos;
+        m_deadBodyPos += diff;
+    }
     /// 체크포인트/리셋 시 복귀할 월드 위치(Init 직후 SetPosition으로 보정한 경우 갱신 필요)
     void SetSpawnPosition(Math::Vec2 worldPos) { m_spawnPos = worldPos; m_spawnX = worldPos.x; }
     void SetSize(const Math::Vec2& size) { m_size = size; }

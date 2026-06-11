@@ -552,6 +552,16 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     if (!suppressExteriorDrones)
         UpdateTrainDeckPatrolRobots(fdt, player, player.GetHitboxCenter(), playerHitboxSize);
 
+    // Update dead robots so they bounce and fall under gravity
+    for (auto& r : m_robots)
+    {
+        if (r.IsDead())
+        {
+            std::vector<ObstacleInfo> emptyObs;
+            r.Update(dt, player, emptyObs, 0.f, 0.f);
+        }
+    }
+
     if (m_droneManager && !suppressExteriorDrones)
         m_droneManager->Update(fdt, player, playerHitboxSize, trainEnemyUndetect, true, 1.f);
 

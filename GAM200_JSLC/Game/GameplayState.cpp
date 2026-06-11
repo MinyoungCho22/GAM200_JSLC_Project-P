@@ -2493,6 +2493,7 @@ void GameplayState::HandleTrainToFinalTransition()
     }
 
     player.SetSizeScale(0.6f);
+    player.GetPulseCore().getPulse().set(80.0f); // Set player pulse to 80% on transition
     // Green square door is at X = Final::MIN_X + 293.5f, Y = Final::MIN_Y + 258.0f (deck top)
     float playerStartX = Final::MIN_X + 293.5f;
     float newGroundLevel = Final::MIN_Y + 258.0f;
@@ -2740,6 +2741,7 @@ void GameplayState::RespawnAtCheckpoint()
         }
 
         player.SetSizeScale(0.6f);
+        player.GetPulseCore().getPulse().set(80.0f); // Set player pulse to 80% on checkpoint reload
         float playerStartX = Final::MIN_X + 293.5f;
         float newGroundLevel = Final::MIN_Y + 258.0f;
         float playerStartY = newGroundLevel + player.GetHitboxSize().y * 0.5f;

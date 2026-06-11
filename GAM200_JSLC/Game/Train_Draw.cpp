@@ -570,8 +570,7 @@ void Train::Draw(Shader& shader, Math::Vec2 cameraPos, float viewHalfW,
     // ── Robots (none currently, kept for future use) ─────────────────────
     for (const auto& robot : m_robots)
     {
-        if (!robot.IsDead())
-            robot.Draw(shader);
+        robot.Draw(shader);
     }
 }
 

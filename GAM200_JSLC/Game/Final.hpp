@@ -157,7 +157,7 @@ private:
     Math::Vec2 m_exitGateSize{};
     // 플레이어가 각 과부하 장치 기둥 근처인지 (보라 스캔라인 강조용)
     bool m_deviceProximity[2] = { false, false };
-    bool m_ventProximity[3] = { false, false, false };
+    bool m_ventProximity[4] = { false, false, false, false };
 
     std::unique_ptr<Background> m_pulseLineH;
     std::unique_ptr<Background> m_pulseLineV;

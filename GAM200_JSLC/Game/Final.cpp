@@ -63,6 +63,7 @@ void Final::Initialize()
     m_hitboxes.push_back(makeOrangeHitbox(453.0f, 944.0f));
     m_hitboxes.push_back(makeOrangeHitbox(1436.0f, 944.0f));
     m_hitboxes.push_back(makeOrangeHitbox(2421.0f, 944.0f));
+    m_hitboxes.push_back(makeOrangeHitbox(2200.0f - w1, 944.0f)); // New vent before boss
 
     m_pulseLine = std::make_unique<Background>();
     m_pulseLine->Initialize("Asset/pulse/pulse_line_h.png");
@@ -77,16 +78,21 @@ void Final::Initialize()
     m_pulseVentSprite->Initialize("Asset/Train/Pulse_Vent.png");
 
     m_pulseSources.clear();
-    m_pulseSources.resize(3);
-    for (int i = 0; i < 3; ++i)
+    m_pulseSources.resize(4);
+    for (int i = 0; i < 4; ++i)
     {
-        const auto& hb = m_hitboxes[3 + i]; // Orange slab hitboxes are indices 3, 4, 5
+        const auto& hb = m_hitboxes[3 + i]; // Orange slab hitboxes are indices 3, 4, 5, 6
         m_pulseSources[i].Initialize(hb.pos, hb.size, 100.0f);
         m_pulseSources[i].SetPulseAmount(0.0f); // initially empty/inactive
     }
+    m_pulseSources[3].RefillStock(); // Pre-filled vent before boss
 
     m_activeVentIndex = rand() % 3;
     m_pulseSources[m_activeVentIndex].RefillStock();
+    if (m_pulseSources.size() > 3)
+    {
+        m_pulseSources[3].RefillStock();
+    }
     m_ventTimer = 0.0f;
 
     // Initialize Boss (identical to player assets, same scale so Y aligns with player)
@@ -174,7 +180,7 @@ void Final::Initialize()
     m_bombThrowTimer = 0.0f;
     m_recoilBombs.clear();
     m_bombExplosions.clear();
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 4; ++i)
     {
         m_ventProximity[i] = false;
     }
@@ -229,6 +235,10 @@ void Final::Reset()
         src.SetPulseAmount(0.0f);
     }
     m_pulseSources[m_activeVentIndex].RefillStock();
+    if (m_pulseSources.size() > 3)
+    {
+        m_pulseSources[3].RefillStock();
+    }
     m_nextVentIndex = -1;
     m_ventTimer = 0.0f;
     m_firstVentActivated = false;
@@ -354,6 +364,10 @@ void Final::DrawParallaxLayer(Shader& shader, Background& bg, Math::Vec2 cameraP
 void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, DroneManager& droneManager)
 {
     float fdt = static_cast<float>(dt);
+    if (m_pulseSources.size() > 3)
+    {
+        m_pulseSources[3].RefillStock(); // Force refill extra vent so it never depletes
+    }
 
     if (m_bossDroneSummonEffectTimer > 0.0f)
     {
@@ -909,7 +923,7 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
         }
 
         // Track player proximity to stationary vents (drives the purple scanline highlight for m_realVentSprite)
-        for (int i = 3; i < 6 && i < static_cast<int>(m_hitboxes.size()); ++i)
+        for (int i = 3; i < 7 && i < static_cast<int>(m_hitboxes.size()); ++i)
         {
             const auto& hb = m_hitboxes[i];
             float rangeX = hb.size.x * 0.5f + 180.0f;
@@ -1113,7 +1127,7 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
         }
         if (m_realVentSprite && m_realVentSprite->GetWidth() > 0)
         {
-            for (int i = 3; i < 6 && i < static_cast<int>(m_hitboxes.size()); ++i)
+            for (int i = 3; i < 7 && i < static_cast<int>(m_hitboxes.size()); ++i)
             {
                 const auto& hb = m_hitboxes[i];
                 Math::Matrix model = Math::Matrix::CreateTranslation(hb.pos) * Math::Matrix::CreateScale(hb.size);
@@ -1565,91 +1579,106 @@ void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cam
         shader.setFloat("alpha", 1.0f);
     }
 
-    if (m_activeVentIndex == -1 || !m_pulseVentSprite) return;
+    if (!m_pulseVentSprite) return;
 
-    // Fast 0.25 second rising / falling animation
-    float riseRatio = 0.0f;
-    const float riseTime = 0.25f;
-    if (m_ventTimer < riseTime)
-    {
-        riseRatio = m_ventTimer / riseTime;
-    }
-    else if (m_ventTimer < VENT_ACTIVE_DURATION - riseTime)
-    {
-        riseRatio = 1.0f;
-    }
-    else if (m_ventTimer < VENT_ACTIVE_DURATION)
-    {
-        riseRatio = (VENT_ACTIVE_DURATION - m_ventTimer) / riseTime;
-    }
-    else
-    {
-        riseRatio = 0.0f;
-    }
+    // Helper lambda to draw a single vent sprite and its outline/fill
+    auto drawVent = [&](const Hitbox& hb, float riseRatio) {
+        if (riseRatio <= 0.0f) return;
 
-    if (riseRatio <= 0.0f) return;
+        Math::Vec2 renderPos = hb.pos;
+        
+        // Pin bottom edge to floor (which is hb.pos.y - 90.0f)
+        renderPos.y = (hb.pos.y - 90.0f) + (180.0f * riseRatio) * 0.5f;
+        Math::Vec2 spriteSize = { 156.0f, 180.0f * riseRatio };
 
-    const auto& hb = m_hitboxes[3 + m_activeVentIndex];
-    Math::Vec2 renderPos = hb.pos;
-    
-    // Pin bottom edge to floor (which is hb.pos.y - 90.0f)
-    renderPos.y = (hb.pos.y - 90.0f) + (180.0f * riseRatio) * 0.5f;
-    Math::Vec2 spriteSize = { 156.0f, 180.0f * riseRatio };
+        Math::Matrix model = Math::Matrix::CreateTranslation(renderPos) * Math::Matrix::CreateScale(spriteSize);
 
-    Math::Matrix model = Math::Matrix::CreateTranslation(renderPos) * Math::Matrix::CreateScale(spriteSize);
-
-    // 1. Draw with normal texture shader
-    shader.use();
-    shader.setVec4("spriteRect", 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
-    shader.setBool("flipX", false);
-    shader.setFloat("alpha", 1.0f);
-    shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
-    shader.setFloat("tintStrength", 0.0f);
-    m_pulseVentSprite->Draw(shader, model, 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
-
-    // 2. Draw outline overlay with purple scanline
-    int w = m_pulseVentSprite->GetWidth();
-    int h = m_pulseVentSprite->GetHeight();
-    if (w > 0 && h > 0)
-    {
-        GL::Enable(GL_BLEND);
-        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        outlineShader.use();
-        outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
-        float pulse = std::sin(static_cast<float>(glfwGetTime()) * 3.2f) * 0.5f + 0.5f;
-        float a = 0.55f + 0.40f * pulse;
-        outlineShader.setVec4("outlineColor", 0.95f, 0.55f, 0.15f, a); // warm golden-amber pulse flame scanline
-        outlineShader.setFloat("outlineWidthTexels", 2.0f);
-        outlineShader.setFloat("uTime", static_cast<float>(glfwGetTime()));
-        outlineShader.setBool("isFireGlow", false);
-        outlineShader.setBool("isPulseVent", true);
-
-        m_pulseVentSprite->Draw(outlineShader, model, 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
-
-        // Reset uniform
-        outlineShader.setBool("isPulseVent", false);
-    }
-
-    // 3. Draw interior purple line fill (additive blend over sprite body)
-    {
-        float pulse = (std::sin(static_cast<float>(glfwGetTime()) * 4.0f) * 0.5f + 0.5f); // 0~1 pulsing
-        float purpleAlpha = 0.35f + pulse * 0.25f;
-
-        GL::Enable(GL_BLEND);
-        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE); // additive for glow effect
+        // 1. Draw with normal texture shader
         shader.use();
         shader.setVec4("spriteRect", 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
         shader.setBool("flipX", false);
-        shader.setFloat("alpha", purpleAlpha);
-        shader.setVec3("colorTint", 0.90f, 0.45f, 0.10f); // warm amber pulse flame
-        shader.setFloat("tintStrength", 0.9f);
-        m_pulseVentSprite->Draw(shader, model, 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
-
-        // restore standard blend & tint
-        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         shader.setFloat("alpha", 1.0f);
         shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
         shader.setFloat("tintStrength", 0.0f);
+        m_pulseVentSprite->Draw(shader, model, 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
+
+        // 2. Draw outline overlay with purple scanline
+        int w = m_pulseVentSprite->GetWidth();
+        int h = m_pulseVentSprite->GetHeight();
+        if (w > 0 && h > 0)
+        {
+            GL::Enable(GL_BLEND);
+            GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            outlineShader.use();
+            outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+            float pulse = std::sin(static_cast<float>(glfwGetTime()) * 3.2f) * 0.5f + 0.5f;
+            float a = 0.55f + 0.40f * pulse;
+            outlineShader.setVec4("outlineColor", 0.95f, 0.55f, 0.15f, a); // warm golden-amber pulse flame scanline
+            outlineShader.setFloat("outlineWidthTexels", 2.0f);
+            outlineShader.setFloat("uTime", static_cast<float>(glfwGetTime()));
+            outlineShader.setBool("isFireGlow", false);
+            outlineShader.setBool("isPulseVent", true);
+
+            m_pulseVentSprite->Draw(outlineShader, model, 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
+
+            // Reset uniform
+            outlineShader.setBool("isPulseVent", false);
+        }
+
+        // 3. Draw interior purple line fill (additive blend over sprite body)
+        {
+            float pulse = (std::sin(static_cast<float>(glfwGetTime()) * 4.0f) * 0.5f + 0.5f); // 0~1 pulsing
+            float purpleAlpha = 0.35f + pulse * 0.25f;
+
+            GL::Enable(GL_BLEND);
+            GL::BlendFunc(GL_SRC_ALPHA, GL_ONE); // additive for glow effect
+            shader.use();
+            shader.setVec4("spriteRect", 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
+            shader.setBool("flipX", false);
+            shader.setFloat("alpha", purpleAlpha);
+            shader.setVec3("colorTint", 0.90f, 0.45f, 0.10f); // warm amber pulse flame
+            shader.setFloat("tintStrength", 0.9f);
+            m_pulseVentSprite->Draw(shader, model, 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
+
+            // restore standard blend & tint
+            GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            shader.setFloat("alpha", 1.0f);
+            shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+            shader.setFloat("tintStrength", 0.0f);
+        }
+    };
+
+    // Draw active cycling boss-arena vent
+    if (m_activeVentIndex != -1)
+    {
+        // Fast 0.25 second rising / falling animation
+        float riseRatio = 0.0f;
+        const float riseTime = 0.25f;
+        if (m_ventTimer < riseTime)
+        {
+            riseRatio = m_ventTimer / riseTime;
+        }
+        else if (m_ventTimer < VENT_ACTIVE_DURATION - riseTime)
+        {
+            riseRatio = 1.0f;
+        }
+        else if (m_ventTimer < VENT_ACTIVE_DURATION)
+        {
+            riseRatio = (VENT_ACTIVE_DURATION - m_ventTimer) / riseTime;
+        }
+
+        if (riseRatio > 0.0f)
+        {
+            const auto& hb = m_hitboxes[3 + m_activeVentIndex];
+            drawVent(hb, riseRatio);
+        }
+    }
+
+    // Draw permanent 4th vent before the boss (index 6 in hitboxes)
+    if (m_hitboxes.size() > 6)
+    {
+        const auto& hb = m_hitboxes[6];
+        drawVent(hb, 1.0f);
     }
 }
 
@@ -1724,13 +1753,13 @@ void Final::DrawFinalObjectEffects(Shader& outlineShader)
         m_borderInsideSprite->Draw(outlineShader, model);
     }
 
-    // Real vents (indices 3, 4, 5): subtle purple scanline always; bright purple when player is near
+    // Real vents (indices 3, 4, 5, 6): subtle purple scanline always; bright purple when player is near
     if (m_realVentSprite && m_realVentSprite->GetWidth() > 0)
     {
         const int w = m_realVentSprite->GetWidth();
         const int h = m_realVentSprite->GetHeight();
         outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
-        for (int i = 3; i < 6 && i < static_cast<int>(m_hitboxes.size()); ++i)
+        for (int i = 3; i < 7 && i < static_cast<int>(m_hitboxes.size()); ++i)
         {
             const auto& hb = m_hitboxes[i];
             const float a = m_ventProximity[i - 3] ? (0.55f + 0.40f * pulse) : 0.15f;
