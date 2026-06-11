@@ -84,6 +84,7 @@ void Drone::Init(Math::Vec2 startPos, const char* texturePath, DroneType type)
     m_searchRotation = 0.0f;
     m_searchDir = 1;
     m_debugExitTimer = 0.0f;
+    m_isReturningToSpawn = false;
 
     if (m_moveSound.Load("Asset/drone_3.mp3", true))
     {
@@ -841,14 +842,25 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
             if (m_spawnPos.x >= 50000.0f)
             {
                 float distToTarget = (m_spawnPos - m_position).Length();
-                if (distToTarget > 20.0f)
+                if (!m_isReturningToSpawn && distToTarget > 220.0f)
                 {
-                    Math::Vec2 dir = (m_spawnPos - m_position).GetNormalized();
-                    m_velocity = dir * 450.0f;
-                    m_position += m_velocity * fdt;
-                    m_baseY = m_position.y;
-                    m_direction.x = (dir.x > 0.0f) ? 1.0f : -1.0f;
-                    return;
+                    m_isReturningToSpawn = true;
+                }
+                if (m_isReturningToSpawn)
+                {
+                    if (distToTarget < 30.0f)
+                    {
+                        m_isReturningToSpawn = false;
+                    }
+                    else
+                    {
+                        Math::Vec2 dir = (m_spawnPos - m_position).GetNormalized();
+                        m_velocity = dir * 450.0f;
+                        m_position += m_velocity * fdt;
+                        m_baseY = m_position.y;
+                        m_direction.x = (dir.x > 0.0f) ? 1.0f : -1.0f;
+                        return;
+                    }
                 }
             }
 
@@ -1102,6 +1114,7 @@ void Drone::Reset()
     m_moveTimer     = 0.0f;
     m_bobTimer      = 0.0f;
     m_debugMode     = false;
+    m_isReturningToSpawn = false;
     m_debugExitTimer = 0.0f;
 
     m_jamFleeTimer              = 0.f;

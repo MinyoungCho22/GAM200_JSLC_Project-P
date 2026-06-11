@@ -98,6 +98,7 @@ public:
     bool IsDeviceHovered(int idx, Math::Vec2 playerHbCenter, Math::Vec2 playerHbSize, Math::Vec2 mouseWorld) const;
     void UpdateDeviceInject(int idx, float dt, Player& player, bool godMode);
     bool IsBossHovered(Math::Vec2 mouseWorld) const;
+    bool IsExitGateHovered(Math::Vec2 mouseWorld) const;
     float ConsumeCameraShakeRequest();
 
 private:
@@ -196,4 +197,5 @@ private:
     std::vector<BombExplosion> m_bombExplosions;
     float m_bossBattleTime = 0.0f;
     float m_bombThrowTimer = 0.0f;
+    bool m_bossDefeatedCleanupDone = false;
 };

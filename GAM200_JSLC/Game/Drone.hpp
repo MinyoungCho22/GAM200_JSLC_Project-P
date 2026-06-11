@@ -217,6 +217,7 @@ private:
 
     bool m_debugMode = false; // When true, AI is disabled for manual positioning
     float m_debugExitTimer = 0.0f; // Timer to delay AI restart after exiting debug mode
+    bool m_isReturningToSpawn = false;
 
     // Train 사이렌 맵 전용: 히딩/펄스박스 미포착 시 흔들림 → 랜덤 방향 이탈
     float      m_jamFleeTimer              = 0.f;

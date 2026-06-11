@@ -469,6 +469,180 @@ void GameplayState::Update(double dt)
         return;
     }
 
+    // Check if player clicked the exit gate after boss defeat to trigger the ending cutscene
+    if (m_finalAccessed && m_final && m_final->GetBossState() == BossState::Defeated && m_final3State == Final3State::None)
+    {
+        if (ctl.IsActionTriggered(ControlAction::Attack, input))
+        {
+            double mouseScreenX, mouseScreenY;
+            input.GetMousePosition(mouseScreenX, mouseScreenY);
+            Math::Vec2 mouseWorldPos = ScreenToWorldCoordinates(mouseScreenX, mouseScreenY);
+            if (m_final->IsExitGateHovered(mouseWorldPos))
+            {
+                m_isInFinal3Cutscene = true;
+                m_final3State = Final3State::FadingOutToFinal3;
+                m_final3Timer = 0.0f;
+                m_creditsScrollY = 0.0f;
+                m_fadeAlpha = 0.0f;
+
+                // Load Final_3 background
+                m_final3Bg = std::make_unique<Background>();
+                m_final3Bg->Initialize("Asset/Final_3.png");
+
+                // Initialize Credits Lines
+                const struct { const char* text; float size; } creditDefs[] = {
+                    { "CREDITS",                        80.0f },
+                    { "",                                0.0f },
+                    { "Tech Lead",                      45.0f },
+                    { "Minyoung Cho",                   38.0f },
+                    { "",                                0.0f },
+                    { "QA & Art Lead",                  45.0f },
+                    { "Jisu Son",                        38.0f },
+                    { "",                                0.0f },
+                    { "Design Lead & Level Design Lead", 45.0f },
+                    { "Seoyoung Jung",                   38.0f },
+                    { "",                                0.0f },
+                    { "Producer",                        45.0f },
+                    { "Ryungjae Lee",                    38.0f },
+                    { "",                                0.0f },
+                    { "Special Thanks",                  45.0f },
+                    { "DigiPen Institute of Technology", 36.0f },
+                    { "",                                0.0f },
+                    { "",                                0.0f },
+                    { "Thank you for playing our game!", 48.0f }
+                };
+
+                m_final3CreditsLines.clear();
+                for (auto& d : creditDefs)
+                {
+                    if (d.size == 0.0f)
+                    {
+                        m_final3CreditsLines.push_back({ {0, 0, 0}, 0.0f });
+                    }
+                    else
+                    {
+                        CachedTextureInfo t = m_font->PrintToTexture(*m_fontShader, d.text);
+                        m_final3CreditsLines.push_back({ t, d.size });
+                    }
+                }
+            }
+        }
+    }
+
+    if (m_isInFinal3Cutscene)
+    {
+        const float fdt = static_cast<float>(dt);
+        m_final3Timer += fdt;
+
+        // Force camera position and bounds to show the very left-most screen of Final_3
+        m_camera.SetBounds({ Final::MIN_X, Final::MIN_Y }, { Final::MIN_X + GAME_WIDTH, Final::MIN_Y + GAME_HEIGHT });
+        m_camera.SetPosition({ Final::MIN_X + GAME_WIDTH * 0.5f, Final::MIN_Y + GAME_HEIGHT * 0.5f });
+
+        // Force player to be in God Mode and not Invincible (so they don't blink/disappear)
+        player.SetGodMode(true);
+        player.SetInvincible(false);
+        player.SetInvincibilityTimer(0.0f);
+
+        if (m_final3State == Final3State::FadingOutToFinal3)
+        {
+            m_fadeAlpha = std::min(1.0f, m_final3Timer / 2.5f);
+            if (m_final3Timer >= 2.5f)
+            {
+                // Teleport player to the left door of Final_3
+                m_final3State = Final3State::FadingInToFinal3;
+                m_final3Timer = 0.0f;
+                m_fadeAlpha = 1.0f;
+                
+                // Position player at left door (e.g. MIN_X + 150.0f)
+                Math::Vec2 targetPos = { Final::MIN_X + 150.0f, Final::MIN_Y + 258.0f + player.GetHitboxSize().y * 0.5f };
+                player.SetPosition(targetPos);
+                player.ResetVelocity();
+                player.SetOnGround(true);
+                player.SetFlipped(false);
+            }
+        }
+        else if (m_final3State == Final3State::FadingInToFinal3)
+        {
+            m_fadeAlpha = std::max(0.0f, 1.0f - (m_final3Timer / 2.5f));
+            if (m_final3Timer >= 2.5f)
+            {
+                m_final3State = Final3State::Walking;
+                m_final3Timer = 0.0f;
+                m_fadeAlpha = 0.0f;
+            }
+            player.UpdateNPC(fdt, AnimationState::Idle);
+        }
+        else if (m_final3State == Final3State::Walking)
+        {
+            // First stand still for 1.5 seconds, then walk to the right
+            if (m_final3Timer < 1.5f)
+            {
+                player.UpdateNPC(fdt, AnimationState::Idle);
+            }
+            else
+            {
+                player.UpdateNPC(fdt, AnimationState::Walking);
+                Math::Vec2 pos = player.GetPosition();
+                pos.x += 120.0f * fdt; // Walk slowly to the right
+                player.SetPosition(pos);
+            }
+            player.SetFlipped(false);
+
+            // If player is halfway across the screen (X >= MIN_X + GAME_WIDTH * 0.5f), start credits scroll Y
+            if (player.GetPosition().x >= Final::MIN_X + GAME_WIDTH * 0.5f)
+            {
+                m_final3State = Final3State::Credits;
+                m_final3Timer = 0.0f;
+                m_creditsScrollY = 0.0f;
+            }
+        }
+        else if (m_final3State == Final3State::Credits)
+        {
+            player.UpdateNPC(fdt, AnimationState::Walking);
+            Math::Vec2 pos = player.GetPosition();
+            pos.x += 120.0f * fdt;
+            player.SetPosition(pos);
+            player.SetFlipped(false);
+
+            // Scroll credits
+            m_creditsScrollY += 60.0f * fdt; // Scroll at 60px/sec
+
+            // Calculate total height of credits
+            float totalHeight = 0.0f;
+            constexpr float LINE_GAP = 16.0f;
+            constexpr float EMPTY_GAP = 32.0f;
+            for (auto& ln : m_final3CreditsLines)
+            {
+                if (ln.size == 0.0f) totalHeight += EMPTY_GAP;
+                else totalHeight += ln.size + LINE_GAP;
+            }
+
+            // Once the credits are fully off screen:
+            if (m_creditsScrollY - totalHeight > 1080.0f)
+            {
+                m_final3State = Final3State::Exit;
+                m_final3Timer = 0.0f;
+            }
+        }
+        else if (m_final3State == Final3State::Exit)
+        {
+            // Fade out to black very slowly
+            m_fadeAlpha = std::min(1.0f, m_final3Timer / 2.5f);
+            if (m_final3Timer >= 2.5f)
+            {
+                gsm.ChangeState(std::make_unique<MainMenu>(gsm));
+            }
+        }
+
+        // Keep postprocess and postprocess exposure at correct values
+        auto& pp = gsm.GetEngine().GetPostProcess();
+        pp.Settings().exposure = 1.0f - m_fadeAlpha;
+        pp.Settings().useLightOverlay = false;
+
+        SoundSystem::Instance().Update();
+        return;
+    }
+
     // Train zoom-out + player shrink transition (runs every frame, including during fade)
     if (m_trainZoomTransition)
     {
@@ -2994,6 +3168,93 @@ void GameplayState::DrawMainLayer()
         return;
     }
 
+    if (m_isInFinal3Cutscene)
+    {
+        GL::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        GL::Clear(GL_COLOR_BUFFER_BIT);
+
+        GL::Enable(GL_BLEND);
+        GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        Engine& engine = gsm.GetEngine();
+        Shader& textureShader = engine.GetTextureShader();
+
+        const float effectiveWidth  = GAME_WIDTH  / m_cameraZoom;
+        const float effectiveHeight = GAME_HEIGHT / m_cameraZoom;
+        const float viewHalfW = effectiveWidth * 0.5f;
+        
+        Math::Vec2 camPos   = m_camera.GetPosition();
+        float      offsetX  = std::round(effectiveWidth * 0.5f - camPos.x);
+        float      offsetY  = std::round(effectiveHeight * 0.5f - camPos.y);
+        Math::Matrix zoomedOrtho = Math::Matrix::CreateOrtho(0.0f, effectiveWidth, 0.0f, effectiveHeight, -1.0f, 1.0f);
+        Math::Matrix zoomedView = Math::Matrix::CreateTranslation({ offsetX, offsetY });
+        Math::Matrix worldProjection = zoomedOrtho * zoomedView;
+
+        textureShader.use();
+        textureShader.setMat4("projection", worldProjection);
+        textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        textureShader.setBool("flipX", false);
+        textureShader.setFloat("alpha", 1.0f);
+
+        float w = m_final3Bg->GetWidth() > 0 ? static_cast<float>(m_final3Bg->GetWidth()) : 1920.0f;
+        float h = m_final3Bg->GetHeight() > 0 ? static_cast<float>(m_final3Bg->GetHeight()) : 1080.0f;
+
+        Math::Matrix model = Math::Matrix::CreateTranslation({ Final::MIN_X + w * 0.5f, Final::MIN_Y + h * 0.5f })
+                           * Math::Matrix::CreateScale({ w, h });
+        m_final3Bg->Draw(textureShader, model);
+
+        // Draw Player
+        if (player.GetPosition().x < Final::MIN_X + GAME_WIDTH + 100.0f)
+        {
+            player.Draw(textureShader);
+        }
+
+        // Draw Scrolling Credits
+        if (m_final3State == Final3State::Credits || m_final3State == Final3State::Exit || m_final3State == Final3State::Walking)
+        {
+            if (player.GetPosition().x >= Final::MIN_X + GAME_WIDTH * 0.5f || m_creditsScrollY > 0.0f)
+            {
+                m_fontShader->use();
+                m_fontShader->setMat4("projection", worldProjection);
+
+                constexpr float LINE_GAP = 16.0f;
+                constexpr float EMPTY_GAP = 32.0f;
+
+                float curY = Final::MIN_Y + m_creditsScrollY;
+                for (auto& ln : m_final3CreditsLines)
+                {
+                    if (ln.size == 0.0f)
+                    {
+                        curY -= EMPTY_GAP;
+                        continue;
+                    }
+
+                    float scale = (m_font->m_fontHeight > 0)
+                        ? ln.size / static_cast<float>(m_font->m_fontHeight)
+                        : 1.0f;
+                    float dispW = static_cast<float>(ln.tex.width) * scale;
+                    float dispH = ln.size;
+
+                    Math::Vec2 pos = {
+                        Final::MIN_X + (GAME_WIDTH - dispW) * 0.5f,
+                        curY - dispH
+                    };
+
+                    if (pos.y > Final::MIN_Y - dispH && pos.y < Final::MIN_Y + GAME_HEIGHT)
+                    {
+                        m_fontShader->setFloat("alpha", 1.0f);
+                        m_font->DrawBakedText(*m_fontShader, ln.tex, pos, ln.size);
+                    }
+
+                    curY -= dispH + LINE_GAP;
+                }
+            }
+        }
+
+        GL::Disable(GL_BLEND);
+        return;
+    }
+
     Engine& engine = gsm.GetEngine();
 
     float r, g, b;
@@ -4463,6 +4724,12 @@ void GameplayState::Shutdown()
     RoomTvPng::ReleaseAll();
 
     if (m_storyDialogue) m_storyDialogue->Shutdown();
+    if (m_final3Bg)
+    {
+        m_final3Bg->Shutdown();
+        m_final3Bg.reset();
+    }
+    m_final3CreditsLines.clear();
 
     if (m_fadeVAO != 0)
     {

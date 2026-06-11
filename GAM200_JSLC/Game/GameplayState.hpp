@@ -213,4 +213,14 @@ private:
     float  m_tvFlickerTimer = 0.0f;   
     bool   m_tvTextVisible = true;   
     CachedTextureInfo m_tvLineTex{};
+
+    // Ending Cutscene & Credits Roll (Final_3)
+    bool m_isInFinal3Cutscene = false;
+    enum class Final3State { None, FadingOutToFinal3, FadingInToFinal3, Walking, Credits, Exit };
+    Final3State m_final3State = Final3State::None;
+    float m_final3Timer = 0.0f;
+    float m_creditsScrollY = 0.0f;
+    std::unique_ptr<Background> m_final3Bg;
+    struct CreditLine { CachedTextureInfo tex; float size; };
+    std::vector<CreditLine> m_final3CreditsLines;
 };

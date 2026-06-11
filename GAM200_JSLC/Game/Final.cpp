@@ -130,6 +130,7 @@ void Final::Initialize()
     m_slamGestureTimer = 0.0f;
     m_bossFlipped = false;
     m_bossProjectiles.clear();
+    m_bossDefeatedCleanupDone = false;
 
     m_pulseLock.active = false;
     m_pulseLockCooldownTimer = 0.0f;
@@ -211,6 +212,7 @@ void Final::Reset()
     m_bossFlipped = false;
     m_bossProjectiles.clear();
     m_sweeps.clear();
+    m_bossDefeatedCleanupDone = false;
 
     // Reset Boss NPC properties
     m_boss.Init({ Final::MIN_X + 3960.0f + 1436.0f, 0.0f });
@@ -364,7 +366,7 @@ void Final::DrawParallaxLayer(Shader& shader, Background& bg, Math::Vec2 cameraP
 void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, DroneManager& droneManager)
 {
     float fdt = static_cast<float>(dt);
-    if (m_pulseSources.size() > 3)
+    if (m_bossState != BossState::Defeated && m_pulseSources.size() > 3)
     {
         m_pulseSources[3].RefillStock(); // Force refill extra vent so it never depletes
     }
@@ -422,27 +424,34 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
     }
 
     // Floor Pulse Sweep update
-    m_sweepSpawnTimer += fdt;
-    if (m_sweepSpawnTimer >= 3.5f)
+    if (m_bossState != BossState::Defeated)
     {
-        FloorSweep sweep;
-        sweep.width = 240.0f;
-        sweep.damagedPlayer = false;
-        if (m_spawnDirectionAlternate)
+        m_sweepSpawnTimer += fdt;
+        if (m_sweepSpawnTimer >= 3.5f)
         {
-            // Move from right to left
-            sweep.x = MIN_X + 7920.0f;
-            sweep.speed = -450.0f;
+            FloorSweep sweep;
+            sweep.width = 240.0f;
+            sweep.damagedPlayer = false;
+            if (m_spawnDirectionAlternate)
+            {
+                // Move from right to left
+                sweep.x = MIN_X + 7920.0f;
+                sweep.speed = -450.0f;
+            }
+            else
+            {
+                // Move from left to right
+                sweep.x = MIN_X + 1000.0f;
+                sweep.speed = 450.0f;
+            }
+            m_sweeps.push_back(sweep);
+            m_spawnDirectionAlternate = !m_spawnDirectionAlternate;
+            m_sweepSpawnTimer = 0.0f;
         }
-        else
-        {
-            // Move from left to right
-            sweep.x = MIN_X + 1000.0f;
-            sweep.speed = 450.0f;
-        }
-        m_sweeps.push_back(sweep);
-        m_spawnDirectionAlternate = !m_spawnDirectionAlternate;
-        m_sweepSpawnTimer = 0.0f;
+    }
+    else
+    {
+        m_sweeps.clear();
     }
 
     float playerX = player.GetPosition().x;
@@ -459,7 +468,7 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
             float sweepRight = it->x + it->width * 0.5f;
             if (playerX + halfW >= sweepLeft && playerX - halfW <= sweepRight)
             {
-                player.TakeDamage(15.0f); // Deal 15.0f pulse damage to player
+                player.TakeDamage(7.5f); // Deal 7.5f pulse damage to player (reduced to half)
 
                 // Knockback player: push in the direction of the sweep's speed, pop slightly upwards
                 float knockbackDir = (it->speed > 0.0f) ? 1.0f : -1.0f;
@@ -489,31 +498,40 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
     }
 
     // Vent state cycling update
-    m_ventTimer += fdt;
-    if (m_ventTimer >= VENT_CYCLE_DURATION)
+    if (m_bossState != BossState::Defeated)
     {
-        m_ventTimer = 0.0f;
-        if (m_nextVentIndex != -1)
+        m_ventTimer += fdt;
+        if (m_ventTimer >= VENT_CYCLE_DURATION)
         {
-            m_activeVentIndex = m_nextVentIndex;
-            m_nextVentIndex = -1;
+            m_ventTimer = 0.0f;
+            if (m_nextVentIndex != -1)
+            {
+                m_activeVentIndex = m_nextVentIndex;
+                m_nextVentIndex = -1;
+            }
+            else
+            {
+                m_activeVentIndex = rand() % 3;
+            }
+            m_pulseSources[m_activeVentIndex].RefillStock();
         }
-        else
+        else if (m_ventTimer >= VENT_ACTIVE_DURATION)
         {
-            m_activeVentIndex = rand() % 3;
-        }
-        m_pulseSources[m_activeVentIndex].RefillStock();
-    }
-    else if (m_ventTimer >= VENT_ACTIVE_DURATION)
-    {
-        if (m_activeVentIndex != -1 && m_activeVentIndex < 3)
-            m_pulseSources[m_activeVentIndex].SetPulseAmount(0.0f);
-        m_activeVentIndex = -1;
+            if (m_activeVentIndex != -1 && m_activeVentIndex < 3)
+                m_pulseSources[m_activeVentIndex].SetPulseAmount(0.0f);
+            m_activeVentIndex = -1;
 
-        if (m_nextVentIndex == -1)
-        {
-            m_nextVentIndex = rand() % 3;
+            if (m_nextVentIndex == -1)
+            {
+                m_nextVentIndex = rand() % 3;
+            }
         }
+    }
+    else
+    {
+        m_activeVentIndex = -1;
+        m_nextVentIndex = -1;
+        m_ventTimer = 0.0f;
     }
 
     // ----------------------------------------------------
@@ -573,6 +591,26 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
         bossVel = { 0.0f, 0.0f };
         m_boss.UpdateNPC(0.0f, AnimationState::Crouching);
         m_boss.SetAnimationFrame(AnimationState::Crouching, 1);
+
+        if (!m_bossDefeatedCleanupDone)
+        {
+            droneManager.ClearAllDrones();
+            m_bossProjectiles.clear();
+            m_sweeps.clear();
+            m_activeVentIndex = -1;
+            m_nextVentIndex = -1;
+            for (auto& src : m_pulseSources)
+            {
+                src.SetPulseAmount(0.0f);
+            }
+            for (auto& dev : m_overloadDevices)
+            {
+                dev.charge = 0.0f;
+                dev.isOverloaded = false;
+                dev.pulseAttackActive = false;
+            }
+            m_bossDefeatedCleanupDone = true;
+        }
     }
     else // Normal state AI
     {
@@ -1675,7 +1713,7 @@ void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cam
     }
 
     // Draw permanent 4th vent before the boss (index 6 in hitboxes)
-    if (m_hitboxes.size() > 6)
+    if (m_hitboxes.size() > 6 && m_bossState != BossState::Defeated)
     {
         const auto& hb = m_hitboxes[6];
         drawVent(hb, 1.0f);
@@ -1971,6 +2009,16 @@ bool Final::IsBossHovered(Math::Vec2 mouseWorld) const
 
     return Collision::CheckPointInAABB(mouseWorld, bossPos, bossSize) ||
            Collision::CheckAABB(mouseWorld, cursorHitbox, bossPos, bossSize);
+}
+
+bool Final::IsExitGateHovered(Math::Vec2 mouseWorld) const
+{
+    if (m_bossState != BossState::Defeated)
+        return false;
+
+    const Math::Vec2 cursorHitbox = { 32.0f, 32.0f };
+    return Collision::CheckPointInAABB(mouseWorld, m_exitGatePos, m_exitGateSize) ||
+           Collision::CheckAABB(mouseWorld, cursorHitbox, m_exitGatePos, m_exitGateSize);
 }
 
 float Final::ConsumeCameraShakeRequest()

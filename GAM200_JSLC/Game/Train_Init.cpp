@@ -185,6 +185,8 @@ void Train::Initialize()
     m_tunnelInsideBoardTimer           = -1.f;
     m_playerOnTunnelBoardingFloor        = false;
     m_playerOnTunnelDepartWalkFloor      = false;
+    m_car3InsideDronesSpawned            = false;
+    m_car3InsideDroneInside2Activated    = false;
 
     // Train departure / running sounds.
     // User requested "TrainStart.mpe" and "TrainSound.mp3". Keep .mpe first, then fallback to .mp3.

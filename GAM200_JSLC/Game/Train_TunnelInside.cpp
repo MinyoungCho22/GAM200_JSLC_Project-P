@@ -581,6 +581,8 @@ void Train::CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize)
     player.GetPulseCore().getPulse().set(player.GetPulseCore().getPulse().Max());
     if (m_sirenDroneManager)
         m_sirenDroneManager->ClearAllDrones();
+    m_car3InsideDronesSpawned = false;
+    m_car3InsideDroneInside2Activated = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -605,6 +607,8 @@ void Train::CheatWarpToCar5(Player& player, Math::Vec2 playerHitboxSize)
     m_tunnelInsideBoardTimer           = -1.f;
     m_playerOnTunnelBoardingFloor        = false;
     m_playerOnTunnelDepartWalkFloor      = false;
+    m_car3InsideDronesSpawned            = false;
+    m_car3InsideDroneInside2Activated    = false;
 
     // Snapping player to the leftmost edge of Car 5 (water tank car)
     const float car5Left = MIN_X + m_trainOffset + GetTrainCarLocalLeftEdge(5);
@@ -655,11 +659,37 @@ void Train::CheatWarpToSecondInside1(Player& player, Math::Vec2 playerHitboxSize
     m_tunnelInsideCameraSnapPending = true;
     
     if (m_sirenDroneManager)
+    {
         m_sirenDroneManager->ClearAllDrones();
+        m_car3InsideDronesSpawned = true;
+        const float tl = MIN_X + m_trainOffset;
+        const float ext1L = m_car1Width + m_car2Width + m_car3Width;
+        // Inside_1 정찰드론 2개 — 플레이어를 추적하지 않고 일정 거리를 왕복 정찰
+        const float in1MidX = tl + ext1L + m_car3ExtensionWidths[0] * 0.4f;
+        const float in1MidY = MIN_Y + 740.f - 120.f;
+        for (int k = 0; k < 2; ++k)
+        {
+            const Math::Vec2 sp = { in1MidX + k * 300.f, in1MidY };
+            Drone& d = m_sirenDroneManager->SpawnDrone(sp, kTrainDroneTexturePath, DroneType::General);
+            ScaleTrainCombatDrone(d);
+            d.SetBaseSpeed(55.f);   // 순찰 속도 — trainCarSegment 미설정으로 패트롤 AI 활성
+            d.SetSirenMapDrone(false);
+        }
+        // Inside_2 정찰드론 2개 — 처음부터 바로 순찰 시작
+        const float in2MidX = tl + ext1L + m_car3ExtensionWidths[0] * 1.5f;
+        const float in2MidY = MIN_Y + 740.f - 120.f;
+        for (int k = 0; k < 2; ++k)
+        {
+            const Math::Vec2 sp = { in2MidX + k * 300.f, in2MidY };
+            Drone& d = m_sirenDroneManager->SpawnDrone(sp, kTrainDroneTexturePath, DroneType::General);
+            ScaleTrainCombatDrone(d);
+            d.SetBaseSpeed(55.f);
+            d.SetSirenMapDrone(false);
+        }
+    }
         
     // Reset flags related to transitions
     m_car3InsideTransitionActive = false;
     m_car3TunnelInsideTransitionActive = false;
-    m_car3InsideDronesSpawned = false;
     m_car3InsideDroneInside2Activated = false;
 }
