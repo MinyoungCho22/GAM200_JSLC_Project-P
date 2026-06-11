@@ -12,6 +12,11 @@
 #include <unistd.h>
 #include <filesystem>
 #endif
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <limits.h>
+#include <filesystem>
+#endif
 
 #include "Engine/Engine.hpp"
 #include "Engine/Logger.hpp"
@@ -26,6 +31,14 @@ int main(void)
     if (n > 0)
     {
         exePath[n] = '\0';
+        std::error_code ec;
+        std::filesystem::current_path(std::filesystem::path(exePath).parent_path(), ec);
+    }
+#elif defined(__APPLE__)
+    char exePath[PATH_MAX];
+    uint32_t size = sizeof(exePath);
+    if (_NSGetExecutablePath(exePath, &size) == 0)
+    {
         std::error_code ec;
         std::filesystem::current_path(std::filesystem::path(exePath).parent_path(), ec);
     }

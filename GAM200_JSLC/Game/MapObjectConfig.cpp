@@ -15,6 +15,9 @@
 #elif defined(__linux__)
 #include <limits.h>
 #include <unistd.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <limits.h>
 #endif
 
 namespace
@@ -41,6 +44,16 @@ std::string ResolveMapObjectConfigPathString()
         if (n > 0)
         {
             exeBuf[n] = '\0';
+            const fs::path exeDir = fs::path(exeBuf).parent_path();
+            const fs::path configJson = exeDir / "Config" / "map_objects.json";
+            if (fs::exists(configJson))
+                return configJson.string();
+        }
+#elif defined(__APPLE__)
+        char exeBuf[PATH_MAX];
+        uint32_t size = sizeof(exeBuf);
+        if (_NSGetExecutablePath(exeBuf, &size) == 0)
+        {
             const fs::path exeDir = fs::path(exeBuf).parent_path();
             const fs::path configJson = exeDir / "Config" / "map_objects.json";
             if (fs::exists(configJson))

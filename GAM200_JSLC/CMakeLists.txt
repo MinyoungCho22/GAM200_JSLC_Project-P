@@ -103,10 +103,22 @@ else()
         target_compile_definitions(${PROJECT_NAME} PRIVATE GL_SILENCE_DEPRECATION)
         # Ensure C++ stdlib headers are found (SDK-based toolchain on macOS)
         set(OSX_SYSROOT "$ENV{SDKROOT}")
-        if(NOT OSX_SYSROOT)
-            set(OSX_SYSROOT "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")
+        if(NOT OSX_SYSROOT OR NOT EXISTS "${OSX_SYSROOT}")
+            # Try to query using xcrun on macOS
+            execute_process(
+                COMMAND xcrun --show-sdk-path
+                OUTPUT_VARIABLE OSX_SYSROOT_DETECTED
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            if(OSX_SYSROOT_DETECTED AND EXISTS "${OSX_SYSROOT_DETECTED}")
+                set(OSX_SYSROOT "${OSX_SYSROOT_DETECTED}")
+            else()
+                set(OSX_SYSROOT "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")
+            endif()
         endif()
-        target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${OSX_SYSROOT}/usr/include/c++/v1")
+        if(EXISTS "${OSX_SYSROOT}/usr/include/c++/v1")
+            target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${OSX_SYSROOT}/usr/include/c++/v1")
+        endif()
     endif()
 endif()
 
