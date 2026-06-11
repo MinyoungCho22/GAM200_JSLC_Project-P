@@ -34,19 +34,22 @@ void Final::Initialize()
 
     m_hitboxes.clear();
 
-    // Yellow / Tall blocks (348x662)
-    // Layout label: px = left edge, py = bottom edge (image Y-down). Convert to world center.
-    auto makeYellowHitbox = [&](float px, float pyBottom) {
-        float pw = 348.0f;
-        float ph = 662.0f;
-        float cx = MIN_X + w1 + px + pw * 0.5f;
-        float cy = MIN_Y + (HEIGHT - pyBottom + ph * 0.5f);
-        return Hitbox{ {cx, cy}, {pw, ph}, true };
+    // Yellow / Tall blocks — top-left based (image Y-down, relative to Final_2.png left edge).
+    // Convert image top-left (tlx, tly) + size to world center (Y-up).
+    auto makeYellowHitbox = [&](float tlx, float tly, float w, float h) {
+        float cx = MIN_X + w1 + tlx + w * 0.5f;
+        float cy = MIN_Y + HEIGHT - tly - h * 0.5f;
+        return Hitbox{ {cx, cy}, {w, h}, true };
     };
 
-    m_hitboxes.push_back(makeYellowHitbox(537.0f, 686.0f));
-    m_hitboxes.push_back(makeYellowHitbox(2325.0f, 686.0f));
-    m_hitboxes.push_back(makeYellowHitbox(3507.0f, 825.0f));
+    m_hitboxes.push_back(makeYellowHitbox(519.0f, 219.0f, 285.0f, 467.0f));  // overload device pillar (left)
+    m_hitboxes.push_back(makeYellowHitbox(2307.0f, 219.0f, 285.0f, 467.0f)); // overload device pillar (mid)
+    m_hitboxes.push_back(makeYellowHitbox(3507.0f, 165.0f, 384.0f, 668.0f)); // exit gate (right)
+
+    // Persist exit gate visual rect — hitbox[2].size is zeroed when the boss is defeated,
+    // but the sprite/effect must still render at this location.
+    m_exitGatePos  = m_hitboxes[2].pos;
+    m_exitGateSize = m_hitboxes[2].size;
 
     // Orange / Low slabs (252x203) — same layout convention as yellow blocks
     auto makeOrangeHitbox = [&](float px, float pyBottom) {
@@ -130,8 +133,14 @@ void Final::Initialize()
     m_overloadDeviceSprite = std::make_unique<Background>();
     m_overloadDeviceSprite->Initialize("Asset/Train/PulseBox.png");
 
+    // Overload device pillar overlay + exit gate frame
+    m_overlapSprite = std::make_unique<Background>();
+    m_overlapSprite->Initialize("Asset/Overlap.png");
+    m_borderInsideSprite = std::make_unique<Background>();
+    m_borderInsideSprite->Initialize("Asset/BorderInside.png");
+
     m_pulseMarkSprite = std::make_unique<Background>();
-    m_pulseMarkSprite->Initialize("Asset/Train/PulseMark.png");
+    m_pulseMarkSprite->Initialize("Asset/Pulse_Mark.png");
 
     m_bossDroneProjectileSprite = std::make_unique<Background>();
     m_bossDroneProjectileSprite->Initialize("Asset/RedDrone.png");
@@ -149,8 +158,26 @@ void Final::Initialize()
     m_pulseCornerSW = std::make_unique<Background>();
     m_pulseCornerSW->Initialize("Asset/pulse/pulse_corner_sw.png");
 
+    m_realVentSprite = std::make_unique<Background>();
+    m_realVentSprite->Initialize("Asset/RealVent.png");
+
+    m_bossSummonCircleSprite = std::make_unique<Background>();
+    m_bossSummonCircleSprite->Initialize("Asset/purple_gradient_circle.png");
+
     m_cameraShakeRequest = 0.0f;
     m_nextVentIndex = -1;
+    m_firstVentActivated = false;
+    m_bossEncountered = false;
+    m_droneDelayTimer = 0.0f;
+    m_bossDroneSummonEffectTimer = 0.0f;
+    m_bossBattleTime = 0.0f;
+    m_bombThrowTimer = 0.0f;
+    m_recoilBombs.clear();
+    m_bombExplosions.clear();
+    for (int i = 0; i < 3; ++i)
+    {
+        m_ventProximity[i] = false;
+    }
 }
 
 void Final::Reset()
@@ -191,13 +218,8 @@ void Final::Reset()
     // Restore hitboxes (re-enable exit gate hitbox at index 2 if it was cleared)
     if (m_hitboxes.size() > 2)
     {
-        float w1 = m_final1->GetWidth() > 0 ? static_cast<float>(m_final1->GetWidth()) : 3960.0f;
-        float pw = 348.0f;
-        float ph = 662.0f;
-        float cx = MIN_X + w1 + 3507.0f + pw * 0.5f;
-        float cy = MIN_Y + (HEIGHT - 825.0f + ph * 0.5f);
-        m_hitboxes[2].size = { pw, ph };
-        m_hitboxes[2].pos = { cx, cy };
+        m_hitboxes[2].pos = m_exitGatePos;
+        m_hitboxes[2].size = m_exitGateSize;
     }
 
     // Reset vent variables
@@ -209,10 +231,22 @@ void Final::Reset()
     m_pulseSources[m_activeVentIndex].RefillStock();
     m_nextVentIndex = -1;
     m_ventTimer = 0.0f;
+    m_firstVentActivated = false;
 
     m_pulseLock.active = false;
     m_pulseLockCooldownTimer = 0.0f;
     m_weakenedTimer = 0.0f;
+    m_bossEncountered = false;
+    m_droneDelayTimer = 0.0f;
+    m_bossDroneSummonEffectTimer = 0.0f;
+    m_bossBattleTime = 0.0f;
+    m_bombThrowTimer = 0.0f;
+    m_recoilBombs.clear();
+    m_bombExplosions.clear();
+    for (int i = 0; i < 3; ++i)
+    {
+        m_ventProximity[i] = false;
+    }
 }
 
 void Final::InitSkyVAO()
@@ -320,6 +354,44 @@ void Final::DrawParallaxLayer(Shader& shader, Background& bg, Math::Vec2 cameraP
 void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, DroneManager& droneManager)
 {
     float fdt = static_cast<float>(dt);
+
+    if (m_bossDroneSummonEffectTimer > 0.0f)
+    {
+        m_bossDroneSummonEffectTimer -= fdt;
+    }
+
+    if (!m_bossEncountered)
+    {
+        if (player.GetPosition().x >= MIN_X + 3700.0f)
+        {
+            m_bossEncountered = true;
+            m_droneDelayTimer = 5.0f;
+            m_bombThrowTimer = 5.0f;
+        }
+    }
+    else
+    {
+        if (m_droneDelayTimer > 0.0f)
+        {
+            m_droneDelayTimer -= fdt;
+        }
+    }
+
+    // If leftmost vent is not activated yet, check if player is close to it.
+    if (!m_firstVentActivated && m_hitboxes.size() > 3)
+    {
+        float leftmostVentX = m_hitboxes[3].pos.x;
+        if (player.GetPosition().x >= leftmostVentX - 600.0f)
+        {
+            m_activeVentIndex = 0;
+            m_pulseSources[0].RefillStock();
+            m_pulseSources[1].SetPulseAmount(0.0f);
+            m_pulseSources[2].SetPulseAmount(0.0f);
+            m_ventTimer = 0.0f;
+            m_nextVentIndex = -1;
+            m_firstVentActivated = true;
+        }
+    }
     Math::Vec2 pos = player.GetPosition();
     Math::Vec2 halfSize = playerHitboxSize * 0.5f;
     float minX = MIN_X + halfSize.x;
@@ -351,7 +423,7 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
         else
         {
             // Move from left to right
-            sweep.x = MIN_X + 3960.0f;
+            sweep.x = MIN_X + 1000.0f;
             sweep.speed = 450.0f;
         }
         m_sweeps.push_back(sweep);
@@ -374,6 +446,13 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
             if (playerX + halfW >= sweepLeft && playerX - halfW <= sweepRight)
             {
                 player.TakeDamage(15.0f); // Deal 15.0f pulse damage to player
+
+                // Knockback player: push in the direction of the sweep's speed, pop slightly upwards
+                float knockbackDir = (it->speed > 0.0f) ? 1.0f : -1.0f;
+                player.SetHorizontalSpeed(knockbackDir * 600.0f);
+                player.SetVelocity({ knockbackDir * 600.0f, 350.0f });
+                player.SetOnGround(false);
+
                 it->damagedPlayer = true;
             }
         }
@@ -382,7 +461,7 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
         bool outOfBounds = false;
         if (it->speed > 0.0f && it->x > MIN_X + 7920.0f + 200.0f)
             outOfBounds = true;
-        else if (it->speed < 0.0f && it->x < MIN_X + 3960.0f - 200.0f)
+        else if (it->speed < 0.0f && it->x < MIN_X + 1000.0f - 200.0f)
             outOfBounds = true;
 
         if (outOfBounds)
@@ -441,7 +520,12 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
     }
 
     // Boss State Machine
-    if (m_bossState == BossState::Weakened)
+    if (!m_bossEncountered)
+    {
+        bossVel.x = 0.0f;
+        m_boss.UpdateNPC(fdt, AnimationState::Idle);
+    }
+    else if (m_bossState == BossState::Weakened)
     {
         bossVel.x = 0.0f;
         m_boss.UpdateNPC(fdt, AnimationState::Crouching);
@@ -466,13 +550,15 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
             {
                 m_hitboxes[2].size = { 0.0f, 0.0f };
             }
+            // Clear all drones — they no longer guard devices after boss is defeated
+            droneManager.ClearAllDrones();
         }
     }
     else if (m_bossState == BossState::Defeated)
     {
         bossVel = { 0.0f, 0.0f };
-        bossPos.y -= 300.0f * fdt; // fall off screen
-        m_boss.UpdateNPC(fdt, AnimationState::Idle);
+        m_boss.UpdateNPC(0.0f, AnimationState::Crouching);
+        m_boss.SetAnimationFrame(AnimationState::Crouching, 1);
     }
     else // Normal state AI
     {
@@ -579,6 +665,7 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
                 m_bossSweepTimer = 0.0f;
             }
 
+            /*
             // Projectile Shoot trigger
             m_bossAttackTimer += fdt;
             if (m_bossAttackTimer >= 2.2f)
@@ -592,10 +679,11 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
                 proj.active = true;
                 m_bossProjectiles.push_back(proj);
             }
+            */
 
             // Drone Summon trigger (aggressive summoning)
             m_bossDroneSummonTimer += fdt;
-            if (m_bossDroneSummonTimer >= 6.0f)
+            if (m_bossDroneSummonTimer >= 6.0f && m_droneDelayTimer <= 0.0f)
             {
                 int activeDrones = 0;
                 for (const auto& d : droneManager.GetDrones())
@@ -605,33 +693,53 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
                         activeDrones++;
                     }
                 }
-                if (activeDrones < 3)
+                
+                int dronesToSummon = rand() % 2 + 2; // 2 or 3 drones
+                bool summonedAny = false;
+                
+                for (int i = 0; i < dronesToSummon; ++i)
                 {
+                    if (activeDrones >= 5) break;
+
                     m_bossDroneSummonTimer = 0.0f;
+                    summonedAny = true;
+                    
                     float summonX = player.GetPosition().x;
                     float summonY = (Final::MIN_Y + 258.0f) + 150.0f; // Lower flight height (150px above deck)
+
+                    Math::Vec2 bossPos = m_boss.GetPosition();
+                    bossPos.y += 80.0f; // spawn slightly above head level
 
                     int choice = rand() % 4;
                     if (choice == 0) // Guard Device 0
                     {
                         summonX = m_overloadDevices[0].pos.x + (rand() % 200 - 100);
-                        droneManager.SpawnDrone({ summonX, summonY }, "Asset/Drone.png", DroneType::General);
+                        Drone& d = droneManager.SpawnDrone(bossPos, "Asset/Drone.png", DroneType::General);
+                        d.SetFinalTarget({ summonX, summonY });
                     }
                     else if (choice == 1) // Guard Device 1
                     {
                         summonX = m_overloadDevices[1].pos.x + (rand() % 200 - 100);
-                        droneManager.SpawnDrone({ summonX, summonY }, "Asset/Drone.png", DroneType::General);
+                        Drone& d = droneManager.SpawnDrone(bossPos, "Asset/Drone.png", DroneType::General);
+                        d.SetFinalTarget({ summonX, summonY });
                     }
                     else if (choice == 2 && m_activeVentIndex != -1) // Guard Active Vent
                     {
                         summonX = m_hitboxes[3 + m_activeVentIndex].pos.x + (rand() % 100 - 50);
-                        droneManager.SpawnDrone({ summonX, summonY }, "Asset/Drone.png", DroneType::General);
+                        Drone& d = droneManager.SpawnDrone(bossPos, "Asset/Drone.png", DroneType::General);
+                        d.SetFinalTarget({ summonX, summonY });
                     }
                     else // Chase player directly (Tracer)
                     {
-                        summonX = player.GetPosition().x + (rand() % 300 - 150);
-                        droneManager.SpawnDrone({ summonX, summonY }, "Asset/RedDrone.png", DroneType::Tracer);
+                        droneManager.SpawnDrone(bossPos, "Asset/RedDrone.png", DroneType::Tracer);
                     }
+                    
+                    activeDrones++;
+                }
+
+                if (summonedAny)
+                {
+                    m_bossDroneSummonEffectTimer = 1.5f;
                 }
             }
 
@@ -732,7 +840,13 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
             m_cameraShakeRequest = 18.0f; // Request screen shake with peak 18 pixels
 
             // Damage player if inside radius
-            float dist = (player.GetHitboxCenter() - m_pulseLock.targetPos).Length();
+            Math::Vec2 pHalfSize = playerHitboxSize * 0.5f;
+            Math::Vec2 pCenter = player.GetHitboxCenter();
+
+            float closestX = std::max(pCenter.x - pHalfSize.x, std::min(m_pulseLock.targetPos.x, pCenter.x + pHalfSize.x));
+            float closestY = std::max(pCenter.y - pHalfSize.y, std::min(m_pulseLock.targetPos.y, pCenter.y + pHalfSize.y));
+
+            float dist = (Math::Vec2(closestX, closestY) - m_pulseLock.targetPos).Length();
             if (dist <= m_pulseLock.explosionRadius)
             {
                 if (!player.IsDead() && !player.IsGodMode())
@@ -781,6 +895,165 @@ void Final::Update(double dt, Player& player, Math::Vec2 playerHitboxSize, Drone
             }
         }
     }
+
+    // Track player proximity to overload device pillars (drives the purple scanline highlight)
+    {
+        Math::Vec2 playerC = player.GetHitboxCenter();
+        for (int i = 0; i < 2 && i < static_cast<int>(m_hitboxes.size()); ++i)
+        {
+            const auto& hb = m_hitboxes[i];
+            float rangeX = hb.size.x * 0.5f + 220.0f;
+            float rangeY = hb.size.y * 0.5f + 260.0f;
+            m_deviceProximity[i] = std::abs(playerC.x - hb.pos.x) <= rangeX
+                                && std::abs(playerC.y - hb.pos.y) <= rangeY;
+        }
+
+        // Track player proximity to stationary vents (drives the purple scanline highlight for m_realVentSprite)
+        for (int i = 3; i < 6 && i < static_cast<int>(m_hitboxes.size()); ++i)
+        {
+            const auto& hb = m_hitboxes[i];
+            float rangeX = hb.size.x * 0.5f + 180.0f;
+            float rangeY = hb.size.y * 0.5f + 180.0f;
+            m_ventProximity[i - 3] = std::abs(playerC.x - hb.pos.x) <= rangeX
+                                  && std::abs(playerC.y - hb.pos.y) <= rangeY;
+        }
+    }
+
+    // Update Boss Pulse Recoil Bomb throwing AI
+    if (m_bossEncountered && m_bossState == BossState::Normal)
+    {
+        m_bossBattleTime += fdt;
+        m_bombThrowTimer += fdt;
+
+        float throwCooldown = std::max(3.0f, 7.0f - (m_bossBattleTime * 0.04f));
+        if (m_bombThrowTimer >= throwCooldown)
+        {
+            m_bombThrowTimer = 0.0f;
+            int numBombs = std::min(4, 1 + static_cast<int>(m_bossBattleTime / 30.0f));
+
+            Math::Vec2 playerPos = player.GetPosition();
+            for (int i = 0; i < numBombs; ++i)
+            {
+                float offsetX = 0.0f;
+                if (numBombs == 2)
+                {
+                    offsetX = (i == 0) ? -100.0f : 100.0f;
+                }
+                else if (numBombs == 3)
+                {
+                    if (i == 0) offsetX = -160.0f;
+                    else if (i == 2) offsetX = 160.0f;
+                }
+                else if (numBombs == 4)
+                {
+                    if (i == 0) offsetX = -240.0f;
+                    else if (i == 1) offsetX = -80.0f;
+                    else if (i == 2) offsetX = 80.0f;
+                    else offsetX = 240.0f;
+                }
+
+                RecoilBomb bomb;
+                bomb.pos = m_boss.GetPosition();
+                bomb.pos.y += m_boss.GetHitboxSize().y * 0.2f; // throw from chest/head level
+                bomb.timer = 1.5f;
+                bomb.active = true;
+
+                float targetX = playerPos.x + offsetX;
+                float targetY = Final::MIN_Y + 258.0f; // ground level target
+
+                // calculate velocity
+                float t = 0.8f; // travel time
+                bomb.vel.x = (targetX - bomb.pos.x) / t;
+                float gravity = -1200.0f;
+                bomb.vel.y = (targetY - bomb.pos.y - 0.5f * gravity * t * t) / t;
+
+                m_recoilBombs.push_back(bomb);
+            }
+        }
+    }
+
+    // Update active recoil bombs
+    for (auto& bomb : m_recoilBombs)
+    {
+        if (!bomb.active) continue;
+
+        bomb.timer -= fdt;
+        bomb.vel.y += -1200.0f * fdt; // gravity
+        bomb.pos += bomb.vel * fdt;
+
+        float floorLevel = Final::MIN_Y + 258.0f;
+        if (bomb.pos.y <= floorLevel)
+        {
+            bomb.pos.y = floorLevel;
+            bomb.vel.y = -bomb.vel.y * 0.45f; // bounce vertical dampening
+            bomb.vel.x = 0.0f;                // Stop horizontal movement so it bounces in place at targetX
+            
+            if (std::abs(bomb.vel.y) < 60.0f)
+            {
+                bomb.vel.y = 0.0f;
+            }
+        }
+
+        if (bomb.timer <= 0.0f)
+        {
+            bomb.active = false;
+            
+            // Trigger explosion!
+            BombExplosion exp;
+            exp.pos = bomb.pos;
+            exp.timer = 0.25f;
+            exp.active = true;
+            exp.damagedPlayer = false;
+            m_bombExplosions.push_back(exp);
+
+            // Screen shake
+            m_cameraShakeRequest = std::max(m_cameraShakeRequest, 8.0f);
+        }
+    }
+
+    // Erase inactive bombs
+    m_recoilBombs.erase(std::remove_if(m_recoilBombs.begin(), m_recoilBombs.end(), [](const RecoilBomb& b) { return !b.active; }), m_recoilBombs.end());
+
+    // Update explosions
+    for (auto& exp : m_bombExplosions)
+    {
+        if (!exp.active) continue;
+        exp.timer -= fdt;
+
+        // Deal damage if player collides with the expanding blast ring during its active window
+        if (!exp.damagedPlayer && !player.IsDead() && !player.IsGodMode())
+        {
+            Math::Vec2 pHalfSize = playerHitboxSize * 0.5f;
+            Math::Vec2 pCenter = player.GetHitboxCenter();
+
+            float closestX = std::max(pCenter.x - pHalfSize.x, std::min(exp.pos.x, pCenter.x + pHalfSize.x));
+            float closestY = std::max(pCenter.y - pHalfSize.y, std::min(exp.pos.y, pCenter.y + pHalfSize.y));
+
+            float dist = (Math::Vec2(closestX, closestY) - exp.pos).Length();
+            float progress = 1.0f - (exp.timer / 0.25f);
+            float currentRadius = 175.0f * (0.4f + progress * 0.6f);
+            
+            if (dist <= currentRadius)
+            {
+                player.TakeDamage(18.0f);
+                player.GetPulseCore().getPulse().spend(15.0f);
+                
+                // Knockback player very strongly (further than floor sweeps)
+                float knockDir = (player.GetPosition().x > exp.pos.x) ? 1.0f : -1.0f;
+                player.SetHorizontalSpeed(knockDir * 950.0f);
+                player.SetVelocity({ knockDir * 950.0f, 450.0f });
+                player.SetOnGround(false);
+
+                exp.damagedPlayer = true;
+            }
+        }
+
+        if (exp.timer <= 0.0f)
+        {
+            exp.active = false;
+        }
+    }
+    m_bombExplosions.erase(std::remove_if(m_bombExplosions.begin(), m_bombExplosions.end(), [](const BombExplosion& e) { return !e.active; }), m_bombExplosions.end());
 }
 
 void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, float viewHalfW, const Math::Matrix& projection)
@@ -819,8 +1092,140 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
         m_final2->Draw(shader, model);
     }
 
+    // Draw Final map objects from sprites: overload device pillars (idx 0,1) + exit gate (idx 2)
+    {
+        shader.use();
+        shader.setMat4("projection", projection);
+        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setBool("flipX", false);
+        shader.setFloat("alpha", 1.0f);
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("tintStrength", 0.0f);
+
+        if (m_overlapSprite && m_overlapSprite->GetWidth() > 0)
+        {
+            for (int i = 0; i < 2 && i < static_cast<int>(m_hitboxes.size()); ++i)
+            {
+                const auto& hb = m_hitboxes[i];
+                Math::Matrix model = Math::Matrix::CreateTranslation(hb.pos) * Math::Matrix::CreateScale(hb.size);
+                m_overlapSprite->Draw(shader, model);
+            }
+        }
+        if (m_realVentSprite && m_realVentSprite->GetWidth() > 0)
+        {
+            for (int i = 3; i < 6 && i < static_cast<int>(m_hitboxes.size()); ++i)
+            {
+                const auto& hb = m_hitboxes[i];
+                Math::Matrix model = Math::Matrix::CreateTranslation(hb.pos) * Math::Matrix::CreateScale(hb.size);
+                m_realVentSprite->Draw(shader, model);
+            }
+        }
+        if (m_borderInsideSprite && m_borderInsideSprite->GetWidth() > 0)
+        {
+            Math::Matrix model = Math::Matrix::CreateTranslation(m_exitGatePos) * Math::Matrix::CreateScale(m_exitGateSize);
+            m_borderInsideSprite->Draw(shader, model);
+        }
+    }
+
+    // Draw boss drone summon effect circle behind head
+    if (m_bossDroneSummonEffectTimer > 0.0f && m_bossSummonCircleSprite && m_bossSummonCircleSprite->GetWidth() > 0)
+    {
+        shader.use();
+        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setBool("flipX", false);
+        
+        float alpha = std::min(1.0f, m_bossDroneSummonEffectTimer / 0.5f); // Fade out in last 0.5s
+        shader.setFloat("alpha", alpha * 0.85f);
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f); 
+        shader.setFloat("tintStrength", 0.0f);
+
+        Math::Vec2 headPos = m_boss.GetPosition();
+        headPos.y += m_boss.GetHitboxSize().y * 0.4f;
+
+        float angle = static_cast<float>(glfwGetTime()) * 2.0f * (180.0f / 3.14159265f);
+        float pulseScale = 1.0f + 0.10f * std::sin(static_cast<float>(glfwGetTime()) * 10.0f);
+        Math::Vec2 circleSize = { 150.0f * pulseScale, 150.0f * pulseScale };
+
+        Math::Matrix model = Math::Matrix::CreateTranslation(headPos)
+                           * Math::Matrix::CreateRotation(angle)
+                           * Math::Matrix::CreateScale(circleSize);
+        m_bossSummonCircleSprite->Draw(shader, model);
+
+        // Reset state
+        shader.setFloat("alpha", 1.0f);
+    }
+
     // Draw Boss
+    if (m_bossState == BossState::Defeated)
+    {
+        float t = static_cast<float>(glfwGetTime());
+        float pulse = std::sin(t * 4.0f) * 0.5f + 0.5f; // breathing 0~1
+
+        shader.use();
+        shader.setVec3("colorTint", 0.62f, 0.10f, 1.0f); // purple overload tint
+        shader.setFloat("tintStrength", 0.4f + pulse * 0.3f); // tint pulses between 0.4 and 0.7
+        shader.setFloat("alpha", 0.5f + pulse * 0.5f); // alpha pulses/blinks between 0.5 and 1.0
+    }
     m_boss.Draw(shader);
+
+    // Draw active recoil bombs
+    for (const auto& bomb : m_recoilBombs)
+    {
+        if (!bomb.active) continue;
+
+        shader.use();
+        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setBool("flipX", false);
+
+        // Blinking behavior: gets faster as time runs down
+        float blinkRate = (bomb.timer < 0.5f) ? 20.0f : ((bomb.timer < 1.0f) ? 12.0f : 6.0f);
+        float blink = std::sin(static_cast<float>(glfwGetTime()) * blinkRate) * 0.5f + 0.5f;
+
+        shader.setFloat("alpha", 0.4f + blink * 0.6f); // alpha oscillates between 0.4 and 1.0
+        shader.setVec3("colorTint", 1.0f, 0.2f, 0.2f); // warning red tint
+        shader.setFloat("tintStrength", 0.3f + blink * 0.5f);
+
+        // Bouncing scale pulsating slightly
+        float pulseScale = std::sin(bomb.timer * 10.0f) * 0.1f + 0.9f;
+        Math::Vec2 bombSize = { 48.0f * pulseScale, 48.0f * pulseScale };
+
+        float rotAngle = bomb.timer * 4.0f * (180.0f / 3.14159265f);
+
+        Math::Matrix model = Math::Matrix::CreateTranslation(bomb.pos)
+                           * Math::Matrix::CreateRotation(rotAngle)
+                           * Math::Matrix::CreateScale(bombSize);
+        m_pulseMarkSprite->Draw(shader, model);
+        
+        // reset state
+        shader.setFloat("tintStrength", 0.0f);
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("alpha", 1.0f);
+    }
+
+    // Draw active explosions
+    for (const auto& exp : m_bombExplosions)
+    {
+        if (!exp.active) continue;
+
+        shader.use();
+        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setBool("flipX", false);
+
+        float progress = 1.0f - (exp.timer / 0.25f);
+        shader.setFloat("alpha", (1.0f - progress) * 0.8f);
+        shader.setVec3("colorTint", 1.0f, 0.35f, 0.0f);
+        shader.setFloat("tintStrength", 1.0f);
+
+        float size = 175.0f * (0.4f + progress * 0.6f);
+        Math::Matrix model = Math::Matrix::CreateTranslation(exp.pos)
+                           * Math::Matrix::CreateScale({ size, size });
+        m_pulseMarkSprite->Draw(shader, model);
+
+        // reset state
+        shader.setFloat("tintStrength", 0.0f);
+        shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+        shader.setFloat("alpha", 1.0f);
+    }
 
     // 1. Draw Overload Devices
     for (int i = 0; i < 2; ++i)
@@ -938,9 +1343,9 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
             float tilt = std::sin(static_cast<float>(glfwGetTime()) * 15.0f) * 0.08f;
             
             float droneSize = 48.0f; // slightly larger than plain hitbox for visual appeal
-            Math::Matrix model = Math::Matrix::CreateScale({ droneSize, droneSize })
+            Math::Matrix model = Math::Matrix::CreateTranslation(proj.pos)
                                * Math::Matrix::CreateRotation(tilt * (180.0f / 3.14159265f))
-                               * Math::Matrix::CreateTranslation(proj.pos);
+                               * Math::Matrix::CreateScale({ droneSize, droneSize });
 
             m_bossDroneProjectileSprite->Draw(shader, model);
         }
@@ -949,7 +1354,7 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
     }
 
     // 4. Draw Target Pulse Mark in Weakened state
-    if (m_bossState == BossState::Weakened && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
+    if (false && m_bossState == BossState::Weakened && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
     {
         shader.use();
         shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
@@ -960,16 +1365,16 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
 
         Math::Vec2 targetMarkPos = m_boss.GetPosition() + Math::Vec2(0.0f, m_boss.GetHitboxSize().y * 0.5f + 40.0f);
         float angleDegrees = static_cast<float>(glfwGetTime()) * 3.5f * (180.0f / 3.14159265f);
-        Math::Matrix model = Math::Matrix::CreateScale({ 75.0f, 75.0f })
+        Math::Matrix model = Math::Matrix::CreateTranslation(targetMarkPos)
                            * Math::Matrix::CreateRotation(angleDegrees)
-                           * Math::Matrix::CreateTranslation(targetMarkPos);
+                           * Math::Matrix::CreateScale({ 75.0f, 75.0f });
         m_pulseMarkSprite->Draw(shader, model);
     }
 
     // 4.5. Draw Pulse Lock Warning or Explosion
     if (m_pulseLock.active)
     {
-        if (!m_pulseLock.triggeredExplosion && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
+        if (false && !m_pulseLock.triggeredExplosion && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
         {
             shader.use();
             shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
@@ -987,9 +1392,9 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
 
             float angleDegreesOuter = time * 2.0f * (180.0f / 3.14159265f);
             Math::Vec2 szOuter = { m_pulseLock.explosionRadius * 2.0f * pulseScale, m_pulseLock.explosionRadius * 2.0f * pulseScale };
-            Math::Matrix modelOuter = Math::Matrix::CreateScale(szOuter)
+            Math::Matrix modelOuter = Math::Matrix::CreateTranslation(m_pulseLock.targetPos)
                                     * Math::Matrix::CreateRotation(angleDegreesOuter)
-                                    * Math::Matrix::CreateTranslation(m_pulseLock.targetPos);
+                                    * Math::Matrix::CreateScale(szOuter);
             m_pulseMarkSprite->Draw(shader, modelOuter);
 
             // 2. Inner Lock-on Reticle (Shrinks from 2.5x to 1.0x, fades color from hot orange to neon-yellow)
@@ -1001,9 +1406,9 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
 
             float angleDegreesInner = -time * 5.0f * (180.0f / 3.14159265f);
             Math::Vec2 szInner = { m_pulseLock.explosionRadius * 2.0f * shrinkFactor, m_pulseLock.explosionRadius * 2.0f * shrinkFactor };
-            Math::Matrix modelInner = Math::Matrix::CreateScale(szInner)
+            Math::Matrix modelInner = Math::Matrix::CreateTranslation(m_pulseLock.targetPos)
                                     * Math::Matrix::CreateRotation(angleDegreesInner)
-                                    * Math::Matrix::CreateTranslation(m_pulseLock.targetPos);
+                                    * Math::Matrix::CreateScale(szInner);
             m_pulseMarkSprite->Draw(shader, modelInner);
 
             // Reset shader properties
@@ -1011,7 +1416,7 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
             shader.setFloat("tintStrength", 0.0f);
             shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
         }
-        else if (m_pulseLock.triggeredExplosion && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
+        else if (false && m_pulseLock.triggeredExplosion && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
         {
             shader.use();
             shader.setMat4("projection", projection);
@@ -1032,9 +1437,9 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
                 shader.setVec3("colorTint", 1.0f, 0.45f, 0.0f);
                 shader.setFloat("tintStrength", 1.0f);
                 
-                Math::Matrix model1 = Math::Matrix::CreateScale({ size, size })
+                Math::Matrix model1 = Math::Matrix::CreateTranslation(m_pulseLock.targetPos)
                                     * Math::Matrix::CreateRotation(angleDegrees1)
-                                    * Math::Matrix::CreateTranslation(m_pulseLock.targetPos);
+                                    * Math::Matrix::CreateScale({ size, size });
                 m_pulseMarkSprite->Draw(shader, model1);
 
                 // Inner spin layer (counter-clockwise, slightly smaller, bright neon yellow)
@@ -1043,9 +1448,9 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
                 shader.setVec3("colorTint", 1.0f, 0.85f, 0.1f);
                 shader.setFloat("tintStrength", 1.0f);
 
-                Math::Matrix model2 = Math::Matrix::CreateScale({ size * 0.75f, size * 0.75f })
+                Math::Matrix model2 = Math::Matrix::CreateTranslation(m_pulseLock.targetPos)
                                     * Math::Matrix::CreateRotation(angleDegrees2)
-                                    * Math::Matrix::CreateTranslation(m_pulseLock.targetPos);
+                                    * Math::Matrix::CreateScale({ size * 0.75f, size * 0.75f });
                 m_pulseMarkSprite->Draw(shader, model2);
             }
 
@@ -1065,7 +1470,7 @@ void Final::Draw(Shader& shader, Shader& colorShader, Math::Vec2 cameraPos, floa
         shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
 
         float tileW = 32.0f;
-        float startX = MIN_X + 3960.0f; // start of Final_2.png
+        float startX = MIN_X + 1000.0f; // start of Final_2.png
         float endX = MIN_X + m_mapWidth; // end of map
         float y = MIN_Y + 258.0f + 4.0f; // sit on top of 258.0f deck (raised slightly)
 
@@ -1125,7 +1530,7 @@ void Final::DrawDebug(Shader& colorShader, DebugRenderer& debugRenderer) const
 void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cameraPos, float viewHalfW)
 {
     // 1. Draw pre-vent warning pulse mark if in warning/inactive phase
-    if (m_nextVentIndex != -1 && m_ventTimer >= VENT_ACTIVE_DURATION && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
+    if (false && m_nextVentIndex != -1 && m_ventTimer >= VENT_ACTIVE_DURATION && m_pulseMarkSprite && m_pulseMarkSprite->GetWidth() > 0)
     {
         const auto& hb = m_hitboxes[3 + m_nextVentIndex];
 
@@ -1195,14 +1600,14 @@ void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cam
 
     // 1. Draw with normal texture shader
     shader.use();
-    shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+    shader.setVec4("spriteRect", 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
     shader.setBool("flipX", false);
     shader.setFloat("alpha", 1.0f);
     shader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
     shader.setFloat("tintStrength", 0.0f);
-    m_pulseVentSprite->Draw(shader, model);
+    m_pulseVentSprite->Draw(shader, model, 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
 
-    // 2. Draw outline overlay with fire glow
+    // 2. Draw outline overlay with purple scanline
     int w = m_pulseVentSprite->GetWidth();
     int h = m_pulseVentSprite->GetHeight();
     if (w > 0 && h > 0)
@@ -1211,15 +1616,18 @@ void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cam
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         outlineShader.use();
         outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
-        outlineShader.setVec4("outlineColor", 1.0f, 0.35f, 0.0f, 1.0f); // fiery orange outline
+        float pulse = std::sin(static_cast<float>(glfwGetTime()) * 3.2f) * 0.5f + 0.5f;
+        float a = 0.55f + 0.40f * pulse;
+        outlineShader.setVec4("outlineColor", 0.95f, 0.55f, 0.15f, a); // warm golden-amber pulse flame scanline
         outlineShader.setFloat("outlineWidthTexels", 2.0f);
         outlineShader.setFloat("uTime", static_cast<float>(glfwGetTime()));
-        outlineShader.setBool("isFireGlow", true);
-
-        m_pulseVentSprite->Draw(outlineShader, model);
-
-        // Reset isFireGlow uniform
         outlineShader.setBool("isFireGlow", false);
+        outlineShader.setBool("isPulseVent", true);
+
+        m_pulseVentSprite->Draw(outlineShader, model, 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
+
+        // Reset uniform
+        outlineShader.setBool("isPulseVent", false);
     }
 
     // 3. Draw interior purple line fill (additive blend over sprite body)
@@ -1230,12 +1638,12 @@ void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cam
         GL::Enable(GL_BLEND);
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE); // additive for glow effect
         shader.use();
-        shader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+        shader.setVec4("spriteRect", 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
         shader.setBool("flipX", false);
         shader.setFloat("alpha", purpleAlpha);
-        shader.setVec3("colorTint", 0.55f, 0.0f, 1.0f); // purple
+        shader.setVec3("colorTint", 0.90f, 0.45f, 0.10f); // warm amber pulse flame
         shader.setFloat("tintStrength", 0.9f);
-        m_pulseVentSprite->Draw(shader, model);
+        m_pulseVentSprite->Draw(shader, model, 0.0f, 1.0f - riseRatio, 1.0f, riseRatio);
 
         // restore standard blend & tint
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1247,8 +1655,6 @@ void Final::DrawPulseVents(Shader& shader, Shader& outlineShader, Math::Vec2 cam
 
 void Final::DrawBossDefeatedEffect(Shader& outlineShader)
 {
-    if (m_bossState != BossState::Defeated) return;
-
     float t = static_cast<float>(glfwGetTime());
 
     // Pulsating purple: alpha oscillates between 0.6 and 1.0
@@ -1262,6 +1668,77 @@ void Final::DrawBossDefeatedEffect(Shader& outlineShader)
 
     // DrawOutline now accepts a color; pass purple with pulsing alpha
     m_boss.DrawOutline(outlineShader, 0.55f, 0.0f, 1.0f, outlineAlpha);
+
+    // Reset uniform
+    outlineShader.setVec4("outlineColor", 1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+void Final::DrawFinalObjectEffects(Shader& outlineShader)
+{
+    const float t     = static_cast<float>(glfwGetTime());
+    const float pulse = std::sin(t * 3.2f) * 0.5f + 0.5f; // slow "breathing" 0~1
+
+    outlineShader.use();
+    outlineShader.setBool("isFireGlow", false);
+    outlineShader.setBool("radialScanline", false); // horizontal scanline fill
+    outlineShader.setFloat("uTime", t);
+    outlineShader.setFloat("outlineWidthTexels", 2.0f);
+    outlineShader.setBool("flipX", false);
+    outlineShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+
+    GL::Enable(GL_BLEND);
+    GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Overload device pillars: subtle purple scanline always; bright purple when player is near
+    if (m_overlapSprite && m_overlapSprite->GetWidth() > 0)
+    {
+        const int w = m_overlapSprite->GetWidth();
+        const int h = m_overlapSprite->GetHeight();
+        outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+        for (int i = 0; i < 2 && i < static_cast<int>(m_hitboxes.size()); ++i)
+        {
+            const auto& hb = m_hitboxes[i];
+            const float a = m_deviceProximity[i] ? (0.55f + 0.40f * pulse) : 0.15f;
+            outlineShader.setVec4("outlineColor", 0.62f, 0.10f, 1.0f, a);
+            Math::Matrix model = Math::Matrix::CreateTranslation(hb.pos) * Math::Matrix::CreateScale(hb.size);
+            m_overlapSprite->Draw(outlineShader, model);
+        }
+    }
+
+    // Exit gate: intense breathing scanline once the boss is defeated
+    if (m_bossState == BossState::Defeated && m_borderInsideSprite && m_borderInsideSprite->GetWidth() > 0)
+    {
+        const int w = m_borderInsideSprite->GetWidth();
+        const int h = m_borderInsideSprite->GetHeight();
+        // Dramatic breathing: slow deep pulse with high contrast
+        float gatePulse = std::sin(t * 2.0f) * 0.5f + 0.5f;
+        gatePulse = gatePulse * gatePulse; // ease-in for sharper blink peaks
+        const float a = 0.25f + 0.75f * gatePulse; // alpha range 0.25 → 1.0
+        outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+        // Bright vivid purple-white glow
+        float r = 0.70f + 0.30f * gatePulse;
+        float g = 0.15f + 0.35f * gatePulse;
+        float b = 1.0f;
+        outlineShader.setVec4("outlineColor", r, g, b, a);
+        Math::Matrix model = Math::Matrix::CreateTranslation(m_exitGatePos) * Math::Matrix::CreateScale(m_exitGateSize);
+        m_borderInsideSprite->Draw(outlineShader, model);
+    }
+
+    // Real vents (indices 3, 4, 5): subtle purple scanline always; bright purple when player is near
+    if (m_realVentSprite && m_realVentSprite->GetWidth() > 0)
+    {
+        const int w = m_realVentSprite->GetWidth();
+        const int h = m_realVentSprite->GetHeight();
+        outlineShader.setVec2("texelSize", 1.0f / w, 1.0f / h);
+        for (int i = 3; i < 6 && i < static_cast<int>(m_hitboxes.size()); ++i)
+        {
+            const auto& hb = m_hitboxes[i];
+            const float a = m_ventProximity[i - 3] ? (0.55f + 0.40f * pulse) : 0.15f;
+            outlineShader.setVec4("outlineColor", 0.62f, 0.10f, 1.0f, a);
+            Math::Matrix model = Math::Matrix::CreateTranslation(hb.pos) * Math::Matrix::CreateScale(hb.size);
+            m_realVentSprite->Draw(outlineShader, model);
+        }
+    }
 
     // Reset uniform
     outlineShader.setVec4("outlineColor", 1.0f, 1.0f, 1.0f, 1.0f);
@@ -1295,6 +1772,16 @@ void Final::Shutdown()
         m_overloadDeviceSprite->Shutdown();
         m_overloadDeviceSprite.reset();
     }
+    if (m_overlapSprite)
+    {
+        m_overlapSprite->Shutdown();
+        m_overlapSprite.reset();
+    }
+    if (m_borderInsideSprite)
+    {
+        m_borderInsideSprite->Shutdown();
+        m_borderInsideSprite.reset();
+    }
     if (m_pulseMarkSprite)
     {
         m_pulseMarkSprite->Shutdown();
@@ -1304,6 +1791,16 @@ void Final::Shutdown()
     {
         m_bossDroneProjectileSprite->Shutdown();
         m_bossDroneProjectileSprite.reset();
+    }
+    if (m_realVentSprite)
+    {
+        m_realVentSprite->Shutdown();
+        m_realVentSprite.reset();
+    }
+    if (m_bossSummonCircleSprite)
+    {
+        m_bossSummonCircleSprite->Shutdown();
+        m_bossSummonCircleSprite.reset();
     }
     if (m_pulseLineH) { m_pulseLineH->Shutdown(); m_pulseLineH.reset(); }
     if (m_pulseLineV) { m_pulseLineV->Shutdown(); m_pulseLineV.reset(); }
@@ -1380,6 +1877,35 @@ void Final::UpdateDeviceInject(int idx, float dt, Player& player, bool godMode)
             m_pulseLock.triggeredExplosion = false;
             m_pulseLock.explosionVisualTimer = 0.0f;
             m_pulseLockCooldownTimer = 2.5f; // shorter cooldown during interference to force movement
+        }
+
+        // Throw recoil bombs at the device to interfere with injection
+        if (m_bossState == BossState::Normal && m_bombThrowTimer >= 1.5f)
+        {
+            m_bombThrowTimer = 0.0f;
+            Math::Vec2 devPos = m_overloadDevices[idx].pos;
+
+            int numBombs = 2;
+            for (int i = 0; i < numBombs; ++i)
+            {
+                float offsetX = (i == 0) ? -80.0f : 80.0f;
+
+                RecoilBomb bomb;
+                bomb.pos = m_boss.GetPosition();
+                bomb.pos.y += m_boss.GetHitboxSize().y * 0.2f;
+                bomb.timer = 1.5f;
+                bomb.active = true;
+
+                float targetX = devPos.x + offsetX;
+                float targetY = Final::MIN_Y + 258.0f;
+
+                float t = 0.8f;
+                bomb.vel.x = (targetX - bomb.pos.x) / t;
+                float gravity = -1200.0f;
+                bomb.vel.y = (targetY - bomb.pos.y - 0.5f * gravity * t * t) / t;
+
+                m_recoilBombs.push_back(bomb);
+            }
         }
 
         float deltaCharge = godMode ? (dt / 3.0f) : (pulseThisFrame / 100.0f); // 100 units to fully charge

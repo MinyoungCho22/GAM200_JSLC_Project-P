@@ -31,7 +31,7 @@ public:
     CachedTextureInfo PrintToTexture(Shader& atlasShader, const std::string& text);
     /// Bakes text to a new GL texture without inserting into the long-lived cache (caller deletes `textureID`).
     CachedTextureInfo CreateTextTexture(Shader& atlasShader, const std::string& text);
-    void DrawBakedText(Shader& textureShader, const CachedTextureInfo& textureInfo, Math::Vec2 position, float newHeight);
+    void DrawBakedText(Shader& textureShader, const CachedTextureInfo& textureInfo, Math::Vec2 position, float newHeight, float alpha = 1.0f);
     int m_fontHeight = 0;
 private:
     unsigned int GetPixel(const unsigned char* data, int x, int y, int width, int channels) const;

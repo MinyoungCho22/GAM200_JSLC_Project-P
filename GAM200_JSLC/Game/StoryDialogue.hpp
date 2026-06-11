@@ -37,11 +37,13 @@ public:
 
     void EnqueueLines(const std::vector<std::string>& lines, Font& font, Shader& fontShader,
         std::function<void()> onSequenceComplete = nullptr, bool useConversionBackdrop = true,
-        bool blocksGameplay = true);
+        bool blocksGameplay = true, bool fadeOut = false);
     void EnqueueOpening(Font& font, Shader& fontShader);
 
     void Update(float dt, const Input::Input& input, const ControlBindings& controls, Font& font, Shader& fontShader);
     void Draw(Font& font, Shader& textureShader, Shader& fontShader, const Math::Matrix& screenProjection);
+
+    float GetAlpha() const { return m_alpha; }
 
 private:
     void ClearLineTexture();
@@ -53,10 +55,11 @@ private:
         float preTypeDelay                = 0.0f;
         bool useConversionBackdrop        = true;
         bool blocksGameplay               = true;
+        bool fadeOut                      = false;
     };
 
     void BeginSequence(std::vector<std::string> lines, std::function<void()> onComplete, float preTypeDelay,
-                       bool useConversionBackdrop, bool blocksGameplay);
+                       bool useConversionBackdrop, bool blocksGameplay, bool fadeOut);
     void FinishSequence(Font& font, Shader& fontShader);
 
     static bool s_dialogueEnabled;
@@ -72,6 +75,9 @@ private:
     bool m_active                  = false;
     bool m_useConversionBackdrop   = true;
     bool m_blocksGameplay          = true;
+    bool m_fadeOut                 = false;
+    bool m_isFadingOut             = false;
+    float m_alpha                  = 1.0f;
     std::function<void()> m_onSequenceComplete;
     std::deque<QueuedSequence> m_pending;
 

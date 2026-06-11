@@ -266,6 +266,9 @@ void GameplayState::Initialize()
     m_conversionBackdrop = std::make_unique<Background>();
     m_conversionBackdrop->Initialize("Asset/Conversion.png");
 
+    m_bossSayImage = std::make_unique<Background>();
+    EnsureBossSayImageReady();
+
     m_hallwayHidingPromptS = std::make_unique<Background>();
     m_hallwayHidingPromptS->Initialize("Asset/S.png");
 
@@ -873,6 +876,18 @@ void GameplayState::Update(double dt)
     if (m_storyDialogue)
     {
         m_storyDialogue->Update(static_cast<float>(dt), input, ctl, *m_font, *m_fontShader);
+        if (m_bossSayActive)
+        {
+            if (m_storyDialogue->IsActive())
+            {
+                m_bossSayAlpha = m_storyDialogue->GetAlpha();
+            }
+            else
+            {
+                m_bossSayAlpha = 0.0f;
+                m_bossSayActive = false;
+            }
+        }
         if (m_storyDialogue->IsBlocking())
         {
             if (!m_camera.IsAnimating())
@@ -1907,6 +1922,19 @@ void GameplayState::Update(double dt)
         {
             m_camera.AddScreenShake(0.48f, shakePx);
         }
+
+        // Final 진입 보스 대사 1회: Boss_Say 페이드인 + Conversion 다이얼로그
+        if (!m_finalEntryStoryDone && m_storyDialogue && m_font && m_fontShader)
+        {
+            EnsureBossSayImageReady();
+            m_finalEntryStoryDone = true;
+            m_bossSayActive = true;
+            m_bossSayDialogStarted = false;
+            m_bossSayAlpha = 0.0f;
+            m_storyDialogue->EnqueueLines(
+                { "You can't pass. Starting retrieval of Subject No. 99." },
+                *m_font, *m_fontShader, nullptr, true, true, true);
+        }
     }
 
     auto& hallwayDrones = m_hallway->GetDrones();
@@ -2404,6 +2432,29 @@ void GameplayState::HandleUndergroundToTrainTransition()
         cameraTargetPos.x, cameraTargetPos.y, playerStartX, playerStartY);
 }
 
+void GameplayState::EnsureBossSayImageReady()
+{
+    if (!m_bossSayImage)
+        m_bossSayImage = std::make_unique<Background>();
+
+    if (m_bossSayImage->GetWidth() > 0)
+        return;
+
+    m_bossSayImage->Shutdown();
+    m_bossSayImage->Initialize("Asset/Boss_Say.png");
+
+    if (m_bossSayImage->GetWidth() > 0)
+    {
+        Logger::Instance().Log(Logger::Severity::Info,
+            "Boss_Say.png loaded (%dx%d).", m_bossSayImage->GetWidth(), m_bossSayImage->GetHeight());
+    }
+    else
+    {
+        Logger::Instance().Log(Logger::Severity::Error,
+            "Failed to load Boss_Say.png from Asset/Boss_Say.png");
+    }
+}
+
 void GameplayState::HandleTrainToFinalTransition()
 {
     Logger::Instance().Log(Logger::Severity::Event,
@@ -2415,9 +2466,20 @@ void GameplayState::HandleTrainToFinalTransition()
     m_finalAccessed = true;
     m_currentCheckpoint = MapZone::Final;
 
+    // Final 진입 보스 대사/Boss_Say를 새로 재생하도록 상태 초기화
+    m_finalEntryStoryDone = false;
+    m_bossSayActive = false;
+    m_bossSayDialogStarted = false;
+    m_bossSayAlpha = 0.0f;
+
     if (m_final)
     {
         m_final->Reset();
+    }
+
+    if (droneManager)
+    {
+        droneManager->ClearAllDrones();
     }
 
     if (m_train)
@@ -2505,8 +2567,16 @@ void GameplayState::RespawnAtCheckpoint()
     ResetTvNewsState();
 
     // Reset all enemies
-    droneManager->ResetAllDrones();
-    droneManager->ClearTraceReinforcementDrones();
+    if (m_currentCheckpoint == MapZone::Final)
+    {
+        if (droneManager)
+            droneManager->ClearAllDrones();
+    }
+    else
+    {
+        droneManager->ResetAllDrones();
+        droneManager->ClearTraceReinforcementDrones();
+    }
     if (m_traceSystem)
         m_traceSystem->Reset();
     if (m_hallway)
@@ -3218,12 +3288,15 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
 
     if (m_finalAccessed && m_final)
     {
-        m_final->DrawPulseVents(textureShader, *m_outlineShader, fgCamPos, fgEffectiveWidth * 0.5f);
-
         // Draw purple pulsating glow on the boss after it is defeated
         m_outlineShader->use();
         m_outlineShader->setMat4("projection", projection);
         m_final->DrawBossDefeatedEffect(*m_outlineShader);
+        // 과부하 장치/출구 게이트 보라 스캔라인 효과 (RealVent scanlines drawn here)
+        m_final->DrawFinalObjectEffects(*m_outlineShader);
+
+        // Draw Pulse_Vent AFTER RealVent scanlines so it renders on top
+        m_final->DrawPulseVents(textureShader, *m_outlineShader, fgCamPos, fgEffectiveWidth * 0.5f);
 
         textureShader.use();
         textureShader.setMat4("projection", projection);
@@ -3587,6 +3660,33 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
         m_scanlineDroneExplanation->Draw(textureShader, uiModel);
     }
 
+    // Final 진입 보스 컷신: Boss_Say가 화면 전체를 덮고, Conversion 대사창이 그 위에 표시됨
+    if (m_bossSayActive && m_bossSayAlpha > 0.0f)
+    {
+        if (!m_bossSayImage || m_bossSayImage->GetWidth() <= 0)
+            EnsureBossSayImageReady();
+
+        if (m_bossSayImage && m_bossSayImage->GetWidth() > 0)
+        {
+            GL::Enable(GL_BLEND);
+            GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            textureShader.use();
+            textureShader.setMat4("projection", baseProjection);
+            textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
+            textureShader.setBool("flipX", false);
+            textureShader.setFloat("alpha", m_bossSayAlpha);
+            textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
+            textureShader.setFloat("tintStrength", 0.0f);
+
+            Math::Matrix bossSayModel = Math::Matrix::CreateTranslation({ GAME_WIDTH * 0.5f, GAME_HEIGHT * 0.5f })
+                * Math::Matrix::CreateScale({ GAME_WIDTH, GAME_HEIGHT });
+            m_bossSayImage->Draw(textureShader, bossSayModel);
+
+            textureShader.setFloat("alpha", 1.0f);
+        }
+    }
+
     if (m_storyDialogue && m_storyDialogue->IsBlocking())
     {
         Shader& texForStory = engine.GetTextureShader();
@@ -3604,7 +3704,7 @@ void GameplayState::DrawForegroundLayer(bool compositeToScreen)
             ts.setMat4("projection", baseProjection);
             ts.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
             ts.setBool("flipX", false);
-            ts.setFloat("alpha", 1.0f);
+            ts.setFloat("alpha", m_storyDialogue->GetAlpha());
             ts.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
             ts.setFloat("tintStrength", 0.0f);
             const float boxCx = GAME_WIDTH * 0.5f;
@@ -4353,6 +4453,7 @@ void GameplayState::Shutdown()
     if (m_mouseLeftCursor) m_mouseLeftCursor->Shutdown();
     if (m_mouseRightCursor) m_mouseRightCursor->Shutdown();
     if (m_hudFrame) m_hudFrame->Shutdown();
+    if (m_bossSayImage) m_bossSayImage->Shutdown();
     if (m_hallwayHidingPromptS) m_hallwayHidingPromptS->Shutdown();
     if (m_uiExplanation) m_uiExplanation->Shutdown();
     if (m_scanlineDroneExplanation) m_scanlineDroneExplanation->Shutdown();

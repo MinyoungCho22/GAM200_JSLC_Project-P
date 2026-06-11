@@ -36,6 +36,7 @@ public:
     bool ApplyDamage(float dt);
     void ResetDamageTimer();
     void SetBaseSpeed(float speed);
+    void SetFinalTarget(Math::Vec2 target);
 
     Math::Vec2 GetPosition() const { return m_position; }
     Math::Vec2 GetSize() const { return m_size; }

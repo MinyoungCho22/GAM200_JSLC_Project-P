@@ -9,6 +9,7 @@ uniform bool radialScanline;
 
 uniform float uTime;
 uniform bool isFireGlow;
+uniform bool isPulseVent;
 
 float alphaAt(vec2 uv)
 {
@@ -23,6 +24,8 @@ bool hasOpaqueNeighborInRadius(vec2 uv, float radiusTexel)
     float r = clamp(radiusTexel, 1.0, float(MAX_RADIUS));
     float r2 = r * r;
 
+    float threshold = isPulseVent ? 0.2 : 0.5;
+
     for (int y = -MAX_RADIUS; y <= MAX_RADIUS; ++y)
     {
         for (int x = -MAX_RADIUS; x <= MAX_RADIUS; ++x)
@@ -31,7 +34,10 @@ bool hasOpaqueNeighborInRadius(vec2 uv, float radiusTexel)
             if (d2 > r2) continue;
 
             vec2 uv2 = uv + vec2(float(x) * texelSize.x, float(y) * texelSize.y);
-            if (alphaAt(uv2) > 0.5)
+            if (isPulseVent && (uv2.x < 0.13 || uv2.x > 0.86))
+                continue;
+
+            if (alphaAt(uv2) > threshold)
                 return true;
         }
     }
@@ -77,6 +83,45 @@ void main()
     }
 
     float a = alphaAt(distortedUV);
+    if (isPulseVent)
+    {
+        if (distortedUV.x < 0.13 || distortedUV.x > 0.86)
+        {
+            a = 0.0;
+        }
+        else
+        {
+            // Scan left and right from the current X coordinate to find boundary lines of Pulse_Vent.png
+            bool hitLeft = false;
+            float stepX = max(texelSize.x, 0.002);
+            for (float x = distortedUV.x - stepX; x >= 0.0; x -= stepX)
+            {
+                if (x < 0.13) break;
+                if (alphaAt(vec2(x, distortedUV.y)) > 0.2)
+                {
+                    hitLeft = true;
+                    break;
+                }
+            }
+            if (hitLeft)
+            {
+                bool hitRight = false;
+                for (float x = distortedUV.x + stepX; x <= 1.0; x += stepX)
+                {
+                    if (x > 0.86) break;
+                    if (alphaAt(vec2(x, distortedUV.y)) > 0.2)
+                    {
+                        hitRight = true;
+                        break;
+                    }
+                }
+                if (hitRight && distortedUV.y <= 0.95)
+                {
+                    a = max(a, 1.0);
+                }
+            }
+        }
+    }
     float r = clamp(outlineWidthTexels, 1.0, 3.0);
 
     if (isFireGlow)
@@ -129,6 +174,15 @@ void main()
         }
 
         alpha = fillAlpha * a;
+        if (isPulseVent)
+        {
+            alpha = max(alpha, 0.45);
+        }
+        if (radialScanline)
+        {
+            alpha = max(alpha, 0.35);
+        }
+
         if (isFireGlow)
         {
             alpha = 0.15 * a; // keep inside mostly transparent
@@ -159,5 +213,5 @@ void main()
         alpha = max(alpha, glowAlpha);
     }
 
-    FragColor = vec4(color, clamp(alpha, 0.0, 1.0));
+    FragColor = vec4(color, clamp(alpha, 0.0, 1.0) * outlineColor.a);
 }

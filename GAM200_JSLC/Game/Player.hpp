@@ -49,6 +49,7 @@ public:
     void Init(Math::Vec2 startPos);
     void Update(double dt, Input::Input& input, const ControlBindings& controls);
     void UpdateNPC(float dt, AnimationState state);
+    void SetAnimationFrame(AnimationState state, int frame);
     void Draw(const Shader& shader) const;
     void DrawOutline(const Shader& outlineShader, float r = 0.2f, float g = 0.6f, float b = 1.0f, float a = 1.0f) const;
     void Shutdown();
@@ -68,6 +69,7 @@ public:
     /// Positive = up (same as jump). Train 갭 낙하 등에서 Player::Update 이후에도 같은 프레임에 아래로 떨어지게 할 때 사용.
     void SetVerticalVelocity(float vy) { velocity.y = vy; }
     void SetVelocity(Math::Vec2 vel) { velocity = vel; }
+    void SetHorizontalSpeed(float speed) { m_currentHorizontalSpeed = speed; }
     void SetFlipped(bool flipped) { m_is_flipped = flipped; }
     void SetOnGround(bool onGround);
     bool IsOnGround() const { return is_on_ground; }

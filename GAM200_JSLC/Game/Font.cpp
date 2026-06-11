@@ -259,12 +259,12 @@ CachedTextureInfo Font::BakeTextToTexture(Shader& atlasShader, const std::string
     return { newTexID, textSize.x, textSize.y };
 }
 
-void Font::DrawBakedText(Shader& textureShader, const CachedTextureInfo& textureInfo, Math::Vec2 position, float newHeight)
+void Font::DrawBakedText(Shader& textureShader, const CachedTextureInfo& textureInfo, Math::Vec2 position, float newHeight, float alpha)
 {
     if (textureInfo.textureID == 0 || textureInfo.height == 0)
     {
         return;
-    }
+     }
 
     textureShader.use();
 
@@ -285,7 +285,7 @@ void Font::DrawBakedText(Shader& textureShader, const CachedTextureInfo& texture
     textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
     textureShader.setBool("flipX", false);
 
-    textureShader.setFloat("alpha", 1.0f);
+    textureShader.setFloat("alpha", alpha);
 
     GL::ActiveTexture(GL_TEXTURE0);
     GL::BindTexture(GL_TEXTURE_2D, textureInfo.textureID);

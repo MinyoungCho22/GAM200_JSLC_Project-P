@@ -55,6 +55,9 @@ void StoryDialogue::ResetForNewRun()
     m_active                  = false;
     m_useConversionBackdrop   = true;
     m_blocksGameplay          = true;
+    m_fadeOut                 = false;
+    m_isFadingOut             = false;
+    m_alpha                   = 1.0f;
     m_lineIndex = 0;
     m_visibleChars = 0;
     m_charAccum = 0.0f;
@@ -82,7 +85,7 @@ void StoryDialogue::RebuildLineTexture(Font& font, Shader& fontShader)
 }
 
 void StoryDialogue::BeginSequence(std::vector<std::string> lines, std::function<void()> onComplete, float preTypeDelay,
-                                  bool useConversionBackdrop, bool blocksGameplay)
+                                  bool useConversionBackdrop, bool blocksGameplay, bool fadeOut)
 {
     ClearLineTexture();
     m_lines                   = std::move(lines);
@@ -93,6 +96,9 @@ void StoryDialogue::BeginSequence(std::vector<std::string> lines, std::function<
     m_onSequenceComplete      = std::move(onComplete);
     m_useConversionBackdrop   = useConversionBackdrop;
     m_blocksGameplay          = blocksGameplay;
+    m_fadeOut                 = fadeOut;
+    m_isFadingOut             = false;
+    m_alpha                   = fadeOut ? 0.0f : 1.0f;
     m_active                  = true;
 }
 
@@ -109,6 +115,9 @@ void StoryDialogue::FinishSequence(Font& font, Shader& fontShader)
     m_active                  = false;
     m_useConversionBackdrop   = true;
     m_blocksGameplay          = true;
+    m_fadeOut                 = false;
+    m_isFadingOut             = false;
+    m_alpha                   = 1.0f;
 
     if (done)
         done();
@@ -118,22 +127,22 @@ void StoryDialogue::FinishSequence(Font& font, Shader& fontShader)
         QueuedSequence next = std::move(m_pending.front());
         m_pending.pop_front();
         BeginSequence(std::move(next.lines), std::move(next.onComplete), next.preTypeDelay,
-                      next.useConversionBackdrop, next.blocksGameplay);
+                      next.useConversionBackdrop, next.blocksGameplay, next.fadeOut);
         RebuildLineTexture(font, fontShader);
     }
 }
 
 void StoryDialogue::EnqueueLines(const std::vector<std::string>& lines, Font& font, Shader& fontShader,
-    std::function<void()> onSequenceComplete, bool useConversionBackdrop, bool blocksGameplay)
+    std::function<void()> onSequenceComplete, bool useConversionBackdrop, bool blocksGameplay, bool fadeOut)
 {
     if (lines.empty() || !s_dialogueEnabled)
         return;
     if (m_active)
     {
-        m_pending.push_back({ lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop, blocksGameplay });
+        m_pending.push_back({ lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop, blocksGameplay, fadeOut });
         return;
     }
-    BeginSequence(lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop, blocksGameplay);
+    BeginSequence(lines, std::move(onSequenceComplete), 0.0f, useConversionBackdrop, blocksGameplay, fadeOut);
     RebuildLineTexture(font, fontShader);
 }
 
@@ -152,7 +161,7 @@ void StoryDialogue::EnqueueOpening(Font& font, Shader& fontShader)
         m_pending.push_back(std::move(q));
         return;
     }
-    BeginSequence(std::move(q.lines), std::move(q.onComplete), q.preTypeDelay, q.useConversionBackdrop, q.blocksGameplay);
+    BeginSequence(std::move(q.lines), std::move(q.onComplete), q.preTypeDelay, q.useConversionBackdrop, q.blocksGameplay, q.fadeOut);
     RebuildLineTexture(font, fontShader);
 }
 
@@ -166,6 +175,22 @@ void StoryDialogue::Update(float dt, const Input::Input& input, const ControlBin
     }
     if (!m_active || m_lines.empty())
         return;
+
+    if (m_isFadingOut)
+    {
+        m_alpha -= 1.5f * dt;
+        if (m_alpha <= 0.0f)
+        {
+            m_alpha = 0.0f;
+            FinishSequence(font, fontShader);
+        }
+        return;
+    }
+
+    if (m_fadeOut && m_alpha < 1.0f)
+    {
+        m_alpha = std::min(1.0f, m_alpha + 1.5f * dt);
+    }
 
     if (m_preTypeDelayRemaining > 0.0f)
     {
@@ -191,9 +216,16 @@ void StoryDialogue::Update(float dt, const Input::Input& input, const ControlBin
             ++m_lineIndex;
             if (m_lineIndex >= m_lines.size())
             {
-                FinishSequence(font, fontShader);
-                if (m_active)
-                    RebuildLineTexture(font, fontShader);
+                if (m_fadeOut)
+                {
+                    m_isFadingOut = true;
+                }
+                else
+                {
+                    FinishSequence(font, fontShader);
+                    if (m_active)
+                        RebuildLineTexture(font, fontShader);
+                }
             }
             else
             {
@@ -234,7 +266,7 @@ void StoryDialogue::Draw(Font& font, Shader& textureShader, Shader& fontShader, 
         textureShader.setMat4("projection", screenProjection);
         textureShader.setVec4("spriteRect", 0.0f, 0.0f, 1.0f, 1.0f);
         textureShader.setBool("flipX", false);
-        textureShader.setFloat("alpha", 1.0f);
+        textureShader.setFloat("alpha", m_alpha);
         textureShader.setVec3("colorTint", 1.0f, 1.0f, 1.0f);
         textureShader.setFloat("tintStrength", 0.0f);
 
@@ -253,7 +285,7 @@ void StoryDialogue::Draw(Font& font, Shader& textureShader, Shader& fontShader, 
         GL::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         fontShader.use();
         fontShader.setMat4("projection", screenProjection);
-        font.DrawBakedText(fontShader, m_lineTex, { posX, posY }, TEXT_HEIGHT);
+        font.DrawBakedText(fontShader, m_lineTex, { posX, posY }, TEXT_HEIGHT, m_alpha);
     }
 
     GL::Disable(GL_BLEND);

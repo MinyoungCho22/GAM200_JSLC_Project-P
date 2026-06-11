@@ -223,6 +223,12 @@ void Drone::SetBaseSpeed(float speed)
     m_currentSpeed = speed;
 }
 
+void Drone::SetFinalTarget(Math::Vec2 target)
+{
+    m_spawnPos = target;
+    m_baseY = target.y;
+}
+
 void Drone::ApplyStun(float duration)
 {
     if (m_isDead)
@@ -827,6 +833,20 @@ void Drone::Update(double dt, const Player& player, Math::Vec2 playerHitboxSize,
         }
         else
         {
+            if (m_spawnPos.x >= 50000.0f)
+            {
+                float distToTarget = (m_spawnPos - m_position).Length();
+                if (distToTarget > 20.0f)
+                {
+                    Math::Vec2 dir = (m_spawnPos - m_position).GetNormalized();
+                    m_velocity = dir * 450.0f;
+                    m_position += m_velocity * fdt;
+                    m_baseY = m_position.y;
+                    m_direction.x = (dir.x > 0.0f) ? 1.0f : -1.0f;
+                    return;
+                }
+            }
+
             m_moveTimer += static_cast<float>(dt);
             
             // In Final boss arena, keep patrol range tight around m_spawnPos to guard devices/vents

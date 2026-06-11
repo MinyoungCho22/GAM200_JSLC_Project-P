@@ -350,6 +350,16 @@ void Player::UpdateNPC(float dt, AnimationState state)
     m_animations[static_cast<int>(state)].Update(dt);
 }
 
+void Player::SetAnimationFrame(AnimationState state, int frame)
+{
+    int idx = static_cast<int>(state);
+    if (idx >= 0 && idx < 5)
+    {
+        m_animations[idx].currentFrame = frame;
+        m_animations[idx].timer = 0.0f;
+    }
+}
+
 void Player::Draw(const Shader& shader) const
 {
     if (m_isInvincible && !IsDead())

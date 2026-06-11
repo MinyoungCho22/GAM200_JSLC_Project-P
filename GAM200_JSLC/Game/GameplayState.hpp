@@ -69,6 +69,8 @@ private:
     void ConfigureRoomTvPulseSource();
     // 커서가 TV 모니터 화면 위에 있고 플레이어가 TV 근처(가로)인지 — TV 좌클릭 켜기 판정용
     bool IsTvPowerHovered(Math::Vec2 playerHbCenter, Math::Vec2 mouseWorld) const;
+    /// Boss_Say.png가 없거나 초기 로드에 실패했을 때 Final 진입 시 재시도
+    void EnsureBossSayImageReady();
 
     GameStateManager& gsm;
     Player player;
@@ -139,6 +141,11 @@ private:
     bool m_wasInTunnelInsideView = false;      ///< 직전 프레임 터널 인사이드 뷰 상태
     bool m_car5ReachedStoryDone = false;       ///< 물탱크 칸 도달 대사 1회 표시 여부
     bool m_wasCar5Encounter = false;           ///< 직전 프레임 Car5 조우 상태
+    bool m_finalEntryStoryDone = false;        ///< Final 진입 보스 대사 1회 표시 여부
+    std::unique_ptr<Background> m_bossSayImage; ///< Final 진입 시 페이드인되는 보스 대사 이미지
+    bool m_bossSayActive = false;              ///< Boss_Say 페이드 시퀀스 진행 중
+    bool m_bossSayDialogStarted = false;       ///< Boss_Say 다이얼로그가 시작된 적 있는지
+    float m_bossSayAlpha = 0.0f;               ///< Boss_Say 현재 페이드 알파
     FadeState m_fadeState = FadeState::None;
     float m_fadeAlpha = 0.0f;
     PendingTransition m_pendingTransition = PendingTransition::None;
