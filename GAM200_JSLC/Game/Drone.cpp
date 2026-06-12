@@ -1083,6 +1083,9 @@ void Drone::DrawRadar(const Shader& shader, DebugRenderer& debugRenderer) const
 
 void Drone::Reset()
 {
+    const int  trainSeg = m_trainCarSegment;
+    const bool sirenMap = m_sirenMapDrone;
+
     m_position      = m_spawnPos;
     m_baseY         = m_spawnPos.y;
     m_velocity      = { 0.0f, 0.0f };
@@ -1122,7 +1125,7 @@ void Drone::Reset()
     m_jamFleeDir                = { 1.f, 0.f };
     m_hitHorzVel                = 0.f;
     m_hitWindSign               = 1;
-    m_sirenMapDrone             = false;
+    m_sirenMapDrone             = sirenMap;
     m_sirenPulseRevealTimer     = 0.f;
     m_sirenPulseAggroTimer      = 0.f;
 
@@ -1131,7 +1134,7 @@ void Drone::Reset()
     m_carTransportBobPhase        = 0.f;
     m_carTransportAggroChase      = false;
     m_carTransportHover           = m_carTransportPersistHover;
-    m_trainCarSegment             = 0;
+    m_trainCarSegment             = trainSeg;
     m_tracerHeatLevel             = 0;
     m_dmgWobbleTimer              = 0.f;
     m_wobbleAnimTime              = 0.f;

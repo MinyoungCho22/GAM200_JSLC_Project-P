@@ -566,6 +566,31 @@ void Train::DrawTunnelInsideProps(Shader& shader) const
 // ---------------------------------------------------------------------------
 void Train::CheatWarpToTunnelInside(Player& player, Math::Vec2 playerHitboxSize)
 {
+    // Reset enemy states
+    if (m_droneManager)
+    {
+        m_droneManager->ResetAllDrones();
+        m_droneManager->ClearTraceReinforcementDrones();
+        for (auto& d : m_droneManager->GetDrones())
+            d.SetPosition(d.GetPosition() + Math::Vec2{ m_trainOffset, 0.f });
+    }
+    if (m_carTransportDroneManager)
+    {
+        m_carTransportDroneManager->ResetAllDrones();
+        m_carTransportDroneManager->ClearTraceReinforcementDrones();
+        for (auto& d : m_carTransportDroneManager->GetDrones())
+            d.SetPosition(d.GetPosition() + Math::Vec2{ m_trainOffset, 0.f });
+    }
+    for (auto& r : m_robots)
+    {
+        r.Reset();
+        r.SetPosition(r.GetPosition() + Math::Vec2{ m_trainOffset, 0.f });
+    }
+
+    m_car5EncounterActive = false;
+    m_car5ValveHintTimer  = 0.f;
+    m_encounterScriptTime = 0.f;
+
     m_car3InsideViewActive       = true;   // suppress exterior drones/robots
     m_car3TunnelInsideViewActive = true;
     m_trainState                 = TrainState::Stationary;
@@ -597,6 +622,36 @@ void Train::CheatWarpToCar5(Player& player, Math::Vec2 playerHitboxSize)
 
     m_car3InsideTransitionActive = false;
     m_car3TunnelInsideTransitionActive = false;
+
+    // Reset Car 5 encounter variables
+    m_car5EncounterActive       = false;
+    m_car5ValveHintTimer        = 0.0f;
+    m_encounterScriptTime       = 0.f;
+    m_trainDeckRobotWasAirborne.assign(m_robots.size(), false);
+    m_trainDeckRobotJumpPrepT.assign(m_robots.size(), 0.f);
+    m_trainDeckRobotUsedLandingShake.assign(m_robots.size(), false);
+    m_pendingTrainCameraShakePx = 0.f;
+
+    // Reset enemy states
+    if (m_droneManager)
+    {
+        m_droneManager->ResetAllDrones();
+        m_droneManager->ClearTraceReinforcementDrones();
+        for (auto& d : m_droneManager->GetDrones())
+            d.SetPosition(d.GetPosition() + Math::Vec2{ m_trainOffset, 0.f });
+    }
+    if (m_carTransportDroneManager)
+    {
+        m_carTransportDroneManager->ResetAllDrones();
+        m_carTransportDroneManager->ClearTraceReinforcementDrones();
+        for (auto& d : m_carTransportDroneManager->GetDrones())
+            d.SetPosition(d.GetPosition() + Math::Vec2{ m_trainOffset, 0.f });
+    }
+    for (auto& r : m_robots)
+    {
+        r.Reset();
+        r.SetPosition(r.GetPosition() + Math::Vec2{ m_trainOffset, 0.f });
+    }
 
     // Reset TunnelInside state variables
     m_tunnelInsideInjectT              = 0.f;
@@ -635,6 +690,31 @@ void Train::CheatWarpToCar5(Player& player, Math::Vec2 playerHitboxSize)
 
 void Train::CheatWarpToSecondInside1(Player& player, Math::Vec2 playerHitboxSize)
 {
+    // Reset enemy states
+    if (m_droneManager)
+    {
+        m_droneManager->ResetAllDrones();
+        m_droneManager->ClearTraceReinforcementDrones();
+        for (auto& d : m_droneManager->GetDrones())
+            d.SetPosition(d.GetPosition() + Math::Vec2{ m_trainOffset, 0.f });
+    }
+    if (m_carTransportDroneManager)
+    {
+        m_carTransportDroneManager->ResetAllDrones();
+        m_carTransportDroneManager->ClearTraceReinforcementDrones();
+        for (auto& d : m_carTransportDroneManager->GetDrones())
+            d.SetPosition(d.GetPosition() + Math::Vec2{ m_trainOffset, 0.f });
+    }
+    for (auto& r : m_robots)
+    {
+        r.Reset();
+        r.SetPosition(r.GetPosition() + Math::Vec2{ m_trainOffset, 0.f });
+    }
+
+    m_car5EncounterActive = false;
+    m_car5ValveHintTimer  = 0.f;
+    m_encounterScriptTime = 0.f;
+
     m_car3InsideViewActive       = true;   // suppress exterior drones/robots
     m_car3TunnelInsideViewActive = false;  // not in tunnel inside
     m_car3InsideOnRoof           = false;  // inside cabin

@@ -668,13 +668,38 @@ void Train::Update(double dt, Player& player, Math::Vec2 playerHitboxSize,
     {
         const float trainWorldLeft = MIN_X + m_trainOffset;
         const float ext1Local      = m_car1Width + m_car2Width + m_car3Width;
-        const float boundLeft      = trainWorldLeft + ext1Local + kCar3InsideBoundLeftPx;
         const float inside2Right   = ext1Local + m_car3ExtensionWidths[0] + kCar3InsideBoundRightPx;
         const float inside3Right   = ext1Local + m_car3ExtensionWidths[0] + m_car3ExtensionWidths[1]
             + std::min(kCar3InsideBoundRightPx, std::max(400.f, m_car3ExtensionWidths[2] - 84.f));
-        // 지붕: Inside_2까지 / 내부 바닥: SecondTrain_3까지 이동 가능.
-        const float boundRight     = trainWorldLeft
-            + (m_car3InsideOnRoof ? inside2Right : inside3Right);
+
+        float boundLeft, boundRight;
+
+        if (m_car3InsideOnRoof)
+        {
+            // 지붕: 왼쪽 끝부터 Inside_2의 오른쪽 끝까지 이동 가능
+            boundLeft  = trainWorldLeft + ext1Local + kCar3InsideBoundLeftPx;
+            boundRight = trainWorldLeft + inside2Right;
+        }
+        else
+        {
+            // 내부 바닥: 캐빈 1과 캐빈 2/3 사이를 분리하여 걸어서 통과하는 것을 차단
+            const float playerX = player.GetPosition().x;
+            const float cabin1RightEdge = trainWorldLeft + ext1Local + m_car3ExtensionWidths[0];
+
+            if (playerX < cabin1RightEdge)
+            {
+                // SecondInside_1 (캐빈 1) 바닥 영역 경계
+                boundLeft  = trainWorldLeft + ext1Local + kCar3InsideBoundLeftPx;
+                boundRight = trainWorldLeft + ext1Local + kCar3InsideBoundRightPx;
+            }
+            else
+            {
+                // SecondInside_2 및 SecondInside_3 (캐빈 2 & 3) 바닥 영역 경계
+                boundLeft  = trainWorldLeft + ext1Local + m_car3ExtensionWidths[0] + kCar3InsideBoundLeftPx;
+                boundRight = trainWorldLeft + inside3Right;
+            }
+        }
+
         currentHbCenter            = player.GetHitboxCenter();
         const float playerLeft     = currentHbCenter.x - playerHalfSize.x;
         const float playerRight    = currentHbCenter.x + playerHalfSize.x;

@@ -917,6 +917,28 @@ void GameplayState::Update(double dt)
         m_trainZoomTransition = false;
         player.SetSizeScale(1.0f);
         m_trainDeferEntryUntilIntroDone = false;
+
+        if (m_train)
+        {
+            m_train->RestartEntryTimer();
+            m_train->GetDroneManager()->ResetAllDrones();
+            m_train->GetDroneManager()->ClearTraceReinforcementDrones();
+            if (m_train->GetCarTransportDroneManager())
+            {
+                m_train->GetCarTransportDroneManager()->ResetAllDrones();
+                m_train->GetCarTransportDroneManager()->ClearTraceReinforcementDrones();
+            }
+            if (m_train->GetSirenDroneManager())
+            {
+                m_train->GetSirenDroneManager()->ResetAllDrones();
+                m_train->GetSirenDroneManager()->ClearTraceReinforcementDrones();
+            }
+            for (auto& robot : m_train->GetRobots())
+            {
+                robot.Reset();
+            }
+        }
+
         StartTransition(PendingTransition::UndergroundToTrain);
         Logger::Instance().Log(Logger::Severity::Event, "Cheat: Teleport to Train (Ctrl+5)");
     }
@@ -949,6 +971,7 @@ void GameplayState::Update(double dt)
         m_rooftopAccessed = true;
         m_undergroundAccessed = true;
         m_trainAccessed = true;
+        m_finalAccessed = false;
         m_currentCheckpoint = MapZone::Train;
 
         m_train->CheatWarpToTunnelInside(player, player.GetHitboxSize());
@@ -975,6 +998,7 @@ void GameplayState::Update(double dt)
         m_rooftopAccessed = true;
         m_undergroundAccessed = true;
         m_trainAccessed = true;
+        m_finalAccessed = false;
         m_currentCheckpoint = MapZone::Train;
 
         m_train->CheatWarpToSecondInside1(player, player.GetHitboxSize());
@@ -997,6 +1021,7 @@ void GameplayState::Update(double dt)
         m_rooftopAccessed = true;
         m_undergroundAccessed = true;
         m_trainAccessed = true;
+        m_finalAccessed = false;
         m_currentCheckpoint = MapZone::Train;
 
         m_train->CheatWarpToCar5(player, player.GetHitboxSize());
@@ -1825,10 +1850,13 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            auto* imguiManager = gsm.GetEngine().GetImguiManager();
-            if (!imguiManager || !imguiManager->IsPlayerGodMode())
+            if (Collision::CheckAABB(drone.GetPosition(), drone.GetSize() * 1.2f, player.GetHitboxCenter(), player.GetHitboxSize()))
             {
-                player.TakeDamage(10.0f);
+                auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                {
+                    player.TakeDamage(10.0f);
+                }
             }
             drone.ResetDamageFlag();
             break;
@@ -2122,10 +2150,13 @@ void GameplayState::Update(double dt)
         {
             if (!isPlayerHidingInHallway)
             {
-                auto* imguiManager = gsm.GetEngine().GetImguiManager();
-                if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                if (Collision::CheckAABB(drone.GetPosition(), drone.GetSize() * 1.2f, player.GetHitboxCenter(), player.GetHitboxSize()))
                 {
-                    player.TakeDamage(10.0f);
+                    auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                    if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                    {
+                        player.TakeDamage(10.0f);
+                    }
                 }
             }
             drone.ResetDamageFlag();
@@ -2138,10 +2169,13 @@ void GameplayState::Update(double dt)
     {
         if (!drone.IsDead() && drone.ShouldDealDamage())
         {
-            auto* imguiManager = gsm.GetEngine().GetImguiManager();
-            if (!imguiManager || !imguiManager->IsPlayerGodMode())
+            if (Collision::CheckAABB(drone.GetPosition(), drone.GetSize() * 1.2f, player.GetHitboxCenter(), player.GetHitboxSize()))
             {
-                player.TakeDamage(10.0f);
+                auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                {
+                    player.TakeDamage(10.0f);
+                }
             }
             drone.ResetDamageFlag();
             break;
@@ -2159,10 +2193,13 @@ void GameplayState::Update(double dt)
             {
                 if (!isPlayerHidingInUnderground)
                 {
-                    auto* imguiManager = gsm.GetEngine().GetImguiManager();
-                    if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                    if (Collision::CheckAABB(drone.GetPosition(), drone.GetSize() * 1.2f, player.GetHitboxCenter(), player.GetHitboxSize()))
                     {
-                        player.TakeDamage(20.0f);
+                        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                        if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                        {
+                            player.TakeDamage(20.0f);
+                        }
                     }
                 }
                 drone.ResetDamageFlag();
@@ -2184,12 +2221,15 @@ void GameplayState::Update(double dt)
             {
                 if (!isPlayerHidingInTrain)
                 {
-                    auto* imguiManager = gsm.GetEngine().GetImguiManager();
-                    if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                    if (Collision::CheckAABB(drone.GetPosition(), drone.GetSize() * 1.2f, player.GetHitboxCenter(), player.GetHitboxSize()))
                     {
-                        player.TakeDamage(25.0f);
-                        if (m_train)
-                            m_train->NotifyCarTransportInjectionInterrupted();
+                        auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                        if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                        {
+                            player.TakeDamage(25.0f);
+                            if (m_train)
+                                m_train->NotifyCarTransportInjectionInterrupted();
+                        }
                     }
                 }
                 drone.ResetDamageFlag();
@@ -2211,12 +2251,15 @@ void GameplayState::Update(double dt)
                     }
                     if (!isPlayerHidingInTrain)
                     {
-                        auto* imguiManager = gsm.GetEngine().GetImguiManager();
-                        if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                        if (Collision::CheckAABB(drone.GetPosition(), drone.GetSize() * 1.2f, player.GetHitboxCenter(), player.GetHitboxSize()))
                         {
-                            player.TakeDamage(25.0f);
-                            if (m_train)
-                                m_train->NotifyCarTransportInjectionInterrupted();
+                            auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                            if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                            {
+                                player.TakeDamage(25.0f);
+                                if (m_train)
+                                    m_train->NotifyCarTransportInjectionInterrupted();
+                            }
                         }
                     }
                     drone.ResetDamageFlag();
@@ -2234,12 +2277,15 @@ void GameplayState::Update(double dt)
                 {
                     if (!m_train->IsSirenDroneDamageBlocked(playerHbCenter, playerHitboxSize, player.IsCrouching()))
                     {
-                        auto* imguiManager = gsm.GetEngine().GetImguiManager();
-                        if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                        if (Collision::CheckAABB(drone.GetPosition(), drone.GetSize() * 1.2f, player.GetHitboxCenter(), player.GetHitboxSize()))
                         {
-                            player.TakeDamage(25.0f);
-                            if (m_train)
-                                m_train->NotifyCarTransportInjectionInterrupted();
+                            auto* imguiManager = gsm.GetEngine().GetImguiManager();
+                            if (!imguiManager || !imguiManager->IsPlayerGodMode())
+                            {
+                                player.TakeDamage(25.0f);
+                                if (m_train)
+                                    m_train->NotifyCarTransportInjectionInterrupted();
+                            }
                         }
                     }
                     drone.ResetDamageFlag();
